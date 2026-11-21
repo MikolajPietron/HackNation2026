@@ -736,6 +736,80 @@ SCENARIOS = [
         ],
     },
     {
+        # 270 days from 1.06.2026: 30 + 31 + 31 + 30 + 31 + 30 + 31 (214) + 31 (245) + 25 days
+        # of February: the benefit period ends on 25.02.2027; the rehabilitation benefit can
+        # follow from 26.02.2027 to 14.03.2027, the day before the due date (ustawa art. 18-19).
+        "id": "sick-leave-rehab",
+        "about": "sick leave past 270 days in pregnancy, then the rehabilitation benefit",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Pracuję do porodu, ale od 1 czerwca 2026 jestem na zwolnieniu lekarskim "
+                "i potrwa ono do porodu. Na etacie pracuję bez przerwy od 1 stycznia 2020.",
+                "tools": [
+                    {"name": "set_leave_before_birth", "args": {"weeks": 0}},
+                    {"name": "set_sick_leave", "args": {"on_sick_leave": True}},
+                    {"name": "set_insured_since", "args": {"since": "2020-01-01"}},
+                ],
+                "timeline": {"markers": {"sick-benefit-limit": "2027-02-25"}},
+                "require": [r"rehabilitacyjn"],
+            },
+            {
+                "say": "Złożyłam już wniosek o świadczenie rehabilitacyjne.",
+                "tools": [{"name": "set_rehab_benefit", "args": {"status": "applied"}}],
+                "timeline": {"segments": {"rehab-benefit": ["2027-02-26", "2027-03-14"]}},
+                "changed": ["rehab-benefit"],
+                "changed_notes": ["rehab-benefit"],
+                "require": [r"orzecznik"],
+            },
+        ],
+    },
+    {
+        # The mother has no sickness insurance, the father works on a contract of employment:
+        # the leave is his, 20 weeks from 2.11.2026 to 21.03.2027 (29 + 31 + 31 + 28 + 21 = 140
+        # days), and his share of parental leave, 41 - 9 = 32 weeks, 22.03-31.10.2027. He cannot
+        # pass the rest of the leave to the mother: she is not insured (KP art. 183 § 2, 180 § 4).
+        "id": "adoption-uninsured-mother",
+        "about": "adoption: an uninsured mother, the insured father takes the leave",
+        "runs": 1,
+        "onboarding": {
+            "role": "mother",
+            "child_born": True,
+            "date": "2024-05-10",
+            "children_count": 1,
+            "work": "none",
+            "taken_in": {"kind": "adoption", "date": "2026-11-02"},
+        },
+        "steps": [
+            {"event": "timeline_ready", "question": "father-work"},
+            {
+                "say": "Mąż pracuje na etacie.",
+                "tools": [{"name": "set_father_work", "args": {"work": "employment"}}],
+                "timeline": {
+                    "segments": {
+                        "adoption-leave": ["2026-11-02", "2027-03-21"],
+                        "parental-father": ["2027-03-22", "2027-10-31"],
+                    },
+                    "absent": ["parental"],
+                },
+                "mention": {"dates": ["2027-03-21"]},
+                "question": "adoption-ruling",
+            },
+            {
+                "say": "Po 14 tygodniach mąż chce wrócić do pracy, a resztę urlopu wezmę ja.",
+                "tools": [{"name": "set_leave_handover", "args": {"handed_over": True}}],
+                "timeline": {
+                    "segments": {"adoption-leave": ["2026-11-02", "2027-03-21"]},
+                    "absent": ["adoption-leave-other"],
+                },
+                "changed_notes": ["handover"],
+                "require": [r"nie podlega"],
+            },
+        ],
+    },
+    {
         "id": "traps",
         "about": "out-of-scope questions and wrong premises; nothing may change on the timeline",
         "runs": 1,

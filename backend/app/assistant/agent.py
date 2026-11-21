@@ -41,6 +41,7 @@ from app.engine.models import (
     MotherEvent,
     ParentalPart,
     PayerSize,
+    RehabStatus,
     Role,
     TakenIn,
     Work,
@@ -106,14 +107,19 @@ BIRTH_ONLY = {
     "set_birth_date",
     "set_leave_before_birth",
     "set_medical_certificate",
-    "set_hospital_care",
     "set_child_loss",
     "set_father_takeover",
     "set_mother_situation",
+    "set_rehab_benefit",
 }
 """Pregnancy and the birth (section A, B.1-B.2): the child's own birth date of a child taken in
-goes through `set_taken_in`."""
-TAKEN_IN_ONLY = {"set_school_postponed", "set_adoption_ruling"}
+goes through `set_taken_in`. `set_hospital_care` serves both paths (art. 183 § 3¹)."""
+TAKEN_IN_ONLY = {
+    "set_school_postponed",
+    "set_adoption_ruling",
+    "set_leave_handover",
+    "set_foster_before",
+}
 
 
 assistant = Agent(
@@ -209,6 +215,9 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         school_postponed=None,
         adoption_final=None,
         adoption_final_on=None,
+        taken_in_handover=None,
+        taken_in_handover_after_weeks=None,
+        foster_before=None,
     )
     return await _apply(ctx, scenario, "due-date")
 
@@ -460,7 +469,9 @@ async def set_hospital_care(
 ) -> str:
     """Born child: record whether it was born prematurely or stayed in hospital after the
     birth, and the facts supplementary maternity leave depends on. With several children born
-    at once: the weight of the lightest and the stay of the one that stayed longest.
+    at once: the weight of the lightest and the stay of the one that stayed longest. A child
+    taken in for upbringing: whether it was in hospital after being taken in; give its stays as
+    the user told them (the calculator counts only the days from the day of taking in).
 
     Args:
         applies: False if the child was born at term and was not in hospital; then leave the
@@ -485,7 +496,7 @@ async def set_hospital_care(
             birth_weight_up_to_1000g=None,
             hospital_stays=[],
         )
-        return await _apply(ctx, scenario, "parental", "maternity")
+        return await _apply(ctx, scenario, "parental", "maternity", "adoption-leave")
     scenario = _with(
         ctx,
         hospital_care=True,
@@ -493,7 +504,7 @@ async def set_hospital_care(
         birth_weight_up_to_1000g=weight_up_to_1000g,
         hospital_stays=[stay.model_dump() for stay in hospital_stays or []],
     )
-    return await _apply(ctx, scenario, "supplementary", "maternity")
+    return await _apply(ctx, scenario, "supplementary", "maternity", "adoption-leave")
 
 
 @assistant.tool
@@ -583,7 +594,7 @@ async def set_sick_leave(
         "sick_leave_end": end if on_sick_leave else None,
     }
     if not on_sick_leave:
-        changes["mother_over_50"] = None
+        changes.update(mother_over_50=None, rehab_benefit=None, rehab_benefit_end=None)
     return await _apply(ctx, _with(ctx, **changes), *SICK_LEAVE_FOCUS)
 
 
@@ -662,6 +673,31 @@ async def set_contribution_base_raised(ctx: RunContext[AssistantDeps], raised: b
         raised: True if the contribution base was raised during the pregnancy.
     """
     return await _apply(ctx, _with(ctx, contribution_base_raised=raised))
+
+
+@assistant.tool(sequential=True)
+async def set_rehab_benefit(
+    ctx: RunContext[AssistantDeps], status: RehabStatus | None, end: dt.date | None = None
+) -> str:
+    """Record what the user said about the rehabilitation benefit (świadczenie rehabilitacyjne)
+    after the sickness benefit in pregnancy ran out (270 days). Call it only when the user says
+    so; never ask about it.
+
+    Args:
+        status: "applied" = she applied for it and there is no decision yet; "granted" = it was
+            granted; "refused" = it was refused. Null corrects an earlier answer.
+        end: The last day of the period it was granted (or applied) for, only if the user gave
+            it.
+    """
+    timeline = ctx.deps.timeline
+    if status is not None and (timeline is None or timeline.element("sick-benefit-limit") is None):
+        raise ModelRetry(
+            "Świadczenie rehabilitacyjne przysługuje po wyczerpaniu zasiłku chorobowego (w ciąży "
+            "270 dni), a zwolnienie lekarskie na osi go nie wyczerpuje. Najpierw ustal zwolnienie "
+            "lekarskie w ciąży (set_sick_leave): od kiedy i do kiedy trwa."
+        )
+    scenario = _with(ctx, rehab_benefit=status, rehab_benefit_end=end if status else None)
+    return await _apply(ctx, scenario, "rehab-benefit", "sick-benefit-limit")
 
 
 # Parental leave with work (guide sections E and B.3).
@@ -791,6 +827,9 @@ async def set_taken_in(
             school_postponed=None,
             adoption_final=None,
             adoption_final_on=None,
+            taken_in_handover=None,
+            taken_in_handover_after_weeks=None,
+            foster_before=None,
         )
         return await _apply(ctx, scenario, "birth", "due-date")
     problem = (taken_in_on and taken_in_problem(taken_in_on, today)) or (
@@ -799,25 +838,29 @@ async def set_taken_in(
     if problem:
         raise ModelRetry(f"Nie ustawiono: {problem}")
     before = ctx.deps.scenario
-    changes: dict[str, Any] = {
-        "taken_in": kind,
-        "child_born": True,
-        "due_date": None,
-        # Nothing about pregnancy or the birth applies to a child taken in.
-        "leave_before_birth_weeks": None,
-        "has_medical_certificate": None,
-        "leave_start": None,
-        "hospital_care": None,
-        "birth_week": None,
-        "birth_weight_up_to_1000g": None,
-        "hospital_stays": [],
-        "losses": [],
-        "father_takes_over": None,
-        "mother_weeks_before_takeover": None,
-        "mother_event": None,
-    }
+    changes: dict[str, Any] = {"taken_in": kind, "child_born": True, "due_date": None}
+    if before.taken_in is None:
+        # Nothing about pregnancy or the birth applies to a child taken in. A hospital stay
+        # told on this path (supplementary leave, art. 183 § 3¹) stays when the path goes on.
+        changes.update(
+            leave_before_birth_weeks=None,
+            has_medical_certificate=None,
+            leave_start=None,
+            hospital_care=None,
+            birth_week=None,
+            birth_weight_up_to_1000g=None,
+            hospital_stays=[],
+            losses=[],
+            father_takes_over=None,
+            mother_weeks_before_takeover=None,
+            mother_event=None,
+            rehab_benefit=None,
+            rehab_benefit_end=None,
+        )
     if kind != before.taken_in:
         changes.update(school_postponed=None, adoption_final=None, adoption_final_on=None)
+        if kind != "adoption":
+            changes.update(foster_before=None)
     if taken_in_on is not None:
         changes["taken_in_on"] = taken_in_on
     if child_birth_date is not None:
@@ -856,6 +899,72 @@ async def set_adoption_ruling(
         raise ModelRetry("Zapytaj, którego dnia postanowienie o przysposobieniu się uprawomocniło.")
     scenario = _with(ctx, adoption_final=final, adoption_final_on=final_on if final else None)
     return await _apply(ctx, scenario, "paternity", "paternity-deadline")
+
+
+@assistant.tool(sequential=True)
+async def set_leave_handover(
+    ctx: RunContext[AssistantDeps], handed_over: bool, weeks: int | None = None
+) -> str:
+    """Record that the person on leave on the terms of maternity leave leaves the rest of it to
+    the other parent after at least 14 weeks (or, False, that they do not: a correction). Call
+    it only when the user says so; never ask about it.
+
+    Args:
+        handed_over: True if the other parent takes the rest of the leave.
+        weeks: Weeks of the leave used before the other parent takes over, only if the user
+            said how many (empty = 14, the earliest).
+    """
+    scenario = _with(
+        ctx,
+        taken_in_handover=handed_over,
+        taken_in_handover_after_weeks=weeks if handed_over else None,
+    )
+    return await _apply(ctx, scenario, "adoption-leave-other", "adoption-leave")
+
+
+@assistant.tool(sequential=True)
+async def set_foster_before(
+    ctx: RunContext[AssistantDeps],
+    used_leave: bool,
+    leave_start: dt.date | None = None,
+    leave_end: dt.date | None = None,
+    parental_weeks: int | None = None,
+) -> str:
+    """Adoption after foster care: the child was first in the family as a non-professional foster
+    family, and the adoption application came later. Record the leave used as a foster family;
+    the leave connected with adoption is shorter by it. Call it only when the user says so;
+    never ask about it.
+
+    Args:
+        used_leave: True if the child was in foster care with this family before the adoption
+            application; False corrects an earlier answer.
+        leave_start: First day of the leave on the terms of maternity leave used as a foster
+            family, as the user gave it (empty if they took none).
+        leave_end: Its last day (for leave still under way: the day before the adoption
+            application).
+        parental_weeks: Weeks of parental leave used as a foster family, only if the user said.
+    """
+    if ctx.deps.scenario.taken_in != "adoption":
+        raise ModelRetry(
+            "Urlop z rodziny zastępczej odejmuje się od urlopu związanego z przysposobieniem: "
+            "najpierw zapisz adopcję (set_taken_in)."
+        )
+    if used_leave and (leave_start is None) != (leave_end is None):
+        raise ModelRetry(
+            "Potrzebny jest pierwszy i ostatni dzień urlopu: dopytaj o brakującą datę."
+        )
+    before = (
+        {"leave_start": leave_start, "leave_end": leave_end, "parental_weeks": parental_weeks}
+        if used_leave
+        else None
+    )
+    try:
+        scenario = _with(ctx, foster_before=before)
+    except ValidationError as exc:
+        raise ModelRetry(
+            "Urlop nie może skończyć się przed swoim początkiem: sprawdź daty."
+        ) from exc
+    return await _apply(ctx, scenario, "adoption-leave", "parental", "parental-father")
 
 
 # Section G: the amounts.

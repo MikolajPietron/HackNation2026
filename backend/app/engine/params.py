@@ -155,6 +155,17 @@ class PregnancyParams(BaseModel):
     job_loss_rate_percent: Param[int]
     risk_sham: Rule
     risk_base_raised: Rule
+    # The rehabilitation benefit after the sickness benefit (ustawa art. 18-19).
+    rehab_benefit: Rule
+    rehab_max_months: Param[int]
+    """At most this many months (art. 18 ust. 2)..."""
+    rehab_month_days: Param[int]
+    """...of this many days each (art. 22 with art. 11 ust. 5)."""
+    rehab_decides: Rule
+    """The ZUS medical examiner rules on the conditions; the decision rests on that ruling."""
+    rehab_objection: Rule
+    rehab_rate_percent: Param[int]
+    """Percent of the sickness benefit base when the incapacity falls in pregnancy."""
 
 
 class ParentalPlanParams(BaseModel):
@@ -215,6 +226,16 @@ class TakenInParams(BaseModel):
     """Adoption: paternity leave within this many months of the final adoption ruling..."""
     paternity_age: Param[int]
     """...and not after the child reaches this age."""
+    # Edge cases of art. 183: supplementary leave, passing the leave on, foster care first.
+    supplementary: Rule
+    """§ 3¹: supplementary leave for a hospital stay after the child was taken in."""
+    handover_after_weeks: Param[int]
+    """§ 2 with art. 180 § 4: the rest of the leave passes to the other parent after this many
+    weeks."""
+    after_foster_leave: Rule
+    """§ 7: adoption after foster care, the leave less what was used as a foster family."""
+    after_foster_parental: Rule
+    """§ 8: the same for parental leave."""
     foster: TakenInKindParams
     adoption: TakenInKindParams
 

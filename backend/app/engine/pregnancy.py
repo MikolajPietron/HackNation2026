@@ -20,6 +20,12 @@ Labour Code art. 92. Applied after the mother's and the father's rules (timeline
   (insurance.py), so no maternity benefit (section H, risk 3).
 - Section H, risks 1 and 2 (a contract or business "dla pozoru", raising the contribution base
   in pregnancy): notes, only when the parent said so.
+- The rehabilitation benefit (świadczenie rehabilitacyjne; guide page 1, ustawa art. 18-19, 22):
+  when the sick leave outlasts the 270 days, the incapacity may go on with this benefit if
+  further treatment or medical rehabilitation promises the recovery of the ability to work; the
+  ZUS medical examiner rules on it; at most 12 months of 30 days; 100% of the sickness benefit
+  base when the incapacity falls in pregnancy. A note explains it; a period is drawn only when
+  the parent said it was applied for or granted (never asked).
 
 Our readings, not settled by the guide (CLAUDE.md, open questions):
 - the 30 (90) days count from the first day of insurance, so the right begins on that day + 30;
@@ -30,7 +36,11 @@ Our readings, not settled by the guide (CLAUDE.md, open questions):
 - sick leave without an end runs until the day before the birth; when maternity leave before the
   birth starts earlier, the sick leave ends the day before it;
 - the benefit after losing the job runs from the day after the last day of work until the day
-  before the birth; from the birth the timeline shows the maternity benefit.
+  before the birth; from the birth the timeline shows the maternity benefit;
+- the rehabilitation benefit runs from the day after the 270 days to the last day of the sick
+  leave we count (the day before the birth or the leave before it, or the last day of work);
+  from the birth the timeline shows the maternity benefit: how the two meet, the materials do
+  not say.
 """
 
 import datetime as dt
@@ -65,6 +75,7 @@ LOSS_REASON = {
 SEGMENT_IDS = {"employer": "sick-pay", "benefit": "sick-benefit"}
 PAY_NAME = {"employer": "wynagrodzenie od pracodawcy", "benefit": "zasiłek chorobowy"}
 JOB_LOSS_SEGMENT = "job-loss-benefit"
+REHAB_SEGMENT = "rehab-benefit"
 
 
 @dataclass(frozen=True)
@@ -209,16 +220,20 @@ def pregnancy_rules(draft: Draft, scenario: Scenario, params: Params, birth: dt.
     job = _job_loss_segment(scenario, params, birth)
     busy: list[tuple[dt.date, dt.date]] = []
     mine: list[Segment] = []
+    rehab = None
     if sick is not None:
         busy.append((sick.start, sick.end))
         mine += _sick_segments(sick, scenario, params)
+        rehab = _rehab_segment(sick, scenario, params)
+        if rehab is not None:
+            mine.append(rehab)
         draft.markers += _sick_markers(sick, params)
     if job is not None:
         busy.append((job.start, job.end))
         mine.append(job)
     _trim_work(draft, busy)
     draft.segments[0:0] = mine
-    return _assumptions(scenario, sick, job)
+    return _assumptions(scenario, sick, job) + _rehab_assumptions(scenario, rehab)
 
 
 def _sick_segments(sick: SickLeave, scenario: Scenario, params: Params) -> list[Segment]:
@@ -362,10 +377,124 @@ def _sick_markers(sick: SickLeave, params: Params) -> list[Marker]:
                     f"Zasiłek chorobowy przysługuje najwyżej przez {p.max_days.value} dni (okres "
                     "zasiłkowy). Za dalsze dni zwolnienia już nie przysługuje."
                 ),
-                sources=p.max_days.sources,
+                details=[f"Potem przysługuje świadczenie rehabilitacyjne, jeśli {REHAB_IF}."],
+                sources=merge_sources(p.max_days.sources, p.rehab_benefit.sources),
             )
         )
     return markers
+
+
+# The rehabilitation benefit after the 270 days (ustawa art. 18-19, 22).
+
+REHAB_IF = (
+    "po wyczerpaniu zasiłku chorobowego mama jest nadal niezdolna do pracy, a dalsze leczenie "
+    "lub rehabilitacja lecznicza rokują odzyskanie zdolności do pracy"
+)
+"""The conditions of art. 18 ust. 1, after "jeśli"."""
+REHAB_DECIDES = (
+    "O tych warunkach i o tym, na jak długo, orzeka lekarz orzecznik ZUS; jego orzeczenie jest "
+    "podstawą decyzji w sprawie świadczenia."
+)
+
+
+def rehab_period(
+    sick: SickLeave, scenario: Scenario, params: Params
+) -> tuple[dt.date, dt.date] | None:
+    """The days the rehabilitation benefit can cover: from the day after the 270 days to the
+    last day of the sick leave we count (or of work), at most 12 months of 30 days, and not
+    after the end the parent gave. None when the sick leave does not outlast the 270 days."""
+    if sick.limit_day is None:
+        return None
+    p = params.pregnancy
+    start = sick.limit_day + DAY
+    end = sick.work_ended if sick.work_ended is not None else sick.end
+    longest = p.rehab_max_months.value * p.rehab_month_days.value
+    end = min(end, start + (longest - 1) * DAY)
+    given = scenario.rehab_benefit_end
+    if given is not None and scenario.rehab_benefit in ("applied", "granted"):
+        if given < start:
+            raise ScenarioError(
+                "Świadczenie rehabilitacyjne przysługuje po wyczerpaniu zasiłku chorobowego, czyli "
+                f"od {fmt(start)}. Sprawdź datę jego końca."
+            )
+        end = min(end, given)
+    return start, end
+
+
+def _rehab_segment(sick: SickLeave, scenario: Scenario, params: Params) -> Segment | None:
+    """Drawn only when the parent said it was applied for (an option) or granted."""
+    status = scenario.rehab_benefit
+    period = rehab_period(sick, scenario, params)
+    if period is None or status not in ("applied", "granted"):
+        return None
+    p = params.pregnancy
+    start, end = period
+    pay = (
+        f"{p.rehab_rate_percent.value}% podstawy wymiaru zasiłku chorobowego, bo niezdolność do "
+        "pracy przypada w ciąży"
+    )
+    if status == "granted":
+        summary = f"Po wyczerpaniu zasiłku chorobowego mama ma świadczenie rehabilitacyjne: {pay}."
+    else:
+        summary = (
+            f"Mama ubiega się o świadczenie rehabilitacyjne. Przysługuje, jeśli {REHAB_IF}; "
+            f"wynosi wtedy {pay}."
+        )
+    details = [
+        "Przysługuje przez okres niezbędny do przywrócenia zdolności do pracy, nie dłużej niż "
+        f"{p.rehab_max_months.value} miesięcy.",
+        REHAB_DECIDES,
+    ]
+    if end == scenario.rehab_benefit_end:
+        details.append(f"Pokazujemy je do {fmt(end)}: taki koniec podano.")
+    elif end == sick.work_ended:
+        details.append(
+            f"Praca ustała {fmt(end)}. Świadczenia po ustaniu ubezpieczenia ten etap aplikacji "
+            "jeszcze nie pokazuje."
+        )
+    elif end == sick.end and sick.leave_from is not None:
+        details.append(
+            f"Od {fmt(sick.leave_from)} mama jest na urlopie macierzyńskim przed porodem, więc "
+            "liczymy do dnia wcześniej."
+        )
+    elif end == sick.end and sick.until_birth:
+        details.append(
+            "Od dnia porodu oś pokazuje urlop macierzyński, więc liczymy do dnia przed "
+            + ("porodem." if scenario.child_born else "przewidywaną datą porodu.")
+        )
+    return Segment(
+        id=REHAB_SEGMENT,
+        lane="mother",
+        tone="leave" if status == "granted" else "option",
+        title="Świadczenie rehabilitacyjne"
+        + ("" if status == "granted" else " — jeśli zostanie przyznane"),
+        start=start,
+        end=end,
+        days=days_between(start, end),
+        summary=summary,
+        details=details,
+        sources=merge_sources(
+            p.rehab_benefit.sources,
+            p.rehab_rate_percent.sources,
+            p.rehab_max_months.sources,
+            p.rehab_decides.sources,
+        ),
+    )
+
+
+def _rehab_assumptions(scenario: Scenario, rehab: Segment | None) -> list[str]:
+    if rehab is not None:
+        return [
+            "Świadczenie rehabilitacyjne pokazujemy od dnia po okresie zasiłkowym do końca "
+            "zwolnienia lekarskiego, najpóźniej do dnia przed porodem: od dnia porodu oś pokazuje "
+            "urlop macierzyński. Jak te świadczenia się łączą, materiały nie mówią."
+        ]
+    if scenario.rehab_benefit in ("applied", "granted"):
+        return [
+            "Świadczenie rehabilitacyjne przysługuje dopiero po wyczerpaniu zasiłku chorobowego, "
+            "a podane zwolnienie lekarskie go nie wyczerpuje, więc go nie pokazujemy."
+        ]
+    return []
 
 
 def _job_loss_segment(scenario: Scenario, params: Params, birth: dt.date) -> Segment | None:
@@ -515,6 +644,9 @@ def pregnancy_notes(scenario: Scenario, timeline: Timeline, params: Params) -> l
     sick = sick_leave(scenario, params, timeline.birth_date)
     if sick is not None:
         notes.append(_sick_note(scenario, timeline, params, sick))
+        rehab = _rehab_note(scenario, timeline, params, sick)
+        if rehab is not None:
+            notes.append(rehab)
     if scenario.job_loss is not None:
         notes.append(_job_loss_note(scenario, timeline, params))
     p = params.pregnancy
@@ -682,6 +814,77 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
         title=title,
         text=" ".join(parts),
         sources=merge_sources(sources),
+    )
+
+
+def _rehab_note(
+    scenario: Scenario, timeline: Timeline, params: Params, sick: SickLeave
+) -> CaseNote | None:
+    """After the 270 days: the rehabilitation benefit, its conditions and who rules on them."""
+    period = rehab_period(sick, scenario, params)
+    if period is None or sick.limit_day is None:
+        return None
+    p = params.pregnancy
+    limit = long_date(sick.limit_day)
+    rule = f"Jeśli {REHAB_IF}, przysługuje jej świadczenie rehabilitacyjne"
+    length = (
+        "przez okres niezbędny do przywrócenia zdolności do pracy, nie dłużej niż "
+        f"{p.rehab_max_months.value} miesięcy"
+    )
+    pay = (
+        f"Gdy niezdolność do pracy przypada w ciąży, wynosi {p.rehab_rate_percent.value}% "
+        "podstawy wymiaru zasiłku chorobowego."
+    )
+    segment = next((s for s in timeline.segments if s.id == REHAB_SEGMENT), None)
+    shown = (
+        f" od {long_date(segment.start)} do {long_date(segment.end)}" if segment is not None else ""
+    )
+    match scenario.rehab_benefit:
+        case "refused":
+            return CaseNote(
+                id="rehab-benefit",
+                kind="risk",
+                title="Świadczenia rehabilitacyjnego nie przyznano",
+                text=(
+                    f"Po {limit} zasiłek chorobowy już nie przysługuje, a świadczenia "
+                    "rehabilitacyjnego nie przyznano. Przysługuje ono, gdy dalsze leczenie lub "
+                    "rehabilitacja lecznicza rokują odzyskanie zdolności do pracy; orzeka o tym "
+                    "lekarz orzecznik ZUS. Od jego orzeczenia przysługuje sprzeciw do komisji "
+                    "lekarskiej ZUS."
+                ),
+                sources=merge_sources(
+                    p.rehab_benefit.sources, p.rehab_decides.sources, p.rehab_objection.sources
+                ),
+            )
+        case "granted":
+            title = "Świadczenie rehabilitacyjne po zasiłku chorobowym"
+            text = (
+                f"Okres zasiłkowy kończy się {limit}, a po nim mama ma świadczenie "
+                f"rehabilitacyjne{shown}. {pay} Przysługuje {length}."
+            )
+        case "applied":
+            title = "Świadczenie rehabilitacyjne: wniosek złożony"
+            text = (
+                f"Okres zasiłkowy kończy się {limit}. {rule} {length}. {pay} {REHAB_DECIDES} "
+                f"Na osi pokazujemy je jako możliwe{shown}."
+            )
+        case _:
+            title = "Po okresie zasiłkowym: świadczenie rehabilitacyjne"
+            text = (
+                f"Okres zasiłkowy kończy się {limit}, a zwolnienie trwa dłużej. {rule} "
+                f"{length}. {pay} {REHAB_DECIDES}"
+            )
+    return CaseNote(
+        id="rehab-benefit",
+        kind="right",
+        title=title,
+        text=text,
+        sources=merge_sources(
+            p.rehab_benefit.sources,
+            p.rehab_max_months.sources,
+            p.rehab_rate_percent.sources,
+            p.rehab_decides.sources,
+        ),
     )
 
 

@@ -162,6 +162,30 @@ export interface Scenario {
   father_pay: number | 'unknown' | null
   /** The mother files the request for 81,5% within 21 days after the birth (false = 100%/70%). */
   rate_815: boolean | null
+  // The rehabilitation benefit after 270 days of sick leave in pregnancy (ustawa art. 18-19).
+  /** Recorded only when the parent says so: applied for, granted or refused. */
+  rehab_benefit: RehabStatus | null
+  /** The last day of the period it was granted for, when the parent gave it. */
+  rehab_benefit_end: string | null
+  // Adoption and foster care, edge cases (Labour Code art. 183 § 2, § 7-§ 8).
+  /** The rest of the leave on the terms of maternity leave passes to the other parent. */
+  taken_in_handover: boolean | null
+  /** Weeks used before passing it on; null = 14. */
+  taken_in_handover_after_weeks: number | null
+  /** Adoption after foster care: the leave already used as a foster family. */
+  foster_before: FosterBefore | null
+}
+
+/** Applied for (no decision yet), granted or refused. */
+export type RehabStatus = 'applied' | 'granted' | 'refused'
+
+/** Adoption after foster care (Labour Code art. 183 § 7-§ 8). */
+export interface FosterBefore {
+  /** The leave on the terms of maternity leave used as a foster family: first and last day. */
+  leave_start: string | null
+  leave_end: string | null
+  /** Weeks of parental leave used as a foster family. */
+  parental_weeks: number | null
 }
 
 /**
