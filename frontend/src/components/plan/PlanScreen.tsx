@@ -374,7 +374,10 @@ function Summary({
   onAbout: () => void
   onStartOver: () => void
 }) {
-  const leave = timeline.segments.filter((s) => s.lane === 'mother' && s.tone === 'leave')
+  // A child taken in: the leave on the terms of maternity leave, on the lane of whoever takes it.
+  const leave = timeline.segments.filter((s) =>
+    timeline.taken_in ? s.id === 'adoption-leave' : s.lane === 'mother' && s.tone === 'leave',
+  )
   const days = leave.reduce((sum, s) => sum + s.days, 0)
   const start = leave.map((s) => s.start).sort()[0]
   const end = leave.map((s) => s.end).sort().at(-1)
@@ -387,12 +390,14 @@ function Summary({
   const range =
     start && end
       ? `${formatShortDate(start)} – ${formatShortDate(end)}`
-      : `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`
+      : `${timeline.taken_in ? 'Przyjęcie dziecka' : timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`
 
   return (
     <motion.header variants={ITEM} className="flex flex-wrap items-end gap-x-6 gap-y-2">
       <div className="min-w-0">
-        <p className="text-sm font-bold text-zus-700">Urlop macierzyński</p>
+        <p className="text-sm font-bold text-zus-700">
+          {timeline.taken_in ? 'Urlop na warunkach urlopu macierzyńskiego' : 'Urlop macierzyński'}
+        </p>
         <h1 className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-3xl leading-tight font-bold tracking-tight text-navy-900 lg:text-4xl">
           <TextStates text={amount} />
           <span className="text-base font-bold tracking-normal text-navy-400 lg:text-xl">

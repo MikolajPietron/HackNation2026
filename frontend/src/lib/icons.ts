@@ -65,7 +65,7 @@ export function segmentIcon(segment: Segment): string {
 }
 
 export function markerIcon(marker: Marker): string {
-  if (marker.id === 'birth' || marker.id === 'due-date') return noworodek
+  if (marker.id === 'birth' || marker.id === 'due-date' || marker.id === 'taken-in') return noworodek
   if (marker.id === 'personal-weeks' || marker.id.includes('window') || marker.id.includes('deadline')) {
     return klepsydra
   }
@@ -86,6 +86,7 @@ export function isKeyMarker(marker: Marker): boolean {
   return (
     marker.id === 'birth' ||
     marker.id === 'due-date' ||
+    marker.id === 'taken-in' ||
     marker.id.includes('deadline') ||
     marker.id.includes('window') ||
     marker.id.includes('limit')

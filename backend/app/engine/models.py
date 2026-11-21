@@ -21,6 +21,10 @@ Earnings = Literal["under-5k", "5k-8k", "8k-12k", "over-12k", "unknown"]
 BirthWeek = Literal["before-28", "28-37", "after-37"]
 """When the child was born, as the Labour Code art. 180² § 1 divides it: before the end of the
 28th week of pregnancy, after it but before the end of the 37th, or after the 37th."""
+TakenIn = Literal["adoption", "foster"]
+"""Guide section D: adoption = took the child in and asked the guardianship court to start
+adoption proceedings; foster = a non-professional foster family (rodzina zastępcza
+niezawodowa)."""
 
 
 class SourceRef(BaseModel):
@@ -151,9 +155,27 @@ class Scenario(BaseModel):
     """Weeks after the birth the mother uses before the father takes over (default 14)."""
     mother_event: MotherEvent | None = None
 
+    # Adoption and foster care (guide section D)
+    taken_in: TakenIn | None = None
+    """The child was taken in for upbringing. Then `birth_date` is the child's date of birth
+    (the youngest child's, when several are taken in at once), `children_count` the children
+    taken in at once, and nothing about pregnancy or the birth applies."""
+    taken_in_on: dt.date | None = None
+    """The day the child was taken in; for adoption the day the child was taken in and the court
+    asked to start adoption proceedings (the later of the two)."""
+    school_postponed: bool | None = None
+    """Foster care: compulsory schooling of the child was postponed."""
+    adoption_final: bool | None = None
+    """Adoption: the court's adoption ruling is final (prawomocne)."""
+    adoption_final_on: dt.date | None = None
+    """The day the adoption ruling became final."""
+
     @property
     def anchor_date(self) -> dt.date | None:
-        """The date the timeline counts from: the actual birth once born, else the due date."""
+        """The date the timeline counts from: the actual birth once born, else the due date;
+        for a child taken in, the day of taking in."""
+        if self.taken_in is not None:
+            return self.taken_in_on
         return self.birth_date if self.child_born else self.due_date
 
     def prenatal_days(self, birth: dt.date) -> int:
@@ -246,6 +268,8 @@ class Timeline(BaseModel):
     """The case explanation: situation, options and reliefs, what we computed."""
     warnings: list[str] = []
     assumptions: list[str] = []
+    taken_in: TakenIn | None = None
+    """Set for a child taken in for upbringing: then `birth_date` is the day of taking in."""
 
     def elements(self) -> list[TimelineElement]:
         return [*self.segments, *self.markers, *self.documents]

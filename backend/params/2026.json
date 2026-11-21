@@ -762,6 +762,344 @@
       ]
     }
   },
+  "taken_in": {
+    "insured": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "D",
+          "page": 8,
+          "quote": "Prawo przysługuje ubezpieczonemu"
+        }
+      ]
+    },
+    "benefit": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZM",
+          "page": 4,
+          "quote": "w razie niezdolności do pracy spowodowanej: porodem albo przyjęciem dziecka na wychowanie oraz koniecznością zapewnienia opieki nad dzieckiem"
+        }
+      ]
+    },
+    "leave": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "D.1",
+          "page": 8,
+          "quote": "Urlop na warunkach urlopu macierzyńskiego – jest to odpowiednik urlopu macierzyńskiego w przypadku przyjęcia dziecka na wychowanie."
+        }
+      ]
+    },
+    "minimum_weeks": {
+      "value": 9,
+      "note": "Czytamy jako minimum: gdy granica wieku skróciłaby urlop poniżej 9 tygodni, trwa on 9 tygodni (Załącznik: urlop „nie może trwać krócej niż 9 tygodni”).",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 3",
+          "quote": "Pracownik, o którym mowa w § 1, który przyjął dziecko w wieku do 7 roku życia, a w przypadku dziecka, wobec którego podjęto decyzję o odroczeniu obowiązku szkolnego, do 10 roku życia, oraz pracownik, o którym mowa w § 1¹, który przyjął dziecko w wieku do 14 roku życia - ma prawo do 9 tygodni urlopu na warunkach urlopu macierzyńskiego."
+        }
+      ]
+    },
+    "request_days": {
+      "value": 7,
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 6",
+          "quote": "Urlop na warunkach urlopu macierzyńskiego jest udzielany na wniosek w postaci papierowej lub elektronicznej składany przez pracownika w terminie 7 dni od dnia przyjęcia dziecka na wychowanie jako rodzina zastępcza albo przyjęcia dziecka na wychowanie i wystąpienia do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka."
+        }
+      ]
+    },
+    "latest_start_days": {
+      "value": 21,
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 6",
+          "quote": "Urlop rozpoczyna się w terminie określonym we wniosku pracownika, jednak nie później niż 21 dni od dnia odpowiednio przyjęcia dziecka na wychowanie jako rodzina zastępcza albo przyjęcia dziecka na wychowanie i wystąpienia do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka."
+        }
+      ]
+    },
+    "parental": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "D.2",
+          "page": 9,
+          "quote": "Urlop rodzicielski – tak jak w przypadku urodzenia dziecka (z uwzględnieniem wieku dziecka)."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 183 § 5",
+          "quote": "Do urlopu rodzicielskiego stosuje się odpowiednio przepisy art. 182¹ᵃ § 3-7 i art. 182¹ᶜ -182¹ᵍ."
+        }
+      ]
+    },
+    "parental_parts": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 4⁶",
+          "quote": "Urlop rodzicielski jest udzielany jednorazowo albo nie więcej niż w 5 częściach."
+        }
+      ]
+    },
+    "paternity_months": {
+      "value": 12,
+      "note": "Od uprawomocnienia się postanowienia o przysposobieniu. Przyjmujemy, że ostatni dzień to dzień przed tą samą datą 12 miesięcy później (jak przy 12 miesiącach życia).",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "B.4",
+          "page": 8,
+          "quote": "w ciągu 12 miesięcy od uprawomocnienia się przysposobienia"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182³ § 1",
+          "quote": "2) upływu 12 miesięcy od dnia uprawomocnienia się postanowienia orzekającego przysposobienie dziecka i nie dłużej niż do ukończenia przez dziecko 14 roku życia."
+        }
+      ]
+    },
+    "paternity_age": {
+      "value": 14,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "B.4",
+          "page": 8,
+          "quote": "ale nie później niż do ukończenia przez dziecko 14 lat."
+        }
+      ]
+    },
+    "foster": {
+      "who": {
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "D",
+            "page": 8,
+            "quote": "przyjął dziecko na wychowanie jako rodzina zastępcza niezawodowa"
+          },
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1",
+            "quote": "Pracownik, który przyjął dziecko na wychowanie jako rodzina zastępcza, z wyjątkiem rodziny zastępczej zawodowej, ma prawo do urlopu na warunkach urlopu macierzyńskiego"
+          }
+        ]
+      },
+      "weeks_by_children": {
+        "value": [
+          20,
+          31,
+          33,
+          35,
+          37
+        ],
+        "note": "Indeks = liczba dzieci przyjętych jednocześnie minus 1; ostatnia wartość dotyczy 5 i więcej dzieci.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1",
+            "quote": "1) 20 tygodni - w przypadku przyjęcia jednego dziecka, 2) 31 tygodni - w przypadku jednoczesnego przyjęcia dwojga dzieci, 3) 33 tygodni - w przypadku jednoczesnego przyjęcia trojga dzieci, 4) 35 tygodni - w przypadku jednoczesnego przyjęcia czworga dzieci, 5) 37 tygodni - w przypadku jednoczesnego przyjęcia pięciorga i więcej dzieci"
+          }
+        ]
+      },
+      "age": {
+        "value": 7,
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "D.1",
+            "page": 8,
+            "quote": "Przysługuje do określonego wieku dziecka do 7 lat, a przy odroczeniu obowiązku szkolnego do 10 lat – rodzina zastępcza",
+            "page_to": 9
+          },
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1",
+            "quote": "nie dłużej jednak niż do ukończenia przez dziecko 7 roku życia"
+          }
+        ]
+      },
+      "age_school_postponed": {
+        "value": 10,
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1",
+            "quote": "a w przypadku dziecka, wobec którego podjęto decyzję o odroczeniu obowiązku szkolnego, nie dłużej niż do ukończenia przez nie 10 roku życia."
+          }
+        ]
+      },
+      "parental_weeks_by_children": {
+        "value": [
+          41,
+          43
+        ],
+        "note": "Łącznie dla obojga rodziców: przy przyjęciu jednego dziecka, przy jednoczesnym przyjęciu więcej niż jednego.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4",
+            "quote": "Pracownicy, którzy przyjęli dziecko na wychowanie jako rodzina zastępcza, z wyjątkiem rodziny zastępczej zawodowej, mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad tym dzieckiem w wymiarze do: 1) 41 tygodni - w przypadku, o którym mowa w § 1 pkt 1; 2) 43 tygodni - w przypadkach, o których mowa w § 1 pkt 2-5;"
+          }
+        ]
+      },
+      "parental_weeks_minimum": {
+        "value": 38,
+        "note": "Gdy urlop na warunkach urlopu macierzyńskiego trwa 9 tygodni (art. 183 § 3).",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4",
+            "quote": "3) 38 tygodni - w przypadku, o którym mowa w § 3."
+          }
+        ]
+      },
+      "parental_weeks_za_zyciem": {
+        "value": [
+          65,
+          67
+        ],
+        "note": "Łącznie dla obojga rodziców: przy przyjęciu jednego dziecka, przy jednoczesnym przyjęciu więcej niż jednego.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4³",
+            "quote": "Pracownicy, o których mowa w § 4, w przypadku dziecka posiadającego zaświadczenie, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin,,Za życiem'', mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad tym dzieckiem w wymiarze do: 1) 65 tygodni - w przypadku, o którym mowa w § 1 pkt 1; 2) 67 tygodni - w przypadkach, o których mowa w § 1 pkt 2-5;"
+          }
+        ]
+      },
+      "parental_weeks_za_zyciem_minimum": {
+        "value": 62,
+        "note": "Gdy urlop na warunkach urlopu macierzyńskiego trwa 9 tygodni (art. 183 § 3).",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4³",
+            "quote": "3) 62 tygodni - w przypadku, o którym mowa w § 3."
+          }
+        ]
+      },
+      "parental_age": null
+    },
+    "adoption": {
+      "who": {
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "D",
+            "page": 8,
+            "quote": "przyjął dziecko i wystąpił do sądu o wszczęcie postępowania w sprawie przysposobienia."
+          },
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1¹",
+            "quote": "Pracownik, który przyjął dziecko na wychowanie i wystąpił do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka, ma prawo do urlopu na warunkach urlopu macierzyńskiego"
+          }
+        ]
+      },
+      "weeks_by_children": {
+        "value": [
+          20,
+          31,
+          33,
+          35,
+          37
+        ],
+        "note": "Indeks = liczba dzieci przyjętych jednocześnie minus 1; ostatnia wartość dotyczy 5 i więcej dzieci.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1¹",
+            "quote": "1) 20 tygodni - w przypadku przyjęcia jednego dziecka, 2) 31 tygodni - w przypadku jednoczesnego przyjęcia dwojga dzieci, 3) 33 tygodni - w przypadku jednoczesnego przyjęcia trojga dzieci, 4) 35 tygodni - w przypadku jednoczesnego przyjęcia czworga dzieci, 5) 37 tygodni - w przypadku jednoczesnego przyjęcia pięciorga i więcej dzieci"
+          }
+        ]
+      },
+      "age": {
+        "value": 14,
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "D.1",
+            "page": 9,
+            "quote": "do 14 lat – przy wniosku o przysposobienie."
+          },
+          {
+            "doc": "kp",
+            "article": "art. 183 § 1¹",
+            "quote": "nie dłużej jednak niż do ukończenia przez dziecko 14 roku życia."
+          }
+        ]
+      },
+      "age_school_postponed": null,
+      "parental_weeks_by_children": {
+        "value": [
+          41,
+          43
+        ],
+        "note": "Łącznie dla obojga rodziców: przy przyjęciu jednego dziecka, przy jednoczesnym przyjęciu więcej niż jednego.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4¹",
+            "quote": "Pracownicy, którzy przyjęli dziecko na wychowanie i wystąpili do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka, mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad tym dzieckiem w wymiarze do: 1) 41 tygodni - w przypadku, o którym mowa w § 1¹ pkt 1, 2) 43 tygodni - w przypadkach, o których mowa w § 1¹ pkt 2-5"
+          }
+        ]
+      },
+      "parental_weeks_minimum": {
+        "value": 38,
+        "note": "Gdy urlop na warunkach urlopu macierzyńskiego trwa 9 tygodni (art. 183 § 3).",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4²",
+            "quote": "Pracownicy, o których mowa w § 3, którzy przyjęli na wychowanie dziecko w wieku do ukończenia 14 roku życia, mają prawo do 38 tygodni urlopu rodzicielskiego."
+          }
+        ]
+      },
+      "parental_weeks_za_zyciem": {
+        "value": [
+          65,
+          67
+        ],
+        "note": "Łącznie dla obojga rodziców: przy przyjęciu jednego dziecka, przy jednoczesnym przyjęciu więcej niż jednego.",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4⁴",
+            "quote": "Pracownicy, o których mowa w § 4¹, w przypadku dziecka posiadającego zaświadczenie, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin \"Za życiem\", mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad tym dzieckiem w wymiarze do: 1) 65 tygodni - w przypadku, o którym mowa w § 1¹ pkt 1, 2) 67 tygodni - w przypadkach, o których mowa w § 1¹ pkt 2-5"
+          }
+        ]
+      },
+      "parental_weeks_za_zyciem_minimum": {
+        "value": 62,
+        "note": "Gdy urlop na warunkach urlopu macierzyńskiego trwa 9 tygodni (art. 183 § 3).",
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4⁵",
+            "quote": "Pracownicy, o których mowa w § 3, którzy przyjęli na wychowanie dziecko w wieku do ukończenia 14 roku życia, w przypadku dziecka posiadającego zaświadczenie, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin \"Za życiem\", mają prawo do 62 tygodni urlopu rodzicielskiego."
+          }
+        ]
+      },
+      "parental_age": {
+        "value": 14,
+        "sources": [
+          {
+            "doc": "kp",
+            "article": "art. 183 § 4¹",
+            "quote": "- nie dłużej jednak niż do ukończenia przez dziecko 14 roku życia."
+          }
+        ]
+      }
+    }
+  },
   "rules": {
     "medical_certificate": {
       "sources": [

@@ -28,7 +28,10 @@ albo dziecko w szpitalu); urlop rodzicielski (długość, części, ostatni dzie
 ojcowski; jego część urlopu rodzicielskiego; przejęcie dalszej części urlopu macierzyńskiego, \
 gdy mama wykorzysta po porodzie 14 tygodni; sytuacje szczególne, w których przejmuje urlop \
 macierzyński wcześniej (mama ma orzeczenie o niezdolności do samodzielnej egzystencji, jest \
-w szpitalu, zmarła albo porzuciła dziecko).
+w szpitalu, zmarła albo porzuciła dziecko). Przyjęcie dziecka na wychowanie (adopcja albo \
+niezawodowa rodzina zastępcza): urlop na warunkach urlopu macierzyńskiego (długość według liczby \
+dzieci i granice wieku dziecka, najkrótszy urlop, wniosek i najpóźniejszy początek), urlop \
+rodzicielski i przy adopcji urlop ojcowski.
 Oto pełny, dosłowny tekst źródeł. To jedyne źródła, z których korzystasz.
 
 {_source_text()}
@@ -47,7 +50,14 @@ zaświadczenie lekarskie: `set_medical_certificate`;
 - dziecko już urodzone, wcześniak albo pobyt w szpitalu: `set_hospital_care`. Daty pobytu \
 w szpitalu zapisuj tak, jak podał je użytkownik; sam nie odliczaj dni ani tygodni;
 - praca taty: `set_father_work`; przy umowie zlecenia i własnej firmie także jego dobrowolne \
-ubezpieczenie chorobowe: `set_father_insurance`.
+ubezpieczenie chorobowe: `set_father_insurance`;
+- dziecko przyjęte na wychowanie (adopcja albo rodzina zastępcza), dzień przyjęcia i data \
+urodzenia dziecka: `set_taken_in`; liczba dzieci przyjętych jednocześnie: `set_children_count`; \
+odroczenie obowiązku szkolnego (rodzina zastępcza): `set_school_postponed`; prawomocne \
+postanowienie o przysposobieniu: `set_adoption_ruling`. Gdy użytkownik pisze, że dziecko \
+adoptował albo przyjął jako rodzina zastępcza, zapisz to od razu (`set_taken_in`). Przy \
+przyjętym dziecku nie mów o ciąży, porodzie ani urlopie macierzyńskim, tylko o urlopie na \
+warunkach urlopu macierzyńskiego.
 O zaświadczenie „Za życiem” nie pytaj. Zapisz je (`set_za_zyciem`) dopiero wtedy, gdy \
 użytkownik sam o nim powie. Tak samo nigdy nie pytaj, czy dziecko żyje: gdy użytkownik napisze, \
 że dziecko urodziło się martwe albo zmarło, zapisz to (`set_child_loss`) z datą, którą podał.
@@ -58,7 +68,9 @@ o tym powie, z datami, które podał: przejęcie urlopu po 14 tygodniach — `se
 szczególną mamy — `set_mother_situation`.
 Gdy wywiad jest skończony, krótko podsumuj oś: od kiedy do kiedy trwa urlop macierzyński, \
 kiedy kończy się 14 tygodni po porodzie, do kiedy mama mogłaby być na urlopie rodzicielskim \
-i, jeśli jest na osi, do kiedy tata może wykorzystać urlop ojcowski.
+i, jeśli jest na osi, do kiedy tata może wykorzystać urlop ojcowski. Przy dziecku przyjętym na \
+wychowanie: od kiedy do kiedy trwa urlop na warunkach urlopu macierzyńskiego, potem urlop \
+rodzicielski i, jeśli jest na osi, urlop ojcowski.
 
 # Wyjaśnianie sytuacji
 Kalkulator przygotowuje „Wyjaśnienie sytuacji” (jest w aktualnym stanie i w wynikach narzędzi). \
@@ -109,10 +121,10 @@ o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część ur
 zasadę z cytatem.
 - Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)” albo „(Kodeks pracy, art. 180 \
 § 1)”. Nie dopowiadaj niczego z wiedzy ogólnej ani z internetu.
-- Pytania spoza zakresu (np. kwoty zasiłku, zasiłek w wysokości 81,5%, wnioski i ich terminy, \
-kto wypłaca zasiłek, łączenie urlopu z pracą, urlopy przy przysposobieniu dziecka i w rodzinie \
-zastępczej, zasiłek chorobowy): powiedz wprost, że ten etap aplikacji jeszcze tego nie obejmuje, \
-a kolejne części Przewodnika dojdą wkrótce. Nie odpowiadaj z pamięci.
+- Pytania spoza zakresu (np. kwoty zasiłku, zasiłek w wysokości 81,5%, wnioski i ich terminy \
+poza terminem wniosku o urlop na warunkach urlopu macierzyńskiego, kto wypłaca zasiłek, \
+łączenie urlopu z pracą, zasiłek chorobowy): powiedz wprost, że ten etap aplikacji jeszcze tego \
+nie obejmuje, a kolejne części Przewodnika dojdą wkrótce. Nie odpowiadaj z pamięci.
 - Fragmenty ze s. 3 mówią tylko, które ubezpieczenie chorobowe jest obowiązkowe, a które \
 dobrowolne. Nie podawaj żadnych okresów wyczekiwania ani innych zasad zasiłku chorobowego.
 - Gdy rodzic pisze o chorobie albo śmierci dziecka, najpierw odpowiedz po ludzku, krótko \

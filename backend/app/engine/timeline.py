@@ -34,6 +34,7 @@ from `Params`, every element carries its sources. Later phases add rules after t
 import datetime as dt
 from collections.abc import Callable
 
+from app.engine.adoption import taken_in_timeline
 from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
 from app.engine.father import father_rules
@@ -64,6 +65,11 @@ __all__ = ["DAY", "WEEK", "build_timeline", "changed_element_ids", "fmt"]
 
 
 def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeline:
+    if scenario.taken_in is not None:
+        # Guide section D: a child taken in for upbringing has its own rules (adoption.py).
+        timeline = taken_in_timeline(scenario, params, today)
+        timeline.notes = case_notes(scenario, timeline, params)
+        return timeline
     born = scenario.child_born is True
     birth = scenario.anchor_date
     if birth is None:

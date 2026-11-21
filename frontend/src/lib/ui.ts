@@ -204,6 +204,19 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return typeof args.mother_weeks === 'number'
         ? `Tata przejmuje urlop macierzyński po ${args.mother_weeks} tyg.`
         : 'Tata przejmuje urlop macierzyński'
+    // Guide section D: a child taken in for upbringing.
+    case 'set_taken_in':
+      if (args.kind === 'adoption') return 'Adopcja dziecka'
+      if (args.kind === 'foster') return 'Rodzina zastępcza'
+      return 'Dziecko urodzone w rodzinie'
+    case 'set_school_postponed':
+      return args.postponed
+        ? 'Odroczony obowiązek szkolny'
+        : 'Bez odroczenia obowiązku szkolnego'
+    case 'set_adoption_ruling':
+      return args.final
+        ? `Przysposobienie prawomocne: ${asDate(args.final_on)}`
+        : 'Przysposobienie jeszcze nieprawomocne'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
     default:

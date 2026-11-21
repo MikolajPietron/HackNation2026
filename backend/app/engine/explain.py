@@ -9,6 +9,7 @@ Every phase adds its notes here (CLAUDE.md, "Wyjaśnianie przypadku").
 import datetime as dt
 
 from app.engine.draft import DAY, days_between
+from app.engine.explain_adoption import taken_in_notes
 from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
@@ -23,6 +24,8 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    if scenario.taken_in is not None:
+        return taken_in_notes(scenario, timeline, params)
     cover = coverage(scenario)
     loss = child_loss(scenario, params, timeline.birth_date, timeline.today)
     if loss is not None:

@@ -32,8 +32,13 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
-from app.engine.plausibility import birth_date_problem, due_date_problem
+from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, TakenIn, Work
+from app.engine.plausibility import (
+    birth_date_problem,
+    child_birth_problem,
+    due_date_problem,
+    taken_in_problem,
+)
 from app.engine.timeline import fmt
 
 USAGE_LIMITS = UsageLimits(request_limit=12)
@@ -76,9 +81,26 @@ EXPLAIN_ONLY = {"explain_timeline_element"}
 def _tools_for_turn(
     ctx: RunContext[AssistantDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition]:
-    if ctx.deps.answers_allowed:
-        return tool_defs
-    return [t for t in tool_defs if t.name in EXPLAIN_ONLY]
+    if not ctx.deps.answers_allowed:
+        return [t for t in tool_defs if t.name in EXPLAIN_ONLY]
+    # A child taken in for upbringing: nothing about pregnancy or the birth; the other way round,
+    # no questions that only adoption and foster care have.
+    hidden = BIRTH_ONLY if ctx.deps.scenario.taken_in is not None else TAKEN_IN_ONLY
+    return [t for t in tool_defs if t.name not in hidden]
+
+
+BIRTH_ONLY = {
+    "set_birth_date",
+    "set_leave_before_birth",
+    "set_medical_certificate",
+    "set_hospital_care",
+    "set_child_loss",
+    "set_father_takeover",
+    "set_mother_situation",
+}
+"""Pregnancy and the birth (section A, B.1-B.2): the child's own birth date of a child taken in
+goes through `set_taken_in`."""
+TAKEN_IN_ONLY = {"set_school_postponed", "set_adoption_ruling"}
 
 
 assistant = Agent(
@@ -169,6 +191,11 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         losses=[],
         mother_event=None,
         leave_start=None,
+        taken_in=None,
+        taken_in_on=None,
+        school_postponed=None,
+        adoption_final=None,
+        adoption_final_on=None,
     )
     return await _apply(ctx, scenario, "due-date")
 
@@ -474,3 +501,102 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
     return describe_element(element)
+
+
+# Guide section D: a child taken in for upbringing (adoption, non-professional foster family).
+
+
+@assistant.tool(sequential=True)
+async def set_taken_in(
+    ctx: RunContext[AssistantDeps],
+    kind: TakenIn | None,
+    taken_in_on: dt.date | None = None,
+    child_birth_date: dt.date | None = None,
+) -> str:
+    """The child was taken in for upbringing, not born to this family: record how, the day of
+    taking in and the child's date of birth (any of them may come later; give what the user
+    said). Pregnancy and the birth no longer apply. Null `kind` corrects an earlier answer: the
+    child was born to the family after all.
+
+    Args:
+        kind: "adoption" = took the child in and asked the guardianship court to start adoption
+            proceedings; "foster" = a non-professional foster family (rodzina zastępcza
+            niezawodowa). Null = not taken in.
+        taken_in_on: The day the child was taken in; for adoption the day the child was taken in
+            and the court application filed, the later of the two.
+        child_birth_date: The child's date of birth (with several children: the youngest's).
+    """
+    today = ctx.deps.today
+    if kind is None:
+        scenario = _with(
+            ctx,
+            taken_in=None,
+            taken_in_on=None,
+            school_postponed=None,
+            adoption_final=None,
+            adoption_final_on=None,
+        )
+        return await _apply(ctx, scenario, "birth", "due-date")
+    problem = (taken_in_on and taken_in_problem(taken_in_on, today)) or (
+        child_birth_date and child_birth_problem(child_birth_date, today)
+    )
+    if problem:
+        raise ModelRetry(f"Nie ustawiono: {problem}")
+    before = ctx.deps.scenario
+    changes: dict[str, Any] = {
+        "taken_in": kind,
+        "child_born": True,
+        "due_date": None,
+        # Nothing about pregnancy or the birth applies to a child taken in.
+        "leave_before_birth_weeks": None,
+        "has_medical_certificate": None,
+        "leave_start": None,
+        "hospital_care": None,
+        "birth_week": None,
+        "birth_weight_up_to_1000g": None,
+        "hospital_stays": [],
+        "losses": [],
+        "father_takes_over": None,
+        "mother_weeks_before_takeover": None,
+        "mother_event": None,
+    }
+    if kind != before.taken_in:
+        changes.update(school_postponed=None, adoption_final=None, adoption_final_on=None)
+    if taken_in_on is not None:
+        changes["taken_in_on"] = taken_in_on
+    if child_birth_date is not None:
+        changes["birth_date"] = child_birth_date
+    return await _apply(ctx, _with(ctx, **changes), "adoption-leave", "taken-in")
+
+
+@assistant.tool(sequential=True)
+async def set_school_postponed(ctx: RunContext[AssistantDeps], postponed: bool) -> str:
+    """Foster family: record whether compulsory schooling of the child was postponed; the leave
+    then lasts until the child turns 10, not 7.
+
+    Args:
+        postponed: True if a decision postponing compulsory schooling was made.
+    """
+    if ctx.deps.scenario.taken_in != "foster":
+        raise ModelRetry("Odroczenie obowiązku szkolnego ma znaczenie tylko w rodzinie zastępczej.")
+    scenario = _with(ctx, school_postponed=postponed)
+    return await _apply(ctx, scenario, "adoption-leave", "age-limit")
+
+
+@assistant.tool(sequential=True)
+async def set_adoption_ruling(
+    ctx: RunContext[AssistantDeps], final: bool, final_on: dt.date | None = None
+) -> str:
+    """Adoption: record whether the court's adoption ruling is final, and since when. Paternity
+    leave of the adoptive father runs from that day.
+
+    Args:
+        final: True if the adoption ruling is already final (prawomocne).
+        final_on: The day it became final; required when `final` is true.
+    """
+    if ctx.deps.scenario.taken_in != "adoption":
+        raise ModelRetry("Postanowienie o przysposobieniu dotyczy tylko adopcji (set_taken_in).")
+    if final and final_on is None:
+        raise ModelRetry("Zapytaj, którego dnia postanowienie o przysposobieniu się uprawomocniło.")
+    scenario = _with(ctx, adoption_final=final, adoption_final_on=final_on if final else None)
+    return await _apply(ctx, scenario, "paternity", "paternity-deadline")

@@ -124,6 +124,47 @@ class FatherParams(BaseModel):
     total_cap: Rule
 
 
+class TakenInKindParams(BaseModel):
+    """One way of taking a child in (Labour Code art. 183 § 1 or § 1¹, § 4 or § 4¹-§ 4⁵)."""
+
+    who: Rule
+    weeks_by_children: Param[list[int]]
+    age: Param[int]
+    """The leave lasts at most until the child reaches this age."""
+    age_school_postponed: Param[int] | None
+    """Foster care: the age limit when compulsory schooling was postponed."""
+    parental_weeks_by_children: Param[list[int]]
+    """Both parents together: one child, more children taken in at once."""
+    parental_weeks_minimum: Param[int]
+    """When the leave lasted only the minimum weeks (art. 183 § 3)."""
+    parental_weeks_za_zyciem: Param[list[int]]
+    parental_weeks_za_zyciem_minimum: Param[int]
+    parental_age: Param[int] | None
+    """Adoption: parental leave at most until the child reaches this age. None = the rule for a
+    born child (the end of the calendar year in which the child turns `parental.deadline_age`)."""
+
+
+class TakenInParams(BaseModel):
+    """Guide section D (pages 8-9): a child taken in for upbringing; Labour Code art. 183."""
+
+    insured: Rule
+    benefit: Rule
+    leave: Rule
+    minimum_weeks: Param[int]
+    request_days: Param[int]
+    """The leave is requested within this many days of taking the child in."""
+    latest_start_days: Param[int]
+    """The leave starts at the latest this many days after taking the child in."""
+    parental: Rule
+    parental_parts: Rule
+    paternity_months: Param[int]
+    """Adoption: paternity leave within this many months of the final adoption ruling..."""
+    paternity_age: Param[int]
+    """...and not after the child reaches this age."""
+    foster: TakenInKindParams
+    adoption: TakenInKindParams
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -141,6 +182,7 @@ class Params(BaseModel):
     parental: ParentalParams
     loss: LossParams
     father: FatherParams
+    taken_in: TakenInParams
     rules: Rules
 
     def sources(self) -> list[SourceRef]:
