@@ -1,4 +1,1 @@
-"""Integracje zewnętrzne.
-
-Supabase: parametry, zapisane scenariusze. Claude: asystent z cytatami, odczyt skanów spraw.
-"""
+"""Data sources and external services: legal parameters now, Supabase later."""

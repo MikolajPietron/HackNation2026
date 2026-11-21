@@ -1,1 +1,32 @@
 @import 'tailwindcss';
+
+@theme {
+  /* A changed timeline element pulses once after the assistant recalculates the timeline. */
+  --animate-flash: flash 1.8s ease-out 1;
+  --animate-rise: rise 0.3s ease-out both;
+
+  @keyframes flash {
+    0%,
+    35% {
+      box-shadow: 0 0 0 4px rgb(251 191 36 / 0.9);
+    }
+    100% {
+      box-shadow: 0 0 0 14px rgb(251 191 36 / 0);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+body {
+  @apply bg-stone-50 antialiased;
+}

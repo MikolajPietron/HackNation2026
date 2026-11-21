@@ -1,5 +1,14 @@
-"""Silnik reguł: Scenario -> Timeline (oś czasu rodzica).
+"""Rules engine: Scenario -> Timeline. Pure and deterministic (no I/O, no database, no LLM)."""
 
-Czysty i deterministyczny: bez I/O, bez bazy, bez LLM. Parametry (tygodnie, stawki, limity)
-dostaje z zewnątrz. Każdy element osi ma źródło (dokument + strona/artykuł). Zasady: CLAUDE.md.
-"""
+from app.engine.models import Scenario, ScenarioError, Timeline
+from app.engine.params import Params
+from app.engine.timeline import build_timeline, changed_element_ids
+
+__all__ = [
+    "Params",
+    "Scenario",
+    "ScenarioError",
+    "Timeline",
+    "build_timeline",
+    "changed_element_ids",
+]

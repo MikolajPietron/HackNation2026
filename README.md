@@ -9,7 +9,7 @@ Produkt, domena i zasady pracy: [CLAUDE.md](CLAUDE.md).
 - **Backend**: Python 3.13, FastAPI, uv — `backend/`
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS — `frontend/`
 - **Baza**: Supabase (Postgres), migracje SQL w `supabase/migrations/`
-- **LLM**: Claude (Anthropic SDK)
+- **Asystent AI**: Pydantic AI + Claude — rozmowa zbiera datę porodu i inne fakty, a narzędzia agenta zmieniają oś czasu. Daty liczy deterministyczny silnik reguł, nie AI.
 
 ## Wymagania
 
@@ -25,7 +25,7 @@ cp backend/.env.example backend/.env   # uzupełnij klucze
 npm run dev                            # API na :8000 + frontend na :5173
 ```
 
-Otwórz http://localhost:5173. Ekran startowy pokazuje, czy frontend łączy się z API.
+Otwórz http://localhost:5173 i podaj w czacie datę porodu. Czat potrzebuje `ANTHROPIC_API_KEY` w `backend/.env`; bez klucza zwraca komunikat o wyłączonym asystencie. Kalkulator działa bez AI pod `POST /api/timeline` (dokumentacja API: http://localhost:8000/docs).
 
 ## Komendy
 

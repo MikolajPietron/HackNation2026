@@ -1,1 +1,1 @@
-"""Routery REST pod /api. Jeden moduł = jeden obszar (np. timeline, assistant, cases, params)."""
+"""REST routers under /api. One module per area (timeline, chat, later cases and params)."""
