@@ -74,6 +74,11 @@ interface Props {
   className?: string
 }
 
+/** Day cell size: as big as fits the screen's height and width (the date step must fit 100vh).
+ *  Exported so a row under the calendar can take exactly its width. */
+export const CALENDAR_CELL = '[--cell:clamp(2.25rem,min(5.4dvh,calc((100vw_-_4.5rem)/7)),3.5rem)]'
+export const CALENDAR_WIDTH = 'calc(var(--cell) * 7 + 2.5rem)'
+
 export function Calendar({ value, min, max, today, label, onChange, className }: Props) {
   const clamp = (iso: string) => (iso < min ? min : iso > max ? max : iso)
   const [view, setView] = useState<Month>(() => monthOf(value || clamp(today)))
@@ -139,10 +144,11 @@ export function Calendar({ value, min, max, today, label, onChange, className }:
     // One day's size follows the window (height and width), so the whole step fits on one screen.
     <div
       className={cn(
-        'mx-auto w-full rounded-4xl border border-line bg-white p-3 sm:p-4 [--cell:clamp(2.25rem,min(5.4dvh,calc((100vw_-_4.5rem)/7)),3.5rem)]',
+        'mx-auto w-full rounded-4xl border border-line bg-white p-3 sm:p-4',
+        CALENDAR_CELL,
         className,
       )}
-      style={{ maxWidth: 'calc(var(--cell) * 7 + 2.5rem)' }}
+      style={{ maxWidth: CALENDAR_WIDTH }}
     >
       <div className="mb-2 flex items-center justify-between">
         <button

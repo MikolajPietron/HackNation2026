@@ -16,7 +16,7 @@ import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import { plural } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Earnings, OnboardingAnswers, Role, SessionStart, Work } from '@/types'
-import { Calendar } from './Calendar'
+import { CALENDAR_CELL, CALENDAR_WIDTH, Calendar } from './Calendar'
 import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
 import { ITEM, POP, STEP } from './motion'
 
@@ -514,25 +514,26 @@ function DateStep({
       subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
       compact
     >
-      <motion.div variants={ITEM}>
-        <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
-      </motion.div>
-      {/* The button stays under the calendar's centre; the date grows to its left, so picking
-          a day never moves the button. */}
-      <motion.div
-        variants={ITEM}
-        className="mt-4 flex flex-col items-center gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-6"
-      >
-        <p className="text-lg sm:justify-self-end sm:text-right" aria-live="polite">
-          <TextStates
-            text={valid ? `${formatLongDate(value)} · ${distance(value, today)}` : 'Wybierz dzień'}
-            className={valid ? 'font-bold text-navy-900' : 'text-navy-400'}
-          />
-        </p>
-        <PrimaryButton disabled={!valid} onClick={onNext}>
-          Dalej <ArrowRight className="size-5" />
-        </PrimaryButton>
-      </motion.div>
+      {/* The row under the calendar takes exactly its width: the date on the left edge, the
+          button on the right edge, so the two line up and the button never moves. */}
+      <div className={cn('mx-auto w-full', CALENDAR_CELL)} style={{ maxWidth: CALENDAR_WIDTH }}>
+        <motion.div variants={ITEM}>
+          <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
+        </motion.div>
+        <motion.div variants={ITEM} className="mt-4 flex items-center justify-between gap-3 pl-2">
+          <p className="min-w-0 text-left leading-tight" aria-live="polite">
+            <span className={cn('block text-lg', valid ? 'font-bold text-navy-900' : 'text-navy-400')}>
+              <TextStates text={valid ? formatLongDate(value) : 'Wybierz dzień'} />
+            </span>
+            <span className="mt-0.5 block text-sm text-navy-500">
+              <TextStates text={valid ? distance(value, today) : '\u00a0'} />
+            </span>
+          </p>
+          <PrimaryButton disabled={!valid} onClick={onNext} className="shrink-0">
+            Dalej <ArrowRight className="size-5" />
+          </PrimaryButton>
+        </motion.div>
+      </div>
     </Question>
   )
 }
