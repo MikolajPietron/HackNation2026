@@ -6,13 +6,21 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from pydantic_ai.models import Model
-from pydantic_ai.models.anthropic import AnthropicModel, AnthropicModelSettings
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.settings import ModelSettings
 
 from app.clock import today_in_warsaw
-from app.config import Settings, ThinkingLevel, get_settings
+from app.config import LlmProvider, Settings, ThinkingLevel, get_settings
 from app.engine import Params
 from app.services.params import load_params
+
+KEY_NAMES: dict[LlmProvider, str] = {
+    "openrouter": "OPENROUTER_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+}
 
 
 def get_params() -> Params:
@@ -24,18 +32,30 @@ def get_today() -> dt.date:
 
 
 def get_chat_model(settings: Annotated[Settings, Depends(get_settings)]) -> Model:
-    if not settings.anthropic_api_key:
+    if not settings.llm_api_key:
         raise HTTPException(
             status_code=503,
-            detail="Asystent AI jest wyłączony: brak klucza ANTHROPIC_API_KEY w backend/.env.",
+            detail=(
+                "Asystent AI jest wyłączony: brak klucza "
+                f"{KEY_NAMES[settings.llm_provider]} w backend/.env."
+            ),
         )
-    return _anthropic_model(settings.llm_model, settings.anthropic_api_key, settings.llm_thinking)
+    return _chat_model(
+        settings.llm_provider, settings.llm_model_name, settings.llm_api_key, settings.llm_thinking
+    )
 
 
 @lru_cache(maxsize=4)
-def _anthropic_model(name: str, api_key: str, thinking: ThinkingLevel | None) -> Model:
-    model_settings = AnthropicModelSettings(cache=True)
+def _chat_model(
+    provider: LlmProvider, name: str, api_key: str, thinking: ThinkingLevel | None
+) -> Model:
+    model_settings = ModelSettings(cache=True)
     if thinking is not None:
         model_settings["thinking"] = thinking
-    provider = AnthropicProvider(api_key=api_key)
-    return AnthropicModel(name, provider=provider, settings=model_settings)
+    if provider == "openrouter":
+        return OpenRouterModel(
+            name, provider=OpenRouterProvider(api_key=api_key), settings=model_settings
+        )
+    return AnthropicModel(
+        name, provider=AnthropicProvider(api_key=api_key), settings=model_settings
+    )

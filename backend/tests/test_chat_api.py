@@ -93,10 +93,12 @@ def test_future_birth_of_a_born_child_is_rejected(client: TestClient) -> None:
 
 
 def test_chat_without_api_key_is_unavailable(client: TestClient) -> None:
-    app.dependency_overrides[get_settings] = lambda: Settings(anthropic_api_key="")
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        llm_provider="openrouter", openrouter_api_key=""
+    )
     response = client.post("/api/chat", json={"message": "Cześć"})
     assert response.status_code == 503
-    assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+    assert "OPENROUTER_API_KEY" in response.json()["detail"]
 
 
 def test_timeline_endpoint_without_ai(client: TestClient) -> None:

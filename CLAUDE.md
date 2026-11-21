@@ -162,10 +162,10 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 
   Każde narzędzie zmieniające scenariusz woła `build_timeline` i wysyła zdarzenie `TimelineUpdated` (`ctx.emit`, `CustomEvent`) z osią i listą zmienionych elementów; UI przerysowuje oś w trakcie odpowiedzi. Błąd reguły (`ScenarioError`) zamienia się w `ModelRetry` z polskim komunikatem.
 
-  `POST /api/chat` strumieniuje NDJSON ze zdarzeniami `text`, `tool-call`, `tool-result`, `timeline`, `focus`, `done` i `error`. Klient trzyma historię (zwracaną w `done`) i `scenario` i odsyła je z każdą wiadomością, więc serwer nie ma stanu. Bez `ANTHROPIC_API_KEY` czat zwraca 503, a `/api/timeline` działa dalej.
+  `POST /api/chat` strumieniuje NDJSON ze zdarzeniami `text`, `tool-call`, `tool-result`, `timeline`, `focus`, `done` i `error`. Klient trzyma historię (zwracaną w `done`) i `scenario` i odsyła je z każdą wiadomością, więc serwer nie ma stanu. Bez klucza LLM czat zwraca 503, a `/api/timeline` działa dalej.
 
   Nowa sytuacja do obsłużenia to: pole w `Scenario`, reguła w silniku ze źródłem i testem, narzędzie w agencie i etykieta w `toolLabel` (frontend).
-- **LLM**: Claude przez Pydantic AI (`pydantic-ai-slim[anthropic]`, wersja 2.x), model z `LLM_MODEL` w `.env` (domyślnie `claude-opus-5-5`, adaptive thinking), opcjonalnie `LLM_THINKING`. API wersji 2.x różni się od 1.x, np. `run_stream_events` jest context managerem, a zdarzenia własne idą przez `ctx.emit`. Przed użyciem sprawdzaj źródła w `backend/.venv`. Do czego używamy LLM:
+- **LLM**: Claude przez Pydantic AI (`pydantic-ai-slim[anthropic,openrouter]`, wersja 2.x). Dostawca z `LLM_PROVIDER`: `openrouter` (domyślnie, klucz `OPENROUTER_API_KEY`, model `anthropic/claude-opus-5.5`) albo `anthropic` (klucz `ANTHROPIC_API_KEY`, model `claude-opus-5-5`). `LLM_MODEL` nadpisuje model, `LLM_THINKING` wysiłek myślenia. Wybór modelu: `app/api/deps.py`. API wersji 2.x różni się od 1.x, np. `run_stream_events` jest context managerem, a zdarzenia własne idą przez `ctx.emit`. Przed użyciem sprawdzaj źródła w `backend/.venv`. Do czego używamy LLM:
   - czat zbierający fakty i tłumaczący oś (wyżej),
   - asystent Q&A z cytatami — Claude citations na PDF-ach materiałów zwracają dosłowny `cited_text` i numer strony; nie łączyć z `output_config.format`, bo API zwraca 400,
   - odczyt sprawy ze skanu (vision) do postaci `Scenario`, z numerami stron,
