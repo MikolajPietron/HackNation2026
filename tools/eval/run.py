@@ -27,6 +27,7 @@ from checks import (  # noqa: E402
     SYMPATHY,
     Check,
     Turn,
+    check_brief,
     check_mentions,
     check_notes_covered,
     check_question,
@@ -36,6 +37,7 @@ from checks import (  # noqa: E402
     extract_dates,
     facts,
     load_sources,
+    opening_note_ids,
     source_dates,
     timeline_dates,
 )
@@ -159,10 +161,15 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
     if step.get("out_of_scope"):
         checks.append(Check("says out of scope", OUT_OF_SCOPE.search(text) is not None))
     if step.get("event") == "timeline_ready":
-        checks.append(check_notes_covered(text, [n["id"] for n in after["notes"]]))
+        checks.append(check_notes_covered(text, opening_note_ids(after["notes"])))
     elif rec["changed_notes"]:
+        # The chat says what a change means, not every changed point: reported, not failed.
         covered = [n["id"] for n in after["notes"] if n["id"] in rec["changed_notes"]]
-        checks.append(check_notes_covered(text, covered))
+        note_check = check_notes_covered(text, covered)
+        note_check.soft = True
+        checks.append(note_check)
+    # A loss or a question for details may take more words.
+    checks.append(check_brief(text, question, soft=bool(step.get("sensitive"))))
     leak = re.search(
         r"bez źródła: to opis|nie dopisuj do niego źródła|⟦|Następne pytanie wywiadu", text
     )

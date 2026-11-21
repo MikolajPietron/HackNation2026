@@ -49,8 +49,11 @@ Per step (`checks.py`, `run.py`):
 - **Reply against the timeline**: every date in the reply exists on the timeline (or in the
   user's message, the previous timeline or the sources); the key new dates and numbers are
   stated; required/forbidden phrases (e.g. a source like `art. 180 § 1`, no "40 tyg.").
-- **Explanation**: the welcome covers every point of "Twoja sytuacja"; after a change, every
-  changed point (keyword heuristic).
+- **Explanation**: the welcome covers the opening points (the case, the main entitlement or
+  risk, a loss; `opening_note_ids`), not all of "Twoja sytuacja"; after a change, the changed
+  points are reported softly (the chat says what the change means, not every point).
+- **Brevity**: a reply without the interview question is at most 600 characters (soft after a
+  loss), so the chat never becomes a wall of text.
 - **Quotes**: every „…” of 4+ words is a literal fragment of `przewodnik_pages.json` or
   `kodeks_pracy.json` (an elision must be marked with […]) and the parenthesis after it names a
   page or article that contains it. A non-literal quote is classified: the app's own explanation

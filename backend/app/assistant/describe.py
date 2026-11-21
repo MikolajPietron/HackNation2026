@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.assistant.guide import page_label
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
+    CaseNote,
     Document,
     Marker,
     Payment,
@@ -583,20 +584,41 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
     return "\n".join(lines)
 
 
+SENSITIVE_NOTES = ("loss", "mother-event")
+"""Points about the loss of the child or the mother's situation: always said, in full."""
+
+
+def opening_notes(notes: list[CaseNote]) -> list[CaseNote]:
+    """What the assistant says about a timeline that has just appeared: which case this is,
+    the main entitlement (or what stands in its way) and the sensitive points. Everything else
+    is above the timeline and in "Dlaczego tak?", so the chat does not retell it."""
+    first_right = next((n for n in notes if n.kind in ("right", "risk")), None)
+    return [
+        n
+        for n in notes
+        if n.kind in ("situation", "risk") or n is first_right or n.id in SENSITIVE_NOTES
+    ]
+
+
 def describe_note_changes(timeline: Timeline, changed_notes: list[str] | None) -> str:
     """What to talk about after a recalculation. None = the timeline has just appeared."""
     if changed_notes is None:
+        titles = [f"„{n.title}”" for n in opening_notes(timeline.notes)]
         return (
-            "Oś czasu właśnie powstała: omów całe wyjaśnienie sytuacji, punkt po punkcie, "
-            "w podanej kolejności."
+            f"Oś czasu właśnie powstała. Z wyjaśnienia sytuacji powiedz tylko: "
+            f"{', '.join(titles)}, w najwyżej trzech krótkich zdaniach. Pozostałe punkty "
+            "użytkownik ma nad osią i w „Dlaczego tak?”."
         )
     titles = [f"„{n.title}”" for n in timeline.notes if n.id in changed_notes]
     if not titles:
-        return "Wyjaśnienie sytuacji się nie zmieniło: powiedz krótko, co zmieniło się na osi."
+        return (
+            "Wyjaśnienie sytuacji się nie zmieniło: powiedz jednym zdaniem, co zmieniło się na osi."
+        )
     return (
-        f"Zmienione punkty wyjaśnienia: {', '.join(titles)}. Omów teraz tylko je, w tej "
-        "kolejności, po jednym–dwóch zdaniach na punkt. Pozostałych punktów nie powtarzaj: "
-        "użytkownik już je zna."
+        f"Zmienione punkty wyjaśnienia (użytkownik widzi je podświetlone nad osią): "
+        f"{', '.join(titles)}. Powiedz tylko, co z tej zmiany wynika dla rodzica — najpierw nowe "
+        "daty albo to, co trzeba zrobić — w najwyżej trzech krótkich zdaniach. Pozostałych "
+        "punktów nie powtarzaj."
     )
 
 

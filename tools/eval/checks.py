@@ -336,6 +336,30 @@ NOTE_KEYWORDS = {
 this point"."""
 
 
+def opening_note_ids(notes: list[dict]) -> list[str]:
+    """The points the welcome must say; mirrors `describe.opening_notes` in the backend: the
+    case, the first entitlement or risk, every risk and the points about a loss."""
+    first = next((n["id"] for n in notes if n["kind"] in ("right", "risk")), None)
+    return [
+        n["id"]
+        for n in notes
+        if n["kind"] in ("situation", "risk")
+        or n["id"] == first
+        or n["id"] in ("loss", "mother-event")
+    ]
+
+
+BRIEF_CHARS = 600
+"""The longest reply, without the interview question, that is not yet a wall of text: about
+three short sentences with a source or two."""
+
+
+def check_brief(text: str, question: dict | None, soft: bool = False) -> Check:
+    rest = text.replace(question["text"], "") if question else text
+    n = len(rest.strip())
+    return Check("brief (no wall of text)", n <= BRIEF_CHARS, f"{n} chars", soft=soft)
+
+
 def check_notes_covered(text: str, note_ids: list[str]) -> Check:
     missing = [
         nid
