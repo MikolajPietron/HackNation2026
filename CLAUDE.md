@@ -28,10 +28,14 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
   - `app/assistant/` — agent Pydantic AI (`agent.py`: narzędzia i zdarzenia), `prompts.py` (instrukcje po polsku i spis treści Przewodnika), `describe.py` (opis osi dla modelu), `przewodnik_pages.json`.
   - `app/services/params.py` — wczytanie `params/2026.json`. `params/2026.json` — liczby i reguły ze źródłami.
   - `tests/` — silnik (`test_engine.py`) i API czatu na skryptowanym modelu (`test_chat_api.py`).
-- `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, react-markdown.
+- `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, Motion, lucide-react, react-markdown. Alias `@/` = `src/`.
+  - `src/index.css` — tokeny motywu ZUS (`@theme`: kolory, cienie, animacje wejścia), font Lato.
   - `src/types.ts` — kopia modeli backendu i protokołu czatu (trzymaj w zgodzie z `engine/models.py` i `api/chat.py`); `src/api.ts` — `streamChat` (NDJSON).
-  - `src/hooks/useAssistant.ts` — stan rozmowy, historia i scenariusz po stronie klienta.
-  - `src/components/chat/` — panel czatu; `src/components/timeline/` — oś: pozioma, pionowa, szczegóły ze źródłami, pusty stan.
+  - `src/hooks/useAssistant.ts` — stan rozmowy, historia i scenariusz po stronie klienta, `stop` i `reset`.
+  - `src/components/ui/` — komponenty ze Spectrum UI: `number-ticker`, `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
+  - `src/components/layout/` — lewy pasek ikon (desktop), dolna nawigacja (telefon), widok założeń.
+  - `src/components/timeline/` — `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
+  - `src/components/summary/` — kafelki z liczbami (z `Timeline.summary`) i lista wniosków; `src/components/chat/` — rozmowa.
 - `supabase/` — `config.toml`, `migrations/` (SQL), `seed.sql`.
 - `tools/zus-data/` — pipeline danych ZUS (OCR, katalog spraw). `tools/przewodnik/` — tekst Przewodnika dla asystenta.
 - `docs/` — Przewodnik; `docs/dokumentyZUS/` poufne, poza gitem.
@@ -57,6 +61,36 @@ Oś czasu (to jest „zintegrowany kalkulator”, którego chce ZUS):
 - Mobile-first: oś pionowa na telefonie, pozioma na desktopie.
 
 Funkcje wspierające (nie core): asystent Q&A z cytatami, wgranie/wybór przykładowej sprawy (wymóg testów jury), panel admina parametrów, atrapy integracji.
+
+## Design i UI
+
+Naszym zadaniem jest pokazać rodzicowi informacje, których potrzebuje. Nic więcej.
+
+- **Bez zagracenia (clutter).** Każdy element ekranu musi odpowiadać na pytanie rodzica. Jeśli nie odpowiada, usuń go.
+  - Jeden ekran = jedna główna rzecz (oś czasu). Szczegóły pokazujemy dopiero po kliknięciu elementu.
+  - Nie dodawaj atrap nawigacji, pustych kafelków ani ozdobników bez funkcji.
+  - Krótkie etykiety, dużo światła między elementami. Tekst prawny i cytaty tylko w szczegółach elementu.
+  - Zanim dodasz nowy element na ekran, sprawdź, czy nie da się tej informacji pokazać w istniejącym.
+- **Wzór wyglądu**: dashboard ze zrzutu, który dostaliśmy od zespołu (kalendarz zadań z kolorowymi „pigułkami”). Bierzemy z niego:
+  - wąski lewy pasek z logo i ikonami widoków,
+  - środek: tytuł, pasek dat, pod nim oś z zaokrąglonych pigułek ułożonych kaskadowo (kółko z inicjałem, tytuł, podtytuł, kółko z liczbą na końcu), legenda na dole,
+  - prawa kolumna: trzy kolorowe kafelki z liczbą, krótka lista z ikoną i strzałką, niżej karta (u nas: rozmowa z asystentem),
+  - białe karty na jasnym tle, duże zaokrąglenia, miękkie cienie, dużo pustej przestrzeni.
+- **Kolory: zieleń i biel ZUS** (sprawdzone na zus.pl 21.11.2026). Tokeny są w `frontend/src/index.css` (`@theme`), w komponentach używaj nazw tokenów, nie kodów hex.
+  - zieleń główna `#007834`, ciemna `#025a28` — akcje, mama, zaznaczenia,
+  - granat `#283754` — tata, tekst nagłówków,
+  - bursztyn `#fab856` — ważne dni i terminy,
+  - czerwień `#cd0000` — tylko minięte terminy i błędy,
+  - tło białe i bardzo jasna szarozieleń; font Lato (jak na zus.pl).
+  - Nie używamy logo ZUS ani nie udajemy strony ZUS: to tylko paleta.
+- **Komponenty i animacje: Spectrum UI** (ui.spectrumhq.in, komponenty „kopiuj-wklej” na shadcn/ui + Tailwind + Motion). Kopiujemy je do `frontend/src/components/ui/` i przestawiamy na nasze tokeny kolorów. Nowy komponent UI najpierw szukaj w Spectrum UI, dopiero potem pisz własny.
+  - Animacje komponentów bierzemy ze Spectrum UI (Motion). Animacja ma pokazywać zmianę (nowy element, przeliczona oś, otwarte szczegóły), a nie zdobić.
+  - Szanuj `prefers-reduced-motion`.
+- **Układ ekranu** (stan na 21.11.2026):
+  - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki urlopów, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (kafelki, wnioski, rozmowa).
+  - Telefon: dolna nawigacja Rozmowa / Oś czasu / Założenia; oś jako lista.
+  - Wniosek z terminem jest kółkiem z ikoną przed pigułką swojego urlopu. Jaśniejsza pigułka to przykładowy termin.
+  - Przeliczona oś tylko podświetla zmianę. Szczegóły otwiera kliknięcie albo narzędzie `explain_timeline_element`.
 
 ## Źródła wiedzy — hierarchia
 

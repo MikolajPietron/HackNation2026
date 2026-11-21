@@ -16,6 +16,7 @@ from app.engine.models import (
     ScenarioError,
     Segment,
     SourceRef,
+    Stat,
     Timeline,
     TimelineElement,
 )
@@ -73,12 +74,50 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         birth_date=birth,
         child_born=scenario.child_born,
         children_count=scenario.children_count,
+        summary=_summary(segments, params),
         segments=segments,
         markers=_markers(scenario, params),
         applications=_applications(scenario, params, by_id, today),
         warnings=_warnings(scenario, params, today),
         assumptions=_assumptions(scenario, params),
     )
+
+
+def _summary(segments: list[Segment], params: Params) -> list[Stat]:
+    """Total entitlement per kind of leave, for the summary tiles."""
+
+    def days(prefix: str) -> tuple[int, list[str]]:
+        found = [s for s in segments if s.id.startswith(prefix)]
+        return sum(s.days for s in found), [s.id for s in found]
+
+    maternity_days, maternity_ids = days("maternity")
+    parental_days, parental_ids = days("parental")
+    return [
+        Stat(
+            id="maternity",
+            label="Macierzyński",
+            value=maternity_days // 7,
+            unit="tyg.",
+            lane="mother",
+            segment_ids=maternity_ids,
+        ),
+        Stat(
+            id="parental",
+            label="Rodzicielski",
+            value=parental_days // 7,
+            unit="tyg.",
+            lane="mother",
+            segment_ids=parental_ids,
+        ),
+        Stat(
+            id="paternity",
+            label="Ojcowski",
+            value=params.paternity.days.value,
+            unit="dni",
+            lane="father",
+            segment_ids=["paternity"],
+        ),
+    ]
 
 
 def changed_element_ids(old: Timeline | None, new: Timeline) -> list[str]:

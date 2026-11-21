@@ -1,12 +1,17 @@
 import { useCallback, useState } from 'react'
-import type { ReactNode } from 'react'
-import { ChatPanel } from './components/chat/ChatPanel'
-import { CalendarIcon, ChatIcon, HeartIcon } from './components/Icons'
-import { TimelinePanel } from './components/timeline/TimelinePanel'
-import { useAssistant } from './hooks/useAssistant'
-import { cx } from './lib/ui'
+import { motion, MotionConfig } from 'motion/react'
+import { RotateCcw } from 'lucide-react'
+import { ChatPanel } from '@/components/chat/ChatPanel'
+import { AboutPanel } from '@/components/layout/AboutPanel'
+import { BottomNav, Logo, Rail } from '@/components/layout/Navigation'
+import type { Tab } from '@/components/layout/Navigation'
+import { ApplicationsList, SummaryTiles } from '@/components/summary/Summary'
+import { TimelinePanel } from '@/components/timeline/TimelinePanel'
+import { useAssistant } from '@/hooks/useAssistant'
+import { EASE_OUT } from '@/lib/ease'
+import { cn } from '@/lib/utils'
 
-type Tab = 'chat' | 'timeline'
+const APP_NAME = 'Zasiłkowy Przewodnik Przyszłego Rodzica'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('chat')
@@ -18,113 +23,117 @@ export default function App() {
     setSelectedId(id)
     setFocus((f) => ({ id, tick: f.tick + 1 }))
   }, [])
-  const markUnseen = useCallback(() => setUnseen(true), [])
-  const { messages, busy, send, timeline, changed } = useAssistant({
+  // A recalculated timeline scrolls to what changed but opens nothing: details are on demand.
+  const timelineChanged = useCallback((focusId: string | null) => {
+    setUnseen(true)
+    if (focusId) setFocus((f) => ({ id: focusId, tick: f.tick + 1 }))
+  }, [])
+  const { messages, busy, send, stop, reset, timeline, changed } = useAssistant({
     onFocus: focusOn,
-    onTimeline: markUnseen,
+    onTimeline: timelineChanged,
   })
 
-  // Phones show one panel at a time; from `lg` both are side by side and the tabs are hidden.
+  // Phones show one panel at a time. From `lg` the chat is always on the right and the
+  // tab only switches the middle between the timeline and the assumptions.
   const openTab = (next: Tab) => {
     setTab(next)
     setUnseen(false)
     if (next === 'timeline') setFocus((f) => ({ id: selectedId, tick: f.tick + 1 }))
   }
-  const showTimeline = (elementId: string | null) => {
+  const showOnTimeline = (elementId: string | null) => {
     openTab('timeline')
     if (elementId) focusOn(elementId)
   }
+  const startOver = () => {
+    if (messages.length > 0 && !window.confirm('Zacząć od nowa? Rozmowa i oś czasu znikną.')) return
+    reset()
+    setSelectedId(null)
+    setTab('chat')
+  }
 
   return (
-    <div className="flex h-dvh flex-col bg-stone-50 text-stone-900">
-      <header className="flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 lg:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-rose-500 text-white">
-            <HeartIcon className="size-5" />
-          </span>
-          <div className="min-w-0 leading-tight">
-            <h1 className="truncate text-[15px] font-semibold sm:text-base">
-              Zasiłkowy Przewodnik Przyszłego Rodzica
-            </h1>
-            <p className="hidden text-xs text-stone-500 sm:block">
-              Urlopy i zasiłki po narodzinach dziecka — według Przewodnika ZUS
-            </p>
-          </div>
-        </div>
-        <span className="hidden shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 md:inline">
-          Wersja demonstracyjna
-        </span>
-      </header>
+    <MotionConfig reducedMotion="user">
+      <div className="flex h-dvh flex-col bg-canvas lg:flex-row">
+        <Rail tab={tab} onChange={openTab} onReset={startOver} className="hidden lg:flex" />
 
-      <nav className="grid grid-cols-2 gap-1 border-b border-stone-200 bg-white p-1.5 lg:hidden" aria-label="Widok">
-        <TabButton active={tab === 'chat'} onClick={() => openTab('chat')} icon={<ChatIcon />}>
-          Rozmowa
-        </TabButton>
-        <TabButton
-          active={tab === 'timeline'}
-          onClick={() => openTab('timeline')}
-          icon={<CalendarIcon />}
-          badge={unseen && tab === 'chat'}
-        >
-          Oś czasu
-        </TabButton>
-      </nav>
+        <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-2.5 lg:hidden">
+          <Logo className="size-9" />
+          <p className="min-w-0 flex-1 text-[13px] leading-tight font-black text-navy-900">{APP_NAME}</p>
+          <button
+            type="button"
+            onClick={startOver}
+            aria-label="Zacznij od nowa"
+            className="grid size-9 place-items-center rounded-full text-navy-500"
+          >
+            <RotateCcw className="size-4" />
+          </button>
+        </header>
 
-      <main className="flex min-h-0 flex-1">
-        <section
-          className={cx('min-h-0 flex-1 overflow-y-auto', tab !== 'timeline' && 'hidden lg:block')}
-          aria-label="Oś czasu"
+        <main
+          className={cn('min-h-0 flex-1 overflow-y-auto', tab === 'chat' && 'hidden lg:block')}
+          aria-label={tab === 'about' ? 'Założenia i źródła' : 'Oś czasu'}
         >
-          <TimelinePanel
-            timeline={timeline}
-            changed={changed}
-            selectedId={selectedId}
-            focus={focus}
-            onSelect={setSelectedId}
-          />
-        </section>
-        <aside
-          className={cx(
-            'min-h-0 w-full flex-col bg-white lg:flex lg:w-[400px] lg:shrink-0 lg:border-l lg:border-stone-200',
-            tab === 'chat' ? 'flex' : 'hidden',
+          {tab === 'about' ? (
+            <AboutPanel timeline={timeline} />
+          ) : (
+            <>
+              <p className="hidden px-8 pt-8 text-xs font-black tracking-widest text-zus-700 uppercase lg:block">
+                {APP_NAME}
+              </p>
+              {timeline && (
+                <SummaryTiles
+                  timeline={timeline}
+                  onSelect={focusOn}
+                  className="px-5 pt-5 lg:hidden"
+                />
+              )}
+              <TimelinePanel
+                timeline={timeline}
+                changed={changed}
+                selectedId={selectedId}
+                focus={focus}
+                onSelect={setSelectedId}
+              />
+            </>
           )}
-          aria-label="Rozmowa z asystentem"
-        >
-          <ChatPanel messages={messages} busy={busy} onSend={send} onShowTimeline={showTimeline} />
-        </aside>
-      </main>
-    </div>
-  )
-}
+        </main>
 
-function TabButton({
-  active,
-  onClick,
-  icon,
-  badge = false,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: ReactNode
-  badge?: boolean
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cx(
-        'relative flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition',
-        active ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100',
-      )}
-    >
-      {icon}
-      {children}
-      {badge && (
-        <span className="absolute top-1.5 right-3 size-2 rounded-full bg-rose-500" aria-label="nowe zmiany" />
-      )}
-    </button>
+        <aside
+          className={cn(
+            'min-h-0 w-full flex-col gap-4 bg-white lg:flex lg:w-[380px] lg:flex-none lg:border-l lg:border-line lg:p-4',
+            tab === 'chat' ? 'flex flex-1' : 'hidden',
+          )}
+          aria-label="Podsumowanie i rozmowa z asystentem"
+        >
+          {timeline && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: EASE_OUT }}
+              className="hidden space-y-4 lg:block"
+            >
+              <SummaryTiles timeline={timeline} onSelect={focusOn} />
+              <ApplicationsList timeline={timeline} selectedId={selectedId} onSelect={focusOn} />
+            </motion.div>
+          )}
+          <div className="min-h-0 flex-1 lg:rounded-3xl lg:bg-canvas">
+            <ChatPanel
+              messages={messages}
+              busy={busy}
+              onSend={send}
+              onStop={stop}
+              onShowTimeline={showOnTimeline}
+            />
+          </div>
+        </aside>
+
+        <BottomNav
+          tab={tab}
+          onChange={openTab}
+          timelineBadge={unseen && tab === 'chat'}
+          className="lg:hidden"
+        />
+      </div>
+    </MotionConfig>
   )
 }

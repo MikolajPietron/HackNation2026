@@ -21,21 +21,6 @@ export interface ChangeSet {
   version: number
 }
 
-const GREETING: ChatMessage = {
-  id: 'greeting',
-  role: 'assistant',
-  status: 'done',
-  parts: [
-    {
-      kind: 'text',
-      text:
-        'Cześć! Pomogę Ci zaplanować urlopy i zasiłki po narodzinach dziecka — na podstawie ' +
-        'Przewodnika ZUS.\n\nNa początek: **kiedy urodziło się dziecko albo kiedy jest ' +
-        'przewidywany poród?** Podaj dzień, miesiąc i rok.',
-    },
-  ],
-}
-
 let lastId = 0
 const nextId = () => `m${++lastId}`
 
@@ -48,9 +33,9 @@ function appendText(message: ChatMessage, delta: string): ChatMessage {
 }
 
 interface Options {
-  /** A tool changed the scenario and the timeline was recalculated. */
-  onTimeline?: () => void
-  /** The assistant points at a timeline element. */
+  /** A tool changed the scenario and the timeline was recalculated around `focusId`. */
+  onTimeline?: (focusId: string | null) => void
+  /** The assistant explains a timeline element. */
   onFocus?: (elementId: string) => void
 }
 
@@ -59,18 +44,19 @@ interface Options {
  * sends them with every message; the backend streams text, tool calls and timeline updates.
  */
 export function useAssistant({ onTimeline, onFocus }: Options = {}) {
-  const [messages, setMessages] = useState<ChatMessage[]>([GREETING])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [changed, setChanged] = useState<ChangeSet>({ ids: [], version: 0 })
   const history = useRef<unknown[]>([])
   const scenario = useRef<Scenario | undefined>(undefined)
-  const sending = useRef(false)
+  const request = useRef<AbortController | null>(null)
 
   const send = useCallback(
     async (text: string) => {
-      if (sending.current) return
-      sending.current = true
+      if (request.current) return
+      const controller = new AbortController()
+      request.current = controller
       setBusy(true)
       const assistantId = nextId()
       setMessages((all) => [
@@ -112,8 +98,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
                 scenario.current = event.scenario
                 setTimeline(event.timeline)
                 setChanged((c) => ({ ids: event.changed, version: c.version + 1 }))
-                onTimeline?.()
-                if (event.focus) onFocus?.(event.focus)
+                onTimeline?.(event.focus)
                 break
               case 'focus':
                 onFocus?.(event.element_id)
@@ -126,18 +111,39 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
                 break
             }
           },
+          controller.signal,
         )
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Nie udało się wysłać wiadomości.'
-        patch((m) => ({ ...m, error: message }))
+        // Stopped by the user: keep what has arrived, without an error.
+        if (!controller.signal.aborted) {
+          const message = error instanceof Error ? error.message : 'Nie udało się wysłać wiadomości.'
+          patch((m) => ({ ...m, error: message }))
+        }
       } finally {
         patch((m) => ({ ...m, status: 'done' }))
-        sending.current = false
-        setBusy(false)
+        if (request.current === controller) {
+          request.current = null
+          setBusy(false)
+        }
       }
     },
     [onTimeline, onFocus],
   )
 
-  return { messages, busy, send, timeline, changed }
+  /** Stop the answer that is being written. */
+  const stop = useCallback(() => request.current?.abort(), [])
+
+  /** Forget the conversation and the timeline and start again. */
+  const reset = useCallback(() => {
+    request.current?.abort()
+    request.current = null
+    history.current = []
+    scenario.current = undefined
+    setBusy(false)
+    setMessages([])
+    setTimeline(null)
+    setChanged({ ids: [], version: 0 })
+  }, [])
+
+  return { messages, busy, send, stop, reset, timeline, changed }
 }

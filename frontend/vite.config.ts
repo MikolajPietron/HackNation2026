@@ -1,14 +1,13 @@
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {
-    // W dev frontend woła /api/*, a Vite przekazuje to do FastAPI.
-    proxy: {
-      '/api': 'http://localhost:8000',
-    },
+  resolve: {
+    // Same alias as shadcn/Spectrum UI components expect (`@/lib/utils`).
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  server: { proxy: { '/api': 'http://localhost:8000' } },
 })

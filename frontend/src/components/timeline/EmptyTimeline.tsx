@@ -1,58 +1,33 @@
-import { cx, LANE, LANES } from '../../lib/ui'
+import { cn } from '@/lib/utils'
 
-// Placeholder bars: [offset %, width %] per lane, only to hint at the shape of the timeline.
-const SKETCH = {
-  mother: [[6, 34], [41, 46]],
-  father: [[6, 4], [88, 10]],
-  child: [[6, 1], [12, 1], [70, 1]],
-  applications: [[3, 1], [33, 1], [80, 1]],
-} as const
-
-const PROMISES = [
-  ['Urlopy mamy i taty', 'Od kiedy do kiedy, ile tygodni i jaki procent podstawy zasiłku.'],
-  ['Wnioski i terminy', 'Co złożyć, gdzie i do którego dnia — z przypomnieniem o terminach.'],
-  ['Źródła z cytatami', 'Każdy element osi ma zasadę z Przewodnika ZUS albo przepisu.'],
+// Ghost pills that hint at the shape of the timeline: [offset %, width %, colour].
+const GHOSTS = [
+  [0, 36, 'bg-zus-200'],
+  [0, 8, 'bg-navy-200'],
+  [38, 44, 'bg-zus-100'],
+  [82, 14, 'bg-navy-100'],
 ] as const
 
+/** Before the birth date is known: one sentence and a quiet preview, nothing to read. */
 export function EmptyTimeline() {
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Twoja oś czasu</h2>
-        <p className="mt-1 text-sm text-stone-600">
-          Pojawi się tutaj, gdy w rozmowie podasz datę porodu — faktyczną albo przewidywaną.
+        <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
+        <p className="mt-2 max-w-md text-navy-500">
+          Podaj w rozmowie datę porodu. Pokażemy tu urlopy mamy i taty, zasiłki i terminy wniosków.
         </p>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-dashed border-stone-300 bg-white/70">
-        {LANES.map((lane) => (
-          <div
-            key={lane}
-            className="flex items-center gap-3 border-b border-dashed border-stone-200 px-4 py-4 last:border-b-0"
-          >
-            <span className="flex w-36 shrink-0 items-center gap-2 text-sm font-medium text-stone-500">
-              <span className={cx('size-2 rounded-full opacity-60', LANE[lane].dot)} />
-              {LANE[lane].label}
-            </span>
-            <div className="relative h-5 flex-1">
-              {SKETCH[lane].map(([left, width]) => (
-                <span
-                  key={left}
-                  className="absolute inset-y-0 rounded-md bg-stone-100 motion-safe:animate-pulse"
-                  style={{ left: `${left}%`, width: `${width}%`, minWidth: 10 }}
-                />
-              ))}
-            </div>
+      <div className="space-y-3.5" aria-hidden>
+        {GHOSTS.map(([left, width, color], index) => (
+          <div key={index} className="relative h-11">
+            <span
+              className={cn('absolute inset-y-0 rounded-full motion-safe:animate-pulse', color)}
+              style={{ left: `${left}%`, width: `${width}%`, animationDelay: `${index * 180}ms` }}
+            />
           </div>
         ))}
       </div>
-      <ul className="grid gap-3 sm:grid-cols-3">
-        {PROMISES.map(([title, text]) => (
-          <li key={title} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-            <p className="font-semibold text-stone-900">{title}</p>
-            <p className="mt-1 text-sm text-stone-600">{text}</p>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

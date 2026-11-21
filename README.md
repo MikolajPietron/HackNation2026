@@ -7,7 +7,7 @@ Produkt, domena i zasady pracy: [CLAUDE.md](CLAUDE.md).
 ## Stack
 
 - **Backend**: Python 3.13, FastAPI, uv — `backend/`
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS — `frontend/`
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, komponenty i animacje ze Spectrum UI (Motion), kolory ZUS — `frontend/`
 - **Baza**: Supabase (Postgres), migracje SQL w `supabase/migrations/`
 - **Asystent AI**: Pydantic AI + Claude (przez OpenRouter) — rozmowa zbiera datę porodu i inne fakty, a narzędzia agenta zmieniają oś czasu. Daty liczy deterministyczny silnik reguł, nie AI.
 

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
-import { durationLabel, formatDate, formatLongDate, formatRange } from '../../lib/dates'
-import { cx, LANE, sourceLabel } from '../../lib/ui'
-import type { SourceRef, Timeline } from '../../types'
+import { ChevronRight } from 'lucide-react'
+import { durationLabel, formatDate, formatLongDate, formatRange } from '@/lib/dates'
+import { LANE, sourceLabel } from '@/lib/ui'
+import { cn } from '@/lib/utils'
+import type { SourceRef, Timeline } from '@/types'
 import type { TimelineItem } from './items'
 
 interface Props {
@@ -10,9 +12,10 @@ interface Props {
   onSelect: (id: string) => void
 }
 
+/** What the parent needs about one element: when, how much, who pays, what to file, and the source. */
 export function ElementDetails({ item, timeline, onSelect }: Props) {
   return (
-    <div className="space-y-4 text-sm leading-relaxed text-stone-700">
+    <div className="space-y-4 text-[15px] leading-relaxed text-navy-700">
       <Body item={item} timeline={timeline} onSelect={onSelect} />
       <Sources sources={item.element.sources} />
     </div>
@@ -33,43 +36,41 @@ function Body({ item, timeline, onSelect }: Props) {
             subtitle={
               <>
                 {formatRange(s.start, s.end)}
-                <span className="font-normal text-stone-500"> · {durationLabel(s.days)}</span>
+                <span className="font-normal text-navy-500"> · {durationLabel(s.days)}</span>
               </>
             }
           />
           <p>{s.summary}</p>
-          <dl className="grid gap-x-4 gap-y-1.5 rounded-xl bg-stone-50 p-3 sm:grid-cols-[auto_1fr]">
-            <dt className="text-stone-500">Świadczenie</dt>
-            <dd className="font-medium text-stone-900">{s.benefit}</dd>
-            <dt className="text-stone-500">Kto wypłaca</dt>
+          <dl className="grid gap-x-5 gap-y-1.5 rounded-2xl bg-canvas p-4 text-sm sm:grid-cols-[auto_1fr]">
+            <dt className="text-navy-500">Świadczenie</dt>
+            <dd className="font-bold text-navy-900">{s.benefit}</dd>
+            <dt className="text-navy-500">Kto wypłaca</dt>
             <dd>{s.payer}</dd>
           </dl>
           <Bullets items={s.details} />
           {applications.length > 0 && (
-            <div>
-              <p className="mb-1.5 font-medium text-stone-900">Wnioski</p>
-              <ul className="space-y-1.5">
-                {applications.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(a.id)}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left ring-1 ring-stone-200 transition hover:bg-stone-50"
+            <ul className="space-y-1.5">
+              {applications.map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(a.id)}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-sun-100/60 px-4 py-2.5 text-left text-sm transition-colors hover:bg-sun-100"
+                  >
+                    <span className="min-w-0 flex-1 font-bold text-navy-900">{a.title}</span>
+                    <span
+                      className={cn(
+                        'shrink-0 text-xs font-bold',
+                        a.passed ? 'text-alert-600' : 'text-sun-700',
+                      )}
                     >
-                      <span>{a.title}</span>
-                      <span
-                        className={cx(
-                          'shrink-0 text-xs font-semibold',
-                          a.passed ? 'text-red-700' : 'text-stone-600',
-                        )}
-                      >
-                        {a.is_deadline ? `do ${formatDate(a.due)}` : formatDate(a.due)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                      {a.is_deadline ? `do ${formatDate(a.due)}` : formatDate(a.due)}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-sun-700" />
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </>
       )
@@ -103,7 +104,7 @@ function Body({ item, timeline, onSelect }: Props) {
                 {a.is_deadline ? 'Termin: do ' : 'Potrzebny na: '}
                 {formatLongDate(a.due)}
                 {a.passed && (
-                  <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                  <span className="ml-2 rounded-full bg-alert-50 px-2 py-0.5 text-xs font-bold text-alert-600">
                     termin minął
                   </span>
                 )}
@@ -111,17 +112,18 @@ function Body({ item, timeline, onSelect }: Props) {
             }
           />
           <p>{a.rule}</p>
-          <div className="rounded-xl bg-stone-50 p-3">
-            <p className="text-stone-500">Gdzie złożyć</p>
-            <p className="font-medium text-stone-900">{a.where}</p>
+          <div className="rounded-2xl bg-canvas p-4 text-sm">
+            <p className="text-navy-500">Gdzie złożyć</p>
+            <p className="font-bold text-navy-900">{a.where}</p>
           </div>
           {segment && (
             <button
               type="button"
               onClick={() => onSelect(segment.id)}
-              className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline"
+              className="flex items-center gap-1 text-sm font-bold text-zus-700 underline-offset-2 hover:underline"
             >
-              Dotyczy: {segment.title} →
+              Dotyczy: {segment.title}
+              <ChevronRight className="size-4" />
             </button>
           )}
         </>
@@ -142,10 +144,10 @@ function Header({
   subtitle: ReactNode
 }) {
   return (
-    <header>
-      <p className={cx('text-xs font-semibold tracking-wide uppercase', eyebrowClass)}>{eyebrow}</p>
-      <h3 className="mt-1 text-lg leading-snug font-semibold text-stone-900">{title}</h3>
-      <p className="mt-1 font-medium text-stone-900">{subtitle}</p>
+    <header className="pr-8">
+      <p className={cn('text-xs font-black tracking-widest uppercase', eyebrowClass)}>{eyebrow}</p>
+      <h3 className="mt-1 text-xl leading-snug font-black text-navy-900">{title}</h3>
+      <p className="mt-1 font-bold text-navy-900">{subtitle}</p>
     </header>
   )
 }
@@ -153,7 +155,7 @@ function Header({
 function Bullets({ items }: { items: string[] }) {
   if (items.length === 0) return null
   return (
-    <ul className="list-disc space-y-1 pl-5">
+    <ul className="list-disc space-y-1 pl-5 marker:text-zus-400">
       {items.map((text) => (
         <li key={text}>{text}</li>
       ))}
@@ -161,20 +163,17 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
+/** One quote up front; the rest behind a toggle so the card stays short. */
 function Sources({ sources }: { sources: SourceRef[] }) {
-  const first = sources.slice(0, 2)
-  const rest = sources.slice(2)
+  const [first, ...rest] = sources
+  if (!first) return null
   return (
     <section>
-      <p className="mb-2 font-medium text-stone-900">Źródła</p>
-      <div className="space-y-2">
-        {first.map((source, index) => (
-          <Quote key={index} source={source} />
-        ))}
-      </div>
+      <p className="mb-2 text-xs font-black tracking-widest text-navy-500 uppercase">Źródło</p>
+      <Quote source={first} />
       {rest.length > 0 && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-semibold text-teal-700">
+          <summary className="cursor-pointer text-sm font-bold text-zus-700">
             Więcej źródeł ({rest.length})
           </summary>
           <div className="mt-2 space-y-2">
@@ -190,13 +189,11 @@ function Sources({ sources }: { sources: SourceRef[] }) {
 
 function Quote({ source }: { source: SourceRef }) {
   return (
-    <figure className="rounded-lg border-l-4 border-stone-300 bg-stone-50 px-3 py-2">
+    <figure className="rounded-2xl border-l-4 border-zus-300 bg-zus-50 px-4 py-3">
       {source.quote && (
-        <blockquote className="text-[13px] text-stone-700 italic">„{source.quote}”</blockquote>
+        <blockquote className="text-sm text-navy-700 italic">„{source.quote}”</blockquote>
       )}
-      <figcaption className="mt-1 text-xs font-semibold text-stone-500">
-        {sourceLabel(source)}
-      </figcaption>
+      <figcaption className="mt-1 text-xs font-bold text-zus-700">{sourceLabel(source)}</figcaption>
     </figure>
   )
 }

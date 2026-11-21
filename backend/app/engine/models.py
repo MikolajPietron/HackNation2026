@@ -90,12 +90,24 @@ class Application(BaseModel):
 TimelineElement = Segment | Marker | Application
 
 
+class Stat(BaseModel):
+    """One headline number for the summary tiles, e.g. 20 weeks of maternity leave."""
+
+    id: str
+    label: str
+    value: int
+    unit: str
+    lane: Lane
+    segment_ids: list[str]
+
+
 class Timeline(BaseModel):
     params_version: str
     today: dt.date
     birth_date: dt.date
     child_born: bool
     children_count: int
+    summary: list[Stat] = []
     segments: list[Segment]
     markers: list[Marker]
     applications: list[Application]

@@ -1,44 +1,48 @@
 import type { DocId, Lane, SourceRef } from '../types'
 import { formatDate } from './dates'
 
-export const cx = (...classes: (string | false | null | undefined)[]) =>
-  classes.filter(Boolean).join(' ')
-
-export const LANES: Lane[] = ['mother', 'father', 'child', 'applications']
-
 export const LANE_ORDER: Record<Lane, number> = { child: 0, mother: 1, father: 2, applications: 3 }
 
+/** Colour roles per lane, all from the ZUS palette tokens in index.css. */
 export const LANE: Record<
   Lane,
-  { label: string; bar: string; dot: string; chip: string; text: string }
+  { label: string; initial: string; solid: string; soft: string; dot: string; text: string; chip: string }
 > = {
   mother: {
     label: 'Mama',
-    bar: 'border-rose-300 bg-rose-100 text-rose-950',
-    dot: 'bg-rose-500',
-    chip: 'bg-rose-50 text-rose-800 ring-rose-200',
-    text: 'text-rose-700',
+    initial: 'M',
+    solid: 'bg-zus-600 text-white',
+    soft: 'bg-zus-200 text-zus-900',
+    dot: 'bg-zus-600',
+    text: 'text-zus-700',
+    chip: 'bg-zus-50 text-zus-700 ring-zus-200',
   },
   father: {
     label: 'Tata',
-    bar: 'border-sky-300 bg-sky-100 text-sky-950',
-    dot: 'bg-sky-500',
-    chip: 'bg-sky-50 text-sky-800 ring-sky-200',
-    text: 'text-sky-700',
+    initial: 'T',
+    solid: 'bg-navy-700 text-white',
+    soft: 'bg-navy-200 text-navy-900',
+    dot: 'bg-navy-700',
+    text: 'text-navy-700',
+    chip: 'bg-navy-50 text-navy-700 ring-navy-200',
   },
   child: {
-    label: 'Dziecko i terminy',
-    bar: 'border-amber-300 bg-amber-100 text-amber-950',
-    dot: 'bg-amber-500',
-    chip: 'bg-amber-50 text-amber-800 ring-amber-200',
-    text: 'text-amber-700',
+    label: 'Ważny dzień',
+    initial: '',
+    solid: 'bg-sun-400 text-navy-900',
+    soft: 'bg-sun-100 text-sun-700',
+    dot: 'bg-sun-400',
+    text: 'text-sun-700',
+    chip: 'bg-sun-100 text-sun-700 ring-sun-300',
   },
   applications: {
-    label: 'Wnioski',
-    bar: 'border-violet-300 bg-violet-100 text-violet-950',
-    dot: 'bg-violet-500',
-    chip: 'bg-violet-50 text-violet-800 ring-violet-200',
-    text: 'text-violet-700',
+    label: 'Wniosek',
+    initial: '',
+    solid: 'bg-sun-400 text-navy-900',
+    soft: 'bg-sun-100 text-sun-700',
+    dot: 'bg-sun-400',
+    text: 'text-sun-700',
+    chip: 'bg-sun-100 text-sun-700 ring-sun-300',
   },
 }
 
@@ -57,7 +61,7 @@ export const formatPercent = (value: number) => `${String(value).replace('.', ',
 
 const asDate = (value: unknown) => (typeof value === 'string' ? formatDate(value) : '…')
 
-/** Human label of an assistant tool call, shown as a chip in the chat. */
+/** Human label of an assistant tool call, shown as a step in the chat. */
 export function toolLabel(name: string, args: Record<string, unknown>): string {
   switch (name) {
     case 'set_birth_date':
@@ -79,7 +83,7 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
   }
 }
 
-/** Tools whose result is visible on the timeline (the chip can jump there). */
+/** Tools whose result is visible on the timeline (the step can jump there). */
 export const TIMELINE_TOOLS = new Set([
   'set_birth_date',
   'set_children_count',

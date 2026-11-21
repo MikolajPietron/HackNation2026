@@ -141,3 +141,12 @@ def test_changed_elements_after_twins() -> None:
 def test_missing_birth_date() -> None:
     with pytest.raises(ScenarioError):
         build_timeline(Scenario(), PARAMS, TODAY)
+
+
+def test_summary_tiles() -> None:
+    assert [(s.id, s.value, s.unit) for s in build(maternity_weeks_before_birth=2).summary] == [
+        ("maternity", 20, "tyg."),
+        ("parental", 41, "tyg."),
+        ("paternity", 14, "dni"),
+    ]
+    assert [s.value for s in build(children_count=2).summary] == [31, 43, 14]

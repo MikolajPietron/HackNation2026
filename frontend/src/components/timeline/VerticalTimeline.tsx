@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { dayNumber, durationLabel, formatDate, formatLongDate, formatRange } from '../../lib/dates'
-import { cx, formatPercent, LANE, LANE_ORDER } from '../../lib/ui'
+import { dayNumber, durationLabel, formatDate, formatLongDate, formatRange } from '@/lib/dates'
+import { formatPercent, LANE, LANE_ORDER } from '@/lib/ui'
+import { cn } from '@/lib/utils'
 import { ElementDetails } from './ElementDetails'
 import type { TimelineItem, TimelineViewProps } from './items'
 
@@ -31,10 +32,12 @@ export function VerticalTimeline({
   }, [focus.id, focus.tick])
 
   return (
-    <ol className="relative ml-2 space-y-3 border-l-2 border-stone-200 pl-5">
+    <ol className="relative ml-2 space-y-3 border-l-2 border-line pl-5">
       {sorted.map((item, index) => {
         const isSelected = item.id === selectedId
         const changed = changedIds.has(item.id)
+        const passed = item.kind === 'application' && item.element.passed
+        const example = item.kind === 'segment' && item.element.is_example
         return (
           <Fragment key={item.id}>
             {index === todayIndex && <TodayRow date={timeline.today} />}
@@ -46,12 +49,11 @@ export function VerticalTimeline({
               className="relative scroll-mt-24"
             >
               <span
-                className={cx(
-                  'absolute top-4 -left-[29px] size-4 border-[3px] border-stone-50',
-                  item.kind === 'marker' ? 'rotate-45 rounded-[4px]' : item.kind === 'application' ? 'rounded-[4px]' : 'rounded-full',
-                  item.kind === 'application' && item.element.passed
-                    ? 'bg-red-500'
-                    : LANE[item.lane].dot,
+                className={cn(
+                  'absolute top-5 -left-[29px] size-4 border-[3px] border-canvas',
+                  item.kind === 'segment' ? 'rounded-full' : 'rounded-[4px]',
+                  item.kind === 'marker' && 'rotate-45',
+                  passed ? 'bg-alert-600' : LANE[item.lane].dot,
                 )}
               />
               <button
@@ -59,17 +61,14 @@ export function VerticalTimeline({
                 type="button"
                 onClick={() => onSelect(isSelected ? null : item.id)}
                 aria-expanded={isSelected}
-                className={cx(
-                  'w-full rounded-xl border bg-white p-3.5 text-left shadow-sm transition',
-                  item.kind === 'segment' && item.element.is_example
-                    ? 'border-dashed border-stone-300'
-                    : 'border-stone-200',
-                  isSelected && 'ring-2 ring-stone-900',
-                  changed && 'motion-safe:animate-flash',
+                className={cn(
+                  'w-full rounded-3xl bg-white p-4 text-left shadow-card transition',
+                  isSelected && 'ring-2 ring-navy-900',
+                  changed && 'motion-safe:animate-pop',
                 )}
               >
-                <p className="text-xs font-medium text-stone-500">{dateText(item)}</p>
-                <p className="mt-0.5 font-semibold text-stone-900">{item.title}</p>
+                <p className="text-xs font-bold text-navy-500">{dateText(item)}</p>
+                <p className="mt-0.5 font-black text-navy-900">{item.title}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Chip className={LANE[item.lane].chip}>
                     {item.kind === 'application'
@@ -77,20 +76,20 @@ export function VerticalTimeline({
                       : LANE[item.lane].label}
                   </Chip>
                   {item.kind === 'segment' && (
-                    <Chip className="bg-stone-100 text-stone-700 ring-stone-200">
+                    <Chip className="bg-navy-50 text-navy-700 ring-navy-100">
                       {formatPercent(item.element.rate_percent)} · {durationLabel(item.element.days)}
                     </Chip>
                   )}
-                  {item.kind === 'segment' && item.element.is_example && (
-                    <Chip className="bg-white text-stone-600 ring-stone-300">przykładowy termin</Chip>
+                  {example && (
+                    <Chip className="bg-white text-navy-500 ring-navy-200">przykładowy termin</Chip>
                   )}
-                  {item.kind === 'application' && item.element.passed && (
-                    <Chip className="bg-red-50 text-red-700 ring-red-200">termin minął</Chip>
+                  {passed && (
+                    <Chip className="bg-alert-50 text-alert-600 ring-alert-600/30">termin minął</Chip>
                   )}
                 </div>
               </button>
               {isSelected && (
-                <div className="mt-2 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                <div className="mt-2 rounded-3xl bg-white p-5 shadow-card motion-safe:animate-msg-in">
                   <ElementDetails item={item} timeline={timeline} onSelect={onSelect} />
                 </div>
               )}
@@ -118,8 +117,8 @@ function dateText(item: TimelineItem): string {
 function TodayRow({ date }: { date: string }) {
   return (
     <li className="relative flex items-center gap-2 py-1">
-      <span className="absolute -left-[27px] size-3 rounded-full bg-teal-600 ring-4 ring-teal-100" />
-      <span className="rounded-full bg-teal-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+      <span className="absolute -left-[27px] size-3 rounded-full bg-zus-600 ring-4 ring-zus-100" />
+      <span className="rounded-full bg-zus-600 px-2.5 py-0.5 text-xs font-bold text-white">
         Dziś · {formatDate(date)}
       </span>
     </li>
@@ -128,7 +127,7 @@ function TodayRow({ date }: { date: string }) {
 
 function Chip({ className, children }: { className: string; children: ReactNode }) {
   return (
-    <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1', className)}>
+    <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-bold ring-1', className)}>
       {children}
     </span>
   )

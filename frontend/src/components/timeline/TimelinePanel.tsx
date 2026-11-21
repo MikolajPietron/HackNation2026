@@ -1,12 +1,23 @@
-import { useMemo } from 'react'
-import type { ChangeSet } from '../../hooks/useAssistant'
-import { formatLongDate } from '../../lib/dates'
-import type { Timeline } from '../../types'
-import { AlertIcon } from '../Icons'
+import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { TriangleAlert, X } from 'lucide-react'
+import { TextStates } from '@/components/ui/text-states'
+import type { ChangeSet } from '@/hooks/useAssistant'
+import { formatLongDate } from '@/lib/dates'
+import { EASE_OUT, SPRING_LAYOUT } from '@/lib/ease'
+import { cn } from '@/lib/utils'
+import type { Timeline } from '@/types'
+import { ElementDetails } from './ElementDetails'
 import { EmptyTimeline } from './EmptyTimeline'
-import { HorizontalTimeline } from './HorizontalTimeline'
 import { timelineItems } from './items'
+import { PillTimeline } from './PillTimeline'
 import { VerticalTimeline } from './VerticalTimeline'
+
+type View = 'axis' | 'list'
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'axis', label: 'Oś' },
+  { id: 'list', label: 'Lista' },
+]
 
 interface Props {
   timeline: Timeline | null
@@ -17,85 +28,112 @@ interface Props {
 }
 
 export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }: Props) {
+  const [view, setView] = useState<View>('axis')
   const items = useMemo(() => (timeline ? timelineItems(timeline) : []), [timeline])
   const changedIds = useMemo(() => new Set(changed.ids), [changed])
 
   if (!timeline) {
     return (
-      <div className="p-4 sm:p-6">
+      <div className="p-5 lg:px-8 lg:pt-2 lg:pb-8">
         <EmptyTimeline />
       </div>
     )
   }
 
-  const view = { timeline, items, selectedId, changedIds, changeVersion: changed.version, focus, onSelect }
+  const selected = items.find((item) => item.id === selectedId) ?? null
+  const props = { timeline, items, selectedId, changedIds, changeVersion: changed.version, focus, onSelect }
   const children =
     timeline.children_count === 1 ? '1 dziecko' : `${timeline.children_count} dzieci z jednego porodu`
+  const birth = `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`
 
   return (
-    <div className="space-y-5 p-4 @container sm:p-6">
-      <header className="space-y-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-xl font-semibold text-stone-900">Twoja oś czasu</h2>
-          <p className="text-xs text-stone-500">
-            Liczy kalkulator reguł (bez AI) · parametry {timeline.params_version}
+    // The pill axis needs room; in a narrow column (phone, small laptop) the list takes over.
+    <div className="@container">
+      <div className="space-y-5 p-5 lg:px-8 lg:pt-2 lg:pb-8">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
+            <p className="mt-1 text-sm font-bold text-navy-500">
+              <TextStates text={`${birth} · ${children}`} />
+            </p>
+          </div>
+          <div className="hidden rounded-full bg-white p-1 shadow-card @2xl:flex" role="tablist">
+            {VIEWS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={view === id}
+                onClick={() => setView(id)}
+                className={cn(
+                  'relative rounded-full px-4 py-1.5 text-xs font-bold transition-colors',
+                  view === id ? 'text-white' : 'text-navy-500 hover:text-navy-900',
+                )}
+              >
+                {view === id && (
+                  <motion.span
+                    layoutId="timeline-view"
+                    transition={SPRING_LAYOUT}
+                    className="absolute inset-0 rounded-full bg-zus-600"
+                  />
+                )}
+                <span className="relative">{label}</span>
+              </button>
+            ))}
+          </div>
+        </header>
+
+        {timeline.warnings.map((warning) => (
+          <p
+            key={warning}
+            className="flex gap-2.5 rounded-2xl bg-sun-100 px-4 py-3 text-sm text-sun-700"
+          >
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            {warning}
           </p>
+        ))}
+
+        {view === 'axis' && (
+          <div className="hidden space-y-4 @2xl:block">
+            <PillTimeline {...props} />
+            <AnimatePresence mode="wait">
+              {selected ? (
+                <motion.div
+                  key={selected.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22, ease: EASE_OUT }}
+                  className="relative rounded-3xl bg-white p-6 shadow-card"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelect(null)}
+                    aria-label="Zamknij szczegóły"
+                    className="absolute top-4 right-4 grid size-8 place-items-center rounded-full text-navy-500 transition-colors hover:bg-navy-50 hover:text-navy-900"
+                  >
+                    <X className="size-4" />
+                  </button>
+                  <ElementDetails item={selected} timeline={timeline} onSelect={onSelect} />
+                </motion.div>
+              ) : (
+                <motion.p
+                  key="hint"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="px-1 text-sm text-navy-500"
+                >
+                  Kliknij urlop albo termin, żeby zobaczyć zasady i źródło.
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+        <div className={cn(view === 'axis' && '@2xl:hidden')}>
+          <VerticalTimeline {...props} />
         </div>
-        <p className="text-sm text-stone-600">
-          {timeline.child_born ? 'Data urodzenia' : 'Przewidywana data porodu'}:{' '}
-          <strong className="text-stone-900">{formatLongDate(timeline.birth_date)}</strong> ·{' '}
-          {children}
-        </p>
-      </header>
-
-      {timeline.warnings.map((warning) => (
-        <p
-          key={warning}
-          className="flex gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200"
-        >
-          <AlertIcon className="mt-0.5 size-4 shrink-0" />
-          {warning}
-        </p>
-      ))}
-
-      <Legend />
-
-      <div className="hidden @2xl:block">
-        <HorizontalTimeline {...view} />
       </div>
-      <div className="@2xl:hidden">
-        <VerticalTimeline {...view} />
-      </div>
-
-      <details className="rounded-2xl bg-white p-4 text-sm text-stone-700 shadow-sm ring-1 ring-stone-200">
-        <summary className="cursor-pointer font-medium text-stone-900">Założenia kalkulatora</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          {timeline.assumptions.map((assumption) => (
-            <li key={assumption}>{assumption}</li>
-          ))}
-        </ul>
-      </details>
     </div>
-  )
-}
-
-function Legend() {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-stone-600">
-      <li className="flex items-center gap-1.5">
-        <span className="h-3 w-5 rounded border border-stone-400 bg-stone-100" /> urlop i % podstawy
-        zasiłku
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="h-3 w-5 rounded border border-dashed border-stone-400" /> przykładowy
-        termin
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rotate-45 rounded-[2px] bg-amber-500" /> ważny dzień
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="size-2.5 rounded-sm bg-violet-500" /> wniosek
-      </li>
-    </ul>
   )
 }

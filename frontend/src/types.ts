@@ -61,12 +61,22 @@ export interface Application {
   sources: SourceRef[]
 }
 
+export interface Stat {
+  id: string
+  label: string
+  value: number
+  unit: string
+  lane: Lane
+  segment_ids: string[]
+}
+
 export interface Timeline {
   params_version: string
   today: string
   birth_date: string
   child_born: boolean
   children_count: number
+  summary: Stat[]
   segments: Segment[]
   markers: Marker[]
   applications: Application[]
