@@ -69,6 +69,8 @@ export interface Scenario {
   children_count: number | null
   leave_before_birth_weeks: number | null
   has_medical_certificate: boolean | null
+  /** The real first day of leave before the birth, carried over from the plan at the birth. */
+  leave_start: string | null
   /** Voluntary sickness insurance of a mother on a contract or with her own business. */
   mother_insured: boolean | null
   za_zyciem: boolean | null
