@@ -108,10 +108,15 @@ export const saveParamVersion = (body: { effective_from: string; note: string; v
   requestJson<AdminView>('/api/admin/params', { method: 'POST', body: JSON.stringify(body) })
 
 /** The example family's plan with the parameters in force and with the draft. */
-export const previewParams = (values: ParamValues, childrenCount: number, signal?: AbortSignal) =>
+export const previewParams = (
+  values: ParamValues,
+  childrenCount: number,
+  rate815: boolean,
+  signal?: AbortSignal,
+) =>
   requestJson<ParamPreview>('/api/admin/preview', {
     method: 'POST',
-    body: JSON.stringify({ values, children_count: childrenCount }),
+    body: JSON.stringify({ values, children_count: childrenCount, rate_815: rate815 }),
     signal,
   })
 

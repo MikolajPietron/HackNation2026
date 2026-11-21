@@ -256,8 +256,9 @@ class Rules(BaseModel):
 
 
 class ApplicationParams(BaseModel):
-    """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 12, section I page
-    10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1, 182³ § 2)."""
+    """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
+    page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
+    182³ § 2)."""
 
     paid_by_payer_or_zus: Rule
     payer_more_than_insured: Param[int]
@@ -285,6 +286,15 @@ class ApplicationParams(BaseModel):
     supplementary or parental leave, paternity leave."""
     fixed_term_extended: Rule
     protection_employees_only: Rule
+    # Sick leave in pregnancy (guide page 3): e-ZLA, informing the employer, the forms.
+    sick_e_zla: Rule
+    sick_inform_employer: Rule
+    sick_employee_payer: Rule
+    """The authorized payer pays on the basis of e-ZLA, otherwise sends Z-3 or ZAS-12 to ZUS."""
+    sick_contract: Rule
+    """A contract of mandate: documents to ZUS or the payer; Z-3a."""
+    sick_business: Rule
+    """A business: ZAS-53 to ZUS."""
 
 
 class Params(BaseModel):
