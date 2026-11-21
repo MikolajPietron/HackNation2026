@@ -10,6 +10,9 @@ import type { CaseNote, Marker, Segment, Timeline } from '../types'
  *  out of the 20 weeks of maternity leave). */
 const PART_OF_ANOTHER = new Set(['prenatal-window'])
 
+/** Paid time off in pregnancy, not leave: sick leave and the benefit after losing the job. */
+const isPregnancyBenefit = (s: Segment) => s.id.startsWith('sick-') || s.id === 'job-loss-benefit'
+
 /** The last day a period still to decide can be taken, as the engine marks it. */
 const DEADLINE_OF: Record<string, string> = {
   paternity: 'paternity-deadline',
@@ -98,7 +101,10 @@ export function headline(timeline: Timeline): { title: string; text: string } {
   const parts: string[] = []
   // Before the birth (or before the leave starts) the length of the maternity leave is the news.
   if (active.length === 0) {
-    const maternity = sorted.filter((s) => s.lane === 'mother' && s.tone === 'leave')
+    // Only maternity leave: sick leave in pregnancy is the mother's too, but another period.
+    const maternity = sorted.filter(
+      (s) => s.lane === 'mother' && s.tone === 'leave' && s.id.startsWith('maternity'),
+    )
     if (maternity.length > 0) {
       const days = maternity.reduce((sum, s) => sum + s.days, 0)
       parts.push(
@@ -128,7 +134,7 @@ export interface Budget {
 /** All the leave the family has on the timeline, taken or to decide, per parent. */
 export function leaveBudget(timeline: Timeline): Budget {
   const counted = timeline.segments
-    .filter((s) => s.tone !== 'work' && !PART_OF_ANOTHER.has(s.id))
+    .filter((s) => s.tone !== 'work' && !PART_OF_ANOTHER.has(s.id) && !isPregnancyBenefit(s))
     .sort((a, b) => a.start.localeCompare(b.start))
   const mother = counted.filter((s) => s.lane === 'mother')
   const father = counted.filter((s) => s.lane === 'father')

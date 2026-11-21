@@ -179,7 +179,19 @@ export interface JobLoss {
   court_confirmed: boolean | null
 }
 
-/** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
+/** What the onboarding learned about one parent's work. null = not asked, or "nie wiem". */
+export interface WorkFacts {
+  work: Work | null
+  /** Contract or business only: registered for the voluntary sickness insurance. */
+  insured: boolean | null
+  /** Employment or contract only: does the payer report more than 20 people? */
+  payer_size: PayerSize | null
+  /** Gross salary (employee) or the base of the sickness contribution, per month, in PLN. */
+  pay: number | 'unknown' | null
+}
+
+/** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. `work`,
+ *  `insured`, `payer_size` and `pay` are the respondent's own; `partner` is the other parent. */
 export interface OnboardingAnswers {
   role: Role
   child_born: boolean
@@ -187,9 +199,24 @@ export interface OnboardingAnswers {
   date: string
   children_count: number
   work: Work
-  earnings: Earnings | null
+  insured?: boolean | null
+  payer_size?: PayerSize | null
+  pay?: number | 'unknown' | null
+  partner?: WorkFacts
+  /** No longer asked (the range gave no amounts); kept by the backend for older clients. */
+  earnings?: Earnings | null
   /** A child taken in for upbringing: then `child_born` is true and `date` the child's birth. */
   taken_in?: { kind: TakenIn; date: string } | null
+  /** Born child: premature or in hospital after the birth (the chat asks the details). */
+  hospital_care?: boolean | null
+  /** Born child: weeks of maternity leave the mother took before the birth (0 = none). */
+  leave_before_birth_weeks?: number | null
+  /** Child on the way: the mother's sick leave in this pregnancy; no end = until the birth. */
+  sick_leave?: boolean | null
+  sick_leave_start?: string | null
+  sick_leave_end?: string | null
+  /** The mother's uninterrupted sickness insurance since (from the simulated ZUS data). */
+  insured_since?: string | null
 }
 
 export interface Segment {

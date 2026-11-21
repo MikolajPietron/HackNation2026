@@ -1,5 +1,21 @@
 // Example data for the simulated integrations (FUNKCJE F19, F30–F33). Synthetic: no data from
 // the ZUS case files (CLAUDE.md: only case ids and topics may appear in the app).
+import type { PayerSize, Work } from '@/types'
+
+/** The same account as the engine reads it: what the onboarding fills in after the simulated
+ *  download from ZUS, instead of asking. */
+export interface PersonaFacts {
+  work: Work
+  /** Contract or business: registered for the voluntary sickness insurance. */
+  insured: boolean | null
+  payer: PayerSize | null
+  /** The monthly base of the contributions, in PLN. */
+  pay: number
+  /** ISO date: uninterrupted sickness insurance since. */
+  insuredSince: string
+  /** e-ZLA in this pregnancy, ISO dates; null = none. */
+  sickLeave: { start: string; end: string } | null
+}
 
 export interface Persona {
   id: string
@@ -13,6 +29,7 @@ export interface Persona {
   contributionBase: string
   debt: string
   ezla: { from: string; to: string; code: string; reason: string }[]
+  facts: PersonaFacts
 }
 
 export const PERSONAS: Persona[] = [
@@ -27,6 +44,14 @@ export const PERSONAS: Persona[] = [
     contributionBase: '6 480,00 zł',
     debt: '0,00 zł',
     ezla: [{ from: '2 wrz 2026', to: '15 wrz 2026', code: 'B', reason: 'Niezdolność w okresie ciąży' }],
+    facts: {
+      work: 'employment',
+      insured: null,
+      payer: 'over-20',
+      pay: 6480,
+      insuredSince: '2023-03-01',
+      sickLeave: { start: '2026-09-02', end: '2026-09-15' },
+    },
   },
   {
     id: 'kasia',
@@ -39,6 +64,14 @@ export const PERSONAS: Persona[] = [
     contributionBase: '5 400,00 zł',
     debt: '312,45 zł',
     ezla: [],
+    facts: {
+      work: 'business',
+      insured: true,
+      payer: null,
+      pay: 5400,
+      insuredSince: '2025-06-01',
+      sickLeave: null,
+    },
   },
   {
     id: 'marta',
@@ -51,6 +84,14 @@ export const PERSONAS: Persona[] = [
     contributionBase: '4 200,00 zł',
     debt: '0,00 zł',
     ezla: [{ from: '10 paź 2026', to: '23 paź 2026', code: 'B', reason: 'Niezdolność w okresie ciąży' }],
+    facts: {
+      work: 'contract',
+      insured: true,
+      payer: 'up-to-20',
+      pay: 4200,
+      insuredSince: '2026-02-01',
+      sickLeave: { start: '2026-10-10', end: '2026-10-23' },
+    },
   },
 ]
 

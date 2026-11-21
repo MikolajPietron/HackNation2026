@@ -1,18 +1,19 @@
 """Session endpoints: start one from the onboarding, restore it after a reload, forget it."""
 
 import datetime as dt
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.api.chat import load_history
 from app.api.deps import get_params, get_session_store, get_today
+from app.assistant.agent import MIN_MONTHLY_PAY
 from app.assistant.describe import InterviewQuestion, next_question
 from app.assistant.transcript import to_chat_messages
 from app.engine import Params, Scenario, ScenarioError, Timeline, build_timeline
-from app.engine.models import Earnings, Role, TakenIn, Work
+from app.engine.models import Earnings, Pay, PayerSize, Role, TakenIn, Work
 from app.engine.plausibility import (
     birth_date_problem,
     child_birth_problem,
@@ -42,8 +43,46 @@ class TakenInAnswer(BaseModel):
     """The day of taking in (adoption: and of the court application, the later of the two)."""
 
 
+PAID_WORK = ("employment", "contract", "business")
+
+
+class WorkFacts(BaseModel):
+    """What the onboarding learned about one parent's work. None = not asked, or "nie wiem":
+    the interview in the chat asks it later. The same checks as the assistant's tools."""
+
+    work: Work | None = None
+    insured: bool | None = None
+    """Contract or business only: registered for the voluntary sickness insurance."""
+    payer_size: PayerSize | None = None
+    """Employment or contract only: does the payer report more than 20 people?"""
+    pay: Pay | Literal["unknown"] | None = None
+    """The monthly amount the benefit base comes from: gross salary for an employee, the base of
+    the sickness contribution on a contract or with a business. "unknown" = did not give it."""
+
+    @model_validator(mode="after")
+    def fits_the_work(self) -> Self:
+        if problem := work_facts_problem(self):
+            raise ValueError(problem)
+        return self
+
+
+def work_facts_problem(facts: WorkFacts) -> str | None:
+    """Why these answers about one parent's work do not go together, or None."""
+    if facts.insured is not None and facts.work not in ("contract", "business"):
+        return "Dobrowolne ubezpieczenie chorobowe dotyczy umowy zlecenia i własnej firmy."
+    if facts.payer_size is not None and facts.work not in ("employment", "contract"):
+        return "Liczba osób u płatnika dotyczy etatu i umowy zlecenia."
+    if facts.pay is not None and (facts.work not in PAID_WORK or facts.insured is False):
+        return "Kwotę podaje tylko ktoś, kto pracuje i ma ubezpieczenie chorobowe."
+    if isinstance(facts.pay, float) and facts.pay < MIN_MONTHLY_PAY:
+        return "To bardzo mała kwota miesięczna. Podaj ją w złotych, np. 8000."
+    return None
+
+
 class OnboardingAnswers(BaseModel):
-    """Everything the onboarding asks. Work and earnings are the respondent's own."""
+    """Everything the onboarding asks. `work`, `insured`, `payer_size` and `pay` are the
+    respondent's own; `partner` is what they said about the other parent. Every fact the
+    onboarding gives is one question fewer in the chat (`interview_questions` skips it)."""
 
     role: Role
     child_born: bool
@@ -51,11 +90,53 @@ class OnboardingAnswers(BaseModel):
     """Date of birth when `child_born`, otherwise the expected due date."""
     children_count: int = Field(ge=1, le=10)
     work: Work
+    insured: bool | None = None
+    payer_size: PayerSize | None = None
+    pay: Pay | Literal["unknown"] | None = None
+    partner: WorkFacts = WorkFacts()
     earnings: Earnings | None = None
-    """Not asked when the respondent does not work."""
+    """No longer asked: the range gave no amounts (`pay` does). Kept for older clients."""
     taken_in: TakenInAnswer | None = None
     """Set for a child taken in for upbringing: then `child_born` is true, `date` is the child's
     date of birth and `children_count` the children taken in at once."""
+    # About the mother and the birth; asked only where the interview would ask them.
+    hospital_care: bool | None = None
+    """Born child: premature, or in hospital after the birth. The chat asks the details."""
+    leave_before_birth_weeks: int | None = Field(default=None, ge=0)
+    """Born child: weeks of maternity leave the mother took before the birth (0 = none)."""
+    sick_leave: bool | None = None
+    """Child on the way: the mother is (or was) on sick leave in this pregnancy."""
+    sick_leave_start: dt.date | None = None
+    sick_leave_end: dt.date | None = None
+    """None = until the birth."""
+    insured_since: dt.date | None = None
+    """The mother's uninterrupted sickness insurance since; from the (simulated) ZUS data."""
+
+    @property
+    def own(self) -> WorkFacts:
+        """The respondent's own answers, in the shape of `partner` (checked by the validator)."""
+        return WorkFacts.model_construct(
+            work=self.work, insured=self.insured, payer_size=self.payer_size, pay=self.pay
+        )
+
+    @model_validator(mode="after")
+    def facts_fit_the_case(self) -> Self:
+        if problem := work_facts_problem(self.own):
+            raise ValueError(problem)
+        born = self.child_born and self.taken_in is None
+        expected = not self.child_born and self.taken_in is None
+        about_birth = (self.hospital_care, self.leave_before_birth_weeks)
+        if not born and any(answer is not None for answer in about_birth):
+            raise ValueError(
+                "O szpital i urlop przed porodem pytamy, gdy dziecko już się urodziło."
+            )
+        if not expected and self.sick_leave is not None:
+            raise ValueError("O zwolnienie lekarskie w ciąży pytamy, gdy dziecko jest w drodze.")
+        if self.sick_leave and self.sick_leave_start is None:
+            raise ValueError("Potrzebna jest data początku zwolnienia lekarskiego.")
+        if not self.sick_leave and (self.sick_leave_start or self.sick_leave_end):
+            raise ValueError("Daty zwolnienia podaje się tylko razem ze zwolnieniem.")
+        return self
 
 
 class SessionStart(BaseModel):
@@ -79,18 +160,44 @@ async def start_from_onboarding(
     else:
         check = birth_date_problem if answers.child_born else due_date_problem
         problem = check(answers.date, today)
+    if answers.sick_leave_start is not None and answers.sick_leave_start > today:
+        problem = "Zwolnienie lekarskie nie może zaczynać się w przyszłości. Sprawdź datę."
+    if answers.insured_since is not None and answers.insured_since > today:
+        problem = "Ubezpieczenie nie może zaczynać się w przyszłości. Sprawdź datę."
     if problem:
         raise HTTPException(status_code=422, detail=problem)
+    # The respondent's own facts go to their parent, the partner's to the other one. The own work
+    # stays in `work` (see Scenario.mothers_work).
+    own, partner = answers.own, answers.partner
+    mother, father = (own, partner) if answers.role == "mother" else (partner, own)
+    if answers.sick_leave and mother.work is None:
+        raise HTTPException(
+            status_code=422, detail="Zwolnienie lekarskie: najpierw potrzebna jest praca mamy."
+        )
     scenario = Scenario(
         role=answers.role,
         work=answers.work,
         earnings=answers.earnings,
+        mother_work=mother.work if answers.role == "father" else None,
+        father_work=father.work if answers.role == "mother" else None,
+        mother_insured=mother.insured,
+        father_insured=father.insured,
+        mother_payer_size=mother.payer_size,
+        father_payer_size=father.payer_size,
+        mother_pay=mother.pay,
+        father_pay=father.pay,
         child_born=answers.child_born or taken_in is not None,
         due_date=None if answers.child_born or taken_in else answers.date,
         birth_date=answers.date if answers.child_born or taken_in else None,
         children_count=answers.children_count,
         taken_in=taken_in.kind if taken_in else None,
         taken_in_on=taken_in.date if taken_in else None,
+        hospital_care=answers.hospital_care,
+        leave_before_birth_weeks=answers.leave_before_birth_weeks,
+        sick_leave=answers.sick_leave,
+        sick_leave_start=answers.sick_leave_start,
+        sick_leave_end=answers.sick_leave_end,
+        insured_since=answers.insured_since,
     )
     try:
         timeline = build_timeline(scenario, params, today)
