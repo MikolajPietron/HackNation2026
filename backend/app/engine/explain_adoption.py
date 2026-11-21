@@ -11,11 +11,15 @@ from app.engine.adoption import (
     age_limit,
     children_taken_in,
     cover_of,
+    filler,
+    foster_leave_used,
+    foster_parental_used,
     kind_params,
     other,
     parental_deadline,
     parental_total,
     taken_in_leave,
+    taken_in_supplementary,
     taker,
     work_of,
 )
@@ -23,6 +27,7 @@ from app.engine.draft import merge_sources
 from app.engine.insurance import NOT_INSURED, father_coverage
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
 from app.engine.params import Params
+from app.engine.supplementary import describe_case
 from app.engine.wording import long_date, multiples, weeks_or_days
 
 _WHO = {
@@ -39,9 +44,12 @@ def taken_in_notes(scenario: Scenario, timeline: Timeline, params: Params) -> li
     if cover_of(scenario, taker(scenario)) not in NOT_INSURED:
         optional = [
             _leave(scenario, params, leave),
+            _after_foster(scenario, params, leave),
             _minimum(scenario, params, leave),
             _school(scenario, params, leave),
             _start(scenario, timeline, params),
+            _handover(scenario, timeline, params),
+            _supplementary(scenario, timeline, params),
             _parental(scenario, timeline, params, leave),
             _more_children(scenario, timeline, params),
             _za_zyciem(scenario, timeline, params, leave),
@@ -88,7 +96,7 @@ def _situation(scenario: Scenario, timeline: Timeline) -> CaseNote:
 
 
 def _right(scenario: Scenario, params: Params) -> CaseNote:
-    """Who has the right (guide D) and whether the person filling in is insured."""
+    """Who has the right (guide D) and whether the person who takes the leave is insured."""
     t = params.taken_in
     b = params.benefit
     role = taker(scenario)
@@ -97,6 +105,17 @@ def _right(scenario: Scenario, params: Params) -> CaseNote:
     who_took = _WHO[scenario.taken_in or "foster"]
     rule = f"Zasiłek macierzyński przysługuje osobie ubezpieczonej, która {who_took}."
     base = [t.insured.sources, kind.who.sources, t.benefit.sources]
+    if role != filler(scenario):
+        # The person filling in has no sickness insurance; the other parent took the child in
+        # too and has it, so the leave is theirs.
+        rule = (
+            "Mama nie podlega ubezpieczeniu chorobowemu, więc oś pokazuje urlop taty, który "
+            "przyjął dziecko razem z nią. "
+            if role == "father"
+            else "Tata nie podlega ubezpieczeniu chorobowemu, więc oś pokazuje urlop mamy, która "
+            "przyjęła dziecko razem z nim. "
+        ) + rule
+        base.append(b.paid_to_the_insured.sources)
     work = _WORK.get(work_of(scenario, role) or "", "")
     match cover_of(scenario, role):
         case "obligatory":
@@ -175,7 +194,7 @@ def _right(scenario: Scenario, params: Params) -> CaseNote:
 
 
 def _leave(scenario: Scenario, params: Params, leave: TakenInLeave | None) -> CaseNote | None:
-    if leave is None:
+    if leave is None or leave.used_up:
         return None
     t = params.taken_in
     kind = kind_params(scenario.taken_in or "foster", params)
@@ -224,6 +243,136 @@ def _minimum(scenario: Scenario, params: Params, leave: TakenInLeave | None) -> 
             f"{t.minimum_weeks.value} tygodni urlopu na warunkach urlopu macierzyńskiego."
         ),
         sources=t.minimum_weeks.sources,
+    )
+
+
+def _after_foster(
+    scenario: Scenario, params: Params, leave: TakenInLeave | None
+) -> CaseNote | None:
+    """§ 7-§ 8: adoption after foster care, less the leave used as a foster family."""
+    used, parental = foster_leave_used(scenario), foster_parental_used(scenario)
+    if leave is None or not (used or parental):
+        return None
+    t = params.taken_in
+    parts = [
+        "Dziecko było najpierw w rodzinie zastępczej, a potem wystąpiliście o przysposobienie."
+    ]
+    sources = []
+    if used:
+        rule = (
+            f"Urlop na warunkach urlopu macierzyńskiego przysługuje wtedy w wymiarze "
+            f"{leave.weeks} tyg. obniżonym o urlop wykorzystany jako rodzina zastępcza: "
+            f"{used} dni"
+        )
+        if leave.used_up:
+            parts.append(f"{rule}, więc z tego urlopu nic już nie zostaje.")
+        else:
+            parts.append(f"{rule}, więc zostaje {weeks_or_days(leave.weeks * 7 - used)}.")
+        sources.append(t.after_foster_leave.sources)
+    if parental:
+        total = parental_total(scenario, params, leave)
+        parts.append(
+            f"Urlop rodzicielski przysługuje w wymiarze do {total.value} tyg. obniżonym "
+            f"o {parental} tyg. wykorzystane w rodzinie zastępczej."
+        )
+        sources += [t.after_foster_parental.sources, total.sources]
+    return CaseNote(
+        id="after-foster",
+        kind="risk" if leave.used_up else "right",
+        title="Najpierw rodzina zastępcza: urlop krótszy o wykorzystaną część",
+        text=" ".join(parts),
+        sources=merge_sources(*sources),
+    )
+
+
+def _handover(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
+    """§ 2 with art. 180 § 4: the other parent takes the rest of the leave."""
+    if not scenario.taken_in_handover:
+        return None
+    own = _segment(timeline, "adoption-leave")
+    if own is None:
+        return None
+    t = params.taken_in
+    role = taker(scenario)
+    partner = other(role)
+    rule = (
+        f"Po wykorzystaniu co najmniej {t.handover_after_weeks.value} tygodni urlopu na "
+        "warunkach urlopu macierzyńskiego można zrezygnować z jego dalszej części, jeśli "
+        "wykorzysta ją drugi rodzic."
+    )
+    sources = merge_sources(t.handover_after_weeks.sources, params.father.total_cap.sources)
+    passed = _segment(timeline, "adoption-leave-other")
+    if passed is None:
+        return CaseNote(
+            id="handover",
+            kind="risk",
+            title="Dalszej części urlopu nie przejmie drugi rodzic",
+            text=(
+                f"{rule} Może to być pracownik albo osoba ubezpieczona, która przerwie pracę, "
+                f"żeby opiekować się dzieckiem, a {PERSON[partner]} nie podlega ubezpieczeniu "
+                f"chorobowemu, więc urlop zostaje u {'mamy' if role == 'mother' else 'taty'}."
+            ),
+            sources=sources,
+        )
+    return CaseNote(
+        id="handover",
+        kind="choice",
+        title=f"Dalszą część urlopu wykorzysta {PERSON[partner]}",
+        text=(
+            f"{rule} {PERSON[role].capitalize()} wykorzystuje urlop do {long_date(own.end)}, "
+            f"a {PERSON[partner]} od {long_date(passed.start)} do {long_date(passed.end)}. "
+            "Łączny wymiar urlopu się nie zmienia."
+        ),
+        sources=sources,
+    )
+
+
+def _supplementary(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
+    """§ 3¹: supplementary leave for the days in hospital after taking the child in."""
+    if _segment(timeline, "adoption-leave") is None:
+        return None
+    t = params.taken_in
+    s = params.supplementary
+    segment = _segment(timeline, "supplementary")
+    found = taken_in_supplementary(scenario, params, timeline.today)
+    rule = (
+        "Za pobyt dziecka w szpitalu po przyjęciu na wychowanie przysługuje uzupełniający urlop "
+        "macierzyński, na tych samych zasadach co po porodzie."
+    )
+    if segment is None or found is None:
+        if not (scenario.hospital_care and scenario.hospital_stays):
+            return None
+        return CaseNote(
+            id="supplementary",
+            kind="risk",
+            title="Uzupełniający urlop macierzyński: pobyt w szpitalu się nie liczy",
+            text=(
+                f"{rule} Liczą się tylko dni w szpitalu od dnia przyjęcia dziecka, w okresie "
+                "liczonym od porodu; z podanych pobytów nie wychodzi żaden taki dzień."
+            ),
+            sources=merge_sources(t.supplementary.sources, s.situations.sources),
+        )
+    case_sources = {
+        "early": s.limit_weeks_early.sources,
+        "preterm": s.limit_weeks_preterm.sources,
+        "term": s.term.sources,
+    }[found.case]
+    return CaseNote(
+        id="supplementary",
+        kind="relief",
+        title=f"Uzupełniający urlop macierzyński: {found.weeks} tyg.",
+        text=(
+            f"{rule} {describe_case(found, params)} Po przyjęciu dziecka liczy się {found.days} "
+            f"{'dzień' if found.days == 1 else 'dni'} w szpitalu, więc {found.weeks} tyg. "
+            "urlopu, bezpośrednio po urlopie na warunkach urlopu macierzyńskiego: od "
+            f"{long_date(segment.start)} do {long_date(segment.end)}."
+        ),
+        sources=merge_sources(
+            t.supplementary.sources,
+            case_sources,
+            s.sum_and_round.sources,
+            s.once_after_maternity.sources,
+        ),
     )
 
 
@@ -280,6 +429,8 @@ def _parental(
     t = params.taken_in
     p = params.parental
     total = parental_total(scenario, params, leave)
+    used = foster_parental_used(scenario)
+    pool = total.value - used
     exclusive = p.exclusive_weeks.value
     deadline = parental_deadline(scenario, params)
     until = (
@@ -301,6 +452,9 @@ def _parental(
         if leave.minimum
         else ""
     )
+    if used:
+        after_minimum += f" Po odjęciu tygodni wykorzystanych w rodzinie zastępczej: do {pool} tyg."
+        sources.append(t.after_foster_parental.sources)
     return CaseNote(
         id="parental",
         kind="choice",
@@ -309,7 +463,7 @@ def _parental(
             "Urlop rodzicielski przysługuje tak jak przy urodzeniu dziecka, z uwzględnieniem "
             f"jego wieku. Rodzice mają razem do {total.value} tyg.{after_minimum} Każde z nich ma "
             f"{exclusive} tyg. wyłącznie dla siebie, więc {PERSON[role]} może wykorzystać "
-            f"najwięcej {total.value - exclusive} tyg. Urlop można wziąć jednorazowo albo "
+            f"najwięcej {pool - exclusive} tyg. Urlop można wziąć jednorazowo albo "
             f"w nie więcej niż {p.max_parts.value} częściach.{until}"
         ),
         sources=merge_sources(*sources),
@@ -405,6 +559,25 @@ def _computed(
 ) -> CaseNote:
     kind = kind_params(scenario.taken_in or "foster", params)
     own = _segment(timeline, "adoption-leave")
+    if own is None and leave is not None and leave.used_up:
+        # § 7: nothing of the leave is left; parental leave may still be on the timeline.
+        text = "Urlopu na warunkach urlopu macierzyńskiego nie ma na osi: wykorzystano go."
+        for segment_id, whose in (("parental", "mamy"), ("parental-father", "taty")):
+            segment = _segment(timeline, segment_id)
+            if segment is not None:
+                text += (
+                    f" Urlop rodzicielski {whose}: {weeks_or_days(segment.days)}, od "
+                    f"{long_date(segment.start)} do {long_date(segment.end)}."
+                )
+        return CaseNote(
+            id="computed",
+            kind="computed",
+            title="Co policzyliśmy",
+            text=f"{text} Tydzień urlopu to 7 dni kalendarzowych.",
+            sources=merge_sources(
+                params.taken_in.after_foster_leave.sources, params.rules.week_is_7_days.sources
+            ),
+        )
     if own is None:
         if leave is None and scenario.children_count is None:
             return CaseNote(
@@ -441,6 +614,20 @@ def _computed(
             "dzień wcześniej."
         )
         sources.append(limit.sources)
+    passed = _segment(timeline, "adoption-leave-other")
+    if passed is not None:
+        text += (
+            f" Dalsza część tego urlopu ({PERSON[passed.lane]}): {weeks_or_days(passed.days)}, "
+            f"od {long_date(passed.start)} do {long_date(passed.end)}."
+        )
+        sources.append(params.taken_in.handover_after_weeks.sources)
+    supplementary = _segment(timeline, "supplementary")
+    if supplementary is not None:
+        text += (
+            f" Uzupełniający urlop macierzyński: {weeks_or_days(supplementary.days)}, od "
+            f"{long_date(supplementary.start)} do {long_date(supplementary.end)}."
+        )
+        sources.append(params.taken_in.supplementary.sources)
     for segment_id, whose in (("parental", "mamy"), ("parental-father", "taty")):
         segment = _segment(timeline, segment_id)
         if segment is not None:

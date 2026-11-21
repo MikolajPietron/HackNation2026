@@ -37,6 +37,15 @@ PROVISIONS = {
     "art. 3 pkt 3": ("Art. 3 [", "pkt", "3"),
     "art. 3 pkt 4": ("Art. 3 [", "pkt", "4"),
     "art. 11 ust. 4": ("Art. 11 [", "ust", "4"),
+    "art. 11 ust. 5": ("Art. 11 [", "ust", "5"),
+    # Świadczenie rehabilitacyjne after the sickness benefit in pregnancy (art. 18-19).
+    "art. 18 ust. 1": ("Art. 18 [", "ust", "1"),
+    "art. 18 ust. 2": ("Art. 18 [", "ust", "2"),
+    "art. 18 ust. 3": ("Art. 18 [", "ust", "3"),
+    "art. 18 ust. 4": ("Art. 18 [", "ust", "4"),
+    "art. 18 ust. 6": ("Art. 18 [", "ust", "6"),
+    "art. 19 ust. 1": ("Art. 19 [", "ust", "1"),
+    "art. 22": ("Art. 22 [", None, None),
     "art. 30a ust. 1": ("Art. 30a [", "ust", "1"),
     "art. 31 ust. 1": ("Art. 31 [", "ust", "1"),
     "art. 31 ust. 2": ("Art. 31 [", "ust", "2"),
@@ -109,6 +118,8 @@ def provision(text: str, kind: str | None, number: str | None) -> str:
         if not match:
             raise SystemExit(f"{kind} {number} not found")
         body = match.group(1)
+    # The excerpt marks omitted provisions with "(…)"; what follows is not this provision.
+    body = body.split("(…)")[0]
     body = re.sub(r"\s+", " ", body).strip()
     for found, restored in (GLUED | FLAT).items():
         body = body.replace(found, restored)

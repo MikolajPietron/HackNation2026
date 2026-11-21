@@ -1025,6 +1025,81 @@
           "quote": "ZUS po przeprowadzeniu postępowania, może uznać że podwyższenie podstawy wymiaru składek miało wyłącznie na celu uzyskanie wyższych świadczeń i wydać decyzję ustalającą niższą podstawę, co będzie miało wpływ na wysokość zasiłków"
         }
       ]
+    },
+    "rehab_benefit": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "U",
+          "page": 1,
+          "quote": "choroby osoby ubezpieczonej, w tym choroby w czasie ciąży (zasiłek chorobowy i świadczenia rehabilitacyjne)"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 18 ust. 1",
+          "quote": "Świadczenie rehabilitacyjne przysługuje ubezpieczonemu, który po wyczerpaniu zasiłku chorobowego jest nadal niezdolny do pracy, a dalsze leczenie lub rehabilitacja lecznicza rokują odzyskanie zdolności do pracy."
+        }
+      ]
+    },
+    "rehab_max_months": {
+      "value": 12,
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 18 ust. 2",
+          "quote": "Świadczenie rehabilitacyjne przysługuje przez okres niezbędny do przywrócenia zdolności do pracy, nie dłużej jednak niż przez 12 miesięcy."
+        }
+      ]
+    },
+    "rehab_month_days": {
+      "value": 30,
+      "note": "12 miesięcy świadczenia rehabilitacyjnego to 360 dni.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 22",
+          "quote": "Do świadczenia rehabilitacyjnego stosuje się odpowiednio przepisy art. 11 ust. 4 i 5"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 11 ust. 5",
+          "quote": "Ilekroć przy ustalaniu prawa do zasiłku chorobowego lub jego wysokości okres jest oznaczony w miesiącach, za miesiąc uważa się 30 dni."
+        }
+      ]
+    },
+    "rehab_decides": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 18 ust. 3",
+          "quote": "O okolicznościach, o których mowa w ust. 1 i 2, orzeka lekarz orzecznik Zakładu Ubezpieczeń Społecznych."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 18 ust. 6",
+          "quote": "Orzeczenie lekarza orzecznika, od którego nie wniesiono sprzeciwu lub co do którego nie wniesiono zarzutu wadliwości, albo orzeczenie komisji lekarskiej Zakładu Ubezpieczeń Społecznych stanowi podstawę do wydania decyzji w sprawie świadczenia rehabilitacyjnego."
+        }
+      ]
+    },
+    "rehab_objection": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 18 ust. 4",
+          "quote": "Od orzeczenia lekarza orzecznika ubezpieczonemu przysługuje sprzeciw do komisji lekarskiej Zakładu Ubezpieczeń Społecznych"
+        }
+      ]
+    },
+    "rehab_rate_percent": {
+      "value": 100,
+      "note": "Gdy niezdolność do pracy przypada w okresie ciąży; poza ciążą 90% przez pierwsze trzy miesiące, potem 75%.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 19 ust. 1",
+          "quote": "Świadczenie rehabilitacyjne wynosi 90% podstawy wymiaru zasiłku chorobowego za okres pierwszych trzech miesięcy, 75% tej podstawy za pozostały okres, a jeżeli niezdolność do pracy przypada w okresie ciąży - 100% tej podstawy."
+        }
+      ]
     }
   },
   "rules": {
@@ -1677,6 +1752,49 @@
           "section": "B.4",
           "page": 8,
           "quote": "ale nie później niż do ukończenia przez dziecko 14 lat."
+        }
+      ]
+    },
+    "supplementary": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 3¹",
+          "quote": "Pracownik, o którym mowa w § 1 albo § 1¹, ma prawo do uzupełniającego urlopu macierzyńskiego na zasadach określonych w art. 180², jeżeli pobyt dziecka w szpitalu miał miejsce po przyjęciu dziecka na wychowanie."
+        }
+      ]
+    },
+    "handover_after_weeks": {
+      "value": 14,
+      "note": "Art. 183 § 2 każe stosować art. 180 § 4-17 odpowiednio: „14 tygodni po porodzie” czytamy jako 14 tygodni urlopu na warunkach urlopu macierzyńskiego, a dalszą część może wykorzystać drugi rodzic.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 2",
+          "quote": "Do urlopu na warunkach urlopu macierzyńskiego przepisy art. 45 § 3, art. 47, art. 57 § 2, art. 163 § 3, art. 165 pkt 4, art. 166 pkt 4, art. 180 § 4-17, art. 180¹ § 2 i art. 181 stosuje się odpowiednio."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 180 § 4",
+          "quote": "Pracownica, po wykorzystaniu po porodzie co najmniej 14 tygodni urlopu macierzyńskiego, ma prawo zrezygnować z pozostałej części tego urlopu i powrócić do pracy, jeżeli: 1) pozostałą część urlopu macierzyńskiego wykorzysta pracownik - ojciec wychowujący dziecko; 2) przez okres odpowiadający okresowi, który pozostał do końca urlopu macierzyńskiego, osobistą opiekę nad dzieckiem będzie sprawował ubezpieczony - ojciec dziecka, który w celu sprawowania tej opieki przerwał działalność zarobkową."
+        }
+      ]
+    },
+    "after_foster_leave": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 7",
+          "quote": "Pracownik, który korzysta lub korzystał z urlopu na warunkach urlopu macierzyńskiego w związku z przyjęciem dziecka na wychowanie jako rodzina zastępcza, a następnie wystąpił do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka, ma prawo do urlopu na warunkach urlopu macierzyńskiego w związku z wystąpieniem do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka w wymiarze określonym w § 1¹ obniżonym o wykorzystany urlop na warunkach urlopu macierzyńskiego w związku z przyjęciem dziecka na wychowanie jako rodzina zastępcza."
+        }
+      ]
+    },
+    "after_foster_parental": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183 § 8",
+          "quote": "Pracownik, który korzysta lub korzystał z urlopu rodzicielskiego w związku z przyjęciem dziecka na wychowanie jako rodzina zastępcza, a następnie wystąpił do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka, ma prawo do urlopu rodzicielskiego w związku z wystąpieniem do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka w wymiarze określonym w § 4¹ albo 4² albo § 4⁴ albo 4⁵, obniżonym o wykorzystany urlop rodzicielski w związku z przyjęciem dziecka na wychowanie jako rodzina zastępcza."
         }
       ]
     },

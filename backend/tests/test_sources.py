@@ -111,7 +111,9 @@ def test_labour_code_provisions() -> None:
         "art. 182³ § 3",
         "art. 183 § 1",
         "art. 183 § 1¹",
+        "art. 183 § 2",
         "art. 183 § 3",
+        "art. 183 § 3¹",
         "art. 183 § 4",
         "art. 183 § 4¹",
         "art. 183 § 4²",
@@ -121,6 +123,8 @@ def test_labour_code_provisions() -> None:
         "art. 183 § 4⁶",
         "art. 183 § 5",
         "art. 183 § 6",
+        "art. 183 § 7",
+        "art. 183 § 8",
         "art. 183¹ § 1",
         "art. 183¹ § 2",
     }
@@ -164,6 +168,14 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 3 pkt 3",
         "art. 3 pkt 4",
         "art. 11 ust. 4",
+        "art. 11 ust. 5",
+        "art. 18 ust. 1",
+        "art. 18 ust. 2",
+        "art. 18 ust. 3",
+        "art. 18 ust. 4",
+        "art. 18 ust. 6",
+        "art. 19 ust. 1",
+        "art. 22",
         "art. 30a ust. 1",
         "art. 31 ust. 1",
         "art. 31 ust. 2",
@@ -185,6 +197,10 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert texts["art. 3 pkt 3"].startswith("wynagrodzenie - przychód pracownika")
     assert "13,71%" in texts["art. 3 pkt 4"]
     assert texts["art. 31 ust. 5"].endswith("art. 12 ust. 1 i ust. 2 pkt 1 i 3.")
+    # The rehabilitation benefit: the excerpt's "(…)" after art. 22 is not part of it.
+    assert texts["art. 22"].endswith("art. 13 ust. 1, art. 15 i 17.")
+    assert "nie dłużej jednak niż przez 12 miesięcy" in texts["art. 18 ust. 2"]
+    assert "w okresie ciąży - 100% tej podstawy" in texts["art. 19 ust. 1"]
     assert all("Legalis" not in t and "ROZDZIAŁ" not in t for t in texts.values())
     assert SECTIONS["G.3"].text.startswith("Jeżeli ubezpieczona-matka, niepóźnej niż 21 dni")
 
@@ -490,6 +506,29 @@ def pregnancy_scenarios() -> list[dict[str, Any]]:
         | {"insured_in_pregnancy": True, "contribution_base_raised": True}
         for work in ("contract", "business", "employment")
     ]
+    # The rehabilitation benefit after the 270 days: not told, applied for, granted (with an
+    # end), refused; before the leave before the birth; after the birth; a short sick leave.
+    long_sick = {"sick_leave": True, "sick_leave_start": "2026-06-01"}
+    for status in (None, "applied", "granted", "refused"):
+        for extra in (
+            {"leave_before_birth_weeks": 0},
+            {"leave_before_birth_weeks": 1},
+            {"rehab_benefit_end": "2027-03-05", "leave_before_birth_weeks": 0},
+        ):
+            cases.append(employed | long_sick | {"rehab_benefit": status} | extra)
+    cases += [
+        employed | {"due_date": "2027-03-01"} | long_sick | {"rehab_benefit": "granted"},
+        employed
+        | {"sick_leave": True, "sick_leave_start": "2026-05-01", "rehab_benefit": "granted"}
+        | {"job_loss": {"ended_on": "2027-02-10", "reason": "liquidation"}},
+        {"due_date": "2027-03-15", "birth_date": "2027-03-01", "child_born": True}
+        | {"role": "mother", "work": "business", "mother_insured": True, "children_count": 1}
+        | long_sick
+        | {"rehab_benefit": "applied"},
+        employed
+        | {"sick_leave": True, "sick_leave_start": "2026-11-02"}
+        | {"rehab_benefit": "applied"},
+    ]
     return cases
 
 
@@ -531,6 +570,53 @@ def taken_in_scenarios() -> list[dict[str, Any]]:
         for final in ("2026-11-15", "2026-11-20")
     ]
     cases.append(base | ruling | {"birth_date": "2024-05-10", "adoption_final": False})
+    # Art. 183 edge cases: the uninsured person's partner takes the leave, passing the leave on
+    # (to an insured or uninsured parent), supplementary leave, adoption after foster care.
+    cases += [
+        base
+        | {"taken_in": kind, "birth_date": "2024-05-10"}
+        | {"role": role, "work": "none"}
+        | ({"father_work": work} if role == "mother" else {"mother_work": work})
+        for kind in ("adoption", "foster")
+        for role in ("mother", "father")
+        for work in ("employment", "business", "none")
+    ]
+    cases += [
+        base
+        | {"taken_in": kind, "birth_date": "2024-05-10", "role": "father", "work": "employment"}
+        | {"mother_work": work, "taken_in_handover": True, "taken_in_handover_after_weeks": weeks}
+        for kind in ("adoption", "foster")
+        for work in ("employment", "contract", "none")
+        for weeks in (None, 16)
+    ]
+    newborn = base | {"taken_in_on": "2026-09-20", "birth_date": "2026-09-01", "role": "mother"}
+    newborn |= {"work": "employment", "father_work": "employment", "hospital_care": True}
+    cases += [
+        newborn
+        | {"taken_in": kind, "birth_week": week, "birth_weight_up_to_1000g": light}
+        | {"hospital_stays": stays}
+        for kind in ("adoption", "foster")
+        for week, light in (("before-28", True), ("28-37", False), ("after-37", False))
+        for stays in (
+            [{"start": "2026-09-01", "end": "2026-10-10"}],
+            [{"start": "2026-09-01", "end": "2026-09-15"}],
+            [{"start": "2026-10-01", "end": None}],
+        )
+    ]
+    cases.append(newborn | {"taken_in": "adoption", "hospital_care": None})
+    adopted = base | {"taken_in": "adoption", "taken_in_on": "2026-10-01"}
+    adopted |= {"birth_date": "2020-03-15", "role": "mother", "work": "employment"}
+    adopted |= {"father_work": "employment"}
+    cases += [
+        adopted | {"foster_before": before}
+        for before in (
+            {"leave_start": "2026-08-03", "leave_end": "2026-12-31"},
+            {"leave_start": "2026-01-05", "leave_end": "2026-05-24", "parental_weeks": 10},
+            {"parental_weeks": 38},
+            {"leave_start": "2026-08-03", "leave_end": "2026-09-30", "parental_weeks": 2},
+        )
+    ]
+    cases.append(adopted | {"za_zyciem": True, "foster_before": {"parental_weeks": 5}})
     return cases
 
 

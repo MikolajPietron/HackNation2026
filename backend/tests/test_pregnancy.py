@@ -6,18 +6,32 @@ pages 2-4 and 9-10, Labour Code art. 92). Expected dates were computed by hand:
 - 33 days from 01.01.2027 end on 02.02.2027 (31 + 2);
 - insured since 01.10.2026, 90 days: the right begins on 30.12.2026 (30 + 31 + 29 days);
 - 270 days from 01.06.2026: June 30, July 31, August 31, September 30, October 31, November 30,
-  December 31 (214), January 31 (245) and 25 days of February: the last is 25.02.2027.
+  December 31 (214), January 31 (245) and 25 days of February: the last is 25.02.2027;
+- the rehabilitation benefit from 26.02.2027 to 14.03.2027, the day before the due date:
+  3 days of February + 14 of March = 17 days; to 05.03.2027: 3 + 5 = 8 days;
+- 270 days from 01.01.2025: January 31, February 28 (59), March 31 (90), April 30 (120), May 31
+  (151), June 30 (181), July 31 (212), August 31 (243) and 27 days of September: 27.09.2025;
+  12 months of 30 days = 360 days from 28.09.2025: 3 + 31 + 30 + 31 (95), 2026: 31 + 28 + 31 +
+  30 + 31 + 30 + 31 + 31 (338) and 22 days of September: the last is 22.09.2026.
 """
 
 import datetime as dt
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.api.deps import get_param_store, get_session_store, get_today
 from app.assistant.describe import interview_questions
 from app.engine import Scenario, ScenarioError, Timeline, build_timeline
 from app.engine.insurance import coverage
-from app.engine.models import CaseNote
+from app.engine.models import CaseNote, Segment
+from app.main import app
+from app.services.param_versions import MemoryParamStore
 from app.services.params import load_params
+from app.services.sessions import MemorySessionStore
+from tests.test_chat_api import SESSION, ask, rejected, scripted, timeline_after
 
 PARAMS = load_params()
 TODAY = dt.date(2026, 11, 21)
@@ -336,3 +350,134 @@ def test_the_interview_asks_about_sick_leave_then_insurance_then_age() -> None:
 def span_of(timeline: Timeline, segment_id: str) -> tuple[dt.date, dt.date]:
     segment = next(s for s in timeline.segments if s.id == segment_id)
     return segment.start, segment.end
+
+
+# The rehabilitation benefit after the 270 days (guide page 1; ustawa art. 18-19, 22).
+
+LONG_SICK_LEAVE = {"leave_before_birth_weeks": 0, "sick_leave": True}
+LONG_SICK_LEAVE |= {"sick_leave_start": "2026-06-01", "mother_over_50": False}
+
+
+def test_after_270_days_the_note_explains_the_rehabilitation_benefit() -> None:
+    t = expecting(**LONG_SICK_LEAVE)
+    assert t.element("rehab-benefit") is None  # never drawn before the parent mentions it
+    rehab = note(t, "rehab-benefit")
+    assert rehab.kind == "right"
+    assert "Okres zasiłkowy kończy się 25 lutego 2027, a zwolnienie trwa dłużej" in rehab.text
+    assert "dalsze leczenie lub rehabilitacja lecznicza rokują odzyskanie" in rehab.text
+    assert "nie dłużej niż 12 miesięcy" in rehab.text
+    assert "100% podstawy wymiaru zasiłku chorobowego" in rehab.text
+    assert "orzeka lekarz orzecznik ZUS" in rehab.text
+    articles = {s.article for s in rehab.sources if s.doc == "ustawa"}
+    assert {"art. 18 ust. 1", "art. 18 ust. 2", "art. 18 ust. 3", "art. 19 ust. 1"} <= articles
+    assert any(s.section == "U" and s.page == 1 for s in rehab.sources)
+    # It comes right after the sick leave, and the 270-day marker points to it.
+    ids = [n.id for n in t.notes]
+    assert ids.index("rehab-benefit") == ids.index("sick-leave") + 1
+    limit = t.element("sick-benefit-limit")
+    assert limit is not None and "świadczenie rehabilitacyjne" in limit.details[0]  # type: ignore[union-attr]
+    # A shorter sick leave: no note.
+    short = expecting(sick_leave=True, sick_leave_start="2026-11-02", sick_leave_end="2026-11-20")
+    assert "rehab-benefit" not in [n.id for n in short.notes]
+
+
+def test_rehabilitation_benefit_applied_for_or_granted_is_drawn_until_the_birth() -> None:
+    applied = expecting(**LONG_SICK_LEAVE, rehab_benefit="applied")
+    rehab = applied.element("rehab-benefit")
+    assert isinstance(rehab, Segment)
+    assert (rehab.lane, rehab.tone, rehab.start, rehab.end, rehab.days) == (
+        "mother",
+        "option",
+        d("2027-02-26"),
+        d("2027-03-14"),
+        17,
+    )
+    assert rehab.title == "Świadczenie rehabilitacyjne — jeśli zostanie przyznane"
+    assert "Na osi pokazujemy je jako możliwe od 26 lutego 2027 do 14 marca 2027" in (
+        note(applied, "rehab-benefit").text
+    )
+    granted = expecting(**LONG_SICK_LEAVE, rehab_benefit="granted")
+    rehab = granted.element("rehab-benefit")
+    assert isinstance(rehab, Segment)
+    assert (rehab.tone, rehab.title) == ("leave", "Świadczenie rehabilitacyjne")
+    assert "100% podstawy wymiaru zasiłku chorobowego" in rehab.summary
+    # Maternity leave still starts on the due date.
+    assert span_of(granted, "maternity") == (DUE, d("2027-08-01"))
+    # The end of the period granted, when the parent gave it.
+    until = expecting(**LONG_SICK_LEAVE, rehab_benefit="granted", rehab_benefit_end="2027-03-05")
+    assert span_of(until, "rehab-benefit") == (d("2027-02-26"), d("2027-03-05"))
+    assert until.element("rehab-benefit").days == 8  # type: ignore[union-attr]
+    with pytest.raises(ScenarioError, match="po wyczerpaniu zasiłku chorobowego"):
+        expecting(**LONG_SICK_LEAVE, rehab_benefit="granted", rehab_benefit_end="2027-02-20")
+
+
+def test_a_refused_rehabilitation_benefit_says_how_to_object() -> None:
+    t = expecting(**LONG_SICK_LEAVE, rehab_benefit="refused")
+    assert t.element("rehab-benefit") is None
+    rehab = note(t, "rehab-benefit")
+    assert (rehab.kind, rehab.title) == ("risk", "Świadczenia rehabilitacyjnego nie przyznano")
+    assert "sprzeciw do komisji lekarskiej ZUS" in rehab.text
+    assert any(s.article == "art. 18 ust. 4" for s in rehab.sources)
+
+
+def test_no_rehabilitation_benefit_while_the_sick_leave_is_shorter() -> None:
+    t = expecting(
+        sick_leave=True,
+        sick_leave_start="2026-11-02",
+        sick_leave_end="2026-11-20",
+        rehab_benefit="granted",
+    )
+    assert t.element("rehab-benefit") is None
+    assert "rehab-benefit" not in [n.id for n in t.notes]
+    assert any("go nie pokazujemy" in a for a in t.assumptions)
+
+
+def test_the_rehabilitation_benefit_lasts_at_most_12_months_of_30_days() -> None:
+    """Only an implausibly long sick leave reaches the limit; the rule still holds."""
+    t = expecting(
+        leave_before_birth_weeks=0,
+        sick_leave=True,
+        sick_leave_start="2025-01-01",
+        insured_since="2020-01-01",
+        rehab_benefit="granted",
+    )
+    assert t.element("sick-benefit-limit").date == d("2025-09-27")  # type: ignore[union-attr]
+    assert span_of(t, "rehab-benefit") == (d("2025-09-28"), d("2026-09-22"))
+    assert t.element("rehab-benefit").days == 360  # type: ignore[union-attr]
+
+
+@pytest.fixture
+def api() -> Iterator[TestClient]:
+    """The API with in-memory stores, as in test_chat_api.py."""
+    store = MemorySessionStore()
+    params = MemoryParamStore()
+    app.dependency_overrides[get_today] = lambda: TODAY
+    app.dependency_overrides[get_session_store] = lambda: store
+    app.dependency_overrides[get_param_store] = lambda: params
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+ONBOARDING: dict[str, Any] = {
+    "role": "mother",
+    "child_born": False,
+    "date": "2027-03-15",
+    "children_count": 1,
+    "work": "employment",
+    "earnings": "5k-8k",
+}
+
+
+def test_the_chat_records_the_rehabilitation_benefit_only_after_270_days(api: TestClient) -> None:
+    api.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)
+    # No sick leave on the timeline yet: nothing follows the 270 days.
+    out = ask(api, scripted("set_rehab_benefit", {"status": "granted"}, "…"), "…")
+    assert rejected("set_rehab_benefit") in out
+    timeline_after(api, "set_leave_before_birth", {"weeks": 0})
+    timeline_after(api, "set_sick_leave", {"on_sick_leave": True, "start": "2026-06-01"})
+    update = timeline_after(api, "set_rehab_benefit", {"status": "applied"})
+    assert update["scenario"]["rehab_benefit"] == "applied"
+    assert update["focus"] == "rehab-benefit"
+    rehab = next(s for s in update["timeline"]["segments"] if s["id"] == "rehab-benefit")
+    assert (rehab["start"], rehab["end"], rehab["tone"]) == ("2027-02-26", "2027-03-14", "option")
+    assert "rehab-benefit" in update["changed_notes"]
