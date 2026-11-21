@@ -30,7 +30,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, Work
+from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -138,7 +138,8 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         raise ModelRetry(
             f"Nie ustawiono: {problem} Jeśli dziecko już się urodziło, użyj set_birth_date."
         )
-    # Nobody can know before the birth whether the child will need hospital.
+    # Nobody can know before the birth whether the child will need hospital, and the mother's
+    # special situations (the father takes over maternity leave early) come after the birth.
     scenario = _with(
         ctx,
         child_born=False,
@@ -148,6 +149,7 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         birth_weight_up_to_1000g=None,
         hospital_stays=[],
         losses=[],
+        mother_event=None,
     )
     return await _apply(ctx, scenario, "due-date")
 
@@ -248,6 +250,97 @@ async def set_voluntary_insurance(ctx: RunContext[AssistantDeps], registered: bo
         )
     scenario = _with(ctx, mother_insured=registered)
     return await _apply(ctx, scenario, "maternity", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_father_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
+    """Record how the father works. It decides whether he is covered by sickness insurance
+    and so what he is entitled to: paternity leave, his part of parental leave, taking over
+    maternity leave.
+
+    Args:
+        work: "employment" = umowa o pracę (etat), "contract" = umowa zlecenia,
+            "business" = własna działalność gospodarcza, "none" = nie pracuje.
+    """
+    # The father's own answer lives in `work` when he fills in, else in `father_work`.
+    field = "work" if ctx.deps.scenario.role == "father" else "father_work"
+    changes: dict[str, Any] = {field: work}
+    if work in ("employment", "none"):
+        changes["father_insured"] = None
+    scenario = _with(ctx, **changes)
+    return await _apply(ctx, scenario, "paternity", "maternity", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_father_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
+    """Father on a contract of mandate or with his own business: record whether he is
+    registered for the voluntary sickness insurance (pays the sickness contribution).
+
+    Args:
+        registered: True if he is registered for it, False if he is not.
+    """
+    if ctx.deps.scenario.fathers_work not in ("contract", "business"):
+        raise ModelRetry(
+            "Dobrowolne ubezpieczenie chorobowe dotyczy umowy zlecenia i własnej działalności. "
+            "Najpierw ustal, jak pracuje tata (set_father_work)."
+        )
+    scenario = _with(ctx, father_insured=registered)
+    return await _apply(ctx, scenario, "paternity", "maternity", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_father_takeover(
+    ctx: RunContext[AssistantDeps], takes_over: bool, mother_weeks: int | None = None
+) -> str:
+    """Record that the father takes over the rest of maternity leave once the mother has used
+    the minimum after the birth (or, False, that he does not: a correction). Before or after
+    the birth: the mother may apply for only the minimum straight away. Call it only when the
+    user says so; never ask about it. A mother who is ill, in hospital, died or abandoned the
+    child is a special situation: `set_mother_situation`.
+
+    Args:
+        takes_over: True if the father takes over the rest of maternity leave.
+        mother_weeks: Weeks of maternity leave after the birth the mother uses before he takes
+            over, only if the user said how many. Leave it empty for the minimum.
+    """
+    minimum = ctx.deps.params.father.takeover_after_weeks.value
+    if takes_over and mother_weeks is not None and mother_weeks < minimum:
+        raise ModelRetry(
+            f"Mama musi wykorzystać po porodzie co najmniej {minimum} tygodni urlopu "
+            "macierzyńskiego, zanim tata przejmie dalszą część. Wcześniej tata przejmuje urlop "
+            "tylko w sytuacjach szczególnych (set_mother_situation)."
+        )
+    scenario = _with(
+        ctx,
+        father_takes_over=takes_over,
+        mother_weeks_before_takeover=mother_weeks if takes_over else None,
+    )
+    return await _apply(ctx, scenario, "maternity-father", "maternity")
+
+
+@assistant.tool(sequential=True)
+async def set_mother_situation(
+    ctx: RunContext[AssistantDeps], situation: MotherEvent | None
+) -> str:
+    """Born child: record a special situation in which the father takes over maternity leave
+    earlier. Call it only when the user says so; never ask about it. Use the dates the user
+    gave; ask gently for a missing one.
+
+    Args:
+        situation: {"kind": "incapacity", "start": the day the father takes over} = the mother
+            has a certificate of inability to live independently (orzeczenie o niezdolności do
+            samodzielnej egzystencji); {"kind": "hospital", "start": first day, "end": last
+            day} = she is in hospital and cannot look after the child (no `end` = still
+            there); {"kind": "death", "start": the day she died}; {"kind": "abandonment",
+            "start": the day she abandoned the child}. Null corrects an earlier answer.
+    """
+    if not ctx.deps.scenario.child_born:
+        raise ModelRetry(
+            "Najpierw zapisz datę porodu (set_birth_date): tata przejmuje urlop macierzyński "
+            "w takiej sytuacji dopiero po porodzie."
+        )
+    scenario = _with(ctx, mother_event=None if situation is None else situation.model_dump())
+    return await _apply(ctx, scenario, "maternity-father", "maternity")
 
 
 @assistant.tool(sequential=True)

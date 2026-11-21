@@ -14,6 +14,7 @@ from pydantic_ai import ModelMessage, ModelRequest, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 
 from app.api.deps import get_chat_model, get_session_store, get_today
+from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.config import Settings, get_settings
 from app.main import app
 from app.services.sessions import MemorySessionStore, Session
@@ -458,3 +459,254 @@ def test_a_loss_needs_a_born_child(client: TestClient) -> None:
     client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
     out = ask(client, scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "…"), "…")
     assert {"type": "tool-result", "id": "call-1", "name": "set_child_loss", "ok": False} in out
+
+
+# Section B: the father.
+
+FATHER_WORK = (
+    "Jak pracuje tata: na etacie (umowa o pracę), na umowie zlecenia, prowadzi własną firmę "
+    "czy nie pracuje?"
+)
+FATHER_INSURED = (
+    "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłaca składkę chorobową)?"
+)
+FATHER_INSURED_HIMSELF = (
+    "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłacasz składkę chorobową)?"
+)
+
+
+def interview(returned: str) -> str:
+    """The interview part of a tool result: it comes last, after the timeline."""
+    return returned.split("\n\n")[-1]
+
+
+def next_question(question: str, tool: str) -> str:
+    return (
+        f"Następne pytanie wywiadu (zadaj je dokładnie tak): „{question}” Gdy użytkownik odpowie, "
+        f"najpierw zapisz odpowiedź narzędziem {tool}, potem pisz."
+    )
+
+
+def rejected(tool: str) -> dict[str, Any]:
+    return {"type": "tool-result", "id": "call-1", "name": tool, "ok": False}
+
+
+def instructions_now(client: TestClient) -> str:
+    """What the model is told about the current state at the start of the next turn."""
+    seen: list[str] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        seen.append(info.instructions or "")
+        yield "Rozumiem."
+
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
+    events(client.post("/api/chat", json={"session_id": SESSION, "message": "…"}))
+    return seen[0]
+
+
+def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
+    """The mother fills in: after her questions the chat asks how the father works and, on
+    a contract or with a business, about his voluntary insurance. Nothing about taking over."""
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    returned: list[str] = []
+    ask(client, scripted("set_children_count", {"count": 2}, "Bliźnięta.", returned), "Dwoje")
+    assert interview(returned[0]).startswith(
+        "Następne pytanie wywiadu (zadaj je dokładnie tak): „Chcesz zacząć urlop macierzyński"
+    )
+    assert interview(returned[0]).endswith(f"Potem: {FATHER_WORK}")
+
+    returned.clear()
+    ask(client, scripted("set_leave_before_birth", {"weeks": 0}, "Zapisane.", returned), "Nie")
+    assert interview(returned[0]) == next_question(FATHER_WORK, "`set_father_work`")
+
+    returned.clear()
+    model = scripted("set_father_work", {"work": "contract"}, "Zlecenie.", returned)
+    update = next(e for e in ask(client, model, "Tata ma zlecenie") if e["type"] == "timeline")
+    scenario = update["scenario"]
+    assert (scenario["father_work"], scenario["work"]) == ("contract", "employment")
+    assert update["focus"] in ("paternity", "maternity")
+    assert interview(returned[0]) == next_question(FATHER_INSURED, "`set_father_insurance`")
+
+    returned.clear()
+    model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
+    update = next(e for e in ask(client, model, "Tak, płaci") if e["type"] == "timeline")
+    assert update["scenario"]["father_insured"] is True
+    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+
+    # A new job: the voluntary insurance no longer applies.
+    update = timeline_after(client, "set_father_work", {"work": "employment"})
+    assert (update["scenario"]["father_work"], update["scenario"]["father_insured"]) == (
+        "employment",
+        None,
+    )
+
+    state = instructions_now(client)
+    assert "Wiadomo też, że tata pracuje na etacie (umowa o pracę)." in state
+    assert "nie wykorzystuje" not in state
+
+
+def test_the_father_answers_for_himself(client: TestClient) -> None:
+    """The father fills in: his work is his own onboarding answer; the insurance question is
+    addressed to him."""
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "work": "contract"})
+    returned: list[str] = []
+    ask(client, scripted("set_mother_work", {"work": "employment"}, "Etat.", returned), "Etat")
+    assert interview(returned[0]).endswith(f"Potem: {FATHER_INSURED_HIMSELF}")
+
+    update = timeline_after(client, "set_father_work", {"work": "business"})
+    assert (update["scenario"]["work"], update["scenario"]["father_work"]) == ("business", None)
+    update = timeline_after(client, "set_father_insurance", {"registered": False})
+    assert update["scenario"]["father_insured"] is False
+
+
+def test_the_father_is_asked_about_even_when_the_mother_is_not_insured(
+    client: TestClient,
+) -> None:
+    """His rights do not depend on her insurance, so the interview goes on to him."""
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "work": "contract"})
+    returned: list[str] = []
+    ask(client, scripted("set_mother_work", {"work": "none"}, "Rozumiem.", returned), "Nie")
+    assert interview(returned[0]) == next_question(FATHER_INSURED_HIMSELF, "`set_father_insurance`")
+
+    returned.clear()
+    model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
+    update = next(e for e in ask(client, model, "Tak") if e["type"] == "timeline")
+    assert update["scenario"]["father_insured"] is True
+    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+
+
+def test_no_father_questions_once_no_child_lives(client: TestClient) -> None:
+    born = {**ONBOARDING, "role": "mother", "child_born": True, "date": "2026-11-10"}
+    client.put(f"/api/session/{SESSION}/onboarding", json=born)  # twins
+    timeline_after(client, "set_leave_before_birth", {"weeks": 0})
+    timeline_after(client, "set_hospital_care", {"applies": False})
+
+    # One of the twins lives: the father's rights still matter.
+    returned: list[str] = []
+    model = scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "Przykro mi.", returned)
+    ask(client, model, "Jedno z dzieci urodziło się martwe")
+    assert interview(returned[0]) == next_question(FATHER_WORK, "`set_father_work`")
+
+    returned.clear()
+    losses = [{"stillborn": True}, {"stillborn": True}]
+    ask(client, scripted("set_child_loss", {"losses": losses}, "Przykro mi.", returned), "…")
+    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+
+
+def test_father_insurance_is_only_for_a_contract_or_a_business(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)  # he is employed
+    out = ask(client, scripted("set_father_insurance", {"registered": True}, "…"), "…")
+    assert rejected("set_father_insurance") in out
+    assert not any(e["type"] == "timeline" for e in out)
+
+
+def test_taking_over_maternity_leave_is_recorded_when_the_user_says_so(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """Before the birth too: the mother may apply for only 14 weeks straight away."""
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "father_work": "employment",
+            "child_born": False,
+            "due_date": "2027-03-15",
+            "children_count": 2,
+            "leave_before_birth_weeks": 0,
+        },
+    )
+    update = timeline_after(client, "set_father_takeover", {"takes_over": True, "mother_weeks": 16})
+    assert (
+        update["scenario"]["father_takes_over"],
+        update["scenario"]["mother_weeks_before_takeover"],
+    ) == (True, 16)
+    assert update["focus"] in ("maternity-father", "maternity")
+
+    update = timeline_after(client, "set_father_takeover", {"takes_over": True})
+    assert update["scenario"]["mother_weeks_before_takeover"] is None
+
+    update = timeline_after(
+        client, "set_father_takeover", {"takes_over": False, "mother_weeks": 16}
+    )
+    assert (
+        update["scenario"]["father_takes_over"],
+        update["scenario"]["mother_weeks_before_takeover"],
+    ) == (False, None)
+
+    # Fewer than 14 weeks only in the special situations.
+    returned: list[str] = []
+    args = {"takes_over": True, "mother_weeks": 10}
+    out = ask(client, scripted("set_father_takeover", args, "…", returned), "…")
+    assert rejected("set_father_takeover") in out
+    assert not any(e["type"] == "timeline" for e in out)
+    assert "co najmniej 14 tygodni" in returned[0]
+
+
+def test_the_mothers_situation_needs_a_born_child(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)  # child on the way
+    situation = {"kind": "hospital", "start": "2026-12-01"}
+    out = ask(client, scripted("set_mother_situation", {"situation": situation}, "…"), "…")
+    assert rejected("set_mother_situation") in out
+    assert not any(e["type"] == "timeline" for e in out)
+
+
+def test_the_mothers_situation_is_recorded_and_cleared(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    remember(
+        store,
+        {
+            "role": "father",
+            "work": "employment",
+            "mother_work": "employment",
+            "child_born": True,
+            "birth_date": "2026-08-01",
+            "children_count": 1,
+            "leave_before_birth_weeks": 0,
+            "hospital_care": False,
+        },
+    )
+    hospital = {"kind": "hospital", "start": "2026-10-05", "end": "2026-10-20"}
+    update = timeline_after(client, "set_mother_situation", {"situation": hospital})
+    assert update["scenario"]["mother_event"] == hospital
+    assert update["focus"] in ("maternity-father", "maternity")
+
+    update = timeline_after(client, "set_mother_situation", {"situation": None})
+    assert update["scenario"]["mother_event"] is None
+
+    # Only a hospital stay has an end.
+    death_with_end = {"kind": "death", "start": "2026-10-05", "end": "2026-10-06"}
+    out = ask(client, scripted("set_mother_situation", {"situation": death_with_end}, "…"), "…")
+    assert rejected("set_mother_situation") in out
+    assert not any(e["type"] == "timeline" for e in out)
+
+    update = timeline_after(
+        client, "set_mother_situation", {"situation": {"kind": "death", "start": "2026-10-05"}}
+    )
+    assert update["scenario"]["mother_event"] == {
+        "kind": "death",
+        "start": "2026-10-05",
+        "end": None,
+    }
+    assert "Mama dziecka zmarła." in instructions_now(client)
+
+    # A due date instead of a birth: the situation came after a birth, so it goes too.
+    update = timeline_after(client, "set_due_date", {"due_date": "2027-03-15"})
+    assert (update["scenario"]["child_born"], update["scenario"]["mother_event"]) == (False, None)
+
+
+def test_the_fathers_leave_is_in_scope() -> None:
+    scope = STATIC_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
+    assert "Tata: urlop ojcowski; jego część urlopu rodzicielskiego; przejęcie" in scope
+    out_of_scope = next(
+        line for line in STATIC_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
+    )
+    for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego"):
+        assert in_scope_now not in out_of_scope
+    for still_out in ("kwoty zasiłku", "81,5%", "wnioski i ich terminy", "łączenie urlopu"):
+        assert still_out in out_of_scope
+    assert "przysposobieniu dziecka i w rodzinie zastępczej" in out_of_scope
+    for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
+        assert f"`{tool}`" in STATIC_INSTRUCTIONS
+    assert "`set_mother_situation`" in STATIC_INSTRUCTIONS

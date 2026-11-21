@@ -6,7 +6,7 @@ All dates and numbers come from the engine; the model only reads them.
 from typing import NamedTuple
 
 from app.assistant.guide import page_label
-from app.engine.insurance import NOT_INSURED, coverage
+from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     Document,
     Marker,
@@ -51,30 +51,38 @@ def source_label(source: SourceRef) -> str:
 
 
 def describe_person(scenario: Scenario) -> str:
-    """Who is writing and how to address them, and what the onboarding said about work."""
+    """Who is writing and how to address them, and what is known about the parents' work."""
     match scenario.role:
         case "mother":
             lines = [
                 "Rozmawiasz z mamą. Mów do niej bezpośrednio: „możesz zacząć urlop…”, "
                 "„Twój urlop macierzyński…”, „masz prawo do zasiłku…”. Wyjaśnienie sytuacji "
-                "pisze o mamie w trzeciej osobie; Ty przekładaj to na „Ty”."
+                "pisze o mamie w trzeciej osobie; Ty przekładaj to na „Ty”. O tacie mów "
+                "w trzeciej osobie."
             ]
         case "father":
             lines = [
-                "Rozmawiasz z tatą. O urlopie macierzyńskim mów w trzeciej osobie: "
-                "„mama może zacząć urlop…”."
+                "Rozmawiasz z tatą. O mamie i jej urlopie mów w trzeciej osobie: „mama może "
+                "zacząć urlop…”. Do niego mów bezpośrednio, także o jego uprawnieniach: "
+                "„możesz wziąć urlop ojcowski…”. Wyjaśnienie sytuacji pisze o tacie w trzeciej "
+                "osobie; Ty przekładaj to na „Ty”."
             ]
         case _:
-            lines = ["Nie wiesz, kto pisze. O urlopie macierzyńskim mów w trzeciej osobie."]
+            lines = ["Nie wiesz, kto pisze. O mamie i o tacie mów w trzeciej osobie."]
     if scenario.mothers_work:
         lines.append(
             f"Mama {WORK[scenario.mothers_work]}. Od tego zależy jej ubezpieczenie chorobowe "
             "i prawo do zasiłku macierzyńskiego (punkt „Uprawnienie” albo „Uwaga” w wyjaśnieniu)."
         )
-    if scenario.role == "father" and scenario.work:
+    if scenario.fathers_work:
         lines.append(
-            f"Z onboardingu wiadomo też, że tata {WORK[scenario.work]}. Ten etap aplikacji tego "
-            "nie wykorzystuje: uprawnienia taty dojdą w kolejnych etapach."
+            f"Wiadomo też, że tata {WORK[scenario.fathers_work]}. Od tego zależą jego "
+            "uprawnienia (punkty wyjaśnienia o tacie)."
+        )
+    if scenario.mother_event and scenario.mother_event.kind == "death":
+        lines.append(
+            "Mama dziecka zmarła. Pisz krótko, z szacunkiem i współczuciem, bez wykrzykników "
+            "i gratulacji, i mów tylko o tym, co przysługuje tacie."
         )
     if scenario.earnings:
         who = "tata" if scenario.role == "father" else "mama"
@@ -93,7 +101,9 @@ class Question(NamedTuple):
 
 
 def interview_questions(scenario: Scenario) -> list[Question]:
-    """The questions the interview still has to ask, in order."""
+    """The questions the interview still has to ask, in order: the date and the children, the
+    mother, then the father. Never about taking over maternity leave or the mother's special
+    situations: those are recorded only when the user brings them up."""
     born = scenario.child_born is True
     mother = scenario.role == "mother"
     cover = coverage(scenario)
@@ -115,7 +125,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "`set_children_count`",
             )
         )
-    # Insurance first: without it there is nothing to plan.
+    # The mother's insurance first: without it she has no maternity leave to plan.
     if cover == "unknown-work":
         questions.append(
             Question(
@@ -135,9 +145,23 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "`set_voluntary_insurance`",
             )
         )
-    if cover in NOT_INSURED:
-        return questions
+    insured = cover not in NOT_INSURED
+    if insured:
+        questions += _leave_before_birth_questions(scenario)
 
+    # Never after the loss of every child: nothing to plan there, and the questions would hurt.
+    if scenario.losses and len(scenario.losses) >= (scenario.children_count or 1):
+        return questions
+    if insured:
+        questions += _hospital_questions(scenario)
+    # The father's rights do not depend on the mother's insurance.
+    return questions + _father_questions(scenario)
+
+
+def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
+    """Maternity leave before the birth and, when she plans it, the medical certificate."""
+    born = scenario.child_born is True
+    mother = scenario.role == "mother"
     if scenario.leave_before_birth_weeks is None:
         if born:
             text = (
@@ -155,28 +179,31 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 else "Czy mama chce zacząć urlop macierzyński przed porodem (ile tygodni "
                 "wcześniej?), czy pracować do dnia porodu?"
             )
-        questions.append(Question(text, "`set_leave_before_birth` (0 = bez urlopu przed porodem)"))
-    elif (
+        return [Question(text, "`set_leave_before_birth` (0 = bez urlopu przed porodem)")]
+    if (
         not born
         and scenario.leave_before_birth_weeks > 0
         and scenario.has_medical_certificate is None
     ):
-        questions.append(
+        return [
             Question(
                 "Czy masz już zaświadczenie lekarskie o przewidywanej dacie porodu?"
                 if mother
                 else "Czy mama ma już zaświadczenie lekarskie o przewidywanej dacie porodu?",
                 "`set_medical_certificate`",
             )
-        )
+        ]
+    return []
 
-    # Only a born child can have been premature or in hospital: supplementary maternity leave.
-    # Never after a loss of every child: nothing to plan there, and the question would hurt.
+
+def _hospital_questions(scenario: Scenario) -> list[Question]:
+    """Only a born child can have been premature or in hospital: supplementary maternity
+    leave."""
+    if scenario.child_born is not True:
+        return []
     several = (scenario.children_count or 1) > 1
-    if scenario.losses and len(scenario.losses) >= (scenario.children_count or 1):
-        return questions
-    if born and scenario.hospital_care is None:
-        questions.append(
+    if scenario.hospital_care is None:
+        return [
             Question(
                 "Czy dzieci urodziły się przed ukończeniem 37. tygodnia ciąży albo któreś "
                 "z nich było po porodzie w szpitalu?"
@@ -185,13 +212,11 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "po porodzie w szpitalu?",
                 "`set_hospital_care` (applies: tak albo nie)",
             )
-        )
-    elif (
-        born
-        and scenario.hospital_care
-        and (scenario.birth_week is None or scenario.birth_weight_up_to_1000g is None)
+        ]
+    if scenario.hospital_care and (
+        scenario.birth_week is None or scenario.birth_weight_up_to_1000g is None
     ):
-        questions.append(
+        return [
             Question(
                 "W którym tygodniu ciąży urodziły się dzieci, czy najlżejsze z nich ważyło nie "
                 "więcej niż 1000 g i od kiedy do kiedy było w szpitalu to, które leżało najdłużej?"
@@ -200,8 +225,35 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "1000 g i od kiedy do kiedy było w szpitalu?",
                 "`set_hospital_care` (ze wszystkimi szczegółami naraz)",
             )
-        )
-    return questions
+        ]
+    return []
+
+
+def _father_questions(scenario: Scenario) -> list[Question]:
+    """How the father works and, on a contract or with a business, his voluntary insurance.
+    His rights depend on it (guide section B)."""
+    match father_coverage(scenario):
+        case "unknown-work":
+            return [
+                Question(
+                    "Jak pracuje tata: na etacie (umowa o pracę), na umowie zlecenia, prowadzi "
+                    "własną firmę czy nie pracuje?",
+                    "`set_father_work`",
+                )
+            ]
+        case "unknown-voluntary":
+            return [
+                Question(
+                    "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłacasz "
+                    "składkę chorobową)?"
+                    if scenario.role == "father"
+                    else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego "
+                    "(opłaca składkę chorobową)?",
+                    "`set_father_insurance`",
+                )
+            ]
+        case _:
+            return []
 
 
 def describe_interview(scenario: Scenario) -> str:
