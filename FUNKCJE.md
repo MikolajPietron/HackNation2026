@@ -143,6 +143,34 @@ Wszystkie symulacje wyraźnie oznaczone w interfejsie jako dane przykładowe.
 
 AI nigdy nie liczy kwot ani nie ustala prawa do zasiłku. Na demo model w chmurze, w opisie wdrożenia ścieżka lokalna (np. Bielik), z jedną warstwą abstrakcji nad dostawcą.
 
+### Agent: wywiad i propozycje (F41, P1)
+
+Czat nie jest głównym flow. Prowadzi wywiad, wypełnia stan sprawy i proponuje plany, a wynik zawsze widać na osi obok rozmowy. Formularz kaflowy działa także bez agenta.
+
+**Zasada:** agent korzysta wyłącznie z przygotowanych narzędzi i z materiałów ZUS. Każdą kwotę, datę i werdykt zwraca narzędzie, nie model.
+
+| Narzędzie | Co robi |
+|---|---|
+| `ustaw_dane_sprawy` | Zapisuje odpowiedź z wywiadu w stanie sprawy (forma pracy, daty, zarobki, liczba dzieci) |
+| `sprawdz_prawo_do_zasilku` | Zwraca: przysługuje / nie przysługuje / zagrożone, z powodem |
+| `policz_zasilek` | Wymiar i wysokość dla bieżącego planu, z krokami obliczeń |
+| `zaproponuj_plany` | 2–3 plany dla wybranego celu |
+| `porownaj_plany` | Różnica w kwocie i w czasie między planami |
+| `dodaj_zdarzenie` | Zdarzenie „Coś się zmieniło” i przeliczenie osi |
+| `test_odpornosci` | Stress-test planu |
+| `lista_krokow` | Co złożyć, komu (pracodawca czy ZUS) i do kiedy |
+| `szukaj_w_materialach_zus` | Fragmenty poradnika, wyciągu przepisów i opisu wyzwania, z odnośnikiem do źródła |
+| `pobierz_dane_zus` | Symulowane dane o ubezpieczeniu, zadłużeniu i e-ZLA |
+| `odczytaj_dokument` | Pola z wgranego wniosku lub pisma |
+| `organizacje_wsparcia` | Podmioty pomocowe dla danej sytuacji |
+
+**Zabezpieczenia:**
+- Zmiana planu wymaga kliknięcia „Zastosuj”; po niej pojawia się Undo Pill.
+- Odpowiedź o przepisach zawsze z cytowanym fragmentem materiałów ZUS; gdy nic nie znaleziono, agent mówi to wprost i odsyła do ZUS.
+- Agent pokazuje opcje i ich skutki, decyzję zostawia rodzicom.
+- W trybie wrażliwym krótko, spokojnie, bez propozycji optymalizacji.
+- Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny.
+
 ## 7. Dane testowe
 
 - Teczki spraw to skany bez warstwy tekstowej (ok. 50 stron każda).
