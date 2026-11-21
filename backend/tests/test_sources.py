@@ -107,6 +107,18 @@ def test_labour_code_provisions() -> None:
         "art. 182³ § 1¹",
         "art. 182³ § 2",
         "art. 182³ § 3",
+        "art. 183 § 1",
+        "art. 183 § 1¹",
+        "art. 183 § 3",
+        "art. 183 § 4",
+        "art. 183 § 4¹",
+        "art. 183 § 4²",
+        "art. 183 § 4³",
+        "art. 183 § 4⁴",
+        "art. 183 § 4⁵",
+        "art. 183 § 4⁶",
+        "art. 183 § 5",
+        "art. 183 § 6",
         "art. 183¹ § 1",
         "art. 183¹ § 2",
     }
@@ -118,6 +130,10 @@ def test_labour_code_provisions() -> None:
     # Article numbers inside the text carry their superscripts again.
     assert kp_articles()["art. 182¹ᵍ"].endswith("art. 183¹ § 1.")
     assert "art. 183¹ § 1 stosuje się odpowiednio" in kp_articles()["art. 180² § 7"]
+    # Paragraphs of art. 183 referred to inside it carry their superscripts again too.
+    assert "pracownik, o którym mowa w § 1¹, który" in kp_articles()["art. 183 § 3"]
+    assert "art. 182¹ᵃ § 3-7" in kp_articles()["art. 183 § 5"]
+    assert "nie później niż 21 dni" in kp_articles()["art. 183 § 6"]
     assert "art. 180² § 4, art. 182¹ᵈ § 1, art. 182³ § 2 oraz" in kp_articles()["art. 177 § 1¹"]
     assert kp_articles()["art. 182¹ᵈ § 1"].count("art. 186⁸ᵃ") == 1
     assert "nie krótszym niż 7 dni przed przystąpieniem do pracy" in kp_articles()["art. 180 § 8"]
@@ -206,7 +222,13 @@ def scenarios() -> list[dict[str, Any]]:
             | {"birth_date": birth, "losses": losses, "children_count": children}
             | {"leave_before_birth_weeks": weeks}
         )
-    return cases + father_scenarios() + application_scenarios() + pregnancy_scenarios()
+    return (
+        cases
+        + father_scenarios()
+        + application_scenarios()
+        + pregnancy_scenarios()
+        + taken_in_scenarios()
+    )
 
 
 def father_scenarios() -> list[dict[str, Any]]:
@@ -396,6 +418,47 @@ def pregnancy_scenarios() -> list[dict[str, Any]]:
         | {"insured_in_pregnancy": True, "contribution_base_raised": True}
         for work in ("contract", "business", "employment")
     ]
+    return cases
+
+
+def taken_in_scenarios() -> list[dict[str, Any]]:
+    """Section D: adoption and foster care, who fills in and how they work, the age limits
+    (cut, the 9-week minimum, too old, postponed schooling), more children, "Za życiem" and the
+    adoption ruling."""
+    base = {"child_born": True, "taken_in_on": "2026-11-02", "children_count": 1}
+    people = [
+        {"role": "mother", "work": "employment", "father_work": "employment"},
+        {"role": "mother", "work": "contract", "mother_insured": True},
+        {"role": "mother", "work": "business"},
+        {"role": "mother", "work": "none", "father_work": "employment"},
+        {"role": "father", "work": "employment", "mother_work": "contract"},
+        {"role": "father", "work": "contract", "father_insured": False},
+        {},
+    ]
+    births = ["2024-05-10", "2020-03-15", "2012-12-01", "2018-01-01", None]
+    cases: list[dict[str, Any]] = [
+        base | person | {"taken_in": kind, "birth_date": birth}
+        for kind in ("adoption", "foster")
+        for person in people
+        for birth in births
+    ]
+    cases += [
+        base | {"taken_in": kind, "birth_date": "2023-01-01", "children_count": count} | extra
+        for kind in ("adoption", "foster")
+        for count in (2, 5)
+        for extra in ({}, {"za_zyciem": True})
+    ]
+    cases += [
+        base | {"taken_in": "foster", "birth_date": "2020-03-15", "school_postponed": True},
+        base | {"taken_in": "foster", "children_count": None, "birth_date": "2024-05-10"},
+    ]
+    ruling = {"taken_in": "adoption", "role": "father", "work": "employment"}
+    cases += [
+        base | ruling | {"birth_date": birth, "adoption_final": True} | {"adoption_final_on": final}
+        for birth in ("2024-05-10", "2012-12-01")
+        for final in ("2026-11-15", "2026-11-20")
+    ]
+    cases.append(base | ruling | {"birth_date": "2024-05-10", "adoption_final": False})
     return cases
 
 

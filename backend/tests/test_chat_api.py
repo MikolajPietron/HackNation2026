@@ -789,7 +789,8 @@ def test_the_fathers_leave_is_in_scope() -> None:
         assert in_scope_now not in out_of_scope
     for still_out in ("kwoty zasiłku", "81,5%"):
         assert still_out in out_of_scope
-    assert "przysposobieniu dziecka i w rodzinie zastępczej" in out_of_scope
+    # Section D (adoption, foster care) is in scope too.
+    assert "przysposobieniu" not in out_of_scope
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
         assert f"`{tool}`" in STATIC_INSTRUCTIONS
     assert "`set_mother_situation`" in STATIC_INSTRUCTIONS

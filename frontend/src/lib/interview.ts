@@ -48,7 +48,7 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
     case 'date':
       return ask(['Podam przewidywaną datę porodu', 'Dziecko już się urodziło'])
     case 'children':
-      return ask(['Jedno dziecko', 'Bliźnięta'])
+      return ask(scenario.taken_in ? ['Jedno dziecko', 'Dwoje dzieci'] : ['Jedno dziecko', 'Bliźnięta'])
     case 'mother-work':
       return ask(
         mother
@@ -86,6 +86,11 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
     case 'mother-payer':
     case 'father-payer':
       return ask(['Więcej niż 20 osób', '20 osób albo mniej', 'Nie wiem'])
+    // Guide section D: a child taken in for upbringing.
+    case 'school-postponed':
+      return ask(['Tak, obowiązek szkolny odroczono', 'Nie, bez odroczenia'])
+    case 'adoption-ruling':
+      return ask(['Postanowienie jeszcze nie jest prawomocne', 'Tak, jest już prawomocne'])
     default:
       return ask([])
   }

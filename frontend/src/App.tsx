@@ -65,7 +65,7 @@ function ParentsApp() {
   const hasSaved = messages.length > 0 || scenario?.role != null
   const savedSummary = timeline
     ? [
-        `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`,
+        `${timeline.taken_in ? 'Przyjęcie dziecka' : timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`,
         timeline.children_count ? childrenLabel(timeline.children_count) : null,
       ]
         .filter(Boolean)

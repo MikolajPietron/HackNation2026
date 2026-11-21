@@ -9,13 +9,14 @@ import etat from '@/assets/onboarding/etat.webp'
 import firma from '@/assets/onboarding/firma.webp'
 import lozeczko from '@/assets/onboarding/lozeczko.webp'
 import mama from '@/assets/onboarding/mama.webp'
+import serce from '@/assets/onboarding/serce.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import { plural } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Earnings, OnboardingAnswers, Role, SessionStart, Work } from '@/types'
+import type { Earnings, OnboardingAnswers, Role, SessionStart, TakenIn, Work } from '@/types'
 import { CALENDAR_CELL, CALENDAR_WIDTH, Calendar } from './Calendar'
 import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
 import { ITEM, POP, STEP } from './motion'
@@ -28,18 +29,41 @@ import { ITEM, POP, STEP } from './motion'
 interface Answers {
   role: Role | null
   born: boolean | null
+  /** Guide section D: the child is taken in for upbringing (then `born` is true). */
+  takenIn: TakenIn | null
   children: number | null
-  /** ISO date: birth date when `born`, otherwise the due date. */
+  /** ISO date: birth date when `born`, otherwise the due date; the day of taking in for `takenIn`. */
   date: string
+  /** ISO date: the child's date of birth, asked only for `takenIn`. */
+  childBirth: string
   work: Work | null
   earnings: Earnings | null
 }
 
-const ILLUSTRATIONS = [mama, tata, dziecko, lozeczko, blizniaki, etat, zlecenie, firma, dom]
+const ILLUSTRATIONS = [mama, tata, dziecko, lozeczko, blizniaki, etat, zlecenie, firma, dom, serce]
 
-const EMPTY: Answers = { role: null, born: null, children: null, date: '', work: null, earnings: null }
+const EMPTY: Answers = {
+  role: null,
+  born: null,
+  takenIn: null,
+  children: null,
+  date: '',
+  childBirth: '',
+  work: null,
+  earnings: null,
+}
 
-type StepId = 'intro' | 'role' | 'born' | 'children' | 'date' | 'work' | 'earnings' | 'calculating'
+type StepId =
+  | 'intro'
+  | 'role'
+  | 'born'
+  | 'kind'
+  | 'children'
+  | 'date'
+  | 'child-birth'
+  | 'work'
+  | 'earnings'
+  | 'calculating'
 
 /** Pause after a tap so the choice visibly lands before the step leaves. */
 const CHOICE_DELAY_MS = 320
@@ -47,6 +71,9 @@ const CHOICE_DELAY_MS = 320
 const MIN_CALCULATING_MS = 1400
 const DUE_DATE_MAX_DAYS_AHEAD = 300
 const BIRTH_DATE_MAX_DAYS_AGO = 6 * 366
+/** A child taken in: the day of taking in may be years back, the child up to its teens. */
+const TAKEN_IN_MAX_DAYS_AGO = 14 * 366
+const CHILD_BIRTH_MAX_DAYS_AGO = 18 * 366
 const CALCULATING = ['Sprawdzamy terminy…', 'Liczymy urlop macierzyński…', 'Układamy oś czasu…']
 
 const EARNINGS: { value: Earnings; label: string }[] = [
@@ -59,13 +86,15 @@ const EARNINGS: { value: Earnings; label: string }[] = [
 
 /** The finished answers, in the shape the backend stores. */
 function toAnswers(answers: Answers): OnboardingAnswers {
+  const takenIn = answers.takenIn
   return {
     role: answers.role ?? 'mother',
-    child_born: answers.born ?? false,
-    date: answers.date,
+    child_born: takenIn ? true : (answers.born ?? false),
+    date: takenIn ? answers.childBirth : answers.date,
     children_count: answers.children ?? 1,
     work: answers.work ?? 'none',
     earnings: answers.work === 'none' ? null : answers.earnings,
+    taken_in: takenIn ? { kind: takenIn, date: answers.date } : null,
   }
 }
 
@@ -149,8 +178,13 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
       break
     case 'born': {
       // The date limits differ, so a changed answer clears the date.
+      const same = (born: boolean) => answers.born === born && answers.takenIn === null
       const pickBorn = (born: boolean) =>
-        choose({ born, date: answers.born === born ? answers.date : '' }, 'children')
+        choose({ born, takenIn: null, date: same(born) ? answers.date : '' }, 'children')
+      const card = (born: boolean) => ({
+        selected: same(born),
+        dimmed: leaving && !same(born),
+      })
       screen = (
         <Question title="Czy dziecko jest już na świecie?">
           <Cards label="Czy dziecko jest już na świecie?">
@@ -158,15 +192,59 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
               image={lozeczko}
               label="Czekamy na nie"
               hint="Jesteśmy w ciąży"
-              {...state('born', false)}
+              {...card(false)}
               onSelect={() => pickBorn(false)}
             />
             <ImageChoice
               image={dziecko}
               label="Już jest z nami"
               hint="Dziecko się urodziło"
-              {...state('born', true)}
+              {...card(true)}
               onSelect={() => pickBorn(true)}
+            />
+          </Cards>
+          {/* Guide section D: rarer, so a link instead of a third card. */}
+          <motion.div variants={ITEM} className="mt-8 flex h-11 justify-center">
+            <button
+              type="button"
+              onClick={() => !leaving && go('kind')}
+              className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+            >
+              Przyjmujemy dziecko na wychowanie (adopcja, rodzina zastępcza)
+            </button>
+          </motion.div>
+        </Question>
+      )
+      break
+    }
+    case 'kind': {
+      // The day of taking in and the child's birth mean something else for the other kind.
+      const pickKind = (takenIn: TakenIn) =>
+        choose(
+          answers.takenIn === takenIn
+            ? { born: true, takenIn }
+            : { born: true, takenIn, date: '', childBirth: '' },
+          'children',
+        )
+      screen = (
+        <Question
+          title="Jak przyjmujecie dziecko?"
+          subtitle="Urlop jest wtedy na warunkach urlopu macierzyńskiego."
+        >
+          <Cards label="Jak przyjmujecie dziecko?">
+            <ImageChoice
+              image={serce}
+              label="Adopcja"
+              hint="wniosek do sądu o przysposobienie"
+              {...state('takenIn', 'adoption')}
+              onSelect={() => pickKind('adoption')}
+            />
+            <ImageChoice
+              image={dom}
+              label="Rodzina zastępcza"
+              hint="niezawodowa"
+              {...state('takenIn', 'foster')}
+              onSelect={() => pickKind('foster')}
             />
           </Cards>
         </Question>
@@ -176,8 +254,18 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
     case 'children':
       screen = (
         <Question
-          title={answers.born ? 'Ile dzieci się urodziło?' : 'Ile dzieci się urodzi?'}
-          subtitle="Przy ciąży mnogiej urlop macierzyński jest dłuższy."
+          title={
+            answers.takenIn
+              ? 'Ile dzieci przyjmujecie?'
+              : answers.born
+                ? 'Ile dzieci się urodziło?'
+                : 'Ile dzieci się urodzi?'
+          }
+          subtitle={
+            answers.takenIn
+              ? 'Przy jednoczesnym przyjęciu kilkorga dzieci urlop jest dłuższy.'
+              : 'Przy ciąży mnogiej urlop macierzyński jest dłuższy.'
+          }
         >
           <Cards label="Liczba dzieci">
             <ImageChoice
@@ -188,7 +276,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
             />
             <ImageChoice
               image={blizniaki}
-              label="Bliźnięta"
+              label={answers.takenIn ? 'Dwoje' : 'Bliźnięta'}
               {...state('children', 2)}
               onSelect={() => choose({ children: 2 }, 'date')}
             />
@@ -204,9 +292,22 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
     case 'date':
       screen = (
         <DateStep
-          born={answers.born ?? false}
+          kind={answers.takenIn ? 'taken-in' : answers.born ? 'birth' : 'due'}
+          adoption={answers.takenIn === 'adoption'}
           value={answers.date}
           onChange={(date) => setAnswers((a) => ({ ...a, date }))}
+          onNext={() => go(answers.takenIn ? 'child-birth' : 'work')}
+        />
+      )
+      break
+    case 'child-birth':
+      screen = (
+        <DateStep
+          kind="child-birth"
+          several={(answers.children ?? 1) > 1}
+          takenInOn={answers.date}
+          value={answers.childBirth}
+          onChange={(childBirth) => setAnswers((a) => ({ ...a, childBirth }))}
           onNext={() => go('work')}
         />
       )
@@ -511,39 +612,82 @@ function distance(date: string, today: string): string {
   const n = Math.abs(days)
   const weeks = Math.floor(n / 7)
   const months = Math.floor(n / 30.44)
+  const years = Math.floor(n / 365.25)
   const amount =
     n < 7
       ? `${n} ${plural(n, 'dzień', 'dni', 'dni')}`
       : days > 0 || n < 84
         ? `${weeks} ${plural(weeks, 'tydzień', 'tygodnie', 'tygodni')}`
-        : `${months} ${plural(months, 'miesiąc', 'miesiące', 'miesięcy')}`
+        : years < 2
+          ? `${months} ${plural(months, 'miesiąc', 'miesiące', 'miesięcy')}`
+          : `${years} ${plural(years, 'rok', 'lata', 'lat')}`
   return days > 0 ? `za ${amount}` : `${amount} temu`
 }
 
+/** Which date the step asks for: the due date, the date of birth, or for a child taken in the
+ *  day of taking in and the child's own date of birth. */
+type DateKind = 'due' | 'birth' | 'taken-in' | 'child-birth'
+
+function dateStep(kind: DateKind, today: string, adoption: boolean, several: boolean, takenInOn: string) {
+  switch (kind) {
+    case 'due':
+      return {
+        title: 'Kiedy jest termin porodu?',
+        subtitle: 'Przewidywana data porodu z karty ciąży.',
+        min: today,
+        max: addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD),
+      }
+    case 'birth':
+      return {
+        title: 'Kiedy urodziło się dziecko?',
+        subtitle: 'Data z aktu urodzenia.',
+        min: addDaysIso(today, -BIRTH_DATE_MAX_DAYS_AGO),
+        max: today,
+      }
+    case 'taken-in':
+      return {
+        title: 'Kiedy dziecko do Was trafiło?',
+        subtitle: adoption
+          ? 'Dzień przyjęcia dziecka. Jeśli wniosek o przysposobienie złożyliście w sądzie później, wybierz dzień wniosku.'
+          : 'Dzień przyjęcia dziecka do rodziny zastępczej.',
+        min: addDaysIso(today, -TAKEN_IN_MAX_DAYS_AGO),
+        max: addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD),
+      }
+    case 'child-birth':
+      return {
+        title: several ? 'Kiedy urodziło się najmłodsze dziecko?' : 'Kiedy urodziło się dziecko?',
+        subtitle: 'Od wieku dziecka zależy, jak długo trwa urlop.',
+        min: addDaysIso(today, -CHILD_BIRTH_MAX_DAYS_AGO),
+        // Born before it was taken in, and not in the future.
+        max: takenInOn && takenInOn < today ? takenInOn : today,
+      }
+  }
+}
+
 function DateStep({
-  born,
+  kind,
+  adoption = false,
+  several = false,
+  takenInOn = '',
   value,
   onChange,
   onNext,
 }: {
-  born: boolean
+  kind: DateKind
+  adoption?: boolean
+  several?: boolean
+  takenInOn?: string
   value: string
   onChange: (date: string) => void
   onNext: () => void
 }) {
   const today = todayIso()
-  const min = born ? addDaysIso(today, -BIRTH_DATE_MAX_DAYS_AGO) : today
-  const max = born ? today : addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD)
+  const { title, subtitle, min, max } = dateStep(kind, today, adoption, several, takenInOn)
   // ISO dates compare correctly as strings.
   const valid = value !== '' && value >= min && value <= max
-  const title = born ? 'Kiedy urodziło się dziecko?' : 'Kiedy jest termin porodu?'
 
   return (
-    <Question
-      title={title}
-      subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
-      compact
-    >
+    <Question title={title} subtitle={subtitle} compact>
       {/* The row under the calendar takes exactly its width: the date on the left edge, the
           button on the right edge, so the two line up and the button never moves. */}
       <div className={cn('mx-auto w-full', CALENDAR_CELL)} style={{ maxWidth: CALENDAR_WIDTH }}>

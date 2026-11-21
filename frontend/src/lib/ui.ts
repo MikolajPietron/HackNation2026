@@ -210,6 +210,19 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       if (args.size === 'up-to-20') return `Zasiłek ${whose} wypłaca ZUS`
       return `Kto wypłaca zasiłek ${whose}: do sprawdzenia`
     }
+    // Guide section D: a child taken in for upbringing.
+    case 'set_taken_in':
+      if (args.kind === 'adoption') return 'Adopcja dziecka'
+      if (args.kind === 'foster') return 'Rodzina zastępcza'
+      return 'Dziecko urodzone w rodzinie'
+    case 'set_school_postponed':
+      return args.postponed
+        ? 'Odroczony obowiązek szkolny'
+        : 'Bez odroczenia obowiązku szkolnego'
+    case 'set_adoption_ruling':
+      return args.final
+        ? `Przysposobienie prawomocne: ${asDate(args.final_on)}`
+        : 'Przysposobienie jeszcze nieprawomocne'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
     case 'set_sick_leave':

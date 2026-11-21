@@ -84,6 +84,10 @@ def describe_person(scenario: Scenario) -> str:
             f"Wiadomo też, że tata {WORK[scenario.fathers_work]}. Od tego zależą jego "
             "uprawnienia (punkty wyjaśnienia o tacie)."
         )
+    if scenario.taken_in is not None:
+        from app.assistant.describe_adoption import describe_taken_in
+
+        lines.append(describe_taken_in(scenario))
     if scenario.mother_event and scenario.mother_event.kind == "death":
         lines.append(
             "Mama dziecka zmarła. Pisz krótko, z szacunkiem i współczuciem, bez wykrzykników "
@@ -150,6 +154,11 @@ def interview_questions(scenario: Scenario) -> list[Question]:
     """The questions the interview still has to ask, in order: the date and the children, the
     mother, then the father. Never about taking over maternity leave or the mother's special
     situations: those are recorded only when the user brings them up."""
+    if scenario.taken_in is not None:
+        # Guide section D: a child taken in for upbringing has its own questions.
+        from app.assistant.describe_adoption import taken_in_questions
+
+        return taken_in_questions(scenario)
     born = scenario.child_born is True
     mother = scenario.role == "mother"
     cover = coverage(scenario)
@@ -461,6 +470,13 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
         if timeline.children_count
         else ""
     )
+    if timeline.taken_in is not None:
+        birth = f"Dzień przyjęcia dziecka na wychowanie: {fmt(timeline.birth_date)}."
+        count = (
+            f" Dzieci przyjęte jednocześnie: {timeline.children_count}."
+            if timeline.children_count
+            else ""
+        )
     lines = [f"{birth}{count} Dziś: {fmt(timeline.today)}.", "", "Na osi (id w nawiasach):"]
     for s in timeline.segments:
         lines.append(f"- [{s.id}] {s.title}: {fmt(s.start)}–{fmt(s.end)} ({s.days} dni)")

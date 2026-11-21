@@ -11,6 +11,11 @@ export type Work = 'employment' | 'contract' | 'business' | 'none'
 export type Earnings = 'under-5k' | '5k-8k' | '8k-12k' | 'over-12k' | 'unknown'
 /** When the child was born, as the Labour Code art. 180² § 1 divides it (weeks of pregnancy). */
 export type BirthWeek = 'before-28' | '28-37' | 'after-37'
+/**
+ * Guide section D: adoption = took the child in and asked the court to start adoption
+ * proceedings; foster = a non-professional foster family.
+ */
+export type TakenIn = 'adoption' | 'foster'
 
 /** A literal quote: from the guide (section and pages) or from the Labour Code (article). */
 export interface SourceRef {
@@ -132,6 +137,19 @@ export interface Scenario {
   contribution_base_raised: boolean | null
   /** Recorded only when the parent says so. */
   job_loss: JobLoss | null
+  // Parental leave with work (guide section E)
+  /** How the parents split parental leave and where they work part-time; [] = no plan. */
+  parental_parts: ParentalPart[]
+  // Adoption and foster care (guide section D).
+  /** The child was taken in for upbringing: `birth_date` is then the child's date of birth. */
+  taken_in: TakenIn | null
+  /** The day of taking in (adoption: and of the court application, the later of the two). */
+  taken_in_on: string | null
+  /** Foster care: compulsory schooling was postponed (age limit 10, not 7). */
+  school_postponed: boolean | null
+  /** Adoption: the adoption ruling is final, since `adoption_final_on`. */
+  adoption_final: boolean | null
+  adoption_final_on: string | null
 }
 
 /**
@@ -147,9 +165,6 @@ export interface JobLoss {
   reason: JobLossReason
   /** Unlawful termination only: a final court judgment confirmed it. */
   court_confirmed: boolean | null
-  // Parental leave with work (guide section E)
-  /** How the parents split parental leave and where they work part-time; [] = no plan. */
-  parental_parts: ParentalPart[]
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
@@ -161,6 +176,8 @@ export interface OnboardingAnswers {
   children_count: number
   work: Work
   earnings: Earnings | null
+  /** A child taken in for upbringing: then `child_born` is true and `date` the child's birth. */
+  taken_in?: { kind: TakenIn; date: string } | null
 }
 
 export interface Segment {
@@ -224,6 +241,8 @@ export interface Timeline {
   notes: CaseNote[]
   warnings: string[]
   assumptions: string[]
+  /** Set for a child taken in for upbringing: then `birth_date` is the day of taking in. */
+  taken_in: TakenIn | null
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */

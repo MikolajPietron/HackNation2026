@@ -10,6 +10,7 @@ import datetime as dt
 
 from app.engine.applications import application_notes
 from app.engine.draft import DAY, days_between
+from app.engine.explain_adoption import taken_in_notes
 from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
@@ -26,6 +27,8 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    if scenario.taken_in is not None:
+        return taken_in_notes(scenario, timeline, params)
     notes = _case_notes(scenario, timeline, params)
     # Guide E and B.3: the parents' plan of parental leave, before "Co policzyliśmy".
     plan = parental_plan_notes(scenario, timeline, params)

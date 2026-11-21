@@ -155,6 +155,25 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
         "Łączenie urlopu rodzicielskiego z pracą",
         [(9, "Ubezpieczony-pracownik może łączyć", "przysługuje zasiłek macierzyński.")],
     ),
+    # Section D: a child taken in for upbringing (adoption, non-professional foster family).
+    (
+        "D",
+        "Zasiłek macierzyński dla osób, które przyjęły dziecko na wychowanie",
+        [(8, "Prawo przysługuje ubezpieczonemu, który:", "w sprawie przysposobienia.")],
+    ),
+    (
+        "D.1",
+        "Urlop na warunkach urlopu macierzyńskiego",
+        [
+            (8, "Urlop na warunkach urlopu macierzyńskiego –", "do określonego wieku dziecka"),
+            (9, "do 7 lat, a przy odroczeniu", "przy wniosku o przysposobienie."),
+        ],
+    ),
+    (
+        "D.2",
+        "Urlop rodzicielski przy przyjęciu dziecka na wychowanie",
+        [(9, "Urlop rodzicielski – tak jak w przypadku", "(z uwzględnieniem wieku dziecka).")],
+    ),
     # Section H, only what "ubezpieczona" in point A.2 depends on (phase 2c).
     (
         "H.1",
