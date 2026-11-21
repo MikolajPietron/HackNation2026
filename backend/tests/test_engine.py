@@ -366,9 +366,11 @@ def test_without_sickness_insurance_there_are_no_benefit_periods(
         assert [n.id for n in t.notes] == ["situation", "insurance", "father", "computed", *extra]
         assert t.notes[1].kind == "risk"
         assert t.notes[1].title == "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
-        assert "Tylko w określonych sytuacjach zasiłek przysługuje także po ustaniu" in (
-            t.notes[1].text
-        )
+        # Ustawa art. 30 ust. 1: the benefit after the insurance ended follows an employment
+        # that ended in pregnancy; it does not concern voluntary insurance never taken out.
+        not_working = "none" in (answers.get("work"), answers.get("mother_work"))
+        after = "Po ustaniu ubezpieczenia zasiłek macierzyński przysługuje tylko w określonych"
+        assert (after in t.notes[1].text) is not_working
         assert "Liczy się, czy w dniu porodu podlega ubezpieczeniu" in t.markers[0].summary
         requests = ["paternity-request", "parental-father-request"] if employed else []
         assert [d.id for d in t.documents] == requests

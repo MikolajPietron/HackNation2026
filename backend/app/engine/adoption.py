@@ -924,8 +924,8 @@ def _assumptions(
     assumptions = [
         "Pokazujemy to, co wynika z części D Przewodnika ZUS (przyjęcie dziecka na wychowanie) "
         "i z Kodeksu pracy: urlop na warunkach urlopu macierzyńskiego, uzupełniający urlop "
-        "macierzyński, urlop rodzicielski i przy adopcji urlop ojcowski. Kwoty zasiłku "
-        "i wnioski o zasiłek dodamy w kolejnych etapach.",
+        "macierzyński, urlop rodzicielski i przy adopcji urlop ojcowski, z kwotą zasiłku, gdy "
+        "jest podana kwota miesięczna. Wnioski o zasiłek dodamy w kolejnych etapach.",
         f"Urlop na warunkach urlopu macierzyńskiego pokazujemy u osoby, która wypełnia wywiad "
         f"({who}).",
     ]

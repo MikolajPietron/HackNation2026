@@ -266,13 +266,19 @@ def test_the_interview_asks_only_what_this_path_needs() -> None:
         "adoption-ruling",
     ]
     done = {"taken_in_on": TAKEN, "birth_date": BIRTH, "children_count": 1}
-    assert questions(taken_in="adoption", father_work="employment", **done) == ["adoption-ruling"]
-    assert questions(taken_in="adoption", father_work="none", **done) == []
+    # Section G last: the amounts of both parents (test_money.py: the choice of 81,5%).
+    money = ["mother-pay", "father-pay"]
+    assert questions(taken_in="adoption", father_work="employment", **done) == [
+        "adoption-ruling",
+        *money,
+    ]
+    assert questions(taken_in="adoption", father_work="none", **done) == ["mother-pay"]
     # Foster care: no ruling; postponed schooling only when the age limit of 7 matters.
-    assert questions(taken_in="foster", father_work="employment", **done) == []
+    assert questions(taken_in="foster", father_work="employment", **done) == money
     near_seven = {**done, "taken_in_on": "2026-11-16", "birth_date": "2020-03-15"}
     assert questions(taken_in="foster", father_work="employment", **near_seven) == [
-        "school-postponed"
+        "school-postponed",
+        *money,
     ]
 
 
@@ -545,3 +551,12 @@ def test_birth_tools_are_hidden_and_adoption_tools_too_on_the_birth_path(
     assert rejected("set_adoption_ruling") in out
     out = ask(api, scripted("set_leave_handover", {"handed_over": True}, "…"), "…")
     assert rejected("set_leave_handover") in out
+
+
+def test_the_handed_over_leave_is_paid() -> None:
+    """The father takes the rest of the leave, 8.02-21.03.2027 (42 days), at 100% of his own
+    base: 6000 x 0,8629 = 5177,40; 5177,40 / 30 = 172,58 a day; 42 x 172,58 = 7248,36."""
+    t = taken_in(father_work="employment", taken_in_handover=True, mother_pay=7000, father_pay=6000)
+    handed = next(p for p in t.payments if p.segment_id == "adoption-leave-other")
+    assert (handed.lane, handed.days, handed.rate) == ("father", 42, 100)
+    assert (handed.monthly, handed.daily, handed.total) == (5177.4, 172.58, 7248.36)

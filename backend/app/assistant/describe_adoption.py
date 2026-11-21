@@ -1,11 +1,12 @@
 """The interview for a child taken in for upbringing (guide section D): what is still unknown,
 in order. Nothing about pregnancy, the birth or a hospital stay is asked on this path."""
 
-from app.assistant.describe import Question
+from app.assistant.describe import Question, _pay_question
 from app.engine.adoption import birthday, cover_of, filler, other, taken_in_leave, taker
 from app.engine.draft import DAY
 from app.engine.insurance import NOT_INSURED
 from app.engine.models import Role, Scenario
+from app.engine.money import pay_matters
 from app.engine.params import Params
 from app.services.params import load_params
 
@@ -75,6 +76,46 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
                 "adoption-ruling",
             )
         )
+    # Section G, last: the amounts and the choice of 81,5% (ustawa art. 30a ust. 2, art. 31).
+    if insured or adoption:
+        questions += _money_questions(scenario, params, taker(scenario), insured)
+    return questions
+
+
+def _money_questions(
+    scenario: Scenario, params: Params, role: Role, insured: bool
+) -> list[Question]:
+    """The monthly amount of the person who took the child in, their choice of rate, then the
+    other parent's amount; once the leave can be drawn."""
+    if scenario.children_count is None or scenario.taken_in_on is None:
+        return []
+    questions = []
+    mine = scenario.mother_pay if role == "mother" else scenario.father_pay
+    if pay_matters(scenario, role) and mine is None:
+        questions.append(_pay_question(scenario, role))
+    leave = taken_in_leave(scenario, params)
+    has_leave = insured and leave is not None and not leave.too_old
+    if has_leave and mine is not None and scenario.rate_815 is None:
+        days = params.money.request_days_taken_in.value
+        verb, choose = {
+            "mother": ("Czy złożyłaś albo złożysz", "wolisz"),
+            "father": ("Czy złożyłeś albo złożysz", "wolisz"),
+            None: ("Czy osoba, która przyjęła dziecko, złożyła albo złoży", "woli"),
+        }[scenario.role]
+        questions.append(
+            Question(
+                f"{verb} (najpóźniej {days} dni po przyjęciu dziecka na wychowanie) wniosek "
+                "o zasiłek 81,5% za cały urlop na warunkach urlopu macierzyńskiego i urlop "
+                f"rodzicielski, czy {choose} 100% za urlop na warunkach urlopu macierzyńskiego "
+                "i 70% za rodzicielski?",
+                "`set_rate_choice`",
+                "rate-815",
+            )
+        )
+    theirs = other(role)
+    pay = scenario.mother_pay if theirs == "mother" else scenario.father_pay
+    if pay_matters(scenario, theirs) and pay is None:
+        questions.append(_pay_question(scenario, theirs))
     return questions
 
 

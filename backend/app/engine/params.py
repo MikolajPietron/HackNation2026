@@ -166,6 +166,27 @@ class PregnancyParams(BaseModel):
     rehab_objection: Rule
     rehab_rate_percent: Param[int]
     """Percent of the sickness benefit base when the incapacity falls in pregnancy."""
+    # After the insurance ends (ustawa art. 7, 8, 13, 29a, 30, 61; after_insurance.py).
+    job_loss_law: Rule
+    """The benefit equal to the maternity benefit until the birth (art. 30 ust. 3)."""
+    maternity_after_job_loss: Rule
+    """The maternity benefit after a birth that follows the end of the insurance (art. 30
+    ust. 1)."""
+    benefit_periods: Rule
+    """The periods the maternity benefit is paid for (art. 29a ust. 1)."""
+    fixed_term_after_insurance: Rule
+    """A fixed-term contract extended until the birth: the benefit after it ends (art. 30
+    ust. 4)."""
+    zus_after_insurance: Rule
+    """ZUS pays every benefit for a period after the insurance ended (art. 61 ust. 1)."""
+    sick_after_insurance: Rule
+    """The sickness benefit after the insurance ended: in pregnancy without the 91-day cap."""
+    sick_after_insurance_not: Rule
+    """...not when the right was not acquired during the insurance (art. 13 ust. 1 pkt 3)."""
+    sick_after_end_within_days: Param[int]
+    """Incapacity that arose after the insurance ended: at most this many days after it..."""
+    sick_after_end_min_days: Param[int]
+    """...and lasting without a break at least this many days (art. 7)."""
 
 
 class ParentalPlanParams(BaseModel):
@@ -266,6 +287,23 @@ class MoneyParams(BaseModel):
     """The base for one day is this fraction of the monthly base."""
     every_day: Rule
     """The benefit is due for every day, days off work included."""
+    # Every paid period (money.py, `PAID`): pregnancy, part-time work, adoption, sharing.
+    sick_pay_rate: Param[float]
+    """The employer's sick pay in pregnancy, percent of the pay (KP art. 92 § 1)."""
+    sick_pay_base: Rule
+    """Sick pay is computed like the sickness benefit base, for every day (KP art. 92 § 2)."""
+    sick_benefit_rate_law: Rule
+    """The ustawa behind the 100% sickness benefit in pregnancy (art. 11 ust. 2)."""
+    base_job_loss: Rule
+    """The base of the benefit equal to the maternity benefit (art. 47)."""
+    work_reduces: Rule
+    """Parental leave combined with work: the benefit shrinks with the working time."""
+    shared_with_father: Rule
+    """With the request, the father shares the 81,5% benefit for parental leave beyond his own
+    weeks (art. 30a ust. 3)."""
+    request_days_taken_in: Param[int]
+    """A child taken in: the request for `rate_single` within this many days (art. 30a
+    ust. 2)."""
 
 
 class Rules(BaseModel):

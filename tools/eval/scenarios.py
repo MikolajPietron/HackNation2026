@@ -811,36 +811,40 @@ SCENARIOS = [
     },
     {
         "id": "traps",
-        "about": "out-of-scope questions and wrong premises; nothing may change on the timeline",
+        "about": "questions without the data to answer, out-of-scope questions and wrong "
+        "premises; nothing may change on the timeline",
         "runs": 1,
         "onboarding": MOTHER_EXPECTED,
         "steps": [
             {"event": "timeline_ready", "question": "leave-before-birth"},
             {
+                # Amounts are in scope (section G), but no monthly amount is known yet: the model
+                # gives the rate from the source and never invents a sum.
                 "say": "Ile pieniędzy dostanę miesięcznie na urlopie macierzyńskim?",
-                "out_of_scope": True,
-                "forbid": [r"\d[\d\s]*zł", r"\d+(,\d+)?\s*%"],
+                "no_tools": ["set_monthly_pay"],
+                "forbid": [r"\d[\d\s]*,\d\d\s*zł"],
+                "require": [r"100\s*%"],
             },
             {
                 "say": "Chcę wybrać wariant 81,5%. Na czym on polega?",
-                "out_of_scope": True,
-                "forbid": [r"21 dni", r"\b70\s*%", r"\b100\s*%"],
+                "no_tools": ["set_rate_choice"],
+                "require": [r"21 dni", r"81,5"],
             },
             {
                 "say": "Do kiedy muszę złożyć wniosek o urlop rodzicielski?",
+                "require": [r"21 dni"],
+            },
+            {
+                # Not in the ZUS materials at all.
+                "say": "Ile wynosi świadczenie 800 plus i jak je dostać?",
                 "out_of_scope": True,
-                "forbid": [r"21 dni", r"14 dni przed", r"7 dni przed"],
+                "forbid": [r"800\s*zł"],
             },
             {
                 # A question, not a plan (guide E p. 9): answered from the source, nothing saved.
                 "say": "Czy mogę łączyć urlop rodzicielski z pracą na pół etatu?",
                 "no_tools": ["set_parental_work", "set_parental_plan"],
                 "require": [r"wydłuż"],
-            },
-            {
-                "say": "Adoptujemy jeszcze drugie dziecko — ile urlopu nam wtedy przysługuje?",
-                "out_of_scope": True,
-                "forbid": [r"\b20 tyg\w*.{0,60}adop|adop\w*.{0,60}\b20 tyg"],
             },
             {
                 "say": "Przy bliźniętach urlop macierzyński trwa 40 tygodni, prawda?",
@@ -854,6 +858,69 @@ SCENARIOS = [
                 "no_tools": ["set_father_takeover", "set_mother_situation"],
                 "mention": {"numbers": [14]},
                 "require": [r"s\.\s*7\b|180\s*§\s*[45]\b"],
+            },
+        ],
+    },
+    {
+        "id": "job-loss-bankruptcy",
+        "about": "the employer's bankruptcy in pregnancy: the benefit equal to the maternity "
+        "benefit until the birth, then the maternity benefit after the insurance ended, no leave "
+        "before the birth (guide p. 4; ustawa art. 30 ust. 1 and 3, art. 29a ust. 1)",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Pracodawca ogłosił upadłość i 30 listopada 2026 rozwiązał ze mną umowę "
+                "o pracę. Innej pracy mi nie zaproponowano.",
+                "tools": [{"name": "set_job_loss"}],
+                "timeline": {
+                    "segments": {
+                        # From the day after the last day of work to the day before the birth.
+                        "job-loss-benefit": ["2026-12-01", "2027-03-14"],
+                        # The maternity benefit after the insurance ended: 20 weeks from the birth.
+                        "maternity": ["2027-03-15", "2027-08-01"],
+                        "parental": ["2027-08-02", "2028-03-12"],
+                    },
+                    "absent": ["prenatal-window", "protection-end", "earliest-start"],
+                    "notes": ["job-loss", "insurance"],
+                },
+                "mention": {"dates": ["2027-03-14"]},
+                "require": [r"ZUS|po ustaniu ubezpieczenia"],
+                # No leave before the birth to ask about any more.
+                "question": "father-work",
+            },
+        ],
+    },
+    {
+        "id": "money-part-time",
+        "about": "the amount of the benefit, then less of it in the weeks of half-time work "
+        "(guide G p. 9, E p. 9; ustawa art. 31 ust. 1-2, art. 31 ust. 4a, art. 36 ust. 3)",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Zarabiam 8000 zł brutto miesięcznie, od roku tyle samo.",
+                "tools": [{"name": "set_monthly_pay", "args": {"parent": "mother"}}],
+                # Base 8000 × (1 − 13,71%) = 6903,20 zł: 100% for maternity leave.
+                "require": [r"6\s?903,20"],
+                "question": "leave-before-birth",
+            },
+            {
+                "say": "Przez pierwsze 16 tygodni urlopu rodzicielskiego będę pracować na pół "
+                "etatu.",
+                "tools": [{"name": "set_parental_work", "args": {"parent": "mother", "weeks": 16}}],
+                "timeline": {
+                    "segments": {
+                        # 32 weeks + 16 × 1/2 = 8 weeks = 280 days: 02.08.2027 + 279 days.
+                        "parental-mother-1": ["2027-08-02", "2028-05-07"],
+                    },
+                    "absent": ["parental"],
+                },
+                # 70% = 4832,24 zł, half of it in the weeks of work: 2416,12 zł a month.
+                "require": [r"2\s?416,12"],
+                "question": "leave-before-birth",
             },
         ],
     },

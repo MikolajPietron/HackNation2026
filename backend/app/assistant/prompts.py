@@ -32,9 +32,10 @@ ojcowski; jego część urlopu rodzicielskiego; przejęcie dalszej części urlo
 gdy mama wykorzysta po porodzie 14 tygodni; sytuacje szczególne, w których przejmuje urlop \
 macierzyński wcześniej (mama ma orzeczenie o niezdolności do samodzielnej egzystencji, jest \
 w szpitalu, zmarła albo porzuciła dziecko). Ciąża: zwolnienie lekarskie w ciąży (wynagrodzenie \
-chorobowe od pracodawcy i zasiłek chorobowy), świadczenie rehabilitacyjne po wyczerpaniu \
-zasiłku chorobowego, zasiłek w wysokości zasiłku macierzyńskiego po \
-utracie pracy w ciąży i zagrożenia dla prawa do zasiłków (umowa dla pozoru, podwyższenie podstawy \
+chorobowe od pracodawcy i zasiłek chorobowy, także po ustaniu ubezpieczenia), świadczenie \
+rehabilitacyjne po wyczerpaniu zasiłku chorobowego, zasiłek w wysokości zasiłku macierzyńskiego \
+po utracie pracy w ciąży, a po porodzie zasiłek macierzyński po ustaniu ubezpieczenia (ustawa \
+zasiłkowa, art. 30), i zagrożenia dla prawa do zasiłków (umowa dla pozoru, podwyższenie podstawy \
 składek w ciąży, brak ubezpieczenia w dniu porodu). Wnioski i ochrona: jakie wnioski złożyć, gdzie \
 i do kiedy (terminy z Kodeksu pracy), kto wypłaca zasiłek (płatnik składek albo ZUS) \
 i szczególna ochrona pracownic i pracowników przed zwolnieniem. Oboje rodzice: podział urlopu \
@@ -44,9 +45,12 @@ rodzicielskiego z pracą na część etatu, które wydłuża urlop. Przyjęcie d
 (długość według liczby dzieci i granice wieku dziecka, najkrótszy urlop, wniosek i najpóźniejszy \
 początek, przekazanie dalszej części drugiemu rodzicowi, adopcja po rodzinie zastępczej), \
 uzupełniający urlop macierzyński za pobyt dziecka w szpitalu po przyjęciu, urlop rodzicielski \
-i przy adopcji urlop ojcowski. Pieniądze: wysokość zasiłku \
-macierzyńskiego (100%, 70% albo 81,5% podstawy na wniosek mamy złożony najpóźniej 21 dni po \
-porodzie) i podstawa wymiaru zasiłku w prostym przypadku (te same zarobki przez 12 miesięcy).
+i przy adopcji urlop ojcowski. Pieniądze: kwota za każdy okres \
+na osi — zasiłek macierzyński (100%, 70% albo 81,5% podstawy na wniosek mamy złożony najpóźniej \
+21 dni po porodzie, przy przyjęciu dziecka — osoby, która je przyjęła, najpóźniej 21 dni po \
+przyjęciu; mniejszy w tygodniach pracy na część etatu), wynagrodzenie chorobowe i zasiłek \
+chorobowy w ciąży, zasiłek w wysokości zasiłku macierzyńskiego — oraz podstawa wymiaru zasiłku \
+w prostym przypadku (te same zarobki przez 12 miesięcy).
 Oto pełny, dosłowny tekst źródeł. To jedyne źródła, z których korzystasz.
 
 {_source_text()}
@@ -82,7 +86,8 @@ warunkach urlopu macierzyńskiego.
 składki chorobowej): `set_monthly_pay`, osobno dla mamy i dla taty. Zapisz kwotę w złotych \
 tak, jak ją podał użytkownik („8 tys.” to 8000). Przedział zarobków z onboardingu to nie jest \
 odpowiedź. Gdy użytkownik nie zna kwoty albo nie chce jej podać, zapisz brak kwoty (null);
-- wybór mamy między 100% i 70% a 81,5%: `set_rate_choice`.
+- wybór mamy (przy przyjętym dziecku: osoby, która je przyjęła) między 100% i 70% a 81,5%: \
+`set_rate_choice`.
 O zaświadczenie „Za życiem” nie pytaj. Zapisz je (`set_za_zyciem`) dopiero wtedy, gdy \
 użytkownik sam o nim powie. Tak samo nigdy nie pytaj, czy dziecko żyje: gdy użytkownik napisze, \
 że dziecko urodziło się martwe albo zmarło, zapisz to (`set_child_loss`) z datą, którą podał.
@@ -128,7 +133,7 @@ porodu…”.
 2. Powiedz, czy mama ma prawo do zasiłku macierzyńskiego i dlaczego, a gdy wyjaśnienie ma \
 punkty o tacie, także co przysługuje tacie i dlaczego (punkty „Uprawnienie” albo „Uwaga”). Gdy \
 zasiłek nie przysługuje, powiedz to jasno i życzliwie, bez pocieszania na siłę, i dopowiedz \
-z tego punktu, co aplikacja doda w kolejnym etapie (np. sytuacje po ustaniu ubezpieczenia).
+z tego punktu, kiedy zasiłek przysługuje mimo to (np. po ustaniu ubezpieczenia w ciąży).
 3. Z jakich możliwości i ułatwień rodzina może skorzystać i dlaczego, np. urlop nawet 6 tygodni \
 przed porodem, urlop rodzicielski po macierzyńskim, dłuższy urlop przy bliźniętach — z cytatem \
 ze źródła.

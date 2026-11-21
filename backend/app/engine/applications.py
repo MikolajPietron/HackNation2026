@@ -21,6 +21,11 @@ Applied last, on the finished timeline (`add_applications`, before the case note
   further period) or, on a contract of mandate, Z-3a; with a business ZAS-53 goes to ZUS;
 - the benefit after losing the job (guide page 4): after an unlawful termination, the final court
   judgment it needs.
+  timeline gives, and the extension of a fixed-term contract until the birth (after which the
+  maternity benefit is due after the insurance ended, ustawa art. 30 ust. 4);
+- a mother whose employment ended in pregnancy and who has the benefit after it (ustawa art. 30
+  ust. 1, after_insurance.py) is no longer an employee: she files ZAM with ZUS, ZUS pays (art. 61
+  ust. 1 pkt 2 lit. d), and no protection marker is drawn.
 
 Our readings (CLAUDE.md, open questions):
 - "w terminie nie krótszym niż N dni przed" a day: the request is filed N days before that day at
@@ -46,6 +51,7 @@ Our readings (CLAUDE.md, open questions):
 import datetime as dt
 from typing import Literal
 
+from app.engine.after_insurance import after_job_loss
 from app.engine.draft import DAY, merge_sources
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
@@ -118,7 +124,7 @@ def _covered(scenario: Scenario, parent: Parent) -> bool:
 
 
 def who_pays(scenario: Scenario, parent: Parent) -> Payer:
-    if _work(scenario, parent) == "business":
+    if _work(scenario, parent) == "business" or _after_job_loss(scenario, parent):
         return "zus"
     size = scenario.mother_payer_size if parent == "mother" else scenario.father_payer_size
     match size:
@@ -128,6 +134,11 @@ def who_pays(scenario: Scenario, parent: Parent) -> Payer:
             return "zus"
         case _:
             return "payer-or-zus"
+
+
+def _after_job_loss(scenario: Scenario, parent: Parent) -> bool:
+    """The mother has the benefit after her employment ended in pregnancy (ustawa art. 30)."""
+    return parent == "mother" and after_job_loss(scenario) is not None
 
 
 def _payer_name(work: Work | None) -> str:
@@ -147,6 +158,11 @@ def payer_line(scenario: Scenario, parent: Parent, params: Params) -> tuple[str,
     certificate = "Z-3a" if work == "contract" else "Z-3"
     mothers = parent == "mother"
     request = a.employer_pays_or_z3.sources if work == "employment" else a.contract_zam.sources
+    if _after_job_loss(scenario, parent):
+        return (
+            "Zasiłek mamy wypłaca ZUS: przysługuje jej za okres po ustaniu ubezpieczenia.",
+            merge_sources(params.pregnancy.zus_after_insurance.sources),
+        )
     match who_pays(scenario, parent):
         case "zus" if work == "business":
             return (
@@ -411,7 +427,7 @@ def _requests(
 ) -> list[Document]:
     documents: list[Document] = []
     if _covered(scenario, "mother"):
-        if scenario.mothers_work == "employment":
+        if scenario.mothers_work == "employment" and not _after_job_loss(scenario, "mother"):
             documents += _employee_mother(scenario, timeline, params, today)
         else:
             documents += _zam(scenario, timeline, params, today, "mother")
@@ -677,7 +693,15 @@ def _zam(
     first = min(periods, key=lambda s: s.start)
     who = WHO[parent]
     work = _work(scenario, parent)
-    if work == "business":
+    loss = after_job_loss(scenario) if parent == "mother" else None
+    if loss is not None:
+        rule = [
+            f"Mama nie jest już pracownicą: zatrudnienie ustało {fmt(loss.ended_on)}. Wniosek "
+            "o zasiłek macierzyński (ZAM) składa bezpośrednio do ZUS, który wypłaca zasiłki za "
+            "okres po ustaniu ubezpieczenia."
+        ]
+        sources = [a.non_employee_zam.sources, params.pregnancy.zus_after_insurance.sources]
+    elif work == "business":
         rule = [
             f"{who} nie jest pracownikiem i prowadzi własną firmę, więc składa wniosek "
             "o zasiłek macierzyński (ZAM) bezpośrednio do ZUS."
@@ -785,6 +809,8 @@ def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> M
         return None
     if scenario.mother_event is not None and scenario.mother_event.kind == "death":
         return None
+    if _after_job_loss(scenario, "mother"):
+        return None  # no longer employed: the benefit after the insurance ended
     a = params.applications
     leave = sorted(
         (s for s in timeline.segments if s.lane == "mother" and s.id in MOTHER_LEAVE),
@@ -848,7 +874,7 @@ def _leave_name(segment: Segment) -> str:
 def _fixed_term(scenario: Scenario, timeline: Timeline, params: Params) -> None:
     """Guide I; art. 177 § 3: while the child is on the way, the due date marker says that an
     employed mother's fixed-term contract is extended until the birth."""
-    if timeline.child_born or scenario.mothers_work != "employment":
+    if timeline.child_born or scenario.mothers_work != "employment" or scenario.job_loss:
         return
     a = params.applications
     timeline.markers = [
@@ -858,9 +884,15 @@ def _fixed_term(scenario: Scenario, timeline: Timeline, params: Params) -> None:
                     *m.details,
                     "Jeśli mama ma umowę o pracę na czas określony albo na okres próbny dłuższy "
                     "niż miesiąc, która skończyłaby się po upływie trzeciego miesiąca ciąży, umowa "
-                    "przedłuża się do dnia porodu.",
+                    "przedłuża się do dnia porodu. Gdy umowę na czas określony przedłużono do dnia "
+                    "porodu, po porodzie przysługuje zasiłek macierzyński po ustaniu "
+                    "ubezpieczenia.",
                 ],
-                "sources": merge_sources(m.sources, a.fixed_term_extended.sources),
+                "sources": merge_sources(
+                    m.sources,
+                    a.fixed_term_extended.sources,
+                    params.pregnancy.fixed_term_after_insurance.sources,
+                ),
             }
         )
         if m.id == "due-date"
@@ -963,7 +995,8 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
         " Tatę, który pracuje na umowie o pracę, chroni to samo od dnia złożenia wniosku "
         "o urlop do dnia jego zakończenia."
     )
-    if alive and mother == "employment" and _has_leave(timeline, "mother"):
+    employed = not _after_job_loss(scenario, "mother")
+    if alive and employed and mother == "employment" and _has_leave(timeline, "mother"):
         marker = next((m for m in timeline.markers if m.id == "protection-end"), None)
         text = (
             "Mama pracuje na umowie o pracę, więc w ciąży i w czasie urlopu macierzyńskiego, "
@@ -978,9 +1011,13 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
             text += (
                 " Umowa na czas określony albo na okres próbny dłuższy niż miesiąc, która "
                 "skończyłaby się po upływie trzeciego miesiąca ciąży, przedłuża się do dnia "
-                "porodu."
+                "porodu; po porodzie przysługuje wtedy zasiłek macierzyński po ustaniu "
+                "ubezpieczenia."
             )
-            sources.append(a.fixed_term_extended.sources)
+            sources += [
+                a.fixed_term_extended.sources,
+                params.pregnancy.fixed_term_after_insurance.sources,
+            ]
         return CaseNote(
             id="protection",
             kind="right",
@@ -1096,6 +1133,8 @@ def _destination(document: Document, scenario: Scenario) -> str:
         work = scenario.fathers_work
     elif document.id in ("maternity-request", "sick-benefit-request"):
         work = scenario.mothers_work
+        if _after_job_loss(scenario, "mother"):
+            return "do ZUS"
     else:
         return "do pracodawcy"
     match work:

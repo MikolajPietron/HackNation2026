@@ -36,6 +36,9 @@ OUT = ROOT / "backend" / "app" / "assistant" / "ustawa_zasilkowa.json"
 PROVISIONS = {
     "art. 3 pkt 3": ("Art. 3 [", "pkt", "3"),
     "art. 3 pkt 4": ("Art. 3 [", "pkt", "4"),
+    "art. 7": ("Art. 7 [", None, None),
+    "art. 8 ust. 2": ("Art. 8 [", "ust", "2"),
+    "art. 11 ust. 2": ("Art. 11 [", "ust", "2"),
     "art. 11 ust. 4": ("Art. 11 [", "ust", "4"),
     "art. 11 ust. 5": ("Art. 11 [", "ust", "5"),
     # Świadczenie rehabilitacyjne after the sickness benefit in pregnancy (art. 18-19).
@@ -46,7 +49,14 @@ PROVISIONS = {
     "art. 18 ust. 6": ("Art. 18 [", "ust", "6"),
     "art. 19 ust. 1": ("Art. 19 [", "ust", "1"),
     "art. 22": ("Art. 22 [", None, None),
+    "art. 13 ust. 1": ("Art. 13 [", "ust", "1"),
+    "art. 29a ust. 1": ("Art. 29a [", "ust", "1"),
+    "art. 30 ust. 1": ("Art. 30 [", "ust", "1"),
+    "art. 30 ust. 3": ("Art. 30 [", "ust", "3"),
+    "art. 30 ust. 4": ("Art. 30 [", "ust", "4"),
     "art. 30a ust. 1": ("Art. 30a [", "ust", "1"),
+    "art. 30a ust. 2": ("Art. 30a [", "ust", "2"),
+    "art. 30a ust. 3": ("Art. 30a [", "ust", "3"),
     "art. 31 ust. 1": ("Art. 31 [", "ust", "1"),
     "art. 31 ust. 2": ("Art. 31 [", "ust", "2"),
     "art. 31 ust. 3": ("Art. 31 [", "ust", "3"),
@@ -54,12 +64,14 @@ PROVISIONS = {
     "art. 31 ust. 3f": ("Art. 31 [", "ust", "3f"),
     "art. 31 ust. 3g": ("Art. 31 [", "ust", "3g"),
     "art. 31 ust. 4": ("Art. 31 [", "ust", "4"),
+    "art. 31 ust. 4a": ("Art. 31 [", "ust", "4a"),
     "art. 31 ust. 5": ("Art. 31 [", "ust", "5"),
     "art. 36 ust. 1": ("Art. 36 [", "ust", "1"),
     "art. 36 ust. 3": ("Art. 36 [", "ust", "3"),
     "art. 47": ("Art. 47 [", None, None),
     "art. 48 ust. 1": ("Art. 48 [", "ust", "1"),
     "art. 52": ("Art. 52 [", None, None),
+    "art. 61 ust. 1": ("Art. 61 [", "ust", "1"),
 }
 
 GLUED = {

@@ -35,6 +35,12 @@ import datetime as dt
 from collections.abc import Callable
 
 from app.engine.adoption import taken_in_timeline
+from app.engine.after_insurance import (
+    after_insurance_assumptions,
+    after_insurance_lines,
+    after_job_loss,
+    without_leave_before,
+)
 from app.engine.applications import add_applications
 from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
@@ -51,7 +57,7 @@ from app.engine.models import (
     Timeline,
     TimelineElement,
 )
-from app.engine.money import money_assumptions, money_rules
+from app.engine.money import money_assumptions, money_rules, taken_in_money
 from app.engine.params import Params
 from app.engine.parental import (
     deadline_marker,
@@ -73,6 +79,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     if scenario.taken_in is not None:
         # Guide section D: a child taken in for upbringing has its own rules (adoption.py).
         timeline = taken_in_timeline(scenario, params, today)
+        taken_in_money(timeline, scenario, params)  # section G for the leave of a child taken in
         timeline.notes = case_notes(scenario, timeline, params)
         return timeline
     born = scenario.child_born is True
@@ -94,6 +101,9 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
             "Tyle tygodni przed porodem to cały urlop macierzyński. Sprawdź liczbę tygodni."
         )
 
+    # Ustawa art. 30: after losing the job in pregnancy no maternity leave can start before the
+    # birth; the rules draw the benefit after the insurance ended (after_insurance.py).
+    answers, scenario = scenario, without_leave_before(scenario)
     cover = coverage(scenario)
     loss = child_loss(scenario, params, birth, today)
     draft = Draft()
@@ -122,6 +132,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     # Guide E and B.3: the parents' own plan of parental leave, when they told us one.
     plan_assumptions = parental_plan_rules(draft, scenario, params, birth, today, cover, loss)
     _for_non_employee(draft, scenario, params, cover)
+    after_insurance_lines(draft, scenario, params)
     # Pregnancy (guide pages 2-4, section H): sick leave and the benefit after losing the job.
     pregnancy = pregnancy_rules(draft, scenario, params, birth)
     # Section G, last: the amount for every period both parents' rules left on the timeline.
@@ -146,7 +157,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         warnings=draft.warnings,
         assumptions=_assumptions(scenario, params, born, cover, loss, draft)
         + pregnancy
-        + plan_assumptions,
+        + plan_assumptions
+        + after_insurance_assumptions(answers),
         payments=draft.payments,
     )
     timeline.assumptions += money_assumptions(scenario, timeline, params)
@@ -453,7 +465,9 @@ def _maternity_after_birth(
         details.append("Bez urlopu przed porodem pierwszym dniem urlopu jest dzień porodu.")
         sources += rules.first_day_is_birth.sources
     benefit = params.benefit
-    if cover == "obligatory":
+    if after_job_loss(scenario) is not None:
+        pass  # the benefit after the insurance ended: after_insurance.py says why
+    elif cover == "obligatory":
         details.append(
             "Mama jest ubezpieczona, więc za ten okres ma prawo do zasiłku macierzyńskiego."
         )
@@ -808,7 +822,7 @@ def _assumptions(
             "Na razie zakładamy, że mama podlega ubezpieczeniu chorobowemu. Potwierdzi to "
             "pytanie w rozmowie."
         )
-    elif mother:
+    elif mother and after_job_loss(scenario) is None:
         assumptions.append(
             "Zakładamy, że ubezpieczenie chorobowe mamy trwa w dniu porodu."
             if not born
