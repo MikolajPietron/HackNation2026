@@ -22,3 +22,6 @@ dist/
 # System i edytory
 .DS_Store
 .idea/
+
+# Worktrees of Claude Code subagents
+.claude/worktrees/
