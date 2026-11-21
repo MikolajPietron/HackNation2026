@@ -237,6 +237,20 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return args.final
         ? `Przysposobienie prawomocne: ${asDate(args.final_on)}`
         : 'Przysposobienie jeszcze nieprawomocne'
+    case 'set_leave_handover':
+      return args.handed_over
+        ? 'Dalszą część urlopu przejmuje drugi rodzic'
+        : 'Urlop bez przekazania drugiemu rodzicowi'
+    case 'set_foster_before':
+      return args.used_leave
+        ? 'Najpierw rodzina zastępcza, potem adopcja'
+        : 'Bez wcześniejszej rodziny zastępczej'
+    case 'set_rehab_benefit':
+      if (args.status === 'granted') return 'Świadczenie rehabilitacyjne przyznane'
+      if (args.status === 'refused') return 'Świadczenie rehabilitacyjne nieprzyznane'
+      return args.status === 'applied'
+        ? 'Wniosek o świadczenie rehabilitacyjne'
+        : 'Świadczenie rehabilitacyjne'
     case 'set_monthly_pay': {
       const whose = args.parent === 'father' ? 'taty' : 'mamy'
       return typeof args.amount === 'number'

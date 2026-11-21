@@ -18,12 +18,87 @@ import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, dayNumber, formatShortDate } from '@/lib/dates'
 import { EASE_OUT, SPRING_PRESS } from '@/lib/ease'
 import { ICONS } from '@/lib/icons'
+import { formatPln, formatRate } from '@/lib/money'
 import { sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { AdminView, ParamPreview, ParamValues, ParamVersion, SourceRef, Timeline } from '@/types'
+import type { AdminView, Param, ParamPreview, ParamValues, ParamVersion, Params, SourceRef, Timeline } from '@/types'
 
 const CHILDREN = ['1 dziecko', 'Bliźnięta', 'Trojaczki', 'Czworaczki', '5 i więcej']
 const CHILDREN_ICON = [ICONS.mamaZDzieckiem, ICONS.blizniaki, ICONS.trojaczki, ICONS.trojaczki, ICONS.trojaczki]
+
+type NumberKey = {
+  [K in keyof ParamValues]: ParamValues[K] extends number ? K : never
+}[keyof ParamValues]
+
+/** One number of the panel besides the weeks of maternity leave: where it lives in the base file
+ *  (for its sources) and how the panel names it. */
+interface NumberField {
+  key: NumberKey
+  param: (base: Params) => Param<number>
+  icon: string
+  label: string
+  hint: string
+}
+
+/** Guide section G: percent of the benefit base. */
+const RATES: NumberField[] = [
+  {
+    key: 'rate_full',
+    param: (p) => p.money.rate_full,
+    icon: ICONS.mamaZDzieckiem,
+    label: 'Urlop macierzyński, uzupełniający i ojcowski',
+    hint: 'Także urlop na warunkach urlopu macierzyńskiego',
+  },
+  {
+    key: 'rate_parental',
+    param: (p) => p.money.rate_parental,
+    icon: ICONS.wozek,
+    label: 'Urlop rodzicielski',
+    hint: 'Gdy mama nie złoży wniosku o jedną stawkę',
+  },
+  {
+    key: 'rate_single',
+    param: (p) => p.money.rate_single,
+    icon: ICONS.skarbonka,
+    label: 'Jedna stawka na wniosek mamy',
+    hint: 'Za cały urlop macierzyński i rodzicielski',
+  },
+]
+
+/** The key deadlines of the requests, in days. */
+const DEADLINES: NumberField[] = [
+  {
+    key: 'rate_single_request_days',
+    param: (p) => p.money.request_days,
+    icon: ICONS.skarbonka,
+    label: 'Wniosek o jedną stawkę',
+    hint: 'Najpóźniej tyle dni po porodzie',
+  },
+  {
+    key: 'parental_request_days',
+    param: (p) => p.applications.parental_days_before,
+    icon: ICONS.wozek,
+    label: 'Wniosek o urlop rodzicielski',
+    hint: 'Co najmniej tyle dni przed jego rozpoczęciem',
+  },
+  {
+    key: 'paternity_request_days',
+    param: (p) => p.applications.paternity_days_before,
+    icon: ICONS.tataZDzieckiem,
+    label: 'Wniosek o urlop ojcowski',
+    hint: 'Co najmniej tyle dni przed jego rozpoczęciem',
+  },
+  {
+    key: 'supplementary_request_days',
+    param: (p) => p.applications.supplementary_days_before_end,
+    icon: ICONS.inkubator,
+    label: 'Wniosek o urlop uzupełniający',
+    hint: 'Co najmniej tyle dni przed końcem urlopu macierzyńskiego',
+  },
+]
+
+/** 81.5 -> "81,5" */
+const decimal = (value: number) => String(value).replace('.', ',')
 
 const RULES: Record<string, string> = {
   medical_certificate: 'Urlop przed porodem wymaga zaświadczenia lekarskiego o przewidywanej dacie porodu',
@@ -95,7 +170,7 @@ export function AdminScreen() {
         >
           <div className="min-w-0 space-y-5">
             <motion.div variants={ITEM}>
-              <h1 className="text-3xl font-bold tracking-tight text-navy-900 lg:text-4xl">Urlop macierzyński</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-navy-900 lg:text-4xl">Urlopy, stawki i terminy</h1>
               <p className="mt-1 max-w-2xl text-navy-500">
                 Zmiana to nowa wersja od wybranej daty. Do tego dnia silnik liczy po obecnych
                 zasadach. Wersja bazowa: {view.base.version}.
@@ -156,6 +231,56 @@ export function AdminScreen() {
                   onChange={(value) => setDraft({ ...draft, mother_personal_weeks: value })}
                 />
               </Row>
+            </ParamCard>
+
+            <ParamCard
+              icon={ICONS.pieniadze}
+              title="Wysokość zasiłku macierzyńskiego"
+              hint="Procent podstawy wymiaru zasiłku"
+            >
+              {RATES.map((field) => (
+                <Row
+                  key={field.key}
+                  icon={field.icon}
+                  label={field.label}
+                  hint={field.hint}
+                  sources={field.param(view.base).sources}
+                >
+                  <Stepper
+                    value={draft[field.key]}
+                    base={view.in_force[field.key]}
+                    label={field.label}
+                    unit="%"
+                    step={0.5}
+                    min={0.5}
+                    max={100}
+                    format={decimal}
+                    wide
+                    onChange={(value) => setDraft({ ...draft, [field.key]: value })}
+                  />
+                </Row>
+              ))}
+            </ParamCard>
+
+            <ParamCard icon={ICONS.koperta} title="Terminy wniosków" hint="Liczba dni kalendarzowych">
+              {DEADLINES.map((field) => (
+                <Row
+                  key={field.key}
+                  icon={field.icon}
+                  label={field.label}
+                  hint={field.hint}
+                  sources={field.param(view.base).sources}
+                >
+                  <Stepper
+                    value={draft[field.key]}
+                    base={view.in_force[field.key]}
+                    label={field.label}
+                    unit="dni"
+                    max={90}
+                    onChange={(value) => setDraft({ ...draft, [field.key]: value })}
+                  />
+                </Row>
+              ))}
             </ParamCard>
 
             <motion.section variants={ITEM} className="rounded-3xl border border-line p-5">
@@ -271,15 +396,24 @@ function Stepper({
   value,
   base,
   label,
+  unit = 'tyg.',
+  step = 1,
   min = 1,
   max = 60,
+  format = String,
+  wide = false,
   onChange,
 }: {
   value: number
   base: number
   label: string
+  unit?: string
+  step?: number
   min?: number
   max?: number
+  format?: (value: number) => string
+  /** Room for a decimal number ("81,5"), so the buttons stay put. */
+  wide?: boolean
   onChange: (value: number) => void
 }) {
   const changed = value !== base
@@ -297,26 +431,27 @@ function Stepper({
             title="Przywróć"
             className="flex items-center gap-1 rounded-full bg-sun-100 px-2 py-0.5 text-xs font-bold whitespace-nowrap text-sun-700 transition-colors hover:bg-sun-300/60"
           >
-            było {base} <RotateCcw className="size-3" />
+            było {format(base)} <RotateCcw className="size-3" />
           </motion.button>
         )}
       </AnimatePresence>
-      <StepButton label="Mniej" disabled={value <= min} onClick={() => onChange(value - 1)}>
+      <StepButton label="Mniej" disabled={value - step < min} onClick={() => onChange(value - step)}>
         <Minus className="size-4" />
       </StepButton>
       <span
         className={cn(
-          'w-9 text-center text-2xl font-bold tabular-nums transition-colors duration-200',
+          'text-center text-2xl font-bold tabular-nums transition-colors duration-200',
+          wide ? 'w-14' : 'w-9',
           changed ? 'text-sun-700' : 'text-navy-900',
         )}
         aria-live="polite"
       >
-        <TextStates text={String(value)} />
+        <TextStates text={format(value)} />
       </span>
-      <StepButton label="Więcej" disabled={value >= max} onClick={() => onChange(value + 1)}>
+      <StepButton label="Więcej" disabled={value + step > max} onClick={() => onChange(value + step)}>
         <Plus className="size-4" />
       </StepButton>
-      <span className="w-7 text-sm font-bold text-navy-500">tyg.</span>
+      <span className="w-7 text-sm font-bold text-navy-500">{unit}</span>
     </div>
   )
 }
@@ -400,6 +535,7 @@ function NewVersion({
   const [calendar, setCalendar] = useState(false)
   const [note, setNote] = useState('')
   const [children, setChildren] = useState(1)
+  const [rate815, setRate815] = useState(false)
   const [preview, setPreview] = useState<ParamPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -409,7 +545,7 @@ function NewVersion({
   useEffect(() => {
     const controller = new AbortController()
     const id = window.setTimeout(() => {
-      previewParams(draft, children, controller.signal)
+      previewParams(draft, children, rate815, controller.signal)
         .then((p) => {
           setPreview(p)
           setError(null)
@@ -422,7 +558,7 @@ function NewVersion({
       window.clearTimeout(id)
       controller.abort()
     }
-  }, [draft, children])
+  }, [draft, children, rate815])
 
   const save = async () => {
     setSaving(true)
@@ -513,29 +649,21 @@ function NewVersion({
 
       <div className="mt-5 flex items-center gap-2">
         <p className="flex-1 text-sm font-bold text-navy-700">Co się zmieni</p>
-        <div className="flex rounded-full bg-navy-50 p-0.5">
-          {[1, 2, 3].map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setChildren(n)}
-              aria-pressed={children === n}
-              className={cn(
-                'relative rounded-full px-2.5 py-1 text-xs font-bold transition-colors',
-                children === n ? 'text-navy-900' : 'text-navy-500',
-              )}
-            >
-              {children === n && (
-                <motion.span
-                  layoutId="preview-children"
-                  className="absolute inset-0 rounded-full bg-white shadow-sm"
-                  transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
-                />
-              )}
-              <span className="relative">{n === 1 ? '1 dziecko' : n === 2 ? 'bliźnięta' : 'trojaczki'}</span>
-            </button>
-          ))}
-        </div>
+        <Segmented
+          id="preview-children"
+          options={['1 dziecko', 'bliźnięta', 'trojaczki']}
+          selected={children - 1}
+          onSelect={(index) => setChildren(index + 1)}
+        />
+      </div>
+      <div className="mt-1.5 flex items-center gap-2">
+        <p className="flex-1 text-xs text-navy-500">Przykładowa rodzina: mama i tata na etacie</p>
+        <Segmented
+          id="preview-rate"
+          options={['100% i 70%', 'jedna stawka']}
+          selected={rate815 ? 1 : 0}
+          onSelect={(index) => setRate815(index === 1)}
+        />
       </div>
       <PreviewDiff preview={preview} dirty={dirty} />
 
@@ -552,6 +680,45 @@ function NewVersion({
         <p className="mt-2 text-center text-xs text-navy-500">Podaj podstawę zmiany, żeby zapisać.</p>
       )}
     </motion.section>
+  )
+}
+
+/** A small pill switch for the preview's example family; the white pill slides to the choice. */
+function Segmented({
+  id,
+  options,
+  selected,
+  onSelect,
+}: {
+  id: string
+  options: string[]
+  selected: number
+  onSelect: (index: number) => void
+}) {
+  return (
+    <div className="flex rounded-full bg-navy-50 p-0.5">
+      {options.map((option, index) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onSelect(index)}
+          aria-pressed={selected === index}
+          className={cn(
+            'relative rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap transition-colors',
+            selected === index ? 'text-navy-900' : 'text-navy-500',
+          )}
+        >
+          {selected === index && (
+            <motion.span
+              layoutId={id}
+              className="absolute inset-0 rounded-full bg-white shadow-sm"
+              transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
+            />
+          )}
+          <span className="relative">{option}</span>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -594,6 +761,26 @@ function changes(before: Timeline, after: Timeline): Change[] {
         parts: [{ label: '', before: formatShortDate(old.date), after: formatShortDate(m.date) }],
       })
     }
+  }
+  for (const d of after.documents) {
+    const old = before.documents.find((b) => b.id === d.id)
+    if (old && old.needed_by !== d.needed_by) {
+      out.push({
+        id: d.id,
+        title: d.title,
+        parts: [{ label: 'do', before: formatShortDate(old.needed_by), after: formatShortDate(d.needed_by) }],
+      })
+    }
+  }
+  for (const p of after.payments) {
+    const old = before.payments.find((b) => b.id === p.id)
+    if (!old) continue
+    const parts: Part[] = []
+    if (old.rate !== p.rate) parts.push({ label: '', before: formatRate(old.rate), after: formatRate(p.rate) })
+    if (old.monthly !== p.monthly) {
+      parts.push({ label: 'miesięcznie', before: formatPln(old.monthly), after: formatPln(p.monthly) })
+    }
+    if (parts.length) out.push({ id: p.id, title: p.title, parts })
   }
   return out
 }
@@ -676,6 +863,14 @@ function History({ view }: { view: AdminView }) {
     }
     if (values.mother_personal_weeks !== base.mother_personal_weeks.value) {
       out.push(`Tylko dla mamy: ${base.mother_personal_weeks.value} → ${values.mother_personal_weeks} tyg.`)
+    }
+    for (const field of RATES) {
+      const was = field.param(view.base).value
+      if (values[field.key] !== was) out.push(`${field.label}: ${decimal(was)} → ${decimal(values[field.key])}%`)
+    }
+    for (const field of DEADLINES) {
+      const was = field.param(view.base).value
+      if (values[field.key] !== was) out.push(`${field.label}: ${was} → ${values[field.key]} dni`)
     }
     return out
   }

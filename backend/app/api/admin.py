@@ -21,22 +21,49 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 PREVIEW_DAYS_TO_BIRTH = 120
 """The preview's example family expects the baby about four months from today."""
+PREVIEW_PAY = 6000.0
+"""The example mother's gross monthly pay, so the preview shows what a rate does to amounts."""
+MAX_DEADLINE_DAYS = 90
+"""The panel refuses a request deadline longer than this (a typo, not a law)."""
 
 
 class ParamValues(BaseModel):
-    """The numbers the panel can change (phase 1 and 2a of the engine)."""
+    """The numbers the panel can change: the length of maternity leave, the rates of the
+    maternity benefit (guide section G) and the key deadlines of the requests."""
 
     max_weeks_before_birth: int = Field(ge=0, le=20)
     weeks_by_children: list[int] = Field(min_length=5, max_length=5)
     mother_personal_weeks: int = Field(ge=1, le=52)
+    rate_full: float
+    """Percent of the base: maternity, supplementary and paternity leave (`money.rate_full`)."""
+    rate_parental: float
+    """Percent of the base: parental leave (`money.rate_parental`)."""
+    rate_single: float
+    """Percent of the base after the mother's request (`money.rate_single`)."""
+    rate_single_request_days: int
+    """The request for `rate_single`: at the latest this many days after the birth."""
+    parental_request_days: int
+    """The request for parental leave: at least this many days before it starts."""
+    paternity_request_days: int
+    """The request for paternity leave: at least this many days before it starts."""
+    supplementary_request_days: int
+    """The request for supplementary leave: at least this many days before maternity leave
+    ends."""
 
 
 def values_of(params: Params) -> ParamValues:
-    m = params.maternity
+    m, money, a = params.maternity, params.money, params.applications
     return ParamValues(
         max_weeks_before_birth=m.max_weeks_before_birth.value,
         weeks_by_children=list(m.weeks_by_children.value),
         mother_personal_weeks=m.mother_personal_weeks.value,
+        rate_full=money.rate_full.value,
+        rate_parental=money.rate_parental.value,
+        rate_single=money.rate_single.value,
+        rate_single_request_days=money.request_days.value,
+        parental_request_days=a.parental_days_before.value,
+        paternity_request_days=a.paternity_days_before.value,
+        supplementary_request_days=a.supplementary_days_before_end.value,
     )
 
 
@@ -51,15 +78,37 @@ def check(values: ParamValues) -> None:
         raise HTTPException(422, "Tygodni tylko dla mamy nie może być więcej niż całego urlopu.")
     if values.max_weeks_before_birth >= weeks[0]:
         raise HTTPException(422, "Część przed porodem musi być krótsza niż cały urlop.")
+    rates = (values.rate_full, values.rate_parental, values.rate_single)
+    if any(rate <= 0 or rate > 100 for rate in rates):
+        raise HTTPException(
+            422, "Stopa procentowa zasiłku musi być większa od 0% i nie większa niż 100%."
+        )
+    days = (
+        values.rate_single_request_days,
+        values.parental_request_days,
+        values.paternity_request_days,
+        values.supplementary_request_days,
+    )
+    if any(d < 1 or d > MAX_DEADLINE_DAYS for d in days):
+        raise HTTPException(
+            422, f"Termin wniosku musi mieścić się między 1 a {MAX_DEADLINE_DAYS} dni."
+        )
 
 
 def with_values(params: Params, values: ParamValues, version: str) -> Params:
     """A copy of the parameters with new numbers; the sources stay attached."""
     copy = params.model_copy(deep=True, update={"version": version})
-    m = copy.maternity
+    m, money, a = copy.maternity, copy.money, copy.applications
     m.max_weeks_before_birth.value = values.max_weeks_before_birth
     m.weeks_by_children.value = list(values.weeks_by_children)
     m.mother_personal_weeks.value = values.mother_personal_weeks
+    money.rate_full.value = values.rate_full
+    money.rate_parental.value = values.rate_parental
+    money.rate_single.value = values.rate_single
+    money.request_days.value = values.rate_single_request_days
+    a.parental_days_before.value = values.parental_request_days
+    a.paternity_days_before.value = values.paternity_request_days
+    a.supplementary_days_before_end.value = values.supplementary_request_days
     return copy
 
 
@@ -150,6 +199,8 @@ async def save_version(
 class Preview(BaseModel):
     values: ParamValues
     children_count: int = Field(default=1, ge=1, le=5)
+    rate_815: bool = False
+    """The example mother files the request for the single rate (81,5%)."""
 
 
 class PreviewResult(BaseModel):
@@ -166,12 +217,18 @@ async def preview(
     today: Annotated[dt.date, Depends(get_today)],
 ) -> PreviewResult:
     check(body.values)
+    # Both parents employed, the mother's pay known: the preview shows leave, amounts and the
+    # requests' deadlines. Without the request for 81,5% the choice stays open (its deadline on
+    # the timeline), so the family gets 100% and 70%.
     scenario = Scenario(
         role="mother",
         work="employment",
+        father_work="employment",
         child_born=False,
         due_date=today + dt.timedelta(days=PREVIEW_DAYS_TO_BIRTH),
         children_count=body.children_count,
+        mother_pay=PREVIEW_PAY,
+        rate_815=True if body.rate_815 else None,
     )
     try:
         return PreviewResult(

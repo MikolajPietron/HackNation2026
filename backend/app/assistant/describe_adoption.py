@@ -1,10 +1,12 @@
 """The interview for a child taken in for upbringing (guide section D): what is still unknown,
 in order. Nothing about pregnancy, the birth or a hospital stay is asked on this path."""
 
-from app.assistant.describe import Question
-from app.engine.adoption import birthday, cover_of, other, taken_in_leave, taker
+from app.assistant.describe import Question, _pay_question
+from app.engine.adoption import birthday, cover_of, filler, other, taken_in_leave, taker
+from app.engine.draft import DAY
 from app.engine.insurance import NOT_INSURED
 from app.engine.models import Role, Scenario
+from app.engine.money import pay_matters
 from app.engine.params import Params
 from app.services.params import load_params
 
@@ -17,7 +19,7 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
     params = params or load_params()
     adoption = scenario.taken_in == "adoption"
     several = (scenario.children_count or 1) > 1
-    role = taker(scenario)
+    me = filler(scenario)
     questions = []
     if scenario.taken_in_on is None:
         questions.append(
@@ -49,8 +51,8 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
                 "children",
             )
         )
-    questions += _work_questions(scenario, role)
-    insured = cover_of(scenario, role) not in NOT_INSURED
+    questions += _work_questions(scenario, me)
+    insured = cover_of(scenario, taker(scenario)) not in NOT_INSURED
     if insured and _school_matters(scenario, params):
         questions.append(
             Question(
@@ -59,9 +61,11 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
                 "school-postponed",
             )
         )
-    # The other parent: their 9 weeks of parental leave and, after adoption, paternity leave.
-    if insured or adoption:
-        questions += _work_questions(scenario, other(role))
+    if insured:
+        questions += _hospital_questions(scenario, params)
+    # The other parent: their 9 weeks of parental leave, after adoption paternity leave, and
+    # the leave itself when the person filling in has no sickness insurance.
+    questions += _work_questions(scenario, other(me))
     father = cover_of(scenario, "father") not in NOT_INSURED
     if adoption and father and scenario.adoption_final is None:
         questions.append(
@@ -72,6 +76,46 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
                 "adoption-ruling",
             )
         )
+    # Section G, last: the amounts and the choice of 81,5% (ustawa art. 30a ust. 2, art. 31).
+    if insured or adoption:
+        questions += _money_questions(scenario, params, taker(scenario), insured)
+    return questions
+
+
+def _money_questions(
+    scenario: Scenario, params: Params, role: Role, insured: bool
+) -> list[Question]:
+    """The monthly amount of the person who took the child in, their choice of rate, then the
+    other parent's amount; once the leave can be drawn."""
+    if scenario.children_count is None or scenario.taken_in_on is None:
+        return []
+    questions = []
+    mine = scenario.mother_pay if role == "mother" else scenario.father_pay
+    if pay_matters(scenario, role) and mine is None:
+        questions.append(_pay_question(scenario, role))
+    leave = taken_in_leave(scenario, params)
+    has_leave = insured and leave is not None and not leave.too_old
+    if has_leave and mine is not None and scenario.rate_815 is None:
+        days = params.money.request_days_taken_in.value
+        verb, choose = {
+            "mother": ("Czy złożyłaś albo złożysz", "wolisz"),
+            "father": ("Czy złożyłeś albo złożysz", "wolisz"),
+            None: ("Czy osoba, która przyjęła dziecko, złożyła albo złoży", "woli"),
+        }[scenario.role]
+        questions.append(
+            Question(
+                f"{verb} (najpóźniej {days} dni po przyjęciu dziecka na wychowanie) wniosek "
+                "o zasiłek 81,5% za cały urlop na warunkach urlopu macierzyńskiego i urlop "
+                f"rodzicielski, czy {choose} 100% za urlop na warunkach urlopu macierzyńskiego "
+                "i 70% za rodzicielski?",
+                "`set_rate_choice`",
+                "rate-815",
+            )
+        )
+    theirs = other(role)
+    pay = scenario.mother_pay if theirs == "mother" else scenario.father_pay
+    if pay_matters(scenario, theirs) and pay is None:
+        questions.append(_pay_question(scenario, theirs))
     return questions
 
 
@@ -88,6 +132,45 @@ def _school_matters(scenario: Scenario, params: Params) -> bool:
     if later is None or leave.start >= birthday(birth, later.value):
         return False
     return leave.too_old or leave.cut
+
+
+def _hospital_questions(scenario: Scenario, params: Params) -> list[Question]:
+    """Supplementary leave (art. 183 § 3¹) counts the days in hospital after taking the child
+    in, within the longest window of art. 180² (15 weeks from the birth): asked only when the
+    child was taken in before that window ends and the leave is drawn."""
+    leave = taken_in_leave(scenario, params)
+    birth, taken = scenario.birth_date, scenario.taken_in_on
+    if leave is None or leave.too_old or leave.used_up or birth is None or taken is None:
+        return []
+    window_end = birth + (params.supplementary.limit_weeks_early.value * 7 - 1) * DAY
+    if taken > window_end:
+        return []
+    several = (scenario.children_count or 1) > 1
+    if scenario.hospital_care is None:
+        return [
+            Question(
+                "Czy któreś z dzieci po przyjęciu na wychowanie było w szpitalu?"
+                if several
+                else "Czy dziecko po przyjęciu na wychowanie było w szpitalu?",
+                "`set_hospital_care` (applies: tak albo nie)",
+                "taken-in-hospital",
+            )
+        ]
+    if scenario.hospital_care and (
+        scenario.birth_week is None or scenario.birth_weight_up_to_1000g is None
+    ):
+        return [
+            Question(
+                "W którym tygodniu ciąży urodziły się dzieci, czy najlżejsze z nich ważyło nie "
+                "więcej niż 1000 g i od kiedy do kiedy było w szpitalu to, które leżało najdłużej?"
+                if several
+                else "W którym tygodniu ciąży urodziło się dziecko, czy ważyło nie więcej niż "
+                "1000 g i od kiedy do kiedy było w szpitalu?",
+                "`set_hospital_care` (ze wszystkimi szczegółami naraz)",
+                "taken-in-hospital-details",
+            )
+        ]
+    return []
 
 
 def _work_questions(scenario: Scenario, role: Role) -> list[Question]:
@@ -136,8 +219,13 @@ def describe_taken_in(scenario: Scenario) -> str:
     """For the model: this family took a child in; who takes the leave."""
     kind = KIND[scenario.taken_in or "foster"]
     who = "mamy" if taker(scenario) == "mother" else "taty"
+    whose = (
+        "czyli osoby, która pisze"
+        if taker(scenario) == filler(scenario)
+        else "bo osoba, która pisze, nie podlega ubezpieczeniu chorobowemu"
+    )
     return (
         f"Dziecko zostało przyjęte na wychowanie ({kind}), a nie urodzone w tej rodzinie. Nie "
         "mów o ciąży, porodzie, urlopie przed porodem ani o 14 tygodniach po porodzie. Urlop na "
-        f"warunkach urlopu macierzyńskiego jest na osi {who}, czyli osoby, która pisze."
+        f"warunkach urlopu macierzyńskiego jest na osi {who}, {whose}."
     )

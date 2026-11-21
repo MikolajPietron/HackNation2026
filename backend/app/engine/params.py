@@ -155,6 +155,38 @@ class PregnancyParams(BaseModel):
     job_loss_rate_percent: Param[int]
     risk_sham: Rule
     risk_base_raised: Rule
+    # The rehabilitation benefit after the sickness benefit (ustawa art. 18-19).
+    rehab_benefit: Rule
+    rehab_max_months: Param[int]
+    """At most this many months (art. 18 ust. 2)..."""
+    rehab_month_days: Param[int]
+    """...of this many days each (art. 22 with art. 11 ust. 5)."""
+    rehab_decides: Rule
+    """The ZUS medical examiner rules on the conditions; the decision rests on that ruling."""
+    rehab_objection: Rule
+    rehab_rate_percent: Param[int]
+    """Percent of the sickness benefit base when the incapacity falls in pregnancy."""
+    # After the insurance ends (ustawa art. 7, 8, 13, 29a, 30, 61; after_insurance.py).
+    job_loss_law: Rule
+    """The benefit equal to the maternity benefit until the birth (art. 30 ust. 3)."""
+    maternity_after_job_loss: Rule
+    """The maternity benefit after a birth that follows the end of the insurance (art. 30
+    ust. 1)."""
+    benefit_periods: Rule
+    """The periods the maternity benefit is paid for (art. 29a ust. 1)."""
+    fixed_term_after_insurance: Rule
+    """A fixed-term contract extended until the birth: the benefit after it ends (art. 30
+    ust. 4)."""
+    zus_after_insurance: Rule
+    """ZUS pays every benefit for a period after the insurance ended (art. 61 ust. 1)."""
+    sick_after_insurance: Rule
+    """The sickness benefit after the insurance ended: in pregnancy without the 91-day cap."""
+    sick_after_insurance_not: Rule
+    """...not when the right was not acquired during the insurance (art. 13 ust. 1 pkt 3)."""
+    sick_after_end_within_days: Param[int]
+    """Incapacity that arose after the insurance ended: at most this many days after it..."""
+    sick_after_end_min_days: Param[int]
+    """...and lasting without a break at least this many days (art. 7)."""
 
 
 class ParentalPlanParams(BaseModel):
@@ -215,6 +247,16 @@ class TakenInParams(BaseModel):
     """Adoption: paternity leave within this many months of the final adoption ruling..."""
     paternity_age: Param[int]
     """...and not after the child reaches this age."""
+    # Edge cases of art. 183: supplementary leave, passing the leave on, foster care first.
+    supplementary: Rule
+    """§ 3¹: supplementary leave for a hospital stay after the child was taken in."""
+    handover_after_weeks: Param[int]
+    """§ 2 with art. 180 § 4: the rest of the leave passes to the other parent after this many
+    weeks."""
+    after_foster_leave: Rule
+    """§ 7: adoption after foster care, the leave less what was used as a foster family."""
+    after_foster_parental: Rule
+    """§ 8: the same for parental leave."""
     foster: TakenInKindParams
     adoption: TakenInKindParams
 
@@ -245,6 +287,23 @@ class MoneyParams(BaseModel):
     """The base for one day is this fraction of the monthly base."""
     every_day: Rule
     """The benefit is due for every day, days off work included."""
+    # Every paid period (money.py, `PAID`): pregnancy, part-time work, adoption, sharing.
+    sick_pay_rate: Param[float]
+    """The employer's sick pay in pregnancy, percent of the pay (KP art. 92 § 1)."""
+    sick_pay_base: Rule
+    """Sick pay is computed like the sickness benefit base, for every day (KP art. 92 § 2)."""
+    sick_benefit_rate_law: Rule
+    """The ustawa behind the 100% sickness benefit in pregnancy (art. 11 ust. 2)."""
+    base_job_loss: Rule
+    """The base of the benefit equal to the maternity benefit (art. 47)."""
+    work_reduces: Rule
+    """Parental leave combined with work: the benefit shrinks with the working time."""
+    shared_with_father: Rule
+    """With the request, the father shares the 81,5% benefit for parental leave beyond his own
+    weeks (art. 30a ust. 3)."""
+    request_days_taken_in: Param[int]
+    """A child taken in: the request for `rate_single` within this many days (art. 30a
+    ust. 2)."""
 
 
 class Rules(BaseModel):
@@ -256,8 +315,9 @@ class Rules(BaseModel):
 
 
 class ApplicationParams(BaseModel):
-    """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 12, section I page
-    10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1, 182³ § 2)."""
+    """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
+    page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
+    182³ § 2)."""
 
     paid_by_payer_or_zus: Rule
     payer_more_than_insured: Param[int]
@@ -285,6 +345,15 @@ class ApplicationParams(BaseModel):
     supplementary or parental leave, paternity leave."""
     fixed_term_extended: Rule
     protection_employees_only: Rule
+    # Sick leave in pregnancy (guide page 3): e-ZLA, informing the employer, the forms.
+    sick_e_zla: Rule
+    sick_inform_employer: Rule
+    sick_employee_payer: Rule
+    """The authorized payer pays on the basis of e-ZLA, otherwise sends Z-3 or ZAS-12 to ZUS."""
+    sick_contract: Rule
+    """A contract of mandate: documents to ZUS or the payer; Z-3a."""
+    sick_business: Rule
+    """A business: ZAS-53 to ZUS."""
 
 
 class Params(BaseModel):

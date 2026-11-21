@@ -8,6 +8,7 @@ from typing import Literal, NamedTuple
 from pydantic import BaseModel
 
 from app.assistant.guide import page_label
+from app.engine.after_insurance import after_job_loss, leave_before_cut
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     CaseNote,
@@ -21,6 +22,7 @@ from app.engine.models import (
     Timeline,
     TimelineElement,
 )
+from app.engine.money import pay_matters
 from app.engine.pregnancy import employer_days_by_year, sick_leave
 from app.engine.timeline import fmt
 from app.services.params import load_params
@@ -210,7 +212,8 @@ def interview_questions(scenario: Scenario) -> list[Question]:
             )
         )
     insured = cover not in NOT_INSURED
-    if insured:
+    # After losing the job in pregnancy (ustawa art. 30) no leave before the birth can start.
+    if insured and not leave_before_cut(scenario):
         questions += _leave_before_birth_questions(scenario)
 
     # Never after the loss of every child: nothing to plan there, and the questions would hurt.
@@ -346,7 +349,8 @@ def _payer_questions(scenario: Scenario) -> list[Question]:
             "mother",
             scenario.mother_payer_size,
             scenario.mothers_work,
-            coverage(scenario) not in NOT_INSURED,
+            # After losing the job in pregnancy ZUS pays (ustawa art. 61 ust. 1).
+            coverage(scenario) not in NOT_INSURED and after_job_loss(scenario) is None,
         ),
         (
             "father",
@@ -453,20 +457,20 @@ PAID_WORK = ("employment", "contract", "business")
 def _money_questions(scenario: Scenario) -> list[Question]:
     """Guide section G: the monthly amount the mother's benefit base comes from, her choice of
     81,5%, then the father's amount. Asked only once the periods are drawn (the number of
-    children is known) and only for a parent who has benefit periods. The onboarding's range of
+    children is known) and only for a parent who has paid periods (the mother's sick leave in
+    pregnancy too, also when her work ended before the birth). The onboarding's range of
     earnings is never enough: the amount is asked exactly."""
     if scenario.children_count is None:
         return []
     questions = []
     mother = coverage(scenario) not in NOT_INSURED and scenario.mothers_work in PAID_WORK
-    if mother and scenario.mother_pay is None:
+    if pay_matters(scenario, "mother") and scenario.mother_pay is None:
         questions.append(_pay_question(scenario, "mother"))
     event = scenario.mother_event
     left = event is not None and event.kind in ("death", "abandonment")
     if mother and scenario.mother_pay is not None and scenario.rate_815 is None and not left:
         questions.append(_rate_question(scenario))
-    father = father_coverage(scenario) not in NOT_INSURED and scenario.fathers_work in PAID_WORK
-    if father and scenario.father_pay is None:
+    if pay_matters(scenario, "father") and scenario.father_pay is None:
         questions.append(_pay_question(scenario, "father"))
     return questions
 

@@ -3,23 +3,74 @@
 The base version is the JSON file in the repo. A saved version is a full copy of the parameters
 with some numbers changed, valid from a date. Without Supabase settings, or before the migration
 is applied, versions are kept in memory (like sessions), so the panel still works in a demo.
+
+A stored version is read onto the base file (`merge_onto_base`): its numbers win, blocks it lacks
+(added to the engine after it was saved) come from the base file, and sources, notes and rules
+always come from the base file: a version from the panel changes only numbers.
 """
 
 import datetime as dt
 import logging
+from collections.abc import Mapping
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from postgrest.exceptions import APIError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError, field_validator
 from supabase import AsyncClient, acreate_client
 
 from app.engine import Params
+from app.services.params import load_params
 
 logger = logging.getLogger(__name__)
 
 TABLE = "param_versions"
 TABLE_MISSING = "PGRST205"
+
+
+def merge_onto_base(stored: Mapping[str, object], base: Params) -> Params:
+    """A stored version over the base file, block by block (`maternity`, `money`, ...). A block
+    the version lacks, or whose numbers no longer fit the model, is the base file's."""
+    base_json = base.model_dump(mode="json")
+    merged = dict(base_json)
+    if isinstance(stored.get("version"), str):
+        merged["version"] = stored["version"]
+    for name, field in Params.model_fields.items():
+        block = stored.get(name)
+        if name in ("version", "description") or not isinstance(block, Mapping):
+            continue
+        candidate = _numbers_onto(base_json[name], block)
+        try:
+            TypeAdapter(field.annotation).validate_python(candidate)
+        except ValidationError:
+            logger.warning("Stored parameters: block `%s` does not fit, base file used.", name)
+            continue
+        merged[name] = candidate
+    return Params.model_validate(merged)
+
+
+def _numbers_onto(base: object, stored: object) -> object:
+    """`base` with the numbers of `stored` in the same places: every parameter's `value` and
+    plain numbers (e.g. the days of the hospital rule). Sources, notes and texts stay `base`'s."""
+    if isinstance(base, dict):
+        if not isinstance(stored, Mapping):
+            return base
+        merged = {}
+        for key, value in base.items():
+            if key == "sources" or key not in stored:
+                merged[key] = value
+            elif key == "value":
+                merged[key] = stored[key]
+            else:
+                merged[key] = _numbers_onto(value, stored[key])
+        return merged
+    if _is_number(base) and _is_number(stored):
+        return stored
+    return base
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 class ParamVersion(BaseModel):
@@ -29,6 +80,15 @@ class ParamVersion(BaseModel):
     note: str
     params: Params
     created_at: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.UTC))
+
+    @field_validator("params", mode="before")
+    @classmethod
+    def onto_base(cls, value: object) -> object:
+        """Stored parameters (a row's JSON) are read onto the base file, so a version saved
+        before a new block of parameters existed still loads."""
+        if isinstance(value, Mapping):
+            return merge_onto_base(value, load_params())
+        return value
 
 
 class ParamStore(Protocol):

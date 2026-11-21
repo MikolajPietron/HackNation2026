@@ -118,6 +118,34 @@ class JobLoss(BaseModel):
         return self
 
 
+RehabStatus = Literal["applied", "granted", "refused"]
+"""The rehabilitation benefit (świadczenie rehabilitacyjne) after the sickness benefit in
+pregnancy, as the parent told it: applied for and not decided yet, granted, or refused."""
+
+
+class FosterBefore(BaseModel):
+    """Adoption after foster care (Labour Code art. 183 § 7-§ 8): before asking the court to
+    start adoption proceedings, the person had the child as a non-professional foster family and
+    used leave for it. Recorded only when the parent says so."""
+
+    leave_start: dt.date | None = None
+    leave_end: dt.date | None = None
+    """The leave on the terms of maternity leave used as a foster family: first and last day.
+    None = no such leave."""
+    parental_weeks: int | None = Field(default=None, ge=0)
+    """Weeks of parental leave used as a foster family. None = none."""
+
+    @model_validator(mode="after")
+    def both_dates_or_none(self) -> Self:
+        if (self.leave_start is None) != (self.leave_end is None):
+            raise ValueError(
+                "Potrzebny jest pierwszy i ostatni dzień urlopu w rodzinie zastępczej."
+            )
+        if self.leave_start and self.leave_end and self.leave_end < self.leave_start:
+            raise ValueError("Urlop nie może skończyć się przed swoim początkiem.")
+        return self
+
+
 def _exact_fraction(value: object) -> object:
     """A part of full time as written: 0.4 is 2/5 (not the binary float), "40%" and "0,4" too."""
     if isinstance(value, float):
@@ -275,6 +303,19 @@ class Scenario(BaseModel):
     rate_815: bool | None = None
     """The mother files (or filed) the written request for 81,5% within 21 days after the
     birth: True = 81,5% for maternity and parental leave, False = 100% and 70%."""
+    # The rehabilitation benefit after 270 days of sick leave in pregnancy (ustawa art. 18-19).
+    rehab_benefit: RehabStatus | None = None
+    """What the parent said about it; recorded only when the parent says so, never asked."""
+    rehab_benefit_end: dt.date | None = None
+    """The last day of the period it was granted (or applied) for, when the parent gave it."""
+    # Adoption and foster care, edge cases (Labour Code art. 183 § 2, § 7-§ 8).
+    taken_in_handover: bool | None = None
+    """The person on leave on the terms of maternity leave passes the rest of it to the other
+    parent (art. 183 § 2 with art. 180 § 4-5). Recorded only when the parent says so."""
+    taken_in_handover_after_weeks: int | None = Field(default=None, ge=1)
+    """Weeks of that leave used before passing it on; None = the minimum (14)."""
+    foster_before: FosterBefore | None = None
+    """Adoption after foster care: the leave already used as a foster family."""
 
     @property
     def anchor_date(self) -> dt.date | None:
@@ -343,12 +384,14 @@ class Document(BaseModel):
 
 
 class Payment(BaseModel):
-    """The maternity benefit for one period on the timeline (guide section G): the "Pieniądze"
-    lane. Amounts in PLN, rounded to grosze. `segment_id` is the period it pays for; dates and
-    days are that period's."""
+    """The money for one period on the timeline: the "Pieniądze" lane. The maternity benefit
+    (guide section G) and in pregnancy the employer's sick pay, the sickness benefit and the
+    benefit equal to the maternity benefit (money.py, `PAID`). Amounts in PLN, rounded to grosze.
+    `segment_id` is the period it pays for; dates and days are that period's, or a piece of it
+    when the rate changes within it (part-time work, the other parent's own weeks)."""
 
     id: str
-    """"pay-" + `segment_id`."""
+    """"pay-" + `segment_id`; a later piece of the same period adds "-part-<n>"."""
     segment_id: str
     lane: Literal["mother", "father"]
     """Whose benefit: the parent on that period's lane."""
@@ -357,11 +400,12 @@ class Payment(BaseModel):
     end: dt.date
     days: int
     rate: float
-    """Percent of the benefit base: 100, 70 or 81.5."""
+    """Percent of the benefit base (of the pay, for sick pay): 100, 70 or 81.5."""
     base: float
     """Monthly benefit base (podstawa wymiaru zasiłku)."""
     monthly: float
-    """`base` × `rate`: the benefit for a whole month."""
+    """`base` × `rate`: the benefit for a whole month; while parental leave is combined with
+    part-time work, less in proportion to the working time."""
     daily: float
     """One thirtieth of the monthly benefit."""
     total: float

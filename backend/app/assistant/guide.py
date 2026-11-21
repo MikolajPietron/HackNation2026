@@ -237,6 +237,13 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
             (4, "wynagrodzenie za czas niezdolności", "okres pobierania zasiłku macierzyńskiego."),
         ],
     ),
+    # Page 1, the introduction: sickness insurance in pregnancy also gives the rehabilitation
+    # benefit (świadczenie rehabilitacyjne) after the sickness benefit; one bullet only.
+    (
+        "U",
+        "Ubezpieczenie chorobowe: choroba w czasie ciąży",
+        [(1, "choroby osoby ubezpieczonej, w tym choroby", "świadczenia rehabilitacyjne),")],
+    ),
     (
         "ZC.s",
         "Szczególna sytuacja – zasiłek w wysokości zasiłku macierzyńskiego",

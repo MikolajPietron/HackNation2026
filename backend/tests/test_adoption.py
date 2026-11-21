@@ -5,7 +5,22 @@ Labour Code art. 183. Expected dates were computed by hand from the rules:
 - 32 weeks of parental leave from 22.03.2027 end on 31.10.2027; 9 more weeks on 2.01.2028;
 - a child born 10.05.2024 turns 14 on 10.05.2038: the last day before it is 9.05.2038;
 - a foster child born 15.03.2020 turns 7 on 15.03.2027: taken in 16.11.2026, the leave ends on
-  14.03.2027 (119 days); turning 10 on 15.03.2030, 31 weeks from 16.11.2026 end on 20.06.2027.
+  14.03.2027 (119 days); turning 10 on 15.03.2030, 31 weeks from 16.11.2026 end on 20.06.2027;
+- passing the leave on after 14 weeks from 2.11.2026: 29 days of November + 31 + 31 + 7 = 98,
+  so the first parent's part ends on 7.02.2027 and the other's runs 8.02-21.03.2027 (42 days);
+  after 16 weeks: 29 + 31 + 31 + 21 = 112, to 21.02.2027, the rest 22.02-21.03.2027 (28 days);
+- taken in 20.09.2026, born 1.09.2026 between the 28th and 37th week, in hospital from the birth
+  to 10.10.2026: the 8 weeks after the birth end on 26.10.2026 (1.09 + 55 days), and from the
+  day of taking in 11 days of September + 10 of October = 21 days count: 3 weeks. 20 weeks from
+  20.09.2026: 11 + 31 + 30 + 31 + 31 = 134 days to 31.01.2027, 6 more: 6.02.2027; then
+  supplementary leave 7.02-27.02.2027 and 32 weeks of parental leave: 28.02.2027 + 223 days =
+  9.10.2027;
+- foster leave from 3.08.2026, adoption application on 1.10.2026: 29 + 30 = 59 days used, so
+  140 - 59 = 81 days from 1.10.2026: 31 + 30 + 20, to 20.12.2026; parental leave 21.12.2026 +
+  223 days = 1.08.2027, the other parent's 9 weeks 2.08-3.10.2027 (30 + 30 + 3 = 63 days);
+- foster leave of 140 days used in full and 10 weeks of foster parental leave: 41 - 10 = 31
+  weeks left, 22 for the person on leave from 1.10.2026: 31 + 30 + 31 + 31 + 28 = 151, 3 more:
+  3.03.2027; then 9 weeks 4.03-5.05.2027 (28 + 30 + 5 = 63 days).
 """
 
 import datetime as dt
@@ -47,8 +62,9 @@ BIRTH_ONLY = {
     "work-until-birth",
     "personal-weeks",
     "medical-certificate",
-    "supplementary",
 }
+"""Supplementary leave is not here: a stay in hospital after taking the child in gives it
+(art. 183 § 3¹)."""
 
 
 def taken_in(**answers: Any) -> Timeline:
@@ -250,14 +266,165 @@ def test_the_interview_asks_only_what_this_path_needs() -> None:
         "adoption-ruling",
     ]
     done = {"taken_in_on": TAKEN, "birth_date": BIRTH, "children_count": 1}
-    assert questions(taken_in="adoption", father_work="employment", **done) == ["adoption-ruling"]
-    assert questions(taken_in="adoption", father_work="none", **done) == []
+    # Section G last: the amounts of both parents (test_money.py: the choice of 81,5%).
+    money = ["mother-pay", "father-pay"]
+    assert questions(taken_in="adoption", father_work="employment", **done) == [
+        "adoption-ruling",
+        *money,
+    ]
+    assert questions(taken_in="adoption", father_work="none", **done) == ["mother-pay"]
     # Foster care: no ruling; postponed schooling only when the age limit of 7 matters.
-    assert questions(taken_in="foster", father_work="employment", **done) == []
+    assert questions(taken_in="foster", father_work="employment", **done) == money
     near_seven = {**done, "taken_in_on": "2026-11-16", "birth_date": "2020-03-15"}
     assert questions(taken_in="foster", father_work="employment", **near_seven) == [
-        "school-postponed"
+        "school-postponed",
+        *money,
     ]
+
+
+# The edge cases of art. 183: the other parent takes the leave, passing it on, supplementary
+# leave, adoption after foster care.
+
+
+def test_an_uninsured_persons_partner_takes_the_leave() -> None:
+    t = taken_in(work="none", father_work="employment")
+    assert span(t, "adoption-leave") == ("father", TAKEN, dt.date(2027, 3, 21), 140)
+    # The father's share of parental leave (41 - 9); the mother, uninsured, has none.
+    assert span(t, "parental-father")[1:] == (dt.date(2027, 3, 22), dt.date(2027, 10, 31), 224)
+    assert t.element("parental") is None
+    insurance = next(n for n in t.notes if n.id == "insurance")
+    assert (insurance.kind, insurance.title) == (
+        "right",
+        "Tata ma prawo do zasiłku macierzyńskiego",
+    )
+    assert insurance.text.startswith("Mama nie podlega ubezpieczeniu chorobowemu")
+    assert any("Zakładamy, że dziecko przyjęliście razem" in a for a in t.assumptions)
+    # Nobody said how the father works: nobody is assumed, the interview asks.
+    assert taken_in(work="none").segments == []
+    done = {"taken_in_on": TAKEN, "birth_date": BIRTH, "children_count": 1}
+    assert questions(taken_in="foster", work="none", **done) == ["father-work"]
+
+
+def test_the_rest_of_the_leave_passes_to_the_other_parent_after_14_weeks() -> None:
+    t = taken_in(father_work="employment", taken_in_handover=True)
+    assert span(t, "adoption-leave") == ("mother", TAKEN, dt.date(2027, 2, 7), 98)
+    assert span(t, "adoption-leave-other") == (
+        "father",
+        dt.date(2027, 2, 8),
+        dt.date(2027, 3, 21),
+        42,
+    )
+    # The total does not change: parental leave starts where it did.
+    assert span(t, "parental")[1] == dt.date(2027, 3, 22)
+    handover = next(n for n in t.notes if n.id == "handover")
+    assert handover.kind == "choice"
+    assert "a tata od 8 lutego 2027 do 21 marca 2027" in handover.text
+    assert {s.article for s in handover.sources if s.doc == "kp"} >= {
+        "art. 183 § 2",
+        "art. 180 § 4",
+        "art. 180 § 14",
+    }
+    later = taken_in(
+        father_work="employment", taken_in_handover=True, taken_in_handover_after_weeks=16
+    )
+    assert span(later, "adoption-leave")[1:3] == (TAKEN, dt.date(2027, 2, 21))
+    assert span(later, "adoption-leave-other")[1:] == (
+        dt.date(2027, 2, 22),
+        dt.date(2027, 3, 21),
+        28,
+    )
+
+
+def test_passing_the_leave_on_needs_14_weeks_and_an_insured_parent() -> None:
+    with pytest.raises(ScenarioError, match="co najmniej 14 tygodni"):
+        taken_in(taken_in_handover=True, taken_in_handover_after_weeks=10)
+    # A 9-week leave (the child turns 14 soon) leaves nothing to pass on after 14 weeks.
+    with pytest.raises(ScenarioError, match="nie zostaje nic"):
+        taken_in(birth_date=dt.date(2012, 12, 1), taken_in_handover=True)
+    t = taken_in(father_work="none", taken_in_handover=True)
+    assert t.element("adoption-leave-other") is None
+    assert span(t, "adoption-leave")[2] == dt.date(2027, 3, 21)
+    handover = next(n for n in t.notes if n.id == "handover")
+    assert handover.kind == "risk"
+
+
+SUPPLEMENTARY = {
+    "taken_in_on": "2026-09-20",
+    "birth_date": "2026-09-01",
+    "father_work": "employment",
+    "hospital_care": True,
+    "birth_week": "28-37",
+    "birth_weight_up_to_1000g": False,
+}
+
+
+def test_a_hospital_stay_after_taking_the_child_in_gives_supplementary_leave() -> None:
+    t = taken_in(**SUPPLEMENTARY, hospital_stays=[{"start": "2026-09-01", "end": "2026-10-10"}])
+    assert span(t, "adoption-leave")[1:3] == (dt.date(2026, 9, 20), dt.date(2027, 2, 6))
+    assert span(t, "supplementary") == ("mother", dt.date(2027, 2, 7), dt.date(2027, 2, 27), 21)
+    assert span(t, "parental")[1:3] == (dt.date(2027, 2, 28), dt.date(2027, 10, 9))
+    supplementary = next(n for n in t.notes if n.id == "supplementary")
+    assert supplementary.kind == "relief"
+    assert "Po przyjęciu dziecka liczy się 21 dni w szpitalu, więc 3 tyg." in supplementary.text
+    assert any(s.article == "art. 183 § 3¹" for s in supplementary.sources)
+    # A stay that ended before the child was taken in does not count.
+    before = taken_in(
+        **SUPPLEMENTARY, hospital_stays=[{"start": "2026-09-01", "end": "2026-09-15"}]
+    )
+    assert before.element("supplementary") is None
+    assert next(n for n in before.notes if n.id == "supplementary").kind == "risk"
+
+
+def test_the_interview_asks_about_hospital_only_for_a_newborn_taken_in() -> None:
+    young = {"taken_in_on": "2026-09-20", "birth_date": "2026-09-01", "children_count": 1}
+    asked = questions(taken_in="adoption", father_work="employment", **young)
+    assert asked[:1] == ["taken-in-hospital"]
+    told = {**young, "hospital_care": True}
+    asked = questions(taken_in="adoption", father_work="employment", **told)
+    assert asked[:1] == ["taken-in-hospital-details"]
+    # Taken in after the 15 weeks from the birth: no hospital stay can count.
+    done = {"taken_in_on": TAKEN, "birth_date": BIRTH, "children_count": 1}
+    assert "taken-in-hospital" not in questions(taken_in="adoption", **done)
+
+
+def test_adoption_after_foster_care_takes_off_the_leave_already_used() -> None:
+    base = {"taken_in_on": "2026-10-01", "birth_date": "2020-03-15", "father_work": "employment"}
+    t = taken_in(**base, foster_before={"leave_start": "2026-08-03", "leave_end": "2026-12-31"})
+    assert span(t, "adoption-leave")[1:] == (dt.date(2026, 10, 1), dt.date(2026, 12, 20), 81)
+    assert span(t, "parental")[1:3] == (dt.date(2026, 12, 21), dt.date(2027, 8, 1))
+    assert span(t, "parental-father")[1:] == (dt.date(2027, 8, 2), dt.date(2027, 10, 3), 63)
+    foster = next(n for n in t.notes if n.id == "after-foster")
+    assert foster.kind == "right"
+    assert "59 dni, więc zostaje 81 dni" in foster.text
+    assert any(s.article == "art. 183 § 7" for s in foster.sources)
+    # The whole leave used, and 10 weeks of foster parental leave: 31 weeks are left.
+    used = taken_in(
+        **base,
+        foster_before={
+            "leave_start": "2026-01-05",
+            "leave_end": "2026-05-24",
+            "parental_weeks": 10,
+        },
+    )
+    assert used.element("adoption-leave") is None
+    assert used.element("leave-request-deadline") is None
+    assert span(used, "parental")[1:] == (dt.date(2026, 10, 1), dt.date(2027, 3, 3), 154)
+    assert span(used, "parental-father")[1:] == (dt.date(2027, 3, 4), dt.date(2027, 5, 5), 63)
+    foster = next(n for n in used.notes if n.id == "after-foster")
+    assert foster.kind == "risk"
+    assert {"art. 183 § 7", "art. 183 § 8"} <= {s.article for s in foster.sources}
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        {"taken_in": "foster", "foster_before": {"parental_weeks": 3}},
+        {"foster_before": {"leave_start": "2026-11-02", "leave_end": "2026-11-20"}},
+    ],
+)
+def test_impossible_foster_care_before_adoption_is_rejected(answers: dict[str, Any]) -> None:
+    with pytest.raises(ScenarioError):
+        taken_in(**answers)
 
 
 # The onboarding and the chat.
@@ -366,7 +533,10 @@ def test_tools_follow_the_path(api: TestClient) -> None:
     app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
     events(api.post("/api/chat", json={"session_id": SESSION, "message": "Tata ma etat"}))
     assert {"set_taken_in", "set_adoption_ruling", "set_father_work"} <= set(tools)
-    assert not {"set_leave_before_birth", "set_hospital_care", "set_birth_date"} & set(tools)
+    assert {"set_leave_handover", "set_foster_before"} <= set(tools)
+    # A hospital stay after taking the child in gives supplementary leave (art. 183 § 3¹).
+    assert "set_hospital_care" in tools
+    assert not {"set_leave_before_birth", "set_birth_date", "set_rehab_benefit"} & set(tools)
     # Postponed schooling matters in foster care only.
     out = ask(api, scripted("set_school_postponed", {"postponed": True}, "…"), "…")
     assert rejected("set_school_postponed") in out
@@ -379,3 +549,14 @@ def test_birth_tools_are_hidden_and_adoption_tools_too_on_the_birth_path(
     api.put(f"/api/session/{SESSION}/onboarding", json=born)
     out = ask(api, scripted("set_adoption_ruling", {"final": False}, "…"), "…")
     assert rejected("set_adoption_ruling") in out
+    out = ask(api, scripted("set_leave_handover", {"handed_over": True}, "…"), "…")
+    assert rejected("set_leave_handover") in out
+
+
+def test_the_handed_over_leave_is_paid() -> None:
+    """The father takes the rest of the leave, 8.02-21.03.2027 (42 days), at 100% of his own
+    base: 6000 x 0,8629 = 5177,40; 5177,40 / 30 = 172,58 a day; 42 x 172,58 = 7248,36."""
+    t = taken_in(father_work="employment", taken_in_handover=True, mother_pay=7000, father_pay=6000)
+    handed = next(p for p in t.payments if p.segment_id == "adoption-leave-other")
+    assert (handed.lane, handed.days, handed.rate) == ("father", 42, 100)
+    assert (handed.monthly, handed.daily, handed.total) == (5177.4, 172.58, 7248.36)
