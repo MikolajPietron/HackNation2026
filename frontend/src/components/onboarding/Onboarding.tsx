@@ -1,0 +1,610 @@
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { fetchTimeline } from '@/api'
+import blizniaki from '@/assets/onboarding/blizniaki.webp'
+import dom from '@/assets/onboarding/dom.webp'
+import dziecko from '@/assets/onboarding/dziecko.webp'
+import etat from '@/assets/onboarding/etat.webp'
+import firma from '@/assets/onboarding/firma.webp'
+import lozeczko from '@/assets/onboarding/lozeczko.webp'
+import mama from '@/assets/onboarding/mama.webp'
+import tata from '@/assets/onboarding/tata.webp'
+import zlecenie from '@/assets/onboarding/zlecenie.webp'
+import { TextStates } from '@/components/ui/text-states'
+import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
+import { cn } from '@/lib/utils'
+import type { Scenario, Timeline } from '@/types'
+import { Calendar } from './Calendar'
+import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
+import { ITEM, POP, STEP } from './motion'
+
+export type Role = 'mother' | 'father'
+export type Work = 'employment' | 'contract' | 'business' | 'none'
+export type Earnings = 'under-5k' | '5k-8k' | '8k-12k' | 'over-12k' | 'unknown'
+
+/** What the parent told us. Work and earnings do not reach the engine yet (see toScenario). */
+export interface Answers {
+  role: Role | null
+  born: boolean | null
+  children: number | null
+  /** ISO date: birth date when `born`, otherwise the due date. */
+  date: string
+  work: Work | null
+  earnings: Earnings | null
+}
+
+const ILLUSTRATIONS = [mama, tata, dziecko, lozeczko, blizniaki, etat, zlecenie, firma, dom]
+
+const EMPTY: Answers = { role: null, born: null, children: null, date: '', work: null, earnings: null }
+
+type StepId = 'intro' | 'role' | 'born' | 'children' | 'date' | 'work' | 'earnings' | 'calculating'
+
+/** Pause after a tap so the choice visibly lands before the step leaves. */
+const CHOICE_DELAY_MS = 320
+/** The calculation is fast; its screen stays long enough to read instead of flashing. */
+const MIN_CALCULATING_MS = 1400
+const DUE_DATE_MAX_DAYS_AHEAD = 300
+const BIRTH_DATE_MAX_DAYS_AGO = 6 * 366
+const CALCULATING = ['Sprawdzamy terminy…', 'Liczymy urlopy…', 'Układamy oś czasu…']
+
+const EARNINGS: { value: Earnings; label: string }[] = [
+  { value: 'under-5k', label: 'Do 5 000 zł' },
+  { value: '5k-8k', label: '5 000 – 8 000 zł' },
+  { value: '8k-12k', label: '8 000 – 12 000 zł' },
+  { value: 'over-12k', label: 'Powyżej 12 000 zł' },
+  { value: 'unknown', label: 'Nie wiem' },
+]
+
+function toScenario(answers: Answers): Scenario {
+  return {
+    birth_date: answers.date,
+    child_born: answers.born ?? false,
+    children_count: answers.children ?? 1,
+    maternity_weeks_before_birth: 0,
+    flat_rate: false,
+    paternity_start: null,
+  }
+}
+
+interface Props {
+  onDone: (scenario: Scenario, timeline: Timeline, answers: Answers) => void
+  /** Go straight to the assistant. */
+  onSkip: () => void
+}
+
+/** Full-screen questions, one per screen, then the first timeline. No progress bar on purpose. */
+export function Onboarding({ onDone, onSkip }: Props) {
+  const [path, setPath] = useState<StepId[]>(['intro'])
+  const [answers, setAnswers] = useState<Answers>(EMPTY)
+  const [leaving, setLeaving] = useState(false)
+  const timer = useRef(0)
+  const step = path[path.length - 1]
+
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  useEffect(() => {
+    for (const src of ILLUSTRATIONS) new Image().src = src
+  }, [])
+
+  const go = (next: StepId) => {
+    setLeaving(false)
+    setPath((p) => [...p, next])
+  }
+  const backTo = (target?: StepId) => {
+    window.clearTimeout(timer.current)
+    setLeaving(false)
+    setPath((p) => {
+      const index = target ? p.lastIndexOf(target) : p.length - 2
+      return index >= 0 ? p.slice(0, index + 1) : p
+    })
+  }
+  /** Record an answer, let the selection land, then move on. */
+  const choose = (patch: Partial<Answers>, next: StepId) => {
+    if (leaving) return
+    setAnswers((a) => ({ ...a, ...patch }))
+    setLeaving(true)
+    timer.current = window.setTimeout(() => go(next), CHOICE_DELAY_MS)
+  }
+  const state = <K extends keyof Answers>(key: K, value: Answers[K]) => ({
+    selected: answers[key] === value,
+    dimmed: leaving && answers[key] !== value,
+  })
+
+  let screen: ReactNode
+  switch (step) {
+    case 'intro':
+      screen = <Intro onStart={() => go('role')} onSkip={onSkip} />
+      break
+    case 'role':
+      screen = (
+        <Question title="Kim jesteś?" subtitle="Policzymy urlopy i zasiłki dla obojga rodziców.">
+          <Cards label="Kim jesteś?">
+            <ImageChoice
+              image={mama}
+              label="Mamą"
+              {...state('role', 'mother')}
+              onSelect={() => choose({ role: 'mother' }, 'born')}
+            />
+            <ImageChoice
+              image={tata}
+              label="Tatą"
+              {...state('role', 'father')}
+              onSelect={() => choose({ role: 'father' }, 'born')}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    case 'born': {
+      // The date limits differ, so a changed answer clears the date.
+      const pickBorn = (born: boolean) =>
+        choose({ born, date: answers.born === born ? answers.date : '' }, 'children')
+      screen = (
+        <Question title="Czy dziecko jest już na świecie?">
+          <Cards label="Czy dziecko jest już na świecie?">
+            <ImageChoice
+              image={lozeczko}
+              label="Czekamy na nie"
+              hint="Jesteśmy w ciąży"
+              {...state('born', false)}
+              onSelect={() => pickBorn(false)}
+            />
+            <ImageChoice
+              image={dziecko}
+              label="Już jest z nami"
+              hint="Dziecko się urodziło"
+              {...state('born', true)}
+              onSelect={() => pickBorn(true)}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    }
+    case 'children':
+      screen = (
+        <Question
+          title={answers.born ? 'Ile dzieci się urodziło?' : 'Ile dzieci się urodzi?'}
+          subtitle="Przy ciąży mnogiej urlop macierzyński i rodzicielski są dłuższe."
+        >
+          <Cards label="Liczba dzieci">
+            <ImageChoice
+              image={dziecko}
+              label="Jedno"
+              {...state('children', 1)}
+              onSelect={() => choose({ children: 1 }, 'date')}
+            />
+            <ImageChoice
+              image={blizniaki}
+              label="Bliźnięta"
+              {...state('children', 2)}
+              onSelect={() => choose({ children: 2 }, 'date')}
+            />
+          </Cards>
+          <MoreChildren
+            value={answers.children}
+            leaving={leaving}
+            onSelect={(children) => choose({ children }, 'date')}
+          />
+        </Question>
+      )
+      break
+    case 'date':
+      screen = (
+        <DateStep
+          born={answers.born ?? false}
+          value={answers.date}
+          onChange={(date) => setAnswers((a) => ({ ...a, date }))}
+          onNext={() => go('work')}
+        />
+      )
+      break
+    case 'work': {
+      const pickWork = (work: Work) => choose({ work }, work === 'none' ? 'calculating' : 'earnings')
+      screen = (
+        <Question
+          title="Jak pracujesz?"
+          subtitle="Od tego zależy, kto wypłaci zasiłek i gdzie złożysz wniosek."
+        >
+          <Cards label="Jak pracujesz?" wide>
+            <ImageChoice
+              image={etat}
+              label="Na etacie"
+              hint="umowa o pracę"
+              {...state('work', 'employment')}
+              onSelect={() => pickWork('employment')}
+            />
+            <ImageChoice
+              image={zlecenie}
+              label="Na zleceniu"
+              hint="umowa zlecenia"
+              {...state('work', 'contract')}
+              onSelect={() => pickWork('contract')}
+            />
+            <ImageChoice
+              image={firma}
+              label="Własna firma"
+              hint="JDG"
+              {...state('work', 'business')}
+              onSelect={() => pickWork('business')}
+            />
+            <ImageChoice
+              image={dom}
+              label="Nie pracuję"
+              {...state('work', 'none')}
+              onSelect={() => pickWork('none')}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    }
+    case 'earnings':
+      screen = (
+        <Question title="Ile zarabiasz miesięcznie?" subtitle="Brutto, w przybliżeniu. Wystarczy przedział.">
+          <div role="radiogroup" aria-label="Zarobki" className="mx-auto w-full max-w-md space-y-3">
+            {EARNINGS.map((option) => (
+              <TextChoice
+                key={option.value}
+                label={option.label}
+                {...state('earnings', option.value)}
+                onSelect={() => choose({ earnings: option.value }, 'calculating')}
+              />
+            ))}
+          </div>
+        </Question>
+      )
+      break
+    case 'calculating':
+      screen = <Calculating answers={answers} onDone={onDone} onFix={() => backTo('date')} />
+      break
+  }
+
+  const canGoBack = step !== 'intro' && step !== 'calculating'
+
+  return (
+    <div className="relative flex h-dvh flex-col bg-white">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-16 items-center px-3 sm:px-6">
+        <AnimatePresence>
+          {canGoBack && (
+            <motion.button
+              type="button"
+              onClick={() => backTo()}
+              aria-label="Wstecz"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-auto grid size-11 place-items-center rounded-full text-navy-500 transition-colors hover:bg-navy-50 hover:text-navy-900 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+            >
+              <ArrowLeft className="size-5" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence mode="wait">
+        <motion.main
+          key={step}
+          variants={STEP}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+        >
+          {screen}
+        </motion.main>
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function Question({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center px-5 py-20 text-center sm:px-8">
+      <motion.h1
+        variants={ITEM}
+        className="max-w-3xl text-[34px] leading-[1.1] font-bold tracking-[-0.02em] text-balance text-navy-900 sm:text-5xl"
+      >
+        {title}
+      </motion.h1>
+      {subtitle && (
+        <motion.p
+          variants={ITEM}
+          className="mt-3 max-w-xl text-base text-pretty text-navy-500 sm:text-lg"
+        >
+          {subtitle}
+        </motion.p>
+      )}
+      <div className="mt-10 w-full sm:mt-14">{children}</div>
+    </div>
+  )
+}
+
+function Cards({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn(
+        'mx-auto grid w-full grid-cols-2 gap-3 sm:gap-6',
+        wide ? 'max-w-5xl lg:grid-cols-4' : 'max-w-3xl',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
+  return (
+    <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-16 text-center">
+      <div className="flex items-end justify-center" aria-hidden>
+        <motion.img
+          variants={POP}
+          src={mama}
+          alt=""
+          className="-mr-3 w-32 select-none sm:-mr-4 sm:w-44"
+        />
+        <motion.img
+          variants={POP}
+          src={dziecko}
+          alt=""
+          className="relative w-20 select-none sm:w-28"
+        />
+        <motion.img
+          variants={POP}
+          src={tata}
+          alt=""
+          className="-ml-3 w-32 select-none sm:-ml-4 sm:w-44"
+        />
+      </div>
+      <motion.h1
+        variants={ITEM}
+        className="mt-6 text-4xl leading-[1.05] font-bold tracking-tight text-balance text-navy-900 sm:text-6xl"
+      >
+        Policzmy, co Wam się należy
+      </motion.h1>
+      <motion.p variants={ITEM} className="mt-4 max-w-md text-lg text-pretty text-navy-500">
+        Urlopy, zasiłki i terminy wniosków na jednej osi czasu. Kilka pytań, bez logowania.
+      </motion.p>
+      <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
+        <PrimaryButton onClick={onStart}>
+          Zaczynamy <ArrowRight className="size-5" />
+        </PrimaryButton>
+        <button
+          type="button"
+          onClick={onSkip}
+          className="text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+        >
+          Wolę porozmawiać z asystentem AI
+        </button>
+      </motion.div>
+    </div>
+  )
+}
+
+/** Triplets and more are rare: hidden behind a link instead of a third card. */
+function MoreChildren({
+  value,
+  leaving,
+  onSelect,
+}: {
+  value: number | null
+  leaving: boolean
+  onSelect: (children: number) => void
+}) {
+  const [open, setOpen] = useState((value ?? 0) > 2)
+  return (
+    <motion.div variants={ITEM} className="mt-8 flex h-11 justify-center">
+      <AnimatePresence mode="wait" initial={false}>
+        {open ? (
+          <motion.div
+            key="counts"
+            role="radiogroup"
+            aria-label="Więcej dzieci"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-2"
+          >
+            {[3, 4, 5].map((count) => (
+              <button
+                key={count}
+                type="button"
+                role="radio"
+                aria-checked={value === count}
+                onClick={() => onSelect(count)}
+                className={cn(
+                  'h-11 rounded-full border px-5 font-bold transition-[border-color,background-color,opacity,transform] duration-200 active:scale-[0.96]',
+                  value === count
+                    ? 'border-zus-600 bg-zus-50 text-zus-900'
+                    : 'border-line text-navy-900 hover:border-navy-200',
+                  leaving && value !== count && 'opacity-40',
+                )}
+              >
+                {count === 5 ? '5 lub więcej' : count}
+              </button>
+            ))}
+          </motion.div>
+        ) : (
+          <motion.button
+            key="link"
+            type="button"
+            onClick={() => setOpen(true)}
+            exit={{ opacity: 0 }}
+            className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+          >
+            Trojaczki lub więcej?
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+/** Polish plural: 1 tydzień, 2 tygodnie, 5 tygodni. */
+function plural(n: number, one: string, few: string, many: string): string {
+  if (n === 1) return one
+  const last = n % 10
+  const lastTwo = n % 100
+  return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many
+}
+
+/** "za 17 tygodni" before the birth (pregnancy counts in weeks), "3 miesiące temu" after it. */
+function distance(date: string, today: string): string {
+  const days = Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000)
+  if (days === 0) return 'dziś'
+  const n = Math.abs(days)
+  const weeks = Math.floor(n / 7)
+  const months = Math.floor(n / 30.44)
+  const amount =
+    n < 7
+      ? `${n} ${plural(n, 'dzień', 'dni', 'dni')}`
+      : days > 0 || n < 84
+        ? `${weeks} ${plural(weeks, 'tydzień', 'tygodnie', 'tygodni')}`
+        : `${months} ${plural(months, 'miesiąc', 'miesiące', 'miesięcy')}`
+  return days > 0 ? `za ${amount}` : `${amount} temu`
+}
+
+function DateStep({
+  born,
+  value,
+  onChange,
+  onNext,
+}: {
+  born: boolean
+  value: string
+  onChange: (date: string) => void
+  onNext: () => void
+}) {
+  const today = todayIso()
+  const min = born ? addDaysIso(today, -BIRTH_DATE_MAX_DAYS_AGO) : today
+  const max = born ? today : addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD)
+  // ISO dates compare correctly as strings.
+  const valid = value !== '' && value >= min && value <= max
+  const title = born ? 'Kiedy urodziło się dziecko?' : 'Kiedy jest termin porodu?'
+
+  return (
+    <Question
+      title={title}
+      subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
+    >
+      <motion.div variants={ITEM}>
+        <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
+      </motion.div>
+      <motion.div variants={ITEM} className="mt-6 flex flex-col items-center gap-5">
+        <p className="h-7 text-lg" aria-live="polite">
+          <TextStates
+            text={valid ? `${formatLongDate(value)} · ${distance(value, today)}` : 'Wybierz dzień'}
+            className={valid ? 'font-bold text-navy-900' : 'text-navy-400'}
+          />
+        </p>
+        <PrimaryButton disabled={!valid} onClick={onNext}>
+          Dalej <ArrowRight className="size-5" />
+        </PrimaryButton>
+      </motion.div>
+    </Question>
+  )
+}
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+function Calculating({
+  answers,
+  onDone,
+  onFix,
+}: {
+  answers: Answers
+  onDone: Props['onDone']
+  onFix: () => void
+}) {
+  const [phase, setPhase] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const done = useRef(onDone)
+  useEffect(() => {
+    done.current = onDone
+  })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const scenario = toScenario(answers)
+    Promise.all([fetchTimeline(scenario, controller.signal), wait(MIN_CALCULATING_MS)])
+      .then(([timeline]) => {
+        if (!controller.signal.aborted) done.current(scenario, timeline, answers)
+      })
+      .catch((reason: unknown) => {
+        if (controller.signal.aborted) return
+        setError(reason instanceof Error ? reason.message : 'Nie udało się policzyć osi czasu.')
+      })
+    return () => controller.abort()
+  }, [answers, attempt])
+
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setPhase((p) => Math.min(p + 1, CALCULATING.length - 1)),
+      MIN_CALCULATING_MS / CALCULATING.length,
+    )
+    return () => window.clearInterval(id)
+  }, [attempt])
+
+  const retry = () => {
+    setError(null)
+    setPhase(0)
+    setAttempt((a) => a + 1)
+  }
+
+  return (
+    <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center px-6 py-16 text-center">
+      <div className="flex items-end" aria-hidden>
+        {[mama, dziecko, tata].map((src, index) => (
+          <motion.div key={src} variants={POP}>
+            <motion.img
+              src={src}
+              alt=""
+              animate={error ? { y: 0 } : { y: [0, -8, 0] }}
+              transition={{ duration: 1.1, repeat: error ? 0 : Infinity, delay: index * 0.14, ease: 'easeInOut' }}
+              className={cn(
+                'select-none',
+                index === 1 ? 'w-16 sm:w-20' : 'w-24 sm:w-28',
+              )}
+            />
+          </motion.div>
+        ))}
+      </div>
+      <motion.p variants={ITEM} className="mt-8 text-2xl font-bold text-navy-900" aria-live="polite">
+        <TextStates text={error ? 'Nie udało się policzyć' : CALCULATING[phase]} />
+      </motion.p>
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-3 flex flex-col items-center gap-6"
+          >
+            <p className="text-pretty text-navy-500">{error}</p>
+            <div className="flex flex-col items-center gap-4">
+              <PrimaryButton onClick={retry}>Spróbuj ponownie</PrimaryButton>
+              <button
+                type="button"
+                onClick={onFix}
+                className="text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+              >
+                Zmień datę
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}

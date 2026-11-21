@@ -1,7 +1,27 @@
-import type { ChatEvent, ChatRequest } from './types'
+import type { ChatEvent, ChatRequest, Scenario, Timeline } from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
 export const API_URL: string = import.meta.env.VITE_API_URL ?? ''
+
+const OFFLINE = 'Brak połączenia z serwerem. Sprawdź, czy backend działa (npm run dev).'
+
+/** The deterministic calculator, without AI. */
+export async function fetchTimeline(scenario: Scenario, signal?: AbortSignal): Promise<Timeline> {
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}/api/timeline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scenario),
+      signal,
+    })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new Error(OFFLINE)
+  }
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as Timeline
+}
 
 /** One assistant turn. The backend streams NDJSON: one ChatEvent per line. */
 export async function streamChat(
@@ -18,7 +38,7 @@ export async function streamChat(
       signal,
     })
   } catch {
-    throw new Error('Brak połączenia z serwerem. Sprawdź, czy backend działa (npm run dev).')
+    throw new Error(OFFLINE)
   }
   if (!response.ok || !response.body) {
     throw new Error(await errorDetail(response))

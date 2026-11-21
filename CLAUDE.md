@@ -31,13 +31,15 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
 - `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, Motion, lucide-react, react-markdown. Alias `@/` = `src/`.
   - `src/index.css` — tokeny motywu ZUS (`@theme`: kolory, cienie, animacje wejścia), font Lato.
   - `src/types.ts` — kopia modeli backendu i protokołu czatu (trzymaj w zgodzie z `engine/models.py` i `api/chat.py`); `src/api.ts` — `streamChat` (NDJSON).
-  - `src/hooks/useAssistant.ts` — stan rozmowy, historia i scenariusz po stronie klienta, `stop` i `reset`.
+  - `src/hooks/useAssistant.ts` — stan rozmowy, historia i scenariusz po stronie klienta, `stop`, `reset` i `load` (start ze scenariusza z onboardingu).
   - `src/components/ui/` — komponenty ze Spectrum UI: `number-ticker`, `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
   - `src/components/layout/` — lewy pasek ikon (desktop), dolna nawigacja (telefon), widok założeń.
   - `src/components/timeline/` — `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
   - `src/components/summary/` — kafelki z liczbami (z `Timeline.summary`) i lista wniosków; `src/components/chat/` — rozmowa.
+  - `src/components/onboarding/` — pełnoekranowe pytania przed osią (`Onboarding.tsx`: kroki i nawigacja, `ChoiceCard.tsx`: karty wyboru, `Calendar.tsx`: własny kalendarz osadzony w kroku daty, bez natywnego `input type=date`, `motion.ts`: warianty ruchu). Ikony w `src/assets/onboarding/*.webp`.
 - `supabase/` — `config.toml`, `migrations/` (SQL), `seed.sql`.
 - `tools/zus-data/` — pipeline danych ZUS (OCR, katalog spraw). `tools/przewodnik/` — tekst Przewodnika dla asystenta.
+- `tools/illustrations/` — generator ikon onboardingu (OpenRouter, Nano Banana 2.1): `style.txt` + `subjects/<nazwa>.txt`, oryginały w `png/`, wzorem stylu jest `png/mama.png`; do aplikacji trafia WebP 640 px z przezroczystym tłem, przycięty do rysunku. Nowa ikona: `uv run tools/illustrations/generate.py <nazwa>`.
 - `docs/` — Przewodnik; `docs/dokumentyZUS/` poufne, poza gitem.
 
 ## Core: oś czasu rodzica
@@ -89,6 +91,7 @@ Naszym zadaniem jest pokazać rodzicowi informacje, których potrzebuje. Nic wi�
 - **Układ ekranu** (stan na 21.11.2026):
   - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki urlopów, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (kafelki, wnioski, rozmowa).
   - Telefon: dolna nawigacja Rozmowa / Oś czasu / Założenia; oś jako lista.
+  - Onboarding (przed osią): jedno pytanie na pełnym ekranie, duże karty z ikonami, bez paska postępu, przejścia blur + przesunięcie. Kroki: kim jesteś → czy dziecko już jest → ile dzieci → data → jak pracujesz → zarobki → liczenie → oś. Praca i zarobki nie trafiają jeszcze do silnika.
   - Wniosek z terminem jest kółkiem z ikoną przed pigułką swojego urlopu. Jaśniejsza pigułka to przykładowy termin.
   - Przeliczona oś tylko podświetla zmianę. Szczegóły otwiera kliknięcie albo narzędzie `explain_timeline_element`.
 

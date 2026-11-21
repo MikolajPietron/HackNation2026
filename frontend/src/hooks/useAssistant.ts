@@ -130,6 +130,13 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     [onTimeline, onFocus],
   )
 
+  /** Start from a scenario computed outside the chat (onboarding). The assistant continues from it. */
+  const load = useCallback((next: Scenario, nextTimeline: Timeline) => {
+    scenario.current = next
+    setTimeline(nextTimeline)
+    setChanged((c) => ({ ids: [], version: c.version + 1 }))
+  }, [])
+
   /** Stop the answer that is being written. */
   const stop = useCallback(() => request.current?.abort(), [])
 
@@ -145,5 +152,5 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setChanged({ ids: [], version: 0 })
   }, [])
 
-  return { messages, busy, send, stop, reset, timeline, changed }
+  return { messages, busy, send, stop, reset, load, timeline, changed }
 }
