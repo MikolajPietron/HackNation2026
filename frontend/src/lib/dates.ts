@@ -95,7 +95,10 @@ export function monthCells(fromDay: number, toDay: number): MonthCell[] {
 /** "21 lis 2026" — short date with the year, for facts. */
 export const formatShortDate = (iso: string) => `${formatDayMonthShort(iso)} ${iso.slice(0, 4)}`
 
-/** "dziś", "za 5 dni", "za 3 tyg.", "za 4 mies.", "2 tyg. temu" — distance between two dates. */
+const years = (n: number) =>
+  `${n} ${n === 1 ? 'rok' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'lata' : 'lat'}`
+
+/** "dziś", "za 5 dni", "za 3 tyg.", "za 4 mies.", "za 6 lat", "2 tyg. temu" — distance between two dates. */
 export function formatDistance(from: string, to: string): string {
   const days = dayNumber(to) - dayNumber(from)
   if (days === 0) return 'dziś'
@@ -105,6 +108,8 @@ export function formatDistance(from: string, to: string): string {
       ? `${n} ${n === 1 ? 'dzień' : 'dni'}`
       : n < 84
         ? `${Math.floor(n / 7)} tyg.`
-        : `${Math.floor(n / 30.44)} mies.`
+        : n < 730
+          ? `${Math.floor(n / 30.44)} mies.`
+          : years(Math.floor(n / 365.25))
   return days > 0 ? `za ${amount}` : `${amount} temu`
 }

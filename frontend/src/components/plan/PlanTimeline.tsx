@@ -1,10 +1,14 @@
 // The plan's timeline, built like a video editor's: a ruler with months and week ticks, tracks
-// (Dziecko, Mama, Tata, Dokumenty; Pieniądze joins when the engine computes it) with clips
-// for leave and keyframes for important days, and a playhead. Drag the playhead along the ruler
-// and the readout below says what happens on that day; ‹ › jump between events like keyframes.
-// The tracks scroll sideways with momentum (drag them, or use the trackpad) and zoom on a spring
-// (− / +, Ctrl/⌘ + wheel or pinch, anchored at the pointer). After a recalculation the old plan
-// stays for a moment as a shadow (FUNKCJE F16).
+// (Dziecko, Mama, Tata, Dokumenty) with clips for leave and keyframes for important days, and a
+// playhead. Drag the playhead along the ruler and the readout below says what happens on that
+// day; ‹ › jump between events like keyframes. The tracks scroll sideways with momentum (drag
+// them, or use the trackpad) and zoom on a spring (− / +, Ctrl/⌘ + wheel or pinch, anchored at
+// the pointer). After a recalculation the old plan stays for a moment as a shadow (FUNKCJE F16).
+//
+// The scale is spent on the leave: deadlines years away (the end of parental leave in the year
+// of the 6th birthday) sit behind a break in the scale, "⋯ 5 lat ⋯", so 20 weeks stay a clip you
+// can read. A period still to decide is a light clip with its name beside it when it is too
+// narrow; one that can be taken any time up to a deadline (paternity leave) shows that window.
 //
 // Motion follows Emil Kowalski's rules: springs for anything interruptible, no animation on what
 // repeats constantly (scrubbing follows the pointer 1:1), reduced motion respected.
@@ -12,30 +16,36 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { PointerEvent, ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { AnimationPlaybackControls } from 'motion/react'
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Minimize2,
-  Minus,
-  Plus,
-} from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
 import dziecko from '@/assets/onboarding/dziecko.webp'
 import mama from '@/assets/onboarding/mama.webp'
-import pieniadze from '@/assets/onboarding/pieniadze.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zaswiadczenie from '@/assets/onboarding/zaswiadczenie.webp'
-import { dayNumber, formatDayMonthShort, formatDistance, isoFromDay, monthCells } from '@/lib/dates'
+import {
+  dayNumber,
+  formatDayMonthShort,
+  formatShortDate,
+  isoFromDay,
+  monthCells,
+} from '@/lib/dates'
 import { SPRING_LAYOUT } from '@/lib/ease'
 import { Illustration } from '@/components/ui/illustration'
-import { documentIcon, ICONS, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
-import { LANE_ORDER, segmentLook } from '@/lib/ui'
+import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
+import { clipName, length, optionWindow } from '@/lib/plan'
+import { LANE_ORDER } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Lane, Segment, Timeline } from '@/types'
+import { Readout } from './Readout'
 
 /** Days of margin before the first and after the last element. */
-const PAD_DAYS = 14
+const PAD_DAYS = 10
+/** Pixels kept free at both ends of the track, so nothing slides under the track names. */
+const EDGE = 28
+/** The hatched break in the scale, and the whole far part after it (the break included). */
+const BREAK_GAP = 64
+const BREAK = 172
+/** A day this long after the last period goes behind the break. */
+const FAR_AFTER_DAYS = 120
 const LABEL_WIDTH = 120
 const RULER_HEIGHT = 44
 /** Every track is the same height, like tracks in a video editor. */
@@ -52,10 +62,10 @@ const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const ZOOM_STEP = 1.6
 const ZOOM_SPRING = { type: 'spring', stiffness: 260, damping: 32, mass: 0.6 } as const
-/** Example only, for the Tata preview track when the engine has no period of the father. */
-const PREVIEW_PATERNITY_DAYS = 14
 /** Momentum after a drag: share of the velocity kept per millisecond. */
 const GLIDE_DECAY = 0.995
+/** Rough width of bold 14 px text, per character, for fitting labels. */
+const CHAR_PX = 7.4
 
 const LANES: Record<Lane, { label: string; image: string }> = {
   child: { label: 'Dziecko', image: dziecko },
@@ -81,16 +91,13 @@ const CLIP: Record<'mother' | 'father', Record<Segment['tone'], string>> = {
   },
 }
 
-const clipClass = (segment: Segment) =>
-  CLIP[segment.lane === 'father' ? 'father' : 'mother'][segment.tone]
+/** The window a period can be taken in: lighter than the clip, so the clip stays the answer. */
+const WINDOW: Record<'mother' | 'father', string> = {
+  mother: 'border border-dashed border-zus-200 bg-zus-50/60 text-zus-700',
+  father: 'border border-dashed border-navy-200 bg-navy-50/60 text-navy-500',
+}
 
-const weekdayDate = new Intl.DateTimeFormat('pl-PL', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
+const parentOf = (segment: Segment) => (segment.lane === 'father' ? 'father' : 'mother')
 
 interface Flag {
   id: string
@@ -130,6 +137,42 @@ function placeFlags(flags: Flag[], x: (day: number) => number, width: number): P
     })
 }
 
+/** How a clip is labelled: inside if it fits, else beside it, else just its length. */
+interface ClipLabel {
+  inside: string | null
+  icon: boolean
+  dates: boolean
+  outside: { text: string; side: 'right' | 'left'; width: number } | null
+}
+
+const textPx = (text: string) => text.length * CHAR_PX + 28
+
+function labelClip(segment: Segment, px: number, roomBefore: number, roomAfter: number): ClipLabel {
+  const weeks = length(segment.days)
+  const name = clipName(segment)
+  const short = name.replace(/\s+(po porodzie|przed porodem)$/, '')
+  const option = segment.tone === 'option'
+  const candidates = [
+    ...(option ? [`${name} · ${weeks} · do wyboru`] : []),
+    `${name} · ${weeks}`,
+    `${short} · ${weeks}`,
+  ]
+  const inside = candidates.find((text) => px >= textPx(text)) ?? null
+  if (inside) {
+    const icon = px >= textPx(inside) + 40
+    return { inside, icon, dates: icon && px >= textPx(inside) + 160, outside: null }
+  }
+  const text = `${name} · ${weeks}${option ? ' · do wyboru' : ''}`
+  const needed = text.length * CHAR_PX + 24
+  const side = roomAfter >= needed ? 'right' : roomBefore >= needed ? 'left' : null
+  return {
+    inside: side ? null : px >= 40 ? weeks : null,
+    icon: false,
+    dates: false,
+    outside: side ? { text, side, width: needed } : null,
+  }
+}
+
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 /** 1970-01-01 was a Thursday, so Mondays are the days with (day + 3) % 7 === 0. */
 const isMonday = (day: number) => (((day + 3) % 7) + 7) % 7 === 0
@@ -145,8 +188,8 @@ interface Props {
   initialZoom?: number
   expanded?: boolean
   onToggleExpanded?: () => void
-  /** Show the Tata and Pieniądze tracks with example data until the engine computes them. */
-  preview?: boolean
+  /** Put first in the toolbar (the switch between the axis and the calendar). */
+  toolbarStart?: ReactNode
 }
 
 export function PlanTimeline({
@@ -160,7 +203,7 @@ export function PlanTimeline({
   initialZoom = 1,
   expanded = false,
   onToggleExpanded,
-  preview = false,
+  toolbarStart,
 }: Props) {
   const reduceMotion = useReducedMotion()
   const scroller = useRef<HTMLDivElement>(null)
@@ -178,7 +221,7 @@ export function PlanTimeline({
   const today = dayNumber(timeline.today)
   const [playhead, setPlayhead] = useState(today)
 
-  const width = Math.max(320, (viewport - LABEL_WIDTH) * zoom)
+  const width = Math.max(360, (viewport - LABEL_WIDTH) * zoom)
 
   useEffect(() => {
     const element = scroller.current
@@ -200,7 +243,7 @@ export function PlanTimeline({
       const target = clampZoom(next)
       if (Math.abs(target - zoomRef.current) < 0.001) return
       const at = offset ?? LABEL_WIDTH + (element.clientWidth - LABEL_WIDTH) / 2
-      const track = Math.max(320, (element.clientWidth - LABEL_WIDTH) * zoomRef.current)
+      const track = Math.max(360, (element.clientWidth - LABEL_WIDTH) * zoomRef.current)
       zoomAnimation.current?.stop()
       const instant = !smooth || Boolean(reduceMotion)
       anchor.current = {
@@ -266,23 +309,36 @@ export function PlanTimeline({
     if (moved.length > 0) setShadow({ segments: moved, key: Date.now() })
   }, [timeline])
 
+  // The scale: the periods and what is near them get the width; far deadlines sit behind a break.
   const birth = dayNumber(timeline.birth_date)
-  const segments = timeline.segments.filter((s) => s.lane === 'mother')
   const laneSegments = (lane: Lane) => timeline.segments.filter((s) => s.lane === lane)
-  const hasFather = timeline.segments.some((s) => s.lane === 'father')
-  const days = [
-    today,
-    birth,
-    ...timeline.segments.flatMap((s) => [dayNumber(s.start), dayNumber(s.end) + 1]),
+  const windows = timeline.segments
+    .map((s) => ({ segment: s, deadline: optionWindow(timeline, s) }))
+    .filter((w): w is { segment: Segment; deadline: NonNullable<typeof w.deadline> } => Boolean(w.deadline))
+  const periodDays = timeline.segments.flatMap((s) => [dayNumber(s.start), dayNumber(s.end) + 1])
+  const lastPeriod = Math.max(today, birth, ...periodDays)
+  const datedDays = [
     ...timeline.markers.map((m) => dayNumber(m.date)),
     ...timeline.documents.map((d) => dayNumber(d.needed_by)),
   ]
-  const from = Math.min(...days) - PAD_DAYS
-  const to = Math.max(...days) + PAD_DAYS
-  const x = (day: number) => ((day - from) / (to - from)) * 100
-  const pxPerDay = width / (to - from)
-  const head = Math.min(Math.max(playhead, from), to)
+  const isFar = (day: number) => day > lastPeriod + FAR_AFTER_DAYS
+  const near = [today, birth, ...periodDays, ...datedDays.filter((day) => !isFar(day))]
+  const farDays = datedDays.filter(isFar)
+  const from = Math.min(...near) - PAD_DAYS
+  const to = Math.max(...near) + PAD_DAYS
+  const farTo = farDays.length ? Math.max(...farDays) : to
+  const breakPx = farDays.length ? BREAK : 0
+  const mainPx = width - 2 * EDGE - breakPx
+  const xPx = (day: number) =>
+    day <= to
+      ? EDGE + ((day - from) / (to - from)) * mainPx
+      : EDGE + mainPx + BREAK_GAP + (farTo > to ? (day - to) / (farTo - to) : 1) * (breakPx - BREAK_GAP - 8)
+  const x = (day: number) => (xPx(day) / width) * 100
+  const pxPerDay = mainPx / (to - from)
+  const last = farDays.length ? farTo : to
+  const head = Math.min(Math.max(playhead, from), last)
   const months = monthCells(from, to)
+  const breakYears = Math.round((farTo - to) / 365.25)
 
   // A zoomed-in axis (the expanded view) opens at today, not at the start.
   const startAtToday = useRef(initialZoom > 1)
@@ -291,7 +347,7 @@ export function PlanTimeline({
     if (!element || !startAtToday.current || viewport === 0) return
     startAtToday.current = false
     const visible = element.clientWidth - LABEL_WIDTH
-    element.scrollLeft = Math.max(0, (x(today) / 100) * width - visible * 0.15)
+    element.scrollLeft = Math.max(0, xPx(today) - visible * 0.2)
   })
 
   /** Days a jump can land on: today and every start, end and dated element. */
@@ -312,7 +368,7 @@ export function PlanTimeline({
   const reveal = (day: number) => {
     const element = scroller.current
     if (!element) return
-    const position = LABEL_WIDTH + (x(day) / 100) * width
+    const position = LABEL_WIDTH + xPx(day)
     const left = element.scrollLeft + LABEL_WIDTH + 48
     const right = element.scrollLeft + element.clientWidth - 48
     if (position >= left && position <= right) return
@@ -326,11 +382,12 @@ export function PlanTimeline({
     reveal(day)
   }
 
+  /** The day under the pointer; the break in the scale counts as its last day. */
   const dayAt = (clientX: number) => {
     const element = scroller.current
     if (!element) return head
     const content = clientX - element.getBoundingClientRect().left + element.scrollLeft - LABEL_WIDTH
-    return Math.min(to, Math.max(from, Math.round(from + (content / width) * (to - from))))
+    return Math.min(to, Math.max(from, Math.round(from + ((content - EDGE) / mainPx) * (to - from))))
   }
 
   // Scrubbing: the playhead follows the pointer on the ruler 1:1.
@@ -376,10 +433,10 @@ export function PlanTimeline({
     if (!current || reduceMotion || Math.abs(current.v) < 0.05) return
     const element = event.currentTarget
     let velocity = current.v
-    let last = performance.now()
+    let lastTime = performance.now()
     const step = (now: number) => {
-      const dt = now - last
-      last = now
+      const dt = now - lastTime
+      lastTime = now
       element.scrollLeft -= velocity * dt
       velocity *= Math.pow(GLIDE_DECAY, dt)
       const atEdge =
@@ -392,10 +449,12 @@ export function PlanTimeline({
   // Keyframes per track. The birth is a keyframe on the child's track and a line through all.
   const flags: Record<Lane, Flag[]> = { child: [], mother: [], father: [], documents: [] }
   for (const m of timeline.markers) {
+    const day = dayNumber(m.date)
     flags[m.lane === 'documents' ? 'documents' : 'child'].push({
       id: m.id,
-      day: dayNumber(m.date),
-      text: `${m.label} · ${formatDayMonthShort(m.date)}`,
+      day,
+      // Behind the break the year matters.
+      text: `${m.label} · ${isFar(day) ? formatShortDate(m.date) : formatDayMonthShort(m.date)}`,
       icon: markerIcon(m),
       kind: 'marker',
       key: isKeyMarker(m),
@@ -415,16 +474,7 @@ export function PlanTimeline({
   const lanes = (Object.keys(LANES) as Lane[])
     .filter((lane) => flags[lane].length > 0 || laneSegments(lane).length > 0)
     .sort((a, b) => LANE_ORDER[a] - LANE_ORDER[b])
-  // The Tata example only stands in while the engine has nothing of the father's.
-  const previewFather = preview && !hasFather
-  const previewRows = (preview ? 1 : 0) + (previewFather ? 1 : 0)
-  const rowsBelowRuler = Math.max(1, lanes.length + previewRows)
-
-  // Example data for the preview tracks: tata's paternity leave right after the birth, and the
-  // months the mother's leave is paid. Clearly marked as an example in the UI.
-  const leave = segments.filter((s) => s.tone === 'leave')
-  const leaveStart = leave.length ? Math.min(...leave.map((s) => dayNumber(s.start))) : birth
-  const leaveEnd = leave.length ? Math.max(...leave.map((s) => dayNumber(s.end))) : birth
+  const rowsBelowRuler = Math.max(1, lanes.length)
 
   const sortedIn = (lane: Lane) =>
     laneSegments(lane).sort((a, b) => a.start.localeCompare(b.start))
@@ -440,9 +490,14 @@ export function PlanTimeline({
     }
   }
 
+  // The playhead's label stays beside the line near the ends instead of sliding under the names.
+  const headPx = xPx(head)
+  const headSide = headPx < 56 ? 'start' : headPx > width - 56 ? 'end' : 'middle'
+
   return (
     <div>
       <div className="mb-2 flex items-center gap-1">
+        {toolbarStart}
         <ToolButton
           label="Poprzednie zdarzenie"
           onClick={() => previousStop !== undefined && jump(previousStop)}
@@ -512,9 +567,11 @@ export function PlanTimeline({
             style={{ gridColumn: 2, gridRow: 1, height: RULER_HEIGHT }}
           >
             {months.map((month, index) => {
-              const left = Math.max(0, x(month.start))
+              const left = Math.max(x(from), x(month.start))
               const next = months[index + 1]
               if (next && ((x(next.start) - left) / 100) * width < 44) return null
+              // The break's own label needs the room at the end of the scale.
+              if (breakPx > 0 && (left / 100) * width > EDGE + mainPx - 64) return null
               return (
                 <span
                   key={`${month.year}-${month.start}`}
@@ -522,15 +579,17 @@ export function PlanTimeline({
                   style={{ left: `${left}%` }}
                 >
                   {month.label.replace('.', '')}
-                  {month.label.startsWith('sty') && <span className="ml-1 font-normal">{month.year}</span>}
+                  {(index === 0 || month.label.startsWith('sty')) && (
+                    <span className="ml-1 font-normal">{month.year}</span>
+                  )}
                 </span>
               )
             })}
             {months.map((month) =>
-              x(month.start) > 0 ? (
+              month.start > from ? (
                 <span
                   key={`m-${month.start}`}
-                  className="absolute bottom-0 h-4 w-px bg-navy-300"
+                  className="absolute bottom-0 h-4 w-px bg-navy-200"
                   style={{ left: `${x(month.start)}%` }}
                 />
               ) : null,
@@ -545,6 +604,15 @@ export function PlanTimeline({
                 style={{ left: `${x(tick.day)}%` }}
               />
             ))}
+            {breakPx > 0 && (
+              <span
+                className="absolute top-2 flex justify-center text-xs font-bold whitespace-nowrap text-navy-400"
+                style={{ left: `${x(to)}%`, width: BREAK_GAP }}
+                title="Przerwa w skali"
+              >
+                ⋯ {breakYears >= 1 ? `${breakYears} ${breakYears === 1 ? 'rok' : breakYears < 5 ? 'lata' : 'lat'}` : 'później'} ⋯
+              </span>
+            )}
             {head !== today && (
               <span
                 className="absolute bottom-1.5 -translate-x-1/2 text-[10px] font-bold text-navy-400"
@@ -555,13 +623,13 @@ export function PlanTimeline({
             )}
           </div>
 
-          {/* Under the clips: month lines and today. */}
+          {/* Under the clips: month lines, today and the break in the scale. */}
           <div
             className="pointer-events-none relative"
             style={{ gridColumn: 2, gridRow: `2 / span ${rowsBelowRuler}` }}
           >
             {months.map((month) =>
-              x(month.start) > 0 ? (
+              month.start > from ? (
                 <span
                   key={month.start}
                   className="absolute inset-y-0 w-px bg-line/60"
@@ -570,6 +638,12 @@ export function PlanTimeline({
               ) : null,
             )}
             <span className="absolute inset-y-0 w-px bg-navy-200" style={{ left: `${x(today)}%` }} />
+            {breakPx > 0 && (
+              <span
+                className="absolute inset-y-0 border-x border-dashed border-navy-200 bg-[repeating-linear-gradient(135deg,transparent_0_7px,var(--color-navy-50)_7px_14px)]"
+                style={{ left: `${x(to)}%`, width: BREAK_GAP }}
+              />
+            )}
           </div>
 
           {/* Over the clips: the birth and the playhead. */}
@@ -594,12 +668,15 @@ export function PlanTimeline({
                 onPointerUp={endScrub}
                 onPointerCancel={endScrub}
                 className={cn(
-                  'pointer-events-auto absolute top-1 left-0 -translate-x-1/2 cursor-ew-resize rounded-full bg-navy-900 px-2.5 py-1 text-xs font-bold whitespace-nowrap text-white shadow-[0_6px_14px_-6px_rgb(26_36_56/0.6)] transition-transform duration-150',
+                  'pointer-events-auto absolute top-1 left-0 cursor-ew-resize rounded-full bg-navy-900 px-2.5 py-1 text-xs font-bold whitespace-nowrap text-white shadow-[0_6px_14px_-6px_rgb(26_36_56/0.6)] transition-transform duration-150',
+                  headSide === 'start' && '-translate-x-2',
+                  headSide === 'middle' && '-translate-x-1/2',
+                  headSide === 'end' && '-translate-x-[calc(100%-8px)]',
                   scrubbing && 'scale-105',
                 )}
               >
                 {head === today ? 'Dziś · ' : ''}
-                {formatDayMonthShort(isoFromDay(head))}
+                {head > to ? formatShortDate(isoFromDay(head)) : formatDayMonthShort(isoFromDay(head))}
               </span>
             </motion.div>
           </div>
@@ -608,13 +685,20 @@ export function PlanTimeline({
             const placed = placeFlags(flags[lane], x, width)
             const rows = placed.reduce((n, f) => Math.max(n, f.row + 1), 0)
             const sorted = sortedIn(lane)
-            const hasClips = sorted.length > 0
-            const height = ROW_HEIGHT
-            const clipTop = CLIP_TOP
             // Rows of fixed height, centred in the track; a chip is centred in its row.
             const firstRow = (ROW_HEIGHT - Math.max(1, rows) * FLAG_ROW) / 2
             const flagTop = (row: number, key: boolean) =>
               firstRow + row * FLAG_ROW + (FLAG_ROW - (key ? FLAG_EVENT_HEIGHT : FLAG_HINT_HEIGHT)) / 2
+            // Labels beside clips take the room in order, so two never claim the same gap.
+            let taken = EDGE
+            const labels = sorted.map((s, index) => {
+              const start = xPx(dayNumber(s.start))
+              const end = xPx(dayNumber(s.end) + 1)
+              const after = index < sorted.length - 1 ? xPx(dayNumber(sorted[index + 1].start)) : EDGE + mainPx
+              const label = labelClip(s, end - start, start - taken, after - end)
+              taken = label.outside?.side === 'right' ? end + label.outside.width : end
+              return label
+            })
             return (
               <Fragment key={lane}>
                 <div
@@ -626,7 +710,7 @@ export function PlanTimeline({
                 </div>
                 <div
                   className="relative border-b border-line"
-                  style={{ gridColumn: 2, gridRow: laneIndex + 2, height }}
+                  style={{ gridColumn: 2, gridRow: laneIndex + 2, height: ROW_HEIGHT }}
                 >
                   {placed.map((flag) => (
                     <FlagChip
@@ -634,14 +718,39 @@ export function PlanTimeline({
                       flag={flag}
                       x={x(flag.day)}
                       top={flagTop(flag.row, flag.key)}
-                      stemTo={null}
                       active={selectedId === flag.id || hoveredId === flag.id}
                       onClick={() => onSelect(flag.id)}
                       onHover={(on) => onHover(on ? flag.id : null)}
                     />
                   ))}
 
-                  {hasClips && (
+                  {/* The window a period can be taken in, under its clip. */}
+                  {windows
+                    .filter((w) => w.segment.lane === lane)
+                    .map(({ segment, deadline }) => {
+                      const left = x(dayNumber(segment.start))
+                      const right = x(dayNumber(deadline.date) + 1)
+                      const px = ((right - left) / 100) * width
+                      return (
+                        <button
+                          key={`window-${segment.id}`}
+                          type="button"
+                          onClick={() => onSelect(segment.id)}
+                          onMouseEnter={() => onHover(segment.id)}
+                          onMouseLeave={() => onHover(null)}
+                          aria-label={`Okno: ${clipName(segment)} do ${formatShortDate(deadline.date)}`}
+                          className={cn(
+                            'absolute flex items-center justify-end rounded-xl pr-3 text-xs font-bold whitespace-nowrap',
+                            WINDOW[parentOf(segment)],
+                          )}
+                          style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${left}%`, width: `${right - left}%` }}
+                        >
+                          {px > 420 && <>w dowolnym czasie do {formatShortDate(deadline.date)}</>}
+                        </button>
+                      )
+                    })}
+
+                  {sorted.length > 0 && (
                     <>
                       <AnimatePresence>
                         {shadow?.segments.filter((s) => s.lane === lane).map((s) => (
@@ -652,7 +761,7 @@ export function PlanTimeline({
                             transition={{ duration: 2.4, delay: 0.8, ease: 'easeIn' }}
                             className="absolute rounded-xl border-2 border-dashed border-navy-300"
                             style={{
-                              top: clipTop,
+                              top: CLIP_TOP,
                               height: CLIP_HEIGHT,
                               left: `${x(dayNumber(s.start))}%`,
                               width: `${x(dayNumber(s.end) + 1) - x(dayNumber(s.start))}%`,
@@ -667,8 +776,7 @@ export function PlanTimeline({
                             segment={s}
                             left={x(dayNumber(s.start))}
                             span={x(dayNumber(s.end) + 1) - x(dayNumber(s.start))}
-                            trackWidth={width}
-                            top={clipTop}
+                            label={labels[index]}
                             index={index}
                             joinLeft={joins(sorted[index - 1], s)}
                             joinRight={joins(s, sorted[index + 1])}
@@ -680,200 +788,38 @@ export function PlanTimeline({
                           />
                         ))}
                       </AnimatePresence>
+                      {sorted.map((s, index) => {
+                        const outside = labels[index].outside
+                        if (!outside) return null
+                        const edge = outside.side === 'right' ? x(dayNumber(s.end) + 1) : x(dayNumber(s.start))
+                        return (
+                          <button
+                            key={`label-${s.id}`}
+                            type="button"
+                            onClick={() => onSelect(s.id)}
+                            onMouseEnter={() => onHover(s.id)}
+                            onMouseLeave={() => onHover(null)}
+                            className={cn(
+                              'absolute flex items-center text-sm font-bold whitespace-nowrap transition-colors duration-150',
+                              outside.side === 'right' ? 'pl-2.5' : '-translate-x-full pr-2.5',
+                              s.lane === 'father' ? 'text-navy-700 hover:text-navy-900' : 'text-zus-700 hover:text-zus-900',
+                            )}
+                            style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${edge}%` }}
+                          >
+                            {outside.text}
+                          </button>
+                        )
+                      })}
                     </>
                   )}
                 </div>
               </Fragment>
             )
           })}
-
-          {previewFather && (
-            <>
-              <PreviewLabel row={lanes.length + 2} label="Tata">
-                <Illustration src={tata} size="lane" />
-              </PreviewLabel>
-              <div className="relative border-b border-line" style={{ gridColumn: 2, gridRow: lanes.length + 2, height: ROW_HEIGHT }}>
-                <span
-                  className="absolute grid place-items-center rounded-xl border-2 border-dashed border-navy-300 bg-navy-50"
-                  style={{
-                    top: (ROW_HEIGHT - CLIP_HEIGHT) / 2,
-                    height: CLIP_HEIGHT,
-                    left: `${x(birth)}%`,
-                    width: `max(${CLIP_HEIGHT}px, ${Math.max(x(birth + PREVIEW_PATERNITY_DAYS) - x(birth), 0)}%)`,
-                  }}
-                  title="Urlop ojcowski — przykład"
-                >
-                  <Illustration src={ICONS.tataZDzieckiem} size="event" />
-                </span>
-                <span
-                  className="absolute flex items-center pl-3 text-sm font-bold whitespace-nowrap text-navy-500"
-                  style={{
-                    top: (ROW_HEIGHT - CLIP_HEIGHT) / 2,
-                    height: CLIP_HEIGHT,
-                    left: `calc(${x(birth)}% + max(${CLIP_HEIGHT}px, ${Math.max(x(birth + PREVIEW_PATERNITY_DAYS) - x(birth), 0)}%))`,
-                  }}
-                >
-                  Urlop ojcowski · przykład
-                </span>
-              </div>
-            </>
-          )}
-          {preview && (
-            <>
-              <PreviewLabel row={lanes.length + 2 + (previewFather ? 1 : 0)} label="Pieniądze">
-                <Illustration src={pieniadze} size="lane" />
-              </PreviewLabel>
-              <div
-                className="relative border-b border-line"
-                style={{ gridColumn: 2, gridRow: lanes.length + 2 + (previewFather ? 1 : 0), height: ROW_HEIGHT }}
-              >
-                {months
-                  .filter((month) => month.end >= leaveStart && month.start <= leaveEnd)
-                  .map((month) => {
-                    const start = Math.max(month.start, leaveStart)
-                    const end = Math.min(month.end, leaveEnd) + 1
-                    const span = x(end) - x(start)
-                    return (
-                      <span
-                        key={month.start}
-                        className="absolute flex h-11 items-center justify-center rounded-lg border border-dashed border-sun-400 bg-sun-100/70 text-xs font-bold text-sun-700"
-                        style={{
-                          top: (ROW_HEIGHT - 44) / 2,
-                          left: `calc(${x(start)}% + 2px)`,
-                          width: `calc(${span}% - 4px)`,
-                        }}
-                        title="Wypłata zasiłku — przykład"
-                      >
-                        {(span / 100) * width >= 44 ? 'zasiłek' : ''}
-                      </span>
-                    )
-                  })}
-              </div>
-            </>
-          )}
         </div>
       </div>
 
       <Readout timeline={timeline} day={head} onSelect={onSelect} onHover={onHover} />
-    </div>
-  )
-}
-
-/** Label of a preview track: the drawing, the name and an "example" badge. */
-function PreviewLabel({ row, label, children }: { row: number; label: string; children: ReactNode }) {
-  return (
-    <div
-      className="sticky left-0 z-30 flex items-center gap-2 border-b border-line bg-white pr-2"
-      style={{ gridColumn: 1, gridRow: row }}
-    >
-      {children}
-      <span className="min-w-0">
-        <span className="block text-sm font-bold text-navy-700">{label}</span>
-        <span className="block text-[10px] font-bold text-sun-700">przykład</span>
-      </span>
-    </div>
-  )
-}
-
-/** What happens on a day (the playhead's, or today on phones), in a few bold facts. */
-export function Readout({
-  timeline,
-  day,
-  onSelect,
-  onHover,
-}: {
-  timeline: Timeline
-  day: number
-  onSelect: (id: string) => void
-  onHover: (id: string | null) => void
-}) {
-  const iso = isoFromDay(day)
-  const byStart = [...timeline.segments].sort((a, b) => a.start.localeCompare(b.start))
-  const active = byStart.filter((s) => dayNumber(s.start) <= day && day <= dayNumber(s.end))
-  const upcoming = byStart.find((s) => dayNumber(s.start) > day)
-  const markersToday = timeline.markers.filter((m) => dayNumber(m.date) === day)
-  const nextMarker = [...timeline.markers]
-    .filter((m) => dayNumber(m.date) > day)
-    .sort((a, b) => a.date.localeCompare(b.date))[0]
-  const nextDocument = [...timeline.documents]
-    .filter((d) => !d.done && dayNumber(d.needed_by) >= day)
-    .sort((a, b) => a.needed_by.localeCompare(b.needed_by))[0]
-
-  const lines: { key: string; id: string; icon: string; lead?: string; title: string; rest: string }[] = []
-  for (const s of active) {
-    const elapsed = day - dayNumber(s.start) + 1
-    const progress =
-      s.days % 7 === 0 ? `tydzień ${Math.ceil(elapsed / 7)} z ${s.days / 7}` : `dzień ${elapsed} z ${s.days}`
-    lines.push({ key: `a-${s.id}`, id: s.id, icon: segmentIcon(s), title: s.title, rest: `${progress} · do ${formatDayMonthShort(s.end)}` })
-  }
-  if (active.length === 0 && upcoming) {
-    lines.push({
-      key: `u-${upcoming.id}`,
-      id: upcoming.id,
-      icon: segmentIcon(upcoming),
-      lead: 'Następnie',
-      title: upcoming.title,
-      rest: `${formatDistance(iso, upcoming.start)} · ${formatDayMonthShort(upcoming.start)}`,
-    })
-  }
-  for (const m of markersToday) {
-    lines.push({ key: `t-${m.id}`, id: m.id, icon: markerIcon(m), title: m.title, rest: 'tego dnia' })
-  }
-  if (nextMarker) {
-    lines.push({
-      key: `n-${nextMarker.id}`,
-      id: nextMarker.id,
-      icon: markerIcon(nextMarker),
-      lead: 'Najbliższy ważny dzień',
-      title: nextMarker.title,
-      rest: `${formatDistance(iso, nextMarker.date)} · ${formatDayMonthShort(nextMarker.date)}`,
-    })
-  }
-  if (nextDocument) {
-    lines.push({
-      key: `d-${nextDocument.id}`,
-      id: nextDocument.id,
-      icon: documentIcon(nextDocument),
-      lead: 'Dokument',
-      title: nextDocument.title,
-      rest: `potrzebny ${formatDistance(iso, nextDocument.needed_by)} · ${formatDayMonthShort(nextDocument.needed_by)}`,
-    })
-  }
-
-  const label = weekdayDate.format(new Date(`${iso}T00:00:00Z`))
-  const comma = label.indexOf(', ')
-  return (
-    <div
-      className="mt-3 flex flex-col gap-3 rounded-3xl bg-navy-50/60 px-4 py-4 sm:flex-row sm:gap-6 sm:px-5"
-      aria-live="polite"
-    >
-      <div className="shrink-0 sm:w-44">
-        <p className="text-xs font-bold text-navy-500 capitalize">{label.slice(0, comma)}</p>
-        <p className="mt-0.5 text-lg leading-tight font-bold text-navy-900">{label.slice(comma + 2)}</p>
-        <p className="mt-0.5 text-sm text-navy-500">{formatDistance(timeline.today, iso)}</p>
-      </div>
-      <ul className="-mx-2 min-w-0 flex-1 space-y-0.5 sm:mx-0">
-        {lines.length === 0 && <li className="pt-1 text-navy-500">Tego dnia nic się nie zmienia.</li>}
-        {lines.map((line) => (
-          <li key={line.key}>
-            <button
-              type="button"
-              onClick={() => onSelect(line.id)}
-              onMouseEnter={() => onHover(line.id)}
-              onMouseLeave={() => onHover(null)}
-              className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1 text-left transition-colors duration-150 hover:bg-white"
-            >
-              <Illustration src={line.icon} size="hint" />
-              <span className="min-w-0">
-              {line.lead && <span className="text-navy-500">{line.lead}: </span>}
-              <span className="font-bold text-navy-900">{line.title}</span>
-              <span className="text-navy-400"> · </span>
-              <span className="font-bold text-zus-700">{line.rest}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -907,7 +853,6 @@ function FlagChip({
   flag,
   x,
   top,
-  stemTo,
   active,
   onClick,
   onHover,
@@ -915,45 +860,36 @@ function FlagChip({
   flag: PlacedFlag
   x: number
   top: number
-  stemTo: number | null
   active: boolean
   onClick: () => void
   onHover: (on: boolean) => void
 }) {
   const document = flag.kind === 'document'
   return (
-    <>
-      {stemTo !== null && (
-        <span
-          className="absolute z-10 w-0 -translate-x-1/2 border-l-2 border-dashed border-sun-400"
-          style={{ left: `${x}%`, top: top + FLAG_HINT_HEIGHT, height: stemTo - top - FLAG_HINT_HEIGHT }}
-        />
+    <motion.button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.5 }}
+      className={cn(
+        'absolute z-20 flex items-center rounded-full border whitespace-nowrap',
+        'transition-[border-color,background-color] duration-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+        flag.side === 'left' ? '-translate-x-full' : '-translate-x-[6px]',
+        flag.key
+          ? 'h-10 gap-2 border-sun-300 bg-sun-100/70 pr-4 pl-0.5 text-sm font-bold text-navy-900'
+          : 'h-[30px] gap-1.5 border-line bg-white pr-3 pl-1 text-xs font-bold text-navy-700',
+        document && flag.done && 'border-zus-200 text-zus-700',
+        active && (flag.key ? 'bg-sun-100' : 'border-sun-300 bg-sun-100/60'),
       )}
-      <motion.button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={() => onHover(true)}
-        onMouseLeave={() => onHover(false)}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.5 }}
-        className={cn(
-          'absolute z-20 flex items-center rounded-full border whitespace-nowrap',
-          'transition-[border-color,background-color] duration-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
-          flag.side === 'left' ? '-translate-x-full' : '-translate-x-[6px]',
-          flag.key
-            ? 'h-10 gap-2 border-sun-300 bg-sun-100/70 pr-4 pl-0.5 text-sm font-bold text-navy-900'
-            : 'h-[30px] gap-1.5 border-line bg-white pr-3 pl-1 text-xs font-bold text-navy-700',
-          document && flag.done && 'border-zus-200 text-zus-700',
-          active && (flag.key ? 'bg-sun-100' : 'border-sun-300 bg-sun-100/60'),
-        )}
-        style={{ top, left: `${x}%` }}
-      >
-        <Illustration src={flag.icon} size={flag.key ? 'event' : 'hint'} className={flag.key ? 'bg-white' : ''} />
-        {flag.text}
-        {document && flag.done && <Check className="size-3.5" strokeWidth={3} />}
-      </motion.button>
-    </>
+      style={{ top, left: `${x}%` }}
+    >
+      <Illustration src={flag.icon} size={flag.key ? 'event' : 'hint'} className={flag.key ? 'bg-white' : ''} />
+      {flag.text}
+      {document && flag.done && <Check className="size-3.5" strokeWidth={3} />}
+    </motion.button>
   )
 }
 
@@ -961,8 +897,7 @@ function Clip({
   segment,
   left,
   span,
-  trackWidth,
-  top,
+  label,
   index,
   joinLeft,
   joinRight,
@@ -975,8 +910,7 @@ function Clip({
   segment: Segment
   left: number
   span: number
-  trackWidth: number
-  top: number
+  label: ClipLabel
   index: number
   joinLeft: boolean
   joinRight: boolean
@@ -986,16 +920,13 @@ function Clip({
   onClick: () => void
   onHover: (on: boolean) => void
 }) {
-  const px = (span / 100) * trackWidth
-  const weeks = segment.days % 7 === 0 ? `${segment.days / 7} tyg.` : `${segment.days} dni`
-  const label = segmentLook(segment).label
   return (
     <motion.button
       type="button"
       onClick={onClick}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
-      aria-label={`${segment.title}, ${weeks}`}
+      aria-label={`${segment.title}, ${length(segment.days)}`}
       title={segment.title}
       initial={{ opacity: 0, clipPath: 'inset(0% 100% 0% 0%)' }}
       animate={{ opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' }}
@@ -1009,12 +940,12 @@ function Clip({
         // A recalculated plan glides into place (rare, so animating left/width is fine here).
         'transition-[left,width,filter,box-shadow] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
         'outline-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2',
-        clipClass(segment),
+        CLIP[parentOf(segment)][segment.tone],
         joinLeft && 'rounded-l-none border-l-0',
         joinRight && 'rounded-r-none',
         active && 'ring-2 ring-navy-900/25 ring-offset-2 brightness-[0.96]',
       )}
-      style={{ top, height: CLIP_HEIGHT, left: `${left}%`, width: `${span}%` }}
+      style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${left}%`, width: `${span}%` }}
     >
       {changed && (
         <motion.span
@@ -1025,25 +956,17 @@ function Clip({
           className="absolute inset-0 rounded-[inherit] ring-4 ring-sun-300 ring-inset"
         />
       )}
-      {px >= 96 && (
-        <Illustration src={segmentIcon(segment)} size="event" className="relative -ml-1.5" />
+      {label.icon && <Illustration src={segmentIcon(segment)} size="event" className="relative -ml-1.5" />}
+      {label.inside && (
+        <span className={cn('relative truncate text-sm font-bold', !label.icon && !label.dates && 'mx-auto')}>
+          {label.inside}
+        </span>
       )}
-      {px >= 150 ? (
-        <>
-          <span className="relative truncate text-sm font-bold">
-            {label} · {weeks}
-          </span>
-          {px >= 300 && (
-            <span className="relative ml-auto truncate text-xs font-bold opacity-70">
-              {formatDayMonthShort(segment.start)} – {formatDayMonthShort(segment.end)}
-            </span>
-          )}
-        </>
-      ) : px >= 96 ? (
-        <span className="relative text-xs font-bold">{weeks}</span>
-      ) : px >= 40 ? (
-        <span className="relative mx-auto text-xs font-bold">{weeks}</span>
-      ) : null}
+      {label.dates && (
+        <span className="relative ml-auto truncate text-xs font-bold opacity-70">
+          {formatDayMonthShort(segment.start)} – {formatDayMonthShort(segment.end)}
+        </span>
+      )}
     </motion.button>
   )
 }
