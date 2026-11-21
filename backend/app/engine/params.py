@@ -1,5 +1,7 @@
 """Legal parameters. Every number carries its sources; the engine never hardcodes them."""
 
+from fractions import Fraction
+
 from pydantic import BaseModel, Field
 
 from app.engine.models import SourceRef
@@ -155,6 +157,27 @@ class PregnancyParams(BaseModel):
     risk_base_raised: Rule
 
 
+class ParentalPlanParams(BaseModel):
+    """Guide section E (page 9) and B.3 (page 7): parental leave split between the parents, in
+    parts, and combined with part-time work (Labour Code art. 182¹ᵃ § 6-7, 182¹ᵈ § 2, 182¹ᵉ,
+    182¹ᶠ)."""
+
+    max_work_fraction: Param[Fraction]
+    """The most an employee may work during parental leave, as a part of full time."""
+    work_request_days: Param[int]
+    """The request to start work is filed at least this many days before."""
+    max_weeks_with_work: Param[list[int]]
+    """The longest parental leave extended by work: one child, more children."""
+    max_weeks_with_work_za_zyciem: Param[list[int]]
+    rest_of_time: Rule
+    extension: Rule
+    extension_paid: Rule
+    extension_in_days: Rule
+    extension_of_that_part: Rule
+    parts_of_both_parents: Rule
+    both_at_once: Rule
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -207,6 +230,7 @@ class Params(BaseModel):
     pregnancy: PregnancyParams
     rules: Rules
     applications: ApplicationParams
+    parental_plan: ParentalPlanParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""

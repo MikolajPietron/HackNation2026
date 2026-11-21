@@ -149,6 +149,12 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
         "Zasiłek macierzyński za okres uzupełniającego urlopu macierzyńskiego",
         [(8, "Uzupełniający urlop macierzyński – urlop", "po urlopie macierzyńskim.")],
     ),
+    # Section E: parental leave combined with work.
+    (
+        "E",
+        "Łączenie urlopu rodzicielskiego z pracą",
+        [(9, "Ubezpieczony-pracownik może łączyć", "przysługuje zasiłek macierzyński.")],
+    ),
     # Section H, only what "ubezpieczona" in point A.2 depends on (phase 2c).
     (
         "H.1",

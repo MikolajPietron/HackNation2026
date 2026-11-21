@@ -1347,5 +1347,173 @@
         }
       ]
     }
+  },
+  "parental_plan": {
+    "max_work_fraction": {
+      "value": "1/2",
+      "note": "Najwyższy wymiar pracy w czasie urlopu rodzicielskiego (część pełnego etatu).",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "Ubezpieczony-pracownik może łączyć korzystanie z urlopu rodzicielskiego z wykonywaniem pracy u pracodawcy udzielającego tego urlopu w wymiarze nie wyższym niż połowa pełnego wymiaru czasu pracy."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵉ § 1",
+          "quote": "Pracownik może łączyć korzystanie z urlopu rodzicielskiego z wykonywaniem pracy u pracodawcy udzielającego tego urlopu w wymiarze nie wyższym niż połowa pełnego wymiaru czasu pracy."
+        }
+      ]
+    },
+    "work_request_days": {
+      "value": 21,
+      "note": "Wniosek o podjęcie pracy w czasie urlopu rodzicielskiego: co najmniej tyle dni przed jej rozpoczęciem.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵉ § 2",
+          "quote": "podjęcie pracy następuje na wniosek w postaci papierowej lub elektronicznej składany przez pracownika w terminie nie krótszym niż 21 dni przed rozpoczęciem wykonywania pracy."
+        }
+      ]
+    },
+    "max_weeks_with_work": {
+      "value": [
+        82,
+        86
+      ],
+      "note": "Najdłuższy urlop rodzicielski wydłużony przez pracę: przy jednym dziecku, przy więcej niż jednym.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "(maksymalne limity trwania urlopu określa Kodeks pracy)"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 1",
+          "quote": "wymiar urlopu rodzicielskiego ulega wydłużeniu proporcjonalnie do wymiaru czasu pracy wykonywanej przez pracownika w trakcie korzystania z urlopu lub jego części, nie dłużej jednak niż do: 1) 82 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 86 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
+        }
+      ]
+    },
+    "max_weeks_with_work_za_zyciem": {
+      "value": [
+        130,
+        134
+      ],
+      "note": "Jak wyżej, gdy dziecko ma zaświadczenie „Za życiem”.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "(maksymalne limity trwania urlopu określa Kodeks pracy)"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 1¹",
+          "quote": "nie dłużej jednak niż do: 1) 130 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 134 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
+        }
+      ]
+    },
+    "rest_of_time": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "W takim przypadku urlopu rodzicielskiego udziela się na pozostałą część wymiaru czasu pracy."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵉ § 1",
+          "quote": "W takim przypadku urlopu rodzicielskiego udziela się na pozostałą część wymiaru czasu pracy."
+        }
+      ]
+    },
+    "extension": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "W takim przypadku urlop rodzicielski ulega wydłużeniu proporcjonalnie do wymiaru czasu pracy wykonywanej przez pracownika w trakcie korzystania z urlopu lub jego części"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 2",
+          "quote": "Okres, o który urlop rodzicielski ulega wydłużeniu, stanowi iloczyn liczby tygodni, przez jaką pracownik łączy korzystanie z urlopu rodzicielskiego z wykonywaniem pracy u pracodawcy udzielającego tego urlopu i wymiaru czasu pracy wykonywanej przez pracownika w trakcie korzystania z urlopu rodzicielskiego."
+        }
+      ]
+    },
+    "extension_paid": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "E",
+          "page": 9,
+          "quote": "W takim przypadku również za okres wydłużonego urlopu rodzicielskiego przysługuje zasiłek macierzyński."
+        }
+      ]
+    },
+    "extension_in_days": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 4",
+          "quote": "W przypadku gdy powstała w wyniku wydłużenia wymiaru urlopu rodzicielskiego część urlopu rodzicielskiego nie odpowiada wielokrotności tygodnia, jest ona udzielana w dniach. Przy udzielaniu urlopu niepełny dzień pomija się."
+        }
+      ]
+    },
+    "extension_of_that_part": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 3",
+          "quote": "proporcjonalne wydłużenie wymiaru tego urlopu, następuje wyłącznie w odniesieniu do tej części urlopu rodzicielskiego."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶠ § 5",
+          "quote": "Część urlopu rodzicielskiego, o którą urlop został proporcjonalnie wydłużony zgodnie z § 1-4, wydłuża część urlopu rodzicielskiego, podczas której pracownik łączył korzystanie z urlopu z wykonywaniem pracy w niepełnym wymiarze czasu pracy u pracodawcy udzielającego urlopu."
+        }
+      ]
+    },
+    "parts_of_both_parents": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "B.3",
+          "page": 7,
+          "quote": "Okres urlopu rodzicielskiego, za który przysługuje zasiłek macierzyński, rodzice mogą podzielić na maksymalnie 5 części aż do zakończenia roku kalendarzowego, w którym dziecko skończy 6 lat."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵈ § 2",
+          "quote": "Liczbę części urlopu ustala się w oparciu o liczbę złożonych wniosków o udzielenie urlopu."
+        }
+      ]
+    },
+    "both_at_once": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "B.3",
+          "page": 7,
+          "quote": "Rodzice z urlopu rodzicielskiego mogą korzystać jednocześnie lub naprzemiennie"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 6",
+          "quote": "Z urlopu rodzicielskiego mogą jednocześnie korzystać oboje pracownicy - rodzice dziecka. W takim przypadku łączny wymiar urlopu rodzicielskiego nie może przekraczać wymiaru, o którym mowa w § 1 albo 2."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 7",
+          "quote": "W okresie pobierania przez jednego z rodziców dziecka zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego drugi rodzic może korzystać z urlopu rodzicielskiego."
+        }
+      ]
+    }
   }
 }

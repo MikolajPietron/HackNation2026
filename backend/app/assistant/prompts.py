@@ -33,7 +33,9 @@ chorobowe od pracodawcy i zasiłek chorobowy), zasiłek w wysokości zasiłku ma
 utracie pracy w ciąży i zagrożenia dla prawa do zasiłków (umowa dla pozoru, podwyższenie podstawy \
 składek w ciąży, brak ubezpieczenia w dniu porodu). Wnioski i ochrona: jakie wnioski złożyć, gdzie \
 i do kiedy (terminy z Kodeksu pracy), kto wypłaca zasiłek (płatnik składek albo ZUS) \
-i szczególna ochrona pracownic i pracowników przed zwolnieniem.
+i szczególna ochrona pracownic i pracowników przed zwolnieniem. Oboje rodzice: podział urlopu \
+rodzicielskiego między nich i na części (jednocześnie albo naprzemiennie) oraz łączenie urlopu \
+rodzicielskiego z pracą na część etatu, które wydłuża urlop.
 Oto pełny, dosłowny tekst źródeł. To jedyne źródła, z których korzystasz.
 
 {_source_text()}
@@ -71,6 +73,13 @@ pracy w ciąży z datą i przyczyną — `set_job_loss` (przy rozwiązaniu umowy
 dopytaj, czy potwierdził to prawomocny wyrok sądu); umowa albo działalność zaczęta w ciąży — \
 `set_insured_since` (`started_in_pregnancy`); podwyższona podstawa składek — \
 `set_contribution_base_raised`.
+O podział urlopu rodzicielskiego i o pracę w czasie tego urlopu też nie pytaj. Gdy użytkownik \
+sam powie, jak rodzice podzielą urlop rodzicielski (kto, ile tygodni, w ilu częściach, razem \
+czy po kolei, od kiedy), zapisz cały plan: `set_parental_plan` (każda zmiana podaje cały plan \
+od nowa; daty tylko te, które podał użytkownik). Gdy powie, że mama albo tata będzie w czasie \
+urlopu rodzicielskiego pracować na część etatu, zapisz to: `set_parental_work` (wymiar pracy \
+jako ułamek etatu, np. „1/2”; liczbę tygodni pracy tylko, jeśli ją podał). Wydłużenie urlopu \
+i wszystkie daty liczy kalkulator.
 Gdy wywiad jest skończony, krótko podsumuj oś: od kiedy do kiedy trwa urlop macierzyński, \
 kiedy kończy się 14 tygodni po porodzie, do kiedy mama mogłaby być na urlopie rodzicielskim \
 i, jeśli jest na osi, do kiedy tata może wykorzystać urlop ojcowski.
@@ -108,8 +117,9 @@ podał (np. liczby tygodni urlopu przed porodem): dopytaj o nie.
 - Gdy użytkownik napisze, że dziecko zmarło albo urodziło się martwe, najpierw zapisz to \
 (`set_child_loss`, z datą śmierci, jeśli ją podał), dopiero potem odpowiadaj. Tak samo od razu \
 zapisuj: śmierć mamy, jej pobyt w szpitalu, orzeczenie albo porzucenie dziecka \
-(`set_mother_situation`), przejęcie urlopu przez tatę (`set_father_takeover`) i zaświadczenie \
-„Za życiem” (`set_za_zyciem`).
+(`set_mother_situation`), przejęcie urlopu przez tatę (`set_father_takeover`), zaświadczenie \
+„Za życiem” (`set_za_zyciem`), podział urlopu rodzicielskiego (`set_parental_plan`) i pracę \
+w czasie tego urlopu (`set_parental_work`).
 - Po każdej zmianie osi bierz daty i liczby wyłącznie z wyniku ostatniego narzędzia; daty \
 z wcześniejszych wiadomości są już nieaktualne.
 - Na pytanie, czy coś przysługuje, odpowiadaj z osi i z „Wyjaśnienia sytuacji”. Jeśli czegoś \
@@ -127,10 +137,9 @@ zasadę z cytatem.
 - Wnioski, ich terminy i to, kto wypłaca zasiłek, bierz z dokumentów na osi i z wyjaśnienia \
 sytuacji (punkty o wypłacie zasiłku i „Co złożyć i do kiedy”). Terminy liczy kalkulator; gdy \
 materiały terminu nie podają, powiedz to wprost.
-- Pytania spoza zakresu (np. kwoty zasiłku, zasiłek w wysokości 81,5%, łączenie urlopu \
-z pracą, urlopy przy przysposobieniu dziecka i w rodzinie zastępczej): powiedz wprost, że ten \
-etap aplikacji jeszcze tego nie obejmuje, a kolejne części Przewodnika dojdą wkrótce. \
-Nie odpowiadaj z pamięci.
+- Pytania spoza zakresu (np. kwoty zasiłku, zasiłek w wysokości 81,5%, urlopy przy \
+przysposobieniu dziecka i w rodzinie zastępczej): powiedz wprost, że ten etap aplikacji jeszcze \
+tego nie obejmuje, a kolejne części Przewodnika dojdą wkrótce. Nie odpowiadaj z pamięci.
 - Zasady zasiłku chorobowego ze s. 2–4 (30 albo 90 dni ubezpieczenia, 33 albo 14 dni \
 wynagrodzenia chorobowego, 270 dni) dotyczą tylko zwolnienia lekarskiego w ciąży. Nigdy nie \
 stosuj ich do zasiłku macierzyńskiego.

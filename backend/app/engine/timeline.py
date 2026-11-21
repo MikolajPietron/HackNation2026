@@ -58,6 +58,7 @@ from app.engine.parental import (
     parental_table,
     parental_weeks,
 )
+from app.engine.parental_plan import parental_plan_rules
 from app.engine.pregnancy import pregnancy_rules
 from app.engine.supplementary import describe_case, supplementary_leave
 from app.engine.wording import children_phrase, fmt, weeks_or_days
@@ -110,6 +111,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     # Section B, after the mother's rules: it may shorten her maternity leave and adds the
     # father's lane, also when the mother herself has no benefit periods.
     father_rules(draft, scenario, params, birth, today, cover, loss)
+    # Guide E and B.3: the parents' own plan of parental leave, when they told us one.
+    plan_assumptions = parental_plan_rules(draft, scenario, params, birth, today, cover, loss)
     _for_non_employee(draft, scenario, params, cover)
     # Pregnancy (guide pages 2-4, section H): sick leave and the benefit after losing the job.
     pregnancy = pregnancy_rules(draft, scenario, params, birth)
@@ -131,7 +134,9 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         markers=draft.markers,
         documents=draft.documents,
         warnings=draft.warnings,
-        assumptions=_assumptions(scenario, params, born, cover, loss, draft) + pregnancy,
+        assumptions=_assumptions(scenario, params, born, cover, loss, draft)
+        + pregnancy
+        + plan_assumptions,
     )
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
@@ -777,9 +782,9 @@ def _assumptions(
     draft: Draft,
 ) -> list[str]:
     assumptions = [
-        "Pokazujemy to, co wynika z części A i B Przewodnika ZUS: zasiłek macierzyński mamy "
-        "i uprawnienia taty, z wnioskami, ich terminami i szczególną ochroną. Kolejne części "
-        "(kwoty zasiłku, łączenie urlopu z pracą, adopcja) dodajemy krok po kroku."
+        "Pokazujemy to, co wynika z części A, B i E Przewodnika ZUS: zasiłek macierzyński mamy, "
+        "uprawnienia taty, łączenie urlopu rodzicielskiego z pracą, wnioski z terminami "
+        "i szczególna ochrona. Kolejne części (kwoty zasiłku, adopcja) dodajemy krok po kroku."
     ]
     mother = cover not in NOT_INSURED
     father = father_coverage(scenario)
@@ -857,7 +862,10 @@ def _father_assumptions(
             f"{params.father.paternity_months.value} miesięcy życia: przyjmujemy, że ostatnim "
             "dniem jest dzień przed pierwszymi urodzinami."
         )
-    if "parental-father" in shown and "parental" not in shown:
+    # Parental leave on each lane: the option or the parts of the parents' plan.
+    fathers = any(s.lane == "father" and s.id.startswith("parental") for s in draft.segments)
+    mothers = any(s.lane == "mother" and s.id.startswith("parental") for s in draft.segments)
+    if fathers and not mothers:
         assumptions.append(
             "Urlop rodzicielski taty pokazujemy bez "
             f"{params.parental.exclusive_weeks.value} tygodni, których Kodeks pracy nie pozwala "

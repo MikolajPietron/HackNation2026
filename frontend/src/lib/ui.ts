@@ -226,6 +226,16 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
     case 'set_job_loss':
     case 'set_contribution_base_raised':
       return 'Uwzględniam to na osi czasu'
+    case 'set_parental_plan':
+      return Array.isArray(args.parts) && args.parts.length === 0
+        ? 'Bez planu urlopu rodzicielskiego'
+        : 'Plan urlopu rodzicielskiego'
+    case 'set_parental_work': {
+      const who = args.parent === 'father' ? 'taty' : 'mamy'
+      return typeof args.work_fraction === 'string'
+        ? `Praca ${who} w czasie urlopu rodzicielskiego: ${args.work_fraction} etatu`
+        : `Bez pracy ${who} w czasie urlopu rodzicielskiego`
+    }
     default:
       return name
   }
