@@ -95,23 +95,6 @@ export const PERSONAS: Persona[] = [
   },
 ]
 
-/** Test cases for the jury: ids and topics from the case catalogue (CLAUDE.md), no case data. */
-export const CASES: { id: string; title: string; topic: string }[] = [
-  { id: 'S01', title: 'Koniec umowy przed porodem', topic: 'Brak ubezpieczenia w dniu porodu' },
-  { id: 'S03', title: 'Firma po urlopie macierzyńskim', topic: 'Przerwa w dobrowolnym chorobowym' },
-  { id: 'S04', title: 'Zaległe składki w firmie', topic: 'Zadłużenie na dzień powstania prawa' },
-  { id: 'S07', title: 'Umowa „dla pozoru”', topic: 'Zakwestionowany tytuł ubezpieczenia' },
-  { id: 'S11', title: 'Szósta część rodzicielskiego', topic: 'Limit pięciu części' },
-  { id: 'S16', title: 'Bliźnięta i „Za życiem”', topic: 'Dłuższy macierzyński i rodzicielski' },
-  { id: 'S23', title: 'Likwidacja pracodawcy w ciąży', topic: 'Zasiłek w wysokości macierzyńskiego' },
-  { id: 'S25', title: 'Wcześniak w szpitalu', topic: 'Urlop uzupełniający' },
-  { id: 'S34', title: 'Rodzicielski i praca na pół etatu', topic: 'Wydłużenie urlopu' },
-  { id: 'S37', title: 'Tata przejmuje macierzyński', topic: 'Rezygnacja mamy po 14 tygodniach' },
-  { id: 'S38', title: 'Mama bez ubezpieczenia', topic: 'Zasiłek dla taty' },
-  { id: 'S80', title: 'Poród przed urlopem', topic: 'Niewykorzystana część przechodzi na po porodzie' },
-  { id: 'S84', title: 'Umowa na czas określony w ciąży', topic: 'Przedłużenie do dnia porodu' },
-]
-
 /** Plans from the goal (F8) as they will come from the decision tree. Shapes only, no numbers. */
 export interface GoalPlan {
   id: string

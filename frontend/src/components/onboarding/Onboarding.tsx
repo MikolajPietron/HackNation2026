@@ -13,6 +13,7 @@ import mama from '@/assets/onboarding/mama.webp'
 import noworodek from '@/assets/onboarding/noworodek.webp'
 import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
 import parasol from '@/assets/onboarding/parasol.webp'
+import przyjecie from '@/assets/onboarding/przyjecie.webp'
 import serce from '@/assets/onboarding/serce.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
@@ -434,7 +435,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
         choose({ born, takenIn: null, date: same(born) ? answers.date : '' })
       screen = (
         <Question title="Czy dziecko jest już na świecie?">
-          <Cards label="Czy dziecko jest już na świecie?">
+          <Cards label="Czy dziecko jest już na świecie?" three>
             <ImageChoice
               image={lozeczko}
               label="Czekamy na nie"
@@ -449,17 +450,18 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
               {...pick(same(true))}
               onSelect={() => pickBorn(true)}
             />
+            {/* Guide section D: a child taken in for upbringing. On phones the third card takes
+                the whole row, with a smaller picture, so the step still fits the screen. */}
+            <ImageChoice
+              image={przyjecie}
+              label="Przyjmujemy dziecko"
+              hint="Adopcja albo rodzina zastępcza"
+              selected={answers.takenIn !== null}
+              dimmed={leaving && answers.takenIn === null}
+              onSelect={() => !leaving && go('kind')}
+              className="col-span-2 sm:col-span-1 [&_img]:max-h-[16vh] sm:[&_img]:max-h-[34vh]"
+            />
           </Cards>
-          {/* Guide section D: rarer, so a link instead of a third card. */}
-          <motion.div variants={ITEM} className="mt-8 flex h-11 justify-center">
-            <button
-              type="button"
-              onClick={() => !leaving && go('kind')}
-              className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
-            >
-              Przyjmujemy dziecko na wychowanie (adopcja, rodzina zastępcza)
-            </button>
-          </motion.div>
         </Question>
       )
       break
@@ -1034,14 +1036,25 @@ function Question({
   )
 }
 
-function Cards({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+function Cards({
+  label,
+  wide,
+  three,
+  children,
+}: {
+  label: string
+  wide?: boolean
+  /** Three cards side by side from `sm`; on phones two, and the third under them. */
+  three?: boolean
+  children: ReactNode
+}) {
   return (
     <div
       role="radiogroup"
       aria-label={label}
       className={cn(
         'mx-auto grid w-full grid-cols-2 gap-3 sm:gap-6',
-        wide ? 'max-w-5xl lg:grid-cols-4' : 'max-w-3xl',
+        wide ? 'max-w-5xl lg:grid-cols-4' : three ? 'max-w-5xl sm:grid-cols-3' : 'max-w-3xl',
       )}
     >
       {children}

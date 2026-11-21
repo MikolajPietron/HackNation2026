@@ -15,7 +15,7 @@ import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { MobileBar } from '@/components/layout/MobileBar'
 import { TopBar } from '@/components/layout/TopBar'
-import { CasesDialog } from '@/components/mocks/Cases'
+import { CasesDialog } from '@/components/cases/CasesDialog'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
@@ -30,7 +30,7 @@ import { nextQuestion } from '@/lib/interview'
 import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
-import type { InterviewQuestion, Scenario, Timeline } from '@/types'
+import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
 import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
@@ -71,6 +71,8 @@ interface Props {
   onSend: (text: string) => void
   onStop: () => void
   onStartOver: () => void
+  /** An example case became the plan (a new conversation from its facts). */
+  onLoadCase: (start: SessionStart) => void
 }
 
 export function PlanScreen({
@@ -85,6 +87,7 @@ export function PlanScreen({
   onSend,
   onStop,
   onStartOver,
+  onLoadCase,
 }: Props) {
   const wide = useMediaQuery(WIDE)
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia(WIDE).matches)
@@ -364,7 +367,7 @@ export function PlanScreen({
         }}
       />
       <ZusDataDialog persona={persona} open={zusOpen} onClose={() => setZusOpen(false)} onMock={showMock} />
-      <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onMock={showMock} />
+      <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
 
       <AnimatePresence>
         {mock && (

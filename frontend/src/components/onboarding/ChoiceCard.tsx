@@ -25,7 +25,15 @@ const CARD = cn(
 )
 
 /** A large card with an illustration. */
-export function ImageChoice({ image, label, hint, selected, dimmed, onSelect }: ChoiceProps & { image: string }) {
+export function ImageChoice({
+  image,
+  label,
+  hint,
+  selected,
+  dimmed,
+  onSelect,
+  className,
+}: ChoiceProps & { image: string; className?: string }) {
   return (
     <motion.button
       type="button"
@@ -40,6 +48,7 @@ export function ImageChoice({ image, label, hint, selected, dimmed, onSelect }: 
         selected
           ? 'border-zus-600 bg-zus-50 shadow-[0_0_0_1px_var(--color-zus-600)]'
           : 'border-line hover:border-navy-200 hover:shadow-card',
+        className,
       )}
     >
       <span

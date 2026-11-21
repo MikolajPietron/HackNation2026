@@ -1,10 +1,14 @@
 import type {
   AdminView,
+  CaseFacts,
+  CaseList,
+  CaseResult,
   ChatEvent,
   ChatRequest,
   OnboardingAnswers,
   ParamPreview,
   ParamValues,
+  Scenario,
   SessionStart,
   SessionView,
 } from './types'
@@ -126,3 +130,39 @@ async function errorDetail(response: Response): Promise<string> {
   }
   return `Serwer odpowiedział błędem ${response.status}.`
 }
+
+// ---------------------------------------------------------------------------------------------
+// Example cases from ZUS
+
+/** The catalogue S01–S86: ids and categories (file names stay on the server). */
+export const fetchCases = () => requestJson<CaseList>('/api/cases')
+
+/** Read a catalogue case with AI (the first time; then it comes from the server's memory). */
+export const readCase = (id: string, signal?: AbortSignal) =>
+  requestJson<CaseResult>(`/api/cases/${id}/read`, { method: 'POST', signal })
+
+/** Read an uploaded PDF or photo of a case the same way. */
+export async function uploadCase(file: File, signal?: AbortSignal): Promise<CaseResult> {
+  const body = new FormData()
+  body.append('file', file)
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}/api/cases/upload`, { method: 'POST', body, signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new Error(OFFLINE)
+  }
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as CaseResult
+}
+
+/** Recalculate after the facts were corrected by hand (no AI). */
+export const assessCase = (body: { id: string | null; pages: number; pages_read: number; facts: CaseFacts }) =>
+  requestJson<CaseResult>('/api/cases/assess', { method: 'POST', body: JSON.stringify(body) })
+
+/** The case becomes the plan: a new conversation from its facts. */
+export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
+  requestJson<SessionStart>(`/api/cases/session/${sessionId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ scenario }),
+  })

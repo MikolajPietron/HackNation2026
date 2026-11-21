@@ -48,16 +48,23 @@ const BREAK = 172
 const FAR_AFTER_DAYS = 120
 const LABEL_WIDTH = 120
 const RULER_HEIGHT = 44
-/** Every track is the same height, like tracks in a video editor. */
+/** The height of a track; a track whose flags need more rows grows by a row each. */
 const ROW_HEIGHT = 84
 /** A row of flags; an event chip (40 px) and a hint chip (30 px) are centred in it. */
-const FLAG_ROW = 40
 const FLAG_EVENT_HEIGHT = 40
 const FLAG_HINT_HEIGHT = 30
-/** At most two rows of flags fit in a track. */
-const MAX_FLAG_ROWS = 2
+/** Space between two rows of flags, and above and below them in a grown track. */
+const FLAG_GAP = 6
+const FLAG_ROW = FLAG_EVENT_HEIGHT + FLAG_GAP
+const TRACK_PAD = 10
+/** Space kept between two flags in one row. */
+const FLAG_SPACE = 8
+/** A chip right of its day starts this far before it, so its round edge sits on the day. */
+const FLAG_HANG = 6
 const CLIP_HEIGHT = 46
 const CLIP_TOP = (ROW_HEIGHT - CLIP_HEIGHT) / 2
+/** Heights in the tracks follow the text size ("Większy tekst" scales rem), like the chips. */
+const rem = (px: number) => `${px / 16}rem`
 const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const ZOOM_STEP = 1.6
@@ -115,26 +122,37 @@ interface PlacedFlag extends Flag {
   side: 'right' | 'left'
 }
 
-const flagWidth = (flag: Flag) => (flag.key ? flag.text.length * 7.6 + 64 : flag.text.length * 6.7 + 48)
+/** A guess at a chip's width, until it is on screen and measured. */
+const estimatedWidth = (flag: Flag) =>
+  flag.key ? flag.text.length * 7.6 + 64 : flag.text.length * 6.7 + 48
 
-/** Flags of one track in as few rows as possible, without overlapping. */
-function placeFlags(flags: Flag[], x: (day: number) => number, width: number): PlacedFlag[] {
+/**
+ * Flags of one track without overlapping: each takes the first row where it fits, and a flag
+ * that fits in none starts a new row, so the track grows instead of hiding a flag under another.
+ */
+function placeFlags(
+  flags: Flag[],
+  x: (day: number) => number,
+  width: number,
+  measured: Record<string, number>,
+): PlacedFlag[] {
+  const spans = flags.map((flag) => {
+    const w = measured[flag.id] ?? estimatedWidth(flag)
+    const px = (x(flag.day) / 100) * width
+    // A chip hangs right of its day; near the end of the track it hangs left.
+    const side: PlacedFlag['side'] = px + w > width ? 'left' : 'right'
+    const start = side === 'right' ? px - FLAG_HANG : px - w
+    return { flag, side, start, end: start + w }
+  })
+  // By where they start on screen, so the first row that fits is enough (interval packing).
+  spans.sort((a, b) => a.start - b.start || a.flag.day - b.flag.day)
   const rowEnds: number[] = []
-  return [...flags]
-    .sort((a, b) => a.day - b.day)
-    .map((flag) => {
-      const w = flagWidth(flag)
-      const px = (x(flag.day) / 100) * width
-      const side = px + w > width ? 'left' : 'right'
-      const start = side === 'right' ? px : px - w
-      let row = rowEnds.findIndex((end) => start > end + 8)
-      if (row === -1) {
-        row =
-          rowEnds.length < MAX_FLAG_ROWS ? rowEnds.length : rowEnds.indexOf(Math.min(...rowEnds))
-      }
-      rowEnds[row] = start + w
-      return { ...flag, row, side }
-    })
+  return spans.map(({ flag, side, start, end }) => {
+    let row = rowEnds.findIndex((rowEnd) => start >= rowEnd + FLAG_SPACE)
+    if (row === -1) row = rowEnds.length
+    rowEnds[row] = end
+    return { ...flag, row, side }
+  })
 }
 
 /** How a clip is labelled: inside if it fits, else beside it, else just its length. */
@@ -217,6 +235,36 @@ export function PlanTimeline({
   const [scrubbing, setScrubbing] = useState(false)
   const previous = useRef<Segment[] | null>(null)
   const [shadow, setShadow] = useState<{ segments: Segment[]; key: number } | null>(null)
+
+  // The real width of every flag chip, so rows are packed by what is on screen (the text size
+  // can change), not by a guess.
+  const [chipWidths, setChipWidths] = useState<Record<string, number>>({})
+  const [chipObserver] = useState(
+    () =>
+      new ResizeObserver((entries) =>
+        setChipWidths((current) => {
+          let next = current
+          for (const entry of entries) {
+            const element = entry.target as HTMLElement
+            const id = element.dataset.flag
+            const w = element.offsetWidth
+            if (!id || w === 0 || current[id] === w) continue
+            if (next === current) next = { ...current }
+            next[id] = w
+          }
+          return next
+        }),
+      ),
+  )
+  useEffect(() => () => chipObserver.disconnect(), [chipObserver])
+  const measureChip = useCallback(
+    (element: HTMLElement | null) => {
+      if (!element) return
+      chipObserver.observe(element)
+      return () => chipObserver.unobserve(element)
+    },
+    [chipObserver],
+  )
 
   const today = dayNumber(timeline.today)
   const [playhead, setPlayhead] = useState(today)
@@ -682,13 +730,17 @@ export function PlanTimeline({
           </div>
 
           {lanes.map((lane, laneIndex) => {
-            const placed = placeFlags(flags[lane], x, width)
-            const rows = placed.reduce((n, f) => Math.max(n, f.row + 1), 0)
+            const placed = placeFlags(flags[lane], x, width, chipWidths)
+            const rows = Math.max(1, placed.reduce((n, f) => Math.max(n, f.row + 1), 0))
             const sorted = sortedIn(lane)
-            // Rows of fixed height, centred in the track; a chip is centred in its row.
-            const firstRow = (ROW_HEIGHT - Math.max(1, rows) * FLAG_ROW) / 2
+            // Rows stacked one under another, centred in the track; a chip is centred in its row.
+            const stack = rows * FLAG_ROW - FLAG_GAP
+            const trackHeight = Math.max(ROW_HEIGHT, stack + 2 * TRACK_PAD)
+            const firstRow = (trackHeight - stack) / 2
             const flagTop = (row: number, key: boolean) =>
-              firstRow + row * FLAG_ROW + (FLAG_ROW - (key ? FLAG_EVENT_HEIGHT : FLAG_HINT_HEIGHT)) / 2
+              firstRow +
+              row * FLAG_ROW +
+              (FLAG_EVENT_HEIGHT - (key ? FLAG_EVENT_HEIGHT : FLAG_HINT_HEIGHT)) / 2
             // Labels beside clips take the room in order, so two never claim the same gap.
             let taken = EDGE
             const labels = sorted.map((s, index) => {
@@ -709,12 +761,13 @@ export function PlanTimeline({
                   <span className="text-sm font-bold text-navy-900">{LANES[lane].label}</span>
                 </div>
                 <div
-                  className="relative border-b border-line"
-                  style={{ gridColumn: 2, gridRow: laneIndex + 2, height: ROW_HEIGHT }}
+                  className="relative border-b border-line transition-[height] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none"
+                  style={{ gridColumn: 2, gridRow: laneIndex + 2, height: rem(trackHeight) }}
                 >
                   {placed.map((flag) => (
                     <FlagChip
                       key={flag.id}
+                      measureRef={measureChip}
                       flag={flag}
                       x={x(flag.day)}
                       top={flagTop(flag.row, flag.key)}
@@ -743,7 +796,7 @@ export function PlanTimeline({
                             'absolute flex items-center justify-end rounded-xl pr-3 text-xs font-bold whitespace-nowrap',
                             WINDOW[parentOf(segment)],
                           )}
-                          style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${left}%`, width: `${right - left}%` }}
+                          style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${left}%`, width: `${right - left}%` }}
                         >
                           {px > 420 && <>w dowolnym czasie do {formatShortDate(deadline.date)}</>}
                         </button>
@@ -761,8 +814,8 @@ export function PlanTimeline({
                             transition={{ duration: 2.4, delay: 0.8, ease: 'easeIn' }}
                             className="absolute rounded-xl border-2 border-dashed border-navy-300"
                             style={{
-                              top: CLIP_TOP,
-                              height: CLIP_HEIGHT,
+                              top: rem(CLIP_TOP),
+                              height: rem(CLIP_HEIGHT),
                               left: `${x(dayNumber(s.start))}%`,
                               width: `${x(dayNumber(s.end) + 1) - x(dayNumber(s.start))}%`,
                             }}
@@ -804,7 +857,7 @@ export function PlanTimeline({
                               outside.side === 'right' ? 'pl-2.5' : '-translate-x-full pr-2.5',
                               s.lane === 'father' ? 'text-navy-700 hover:text-navy-900' : 'text-zus-700 hover:text-zus-900',
                             )}
-                            style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${edge}%` }}
+                            style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${edge}%` }}
                           >
                             {outside.text}
                           </button>
@@ -856,6 +909,7 @@ function FlagChip({
   active,
   onClick,
   onHover,
+  measureRef,
 }: {
   flag: PlacedFlag
   x: number
@@ -863,10 +917,13 @@ function FlagChip({
   active: boolean
   onClick: () => void
   onHover: (on: boolean) => void
+  measureRef: (element: HTMLElement | null) => void
 }) {
   const document = flag.kind === 'document'
   return (
     <motion.button
+      ref={measureRef}
+      data-flag={flag.id}
       type="button"
       onClick={onClick}
       onMouseEnter={() => onHover(true)}
@@ -876,15 +933,16 @@ function FlagChip({
       transition={{ duration: 0.3, delay: 0.5 }}
       className={cn(
         'absolute z-20 flex items-center rounded-full border whitespace-nowrap',
-        'transition-[border-color,background-color] duration-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+        // A flag that moves to another row (after a recalculation or zoom) slides there.
+        'transition-[top,border-color,background-color] duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
         flag.side === 'left' ? '-translate-x-full' : '-translate-x-[6px]',
         flag.key
           ? 'h-10 gap-2 border-sun-300 bg-sun-100/70 pr-4 pl-0.5 text-sm font-bold text-navy-900'
-          : 'h-[30px] gap-1.5 border-line bg-white pr-3 pl-1 text-xs font-bold text-navy-700',
+          : 'h-7.5 gap-1.5 border-line bg-white pr-3 pl-1 text-xs font-bold text-navy-700',
         document && flag.done && 'border-zus-200 text-zus-700',
         active && (flag.key ? 'bg-sun-100' : 'border-sun-300 bg-sun-100/60'),
       )}
-      style={{ top, left: `${x}%` }}
+      style={{ top: rem(top), left: `${x}%` }}
     >
       <Illustration src={flag.icon} size={flag.key ? 'event' : 'hint'} className={flag.key ? 'bg-white' : ''} />
       {flag.text}
@@ -945,7 +1003,7 @@ function Clip({
         joinRight && 'rounded-r-none',
         active && 'ring-2 ring-navy-900/25 ring-offset-2 brightness-[0.96]',
       )}
-      style={{ top: CLIP_TOP, height: CLIP_HEIGHT, left: `${left}%`, width: `${span}%` }}
+      style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${left}%`, width: `${span}%` }}
     >
       {changed && (
         <motion.span

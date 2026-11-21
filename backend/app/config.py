@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     llm_thinking: ThinkingLevel | None = None
     """Thinking effort; unset = the model's default (adaptive thinking on Claude Opus 5.5)."""
 
+    # Example cases from ZUS (scanned PDFs, confidential, never in git): the folder they are in,
+    # and where the facts read from them are kept. Empty = docs/dokumentyZUS/sprawy.
+    cases_dir: str = ""
+    cases_cache_dir: str = ".cases_cache"
+    cases_model: str = ""
+    """The model that reads the scans. Empty = Claude Opus 5.5 of the provider, whatever
+    LLM_MODEL the chat uses: the team agreed to send the cases to Claude only."""
+
     # Frontend origins allowed to call the API.
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
@@ -42,6 +50,10 @@ class Settings(BaseSettings):
     @property
     def llm_model_name(self) -> str:
         return self.llm_model or DEFAULT_MODELS[self.llm_provider]
+
+    @property
+    def cases_model_name(self) -> str:
+        return self.cases_model or DEFAULT_MODELS[self.llm_provider]
 
 
 @lru_cache
