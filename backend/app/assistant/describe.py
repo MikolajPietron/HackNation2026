@@ -176,7 +176,9 @@ def interview_questions(scenario: Scenario) -> list[Question]:
     if insured:
         questions += _hospital_questions(scenario)
     # The father's rights do not depend on the mother's insurance.
-    return questions + _father_questions(scenario)
+    questions += _father_questions(scenario)
+    # Applications and protection (guide A.4, I): who pays decides where the request goes.
+    return questions + _payer_questions(scenario)
 
 
 def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
@@ -286,6 +288,50 @@ def _father_questions(scenario: Scenario) -> list[Question]:
             ]
         case _:
             return []
+
+
+def _payer_questions(scenario: Scenario) -> list[Question]:
+    """Whether the employer (or the principal of a contract of mandate) reports more than 20
+    people to sickness insurance: it then pays the benefit itself, otherwise ZUS does (guide
+    page 1, footnote 1). Never for a business: ZAM goes straight to ZUS. For the father only
+    once his leave can be on the timeline (the number of children is known)."""
+    asked = [
+        (
+            "mother",
+            scenario.mother_payer_size,
+            scenario.mothers_work,
+            coverage(scenario) not in NOT_INSURED,
+        ),
+        (
+            "father",
+            scenario.father_payer_size,
+            scenario.fathers_work,
+            father_coverage(scenario) not in NOT_INSURED and scenario.children_count is not None,
+        ),
+    ]
+    questions = []
+    for parent, size, work, relevant in asked:
+        if size is not None or work not in ("employment", "contract") or not relevant:
+            continue
+        own = scenario.role == parent
+        whose = "mamy" if parent == "mother" else "taty"
+        if work == "employment":
+            who = "Twój pracodawca" if own else f"pracodawca {whose}"
+        else:
+            who = (
+                "płatnik składek z Twojej umowy zlecenia (zleceniodawca)"
+                if own
+                else f"płatnik składek z umowy zlecenia {whose} (zleceniodawca)"
+            )
+        questions.append(
+            Question(
+                f"Czy {who} zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Od tego "
+                "zależy, czy zasiłek wypłaci on, czy ZUS. Możesz też odpowiedzieć, że nie wiesz.",
+                f'`set_payer_size` (parent: "{parent}")',
+                f"{parent}-payer",
+            )
+        )
+    return questions
 
 
 def describe_interview(scenario: Scenario) -> str:

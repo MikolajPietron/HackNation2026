@@ -1,6 +1,6 @@
 {
-  "version": "2026.5",
-  "description": "Sekcja A (fazy 1–3) i sekcja B: Przewodnik ZUS, sekcja A (s. 5–6): „Przygotowanie do porodu” i „Urodzenie dziecka” oraz „Szczególna sytuacja” — martwe urodzenie lub zgon dziecka (prawo ubezpieczonej mamy do zasiłku, wymiar urlopu macierzyńskiego, 14 tygodni po porodzie, uzupełniający urlop macierzyński, urlop rodzicielski, „Za życiem”) z fragmentami s. 3–4, 7, 8 i 10, na których ten punkt się opiera; sekcja B (s. 7–8): uprawnienia ojca; Kodeks pracy art. 180 (także § 4–14), 180¹, 180², 182¹ᵃ, 182¹ᶜ, 182¹ᵍ, 182³ i 183¹. Każda liczba i reguła ma dosłowny cytat (z literówkami oryginału Przewodnika).",
+  "version": "2026.6",
+  "description": "Sekcja A (fazy 1–3) i sekcja B: Przewodnik ZUS, sekcja A (s. 5–6): „Przygotowanie do porodu” i „Urodzenie dziecka” oraz „Szczególna sytuacja” — martwe urodzenie lub zgon dziecka (prawo ubezpieczonej mamy do zasiłku, wymiar urlopu macierzyńskiego, 14 tygodni po porodzie, uzupełniający urlop macierzyński, urlop rodzicielski, „Za życiem”) z fragmentami s. 3–4, 7, 8 i 10, na których ten punkt się opiera; sekcja B (s. 7–8): uprawnienia ojca; dokumenty i wnioski (s. 6), kto wypłaca zasiłek (s. 1, przypis 1), formularze (s. 12) i szczególna ochrona (s. 10); Kodeks pracy art. 177, 180 (także § 4–16), 180¹, 180², 182¹ᵃ, 182¹ᶜ, 182¹ᵈ, 182¹ᵍ, 182³ i 183¹. Każda liczba i reguła ma dosłowny cytat (z literówkami oryginału Przewodnika).",
   "maternity": {
     "max_weeks_before_birth": {
       "value": 6,
@@ -807,6 +807,278 @@
           "doc": "kp",
           "article": "art. 180 § 3",
           "quote": "Po porodzie przysługuje urlop macierzyński niewykorzystany przed porodem aż do wyczerpania wymiaru, o którym mowa w § 1."
+        }
+      ]
+    }
+  },
+  "applications": {
+    "paid_by_payer_or_zus": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "W",
+          "page": 1,
+          "quote": "zasiłki są wypłacane przez płatników składek"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "W",
+          "page": 1,
+          "quote": "prawo do zasiłków określonych w ustawie i ich wysokość ustalają oraz zasiłki te wypłacają płatnicy składek na ubezpieczenie chorobowe, którzy zgłaszają do ubezpieczenia chorobowego powyżej 20 ubezpieczonych."
+        }
+      ]
+    },
+    "payer_more_than_insured": {
+      "value": 20,
+      "note": "Płatnik składek sam wypłaca zasiłki, gdy zgłasza do ubezpieczenia chorobowego więcej niż tyle osób; w pozostałych przypadkach zasiłek wypłaca ZUS.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "W",
+          "page": 1,
+          "quote": "płatnicy składek na ubezpieczenie chorobowe, którzy zgłaszają do ubezpieczenia chorobowego powyżej 20 ubezpieczonych."
+        }
+      ]
+    },
+    "payer_count_day": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "W",
+          "page": 1,
+          "quote": "Liczbę ubezpieczonych, ustala się według stanu na dzień 30 listopada poprzedniego roku kalendarzowego"
+        }
+      ]
+    },
+    "employee_request": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "Kobieta będąca pracownikiem występuje do pracodawcy z wnioskiem o udzielnie urlopu macierzyńskiego"
+        }
+      ]
+    },
+    "one_request": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "jeżeli planuje skorzystanie bezpośrednio po nim z urlopu rodzicielskiego, to może złożyć jeden wniosek."
+        }
+      ]
+    },
+    "employer_pays_or_z3": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "Na podstawie tego wniosku uprawniony pracodawca ustala uprawnienia do zasiłku macierzyńskiego i go wypłaca, albo występuje do ZUS z wnioskiem o ustalanie uprawnień (przesyła Zaświadczenie płatnika składek Z-3 do ZUS)"
+        }
+      ]
+    },
+    "non_employee_zam": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "Kobieta, która nie jest pracownikiem powinna złożyć wniosek o zasiłek macierzyński bezpośrednio do ZUS (wniosek o zasiłek macierzyński ZAM)"
+        }
+      ]
+    },
+    "contract_zam": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "Uprawnienia do zasiłku macierzyńskiego kobiecie, która wykonuje pracę na podstawie umowy zlecenia ustali odpowiednio uprawniony do wypłaty zasiłku płatnik składek albo ZUS (w tym celu powinna złożyć dokument ZAM, a do ZUS płatnik składek przesyła Zaświadczenie płatnika składek Z-3a)"
+        }
+      ]
+    },
+    "attachments": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.4",
+          "page": 6,
+          "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+        }
+      ]
+    },
+    "zam_form": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "ZAM – wniosek o zasiłek macierzyński za okres urlopu macierzyńskiego, urlopu rodzicielskiego"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Formularz ZUR od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+        },
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Formularz ZAO od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+        }
+      ]
+    },
+    "parental_days_before": {
+      "value": 21,
+      "note": "Wniosek o urlop rodzicielski: najpóźniej tyle dni przed jego rozpoczęciem.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵈ § 1",
+          "quote": "Urlop rodzicielski jest udzielany na wniosek w postaci papierowej lub elektronicznej składany przez pracownika rodzica dziecka w terminie nie krótszym niż 21 dni przed rozpoczęciem korzystania z urlopu."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵈ § 1",
+          "quote": "Pracodawca jest obowiązany uwzględnić wniosek pracownika."
+        }
+      ]
+    },
+    "supplementary_days_before_end": {
+      "value": 21,
+      "note": "Wniosek o uzupełniający urlop macierzyński: najpóźniej tyle dni przed końcem urlopu macierzyńskiego.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 4",
+          "quote": "Uzupełniający urlop macierzyński jest udzielany jednorazowo na wniosek składany w postaci papierowej lub elektronicznej przez pracownicę albo pracownika - ojca wychowującego dziecko w terminie nie krótszym niż 21 dni przed zakończeniem korzystania z urlopu macierzyńskiego. Pracodawca jest obowiązany uwzględnić wniosek."
+        }
+      ]
+    },
+    "supplementary_hospital_certificate": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 5",
+          "quote": "Do wniosku dołącza się zaświadczenie wydane przez szpital, w którym przebywało dziecko"
+        }
+      ]
+    },
+    "paternity_days_before": {
+      "value": 7,
+      "note": "Wniosek o urlop ojcowski: najpóźniej tyle dni przed jego rozpoczęciem.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182³ § 2",
+          "quote": "Urlop ojcowski jest udzielany na wniosek w postaci papierowej lub elektronicznej składany przez pracownika ojca w terminie nie krótszym niż 7 dni przed rozpoczęciem korzystania z urlopu."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182³ § 2",
+          "quote": "Pracodawca jest obowiązany uwzględnić wniosek pracownika."
+        }
+      ]
+    },
+    "father_maternity_days_before": {
+      "value": 14,
+      "note": "Wniosek taty o część urlopu macierzyńskiego (przejęcie po 14 tygodniach, orzeczenie mamy): najpóźniej tyle dni przed jej rozpoczęciem.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180 § 9",
+          "quote": "Części urlopu macierzyńskiego, o której mowa w § 4 pkt 1, § 5, § 6 pkt 1 i § 7, pracodawca udziela, odpowiednio, pracownikowi - ojcu wychowującemu dziecko albo pracownikowi - innemu członkowi najbliższej rodziny, na wniosek w postaci papierowej lub elektronicznej składany w terminie nie krótszym niż 14 dni przed rozpoczęciem korzystania z części urlopu."
+        }
+      ]
+    },
+    "father_maternity_on_request": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180 § 16",
+          "quote": "W okolicznościach, o których mowa w § 10 pkt 1 i § 11-13 i 15, części urlopu macierzyńskiego udziela się na wniosek składany w postaci papierowej lub elektronicznej przez pracownika - ojca wychowującego dziecko albo pracownika - innego członka najbliższej rodziny."
+        }
+      ]
+    },
+    "resignation_days_before": {
+      "value": 7,
+      "note": "Wniosek mamy o rezygnację z dalszej części urlopu macierzyńskiego: najpóźniej tyle dni przed powrotem do pracy.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180 § 8",
+          "quote": "W przypadkach, o których mowa w § 4 i 6, pracownica składa pracodawcy wniosek w postaci papierowej lub elektronicznej w sprawie rezygnacji z korzystania z części urlopu macierzyńskiego w terminie nie krótszym niż 7 dni przed przystąpieniem do pracy."
+        }
+      ]
+    },
+    "protection": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "I",
+          "page": 10,
+          "quote": "W okresie ciąży oraz w okresie urlopu macierzyńskiego, a także od dnia złożenia przez pracownicę lub pracownika wniosku o udzielenie urlopu macierzyńskiego albo jego części, urlopu na warunkach urlopu macierzyńskiego albo jego części, uzupełniającego urlopu macierzyńskiego, urlopu ojcowskiego albo jego części, urlopu rodzicielskiego albo jego części – do dnia zakończenia tego urlopu pracodawca nie może:"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "I",
+          "page": 10,
+          "quote": "prowadzić przygotowań do wypowiedzenia lub rozwiązania bez wypowiedzenia stosunku pracy z tą pracownicą lub tym pracownikiem;"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "I",
+          "page": 10,
+          "quote": "wypowiedzieć ani rozwiązać stosunku pracy z tą pracownicą lub tym pracownikiem, chyba że zachodzą przyczyny uzasadniające rozwiązanie umowy bez wypowiedzenia z ich winy i reprezentująca tę pracownicę lub tego pracownika zakładowa organizacja związkowa wyraziła zgodę na rozwiązanie umowy."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 177 § 1",
+          "quote": "W okresie ciąży oraz w okresie urlopu macierzyńskiego, a także od dnia złożenia przez pracownicę lub pracownika wniosku o udzielenie urlopu macierzyńskiego albo jego części"
+        }
+      ]
+    },
+    "protection_early_request_days": {
+      "value": [
+        14,
+        21,
+        7
+      ],
+      "note": "Wniosek złożony wcześniej niż w terminie z Kodeksu pracy: zakaz zaczyna obowiązywać tyle dni przed częścią urlopu macierzyńskiego, urlopem uzupełniającym albo rodzicielskim, urlopem ojcowskim.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 177 § 1¹",
+          "quote": "W przypadku złożenia wniosku, o którym mowa w § 1, wcześniej niż w terminach określonych w art. 180 § 9, art. 180² § 4, art. 182¹ᵈ § 1, art. 182³ § 2 oraz art. 183 § 6 zakaz, o którym mowa w § 1, zaczyna obowiązywać na: 1) 14 dni przed rozpoczęciem korzystania z części urlopu macierzyńskiego oraz części urlopu na warunkach urlopu macierzyńskiego; 2) 21 dni przed rozpoczęciem korzystania z uzupełniającego urlopu macierzyńskiego oraz urlopu rodzicielskiego albo jego części; 3) 7 dni przed rozpoczęciem korzystania z urlopu ojcowskiego albo jego części."
+        }
+      ]
+    },
+    "fixed_term_extended": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "I",
+          "page": 10,
+          "quote": "Umowa o pracę zawarta na czas określony albo na okres próbny przekraczający jeden miesiąc, która uległaby rozwiązaniu po upływie trzeciego miesiąca ciąży, ulega przedłużeniu do dnia porodu."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 177 § 3",
+          "quote": "Umowa o pracę zawarta na czas określony albo na okres próbny przekraczający jeden miesiąc, która uległaby rozwiązaniu po upływie trzeciego miesiąca ciąży, ulega przedłużeniu do dnia porodu."
+        }
+      ]
+    },
+    "protection_employees_only": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "I",
+          "page": 10,
+          "quote": "Szczególna ochrona o której mowa w Kodeksie Pracy nie dotyczy osób, które nie są pracownikami albo do których nie stosuje się przepisów Kodeksu pracy np. prowadzących pozarolniczą działalność."
         }
       ]
     }

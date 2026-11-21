@@ -93,6 +93,12 @@ class ScenarioError(ValueError):
     """The scenario breaks a rule. Polish message, shown to the parent or the assistant."""
 
 
+PayerSize = Literal["over-20", "up-to-20", "unknown"]
+"""How many people the payer of contributions (the employer, or the principal of a contract of
+mandate) reports to sickness insurance: more than 20 = it pays the benefit itself, otherwise ZUS
+does (guide page 1, footnote 1). "unknown" = the parent does not know."""
+
+
 class Scenario(BaseModel):
     """What the onboarding and the interview have established. None = not known yet."""
 
@@ -150,6 +156,13 @@ class Scenario(BaseModel):
     mother_weeks_before_takeover: int | None = Field(default=None, ge=1)
     """Weeks after the birth the mother uses before the father takes over (default 14)."""
     mother_event: MotherEvent | None = None
+
+    # Applications and protection (guide A.4, I)
+    mother_payer_size: PayerSize | None = None
+    """The mother's employer (or principal): does it report more than 20 people? None = not
+    asked yet. Not asked for a business: the mother files ZAM straight with ZUS."""
+    father_payer_size: PayerSize | None = None
+    """The same for the father's employer (or principal)."""
 
     @property
     def anchor_date(self) -> dt.date | None:

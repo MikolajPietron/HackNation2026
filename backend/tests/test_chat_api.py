@@ -334,11 +334,13 @@ def test_the_assistant_reacts_to_what_an_answer_changed(client: TestClient) -> N
     out = ask(client, model, "Sześć tygodni przed porodem")
 
     timeline = next(e for e in out if e["type"] == "timeline")
-    assert timeline["changed_notes"] == ["before-birth", "computed"]
+    # The leave starts earlier: the protection ends earlier, the requests are due earlier.
+    assert timeline["changed_notes"] == ["before-birth", "computed", "protection", "applications"]
     assert (
         "Zmienione punkty wyjaśnienia: „Urlop od 1 lutego 2027, 6 tyg. przed przewidywaną datą "
         "porodu”, "
-        "„Co policzyliśmy”. Omów teraz tylko je" in returned[0]
+        "„Co policzyliśmy”, „Ochrona przed zwolnieniem”, „Co złożyć i do kiedy”. Omów teraz "
+        "tylko je" in returned[0]
     )
     assert (
         "„Czy masz już zaświadczenie lekarskie o przewidywanej dacie porodu?” Gdy użytkownik "
@@ -360,7 +362,8 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
     update = next(e for e in ask(client, model, "Mama ma zlecenie") if e["type"] == "timeline")
     assert update["scenario"]["mother_work"] == "contract"
     assert update["scenario"]["work"] == "employment"  # the father's own answer stays his
-    assert update["changed_notes"] == ["insurance"]
+    # Also: no special protection for her, who pays her benefit, her ZAM (guide A.4, I).
+    assert update["changed_notes"] == ["insurance", "protection", "payer", "applications"]
     assert "„Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego" in returned[0]
 
     update = timeline_after(client, "set_voluntary_insurance", {"registered": False})
@@ -378,6 +381,9 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
         "risk",
         "right",
         "computed",
+        "right",  # the employed father's protection
+        "computed",  # who pays his benefit
+        "computed",  # his requests
     ]
     assert update["focus"] == "due-date"
 
@@ -389,7 +395,11 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
 
     app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
     events(client.post("/api/chat", json={"session_id": SESSION, "message": "Dziękuję"}))
-    assert "Wywiad: wszystko ustalone." in seen[0]
+    # Only who pays the father's benefit is left (the mother has none).
+    assert (
+        "„Czy Twój pracodawca zgłasza do ubezpieczenia chorobowego więcej niż 20 osób?" in (seen[0])
+    )
+    assert "pracodawca mamy" not in seen[0]
 
     # She registers after all: the timeline is back.
     update = timeline_after(client, "set_voluntary_insurance", {"registered": True})
@@ -522,6 +532,12 @@ FATHER_INSURED = (
 FATHER_INSURED_HIMSELF = (
     "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłacasz składkę chorobową)?"
 )
+PAYER = (
+    " zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Od tego zależy, czy zasiłek "
+    "wypłaci on, czy ZUS. Możesz też odpowiedzieć, że nie wiesz."
+)
+MOTHER_PAYER_HERSELF = f"Czy Twój pracodawca{PAYER}"
+FATHER_PAYER_CONTRACT = f"Czy płatnik składek z Twojej umowy zlecenia (zleceniodawca){PAYER}"
 
 
 def interview(returned: str) -> str:
@@ -566,7 +582,7 @@ def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
 
     returned.clear()
     ask(client, scripted("set_leave_before_birth", {"weeks": 0}, "Zapisane.", returned), "Nie")
-    assert interview(returned[0]) == next_question(FATHER_WORK, "`set_father_work`")
+    assert interview(returned[0]).startswith(next_question(FATHER_WORK, "`set_father_work`"))
 
     returned.clear()
     model = scripted("set_father_work", {"work": "contract"}, "Zlecenie.", returned)
@@ -574,13 +590,17 @@ def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
     scenario = update["scenario"]
     assert (scenario["father_work"], scenario["work"]) == ("contract", "employment")
     assert update["focus"] in ("paternity", "maternity")
-    assert interview(returned[0]) == next_question(FATHER_INSURED, "`set_father_insurance`")
+    assert interview(returned[0]).startswith(
+        next_question(FATHER_INSURED, "`set_father_insurance`")
+    )
 
     returned.clear()
     model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
     update = next(e for e in ask(client, model, "Tak, płaci") if e["type"] == "timeline")
     assert update["scenario"]["father_insured"] is True
-    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+    assert interview(returned[0]).startswith(
+        next_question(MOTHER_PAYER_HERSELF, '`set_payer_size` (parent: "mother")')
+    )
 
     # A new job: the voluntary insurance no longer applies.
     update = timeline_after(client, "set_father_work", {"work": "employment"})
@@ -617,13 +637,17 @@ def test_the_father_is_asked_about_even_when_the_mother_is_not_insured(
     client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "work": "contract"})
     returned: list[str] = []
     ask(client, scripted("set_mother_work", {"work": "none"}, "Rozumiem.", returned), "Nie")
-    assert interview(returned[0]) == next_question(FATHER_INSURED_HIMSELF, "`set_father_insurance`")
+    assert interview(returned[0]).startswith(
+        next_question(FATHER_INSURED_HIMSELF, "`set_father_insurance`")
+    )
 
     returned.clear()
     model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
     update = next(e for e in ask(client, model, "Tak") if e["type"] == "timeline")
     assert update["scenario"]["father_insured"] is True
-    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+    assert interview(returned[0]) == next_question(
+        FATHER_PAYER_CONTRACT, '`set_payer_size` (parent: "father")'
+    )
 
 
 def test_no_father_questions_once_no_child_lives(client: TestClient) -> None:
@@ -636,7 +660,7 @@ def test_no_father_questions_once_no_child_lives(client: TestClient) -> None:
     returned: list[str] = []
     model = scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "Przykro mi.", returned)
     ask(client, model, "Jedno z dzieci urodziło się martwe")
-    assert interview(returned[0]) == next_question(FATHER_WORK, "`set_father_work`")
+    assert interview(returned[0]).startswith(next_question(FATHER_WORK, "`set_father_work`"))
 
     returned.clear()
     losses = [{"stillborn": True}, {"stillborn": True}]
@@ -755,7 +779,7 @@ def test_the_fathers_leave_is_in_scope() -> None:
     )
     for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego"):
         assert in_scope_now not in out_of_scope
-    for still_out in ("kwoty zasiłku", "81,5%", "wnioski i ich terminy", "łączenie urlopu"):
+    for still_out in ("kwoty zasiłku", "81,5%", "łączenie urlopu"):
         assert still_out in out_of_scope
     assert "przysposobieniu dziecka i w rodzinie zastępczej" in out_of_scope
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
@@ -806,3 +830,78 @@ def test_a_birth_off_the_due_date_keeps_the_real_start_of_the_leave(
     segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
     assert segments.get("maternity-prenatal") == prenatal
     assert segments["maternity"] == (born, maternity_end)
+
+
+# Applications and protection (guide A.4, I).
+
+
+def test_who_pays_is_asked_last_and_recorded(client: TestClient, store: MemorySessionStore) -> None:
+    """After everything else the chat asks whether the employer reports more than 20 people to
+    sickness insurance (guide page 1, footnote 1); the answer says who pays. A father with his
+    own business is not asked: his ZAM goes straight to ZUS."""
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "father_work": "business",
+            "father_insured": True,
+            "child_born": False,
+            "due_date": "2027-03-15",
+            "children_count": 1,
+            "leave_before_birth_weeks": 0,
+        },
+    )
+    assert next_question(MOTHER_PAYER_HERSELF, '`set_payer_size` (parent: "mother")') in (
+        instructions_now(client)
+    )
+    returned: list[str] = []
+    model = scripted("set_payer_size", {"parent": "mother", "size": "over-20"}, "Jasne.", returned)
+    update = next(e for e in ask(client, model, "Tak, ponad 20") if e["type"] == "timeline")
+    assert update["scenario"]["mother_payer_size"] == "over-20"
+    assert update["focus"] == "maternity-request"
+    maternity = next(s for s in update["timeline"]["segments"] if s["id"] == "maternity")
+    assert maternity["details"][-1].startswith("Zasiłek mamy wypłaca jej pracodawca")
+    assert "payer" in update["changed_notes"]
+    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+    assert update["question"] is None
+
+    # "Nie wiem" is an answer too: not asked again.
+    update = timeline_after(client, "set_payer_size", {"parent": "mother", "size": "unknown"})
+    assert update["scenario"]["mother_payer_size"] == "unknown"
+    assert update["question"] is None
+
+
+def test_who_pays_is_not_asked_for_a_business(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "father_work": "business",
+            "due_date": "2027-03-15",
+        },
+    )
+    model = scripted("set_payer_size", {"parent": "father", "size": "over-20"}, "Dobrze.")
+    out = ask(client, model, "Tata ma ponad 20 pracowników")
+    assert rejected("set_payer_size") in out
+    assert not any(e["type"] == "timeline" for e in out)
+
+
+def test_the_ui_gets_the_payer_question(client: TestClient, store: MemorySessionStore) -> None:
+    remember(
+        store,
+        {
+            "role": "father",
+            "work": "contract",
+            "father_insured": True,
+            "mother_work": "none",
+            "child_born": False,
+            "due_date": "2027-03-15",
+            "children_count": 1,
+        },
+    )
+    restored = client.get(f"/api/session/{SESSION}").json()
+    assert restored["question"] == {"key": "father-payer", "text": FATHER_PAYER_CONTRACT}

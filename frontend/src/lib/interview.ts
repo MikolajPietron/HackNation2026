@@ -83,6 +83,9 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
       return ask(['Nie, urodziło się o czasie i nie było w szpitalu', 'Tak, było w szpitalu'])
     case 'leave-before-birth':
       return leaveBeforeBirth(scenario, asked.text)
+    case 'mother-payer':
+    case 'father-payer':
+      return ask(['Więcej niż 20 osób', '20 osób albo mniej', 'Nie wiem'])
     default:
       return ask([])
   }
