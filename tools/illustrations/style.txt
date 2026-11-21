@@ -1,0 +1,5 @@
+STYLE — match the attached reference icon (a pregnant woman) EXACTLY: same rendering, same uniform dark navy (#1A2438) outline weight, same flat fills with one subtle shadow tone per color, same minimal face (two small dot eyes, small subtle smile, no blush, no eyelashes, no nose detail), same simplified hair as one clean shape, same soft blurred grey drop shadow under the feet, same palette and same level of detail. The new icon must look like part of the same icon set. Minimalist and elegant, no texture, no glossy highlights, no gradients, smooth vector edges, NOT pixel art, NOT childish cartoon. Do not draw the woman from the reference.
+
+Palette (strict): mint #8CC5A2, deep green #007834, navy #283754, warm natural skin, small amber #FAB856 accents only. Nothing else.
+
+Composition: one single subject, centered, plain pure white background (#FFFFFF). No text, no letters, no frame, no other objects.

@@ -10,6 +10,14 @@ export function dayNumber(iso: string): number {
 
 const toDate = (day: number) => new Date(day * DAY_MS)
 
+/** Today in Poland as an ISO date (sv-SE formats as YYYY-MM-DD). */
+export const todayIso = () =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Warsaw' }).format(new Date())
+
+/** ISO date shifted by whole days. For input limits only. */
+export const addDaysIso = (iso: string, days: number) =>
+  toDate(dayNumber(iso) + days).toISOString().slice(0, 10)
+
 const shortFormat = new Intl.DateTimeFormat('pl-PL', {
   day: '2-digit',
   month: '2-digit',

@@ -31,13 +31,15 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
 - `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, Motion, lucide-react, react-markdown. Alias `@/` = `src/`.
   - `src/index.css` — tokeny motywu ZUS (`@theme`: kolory, cienie, animacje wejścia), font Lato.
   - `src/types.ts` — kopia modeli backendu i protokołu czatu (trzymaj w zgodzie z `engine/models.py` i `api/chat.py`); `src/api.ts` — `streamChat` (NDJSON).
-  - `src/hooks/useAssistant.ts` — stan rozmowy, przywracanie po odświeżeniu, `stop` i `reset`. `src/lib/session.ts` — identyfikator sesji w `localStorage`.
+  - `src/hooks/useAssistant.ts` — stan rozmowy, przywracanie po odświeżeniu, `stop`, `reset`, `calculate` i `load` (start od daty z onboardingu). `src/lib/session.ts` — identyfikator sesji w `localStorage`.
+  - `src/components/onboarding/` — pełnoekranowy start przed osią (`Onboarding.tsx`: kroki i nawigacja, `Calendar.tsx`: własny kalendarz bez natywnego `input type=date`, `ChoiceCard.tsx`: karty wyboru i przycisk, `motion.ts`: warianty ruchu). Ikony w `src/assets/onboarding/*.webp`.
   - `src/components/ui/` — komponenty ze Spectrum UI: `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
   - `src/components/layout/` — lewy pasek ikon (desktop), dolna nawigacja (telefon), widok założeń.
   - `src/components/timeline/` — `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
   - `src/components/documents/` — lista potrzebnych dokumentów; `src/components/chat/` — rozmowa.
 - `supabase/` — `config.toml`, `migrations/` (SQL), `seed.sql`.
 - `tools/zus-data/` — pipeline danych ZUS (OCR, katalog spraw). `tools/przewodnik/` — tekst Przewodnika dla asystenta.
+- `tools/illustrations/` — generator ikon onboardingu (OpenRouter, Nano Banana 2.1): `style.txt` + `subjects/<nazwa>.txt`, oryginały w `png/`, wzorem stylu jest `png/mama.png`; do aplikacji trafia WebP 640 px z przezroczystym tłem, przycięty do rysunku.
 - `docs/` — Przewodnik; `docs/dokumentyZUS/` poufne, poza gitem.
 
 ## Core: oś czasu rodzica
@@ -89,6 +91,7 @@ Naszym zadaniem jest pokazać rodzicowi informacje, których potrzebuje. Nic wi�
 - **Układ ekranu** (stan na 21.11.2026):
   - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (dokumenty, rozmowa).
   - Telefon: dolna nawigacja Rozmowa / Oś czasu / Założenia; oś jako lista.
+  - Onboarding (nowa rozmowa, przed osią): jedno pytanie na pełnym ekranie, bez paska postępu, przejścia blur + przesunięcie. W fazie 1: powitanie → przewidywana data porodu (kalendarz) → liczenie → oś; dalszy wywiad prowadzi czat. Data zapisuje się w sesji (`PUT /api/session/{id}/due-date`). Kroki spoza fazy 1 (kim jesteś, czy dziecko już jest, ile dzieci, praca, zarobki) są w historii gita w commicie `4092d06` i wracają w swoich fazach. Przywrócona rozmowa pomija onboarding.
   - Kolor pigułki mówi, czym jest odcinek: zielony = urlop mamy, jasnozielony = do wyboru (jeszcze nie zdecydowano), szaroniebieski = praca. Dokument jest kółkiem z ikoną przed pigułką, której dotyczy.
   - Przeliczona oś tylko podświetla zmianę. Szczegóły otwiera kliknięcie albo narzędzie `explain_timeline_element`.
 
@@ -112,7 +115,7 @@ Sekcja A „Zasiłek macierzyński dla kobiety” (s. 5–6), podział na fazy:
 | 4 | Dokumenty i wnioski (s. 6) | A15 pracownica: wniosek do pracodawcy; A16 ZAM do ZUS, zlecenie z Z-3a; A17 załączniki | do zrobienia |
 
 Faza 1 w szczegółach:
-- Wywiad: (1) przewidywana data porodu, (2) urlop przed porodem (ile tygodni) czy praca do dnia porodu, (3) przy urlopie: czy mama ma zaświadczenie lekarskie.
+- Wywiad: (1) przewidywana data porodu — w onboardingu (kalendarz) albo w czacie, (2) urlop przed porodem (ile tygodni) czy praca do dnia porodu, (3) przy urlopie: czy mama ma zaświadczenie lekarskie.
 - Oś: znacznik terminu porodu; przed decyzją jasna pigułka „do wyboru” na całe okno 6 tygodni; po decyzji zielona pigułka urlopu z dokumentem albo pigułka „praca do dnia porodu”; przy urlopie krótszym niż 6 tygodni znacznik najwcześniejszego startu.
 - Poza zakresem fazy 1: wszystko po porodzie (długość urlopu, stawki, tata, wnioski), dziecko już urodzone.
 

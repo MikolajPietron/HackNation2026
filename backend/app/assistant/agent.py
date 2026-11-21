@@ -23,13 +23,10 @@ from app.engine import (
     build_timeline,
     changed_element_ids,
 )
-from app.engine.timeline import DAY, fmt
+from app.engine.plausibility import due_date_problem
+from app.engine.timeline import fmt
 
 USAGE_LIMITS = UsageLimits(request_limit=12)
-
-# Plausibility checks for what the parent typed (not legal rules).
-DUE_DATE_GRACE = 14 * DAY
-DUE_DATE_MAX_AHEAD = 310 * DAY
 
 
 @dataclass
@@ -114,16 +111,10 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
     Args:
         due_date: Expected due date, e.g. from the pregnancy card.
     """
-    today = ctx.deps.today
-    if due_date < today - DUE_DATE_GRACE:
+    problem = due_date_problem(due_date, ctx.deps.today)
+    if problem:
         raise ModelRetry(
-            f"Nie ustawiono: {fmt(due_date)} minęło dawno (dziś {fmt(today)}). Upewnij się "
-            "co do daty. Jeśli dziecko już się urodziło, wyjaśnij zakres tego etapu."
-        )
-    if due_date > today + DUE_DATE_MAX_AHEAD:
-        raise ModelRetry(
-            f"Nie ustawiono: {fmt(due_date)} jest zbyt odległe od dziś ({fmt(today)}). "
-            "Upewnij się co do daty (sprawdź rok)."
+            f"Nie ustawiono: {problem} Jeśli dziecko już się urodziło, wyjaśnij zakres tego etapu."
         )
     return await _apply(ctx, _with(ctx, due_date=due_date), focus="due-date")
 

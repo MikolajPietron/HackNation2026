@@ -172,3 +172,23 @@ def test_timeline_endpoint_without_ai(client: TestClient) -> None:
 
 def test_health_says_where_sessions_are_stored(client: TestClient) -> None:
     assert client.get("/api/health").json() == {"status": "ok", "sessions": "memory"}
+
+
+def test_onboarding_starts_the_session_with_the_due_date(client: TestClient) -> None:
+    started = client.put(f"/api/session/{SESSION}/due-date", json={"due_date": "2027-03-15"})
+    assert started.status_code == 200
+    assert [s["id"] for s in started.json()["segments"]] == ["prenatal-window"]
+
+    # The chat continues from there: the stored scenario already has the date.
+    model = scripted("set_leave_before_birth", {"weeks": 0}, "Zapisane.")
+    update = next(e for e in ask(client, model, "Pracuję do porodu") if e["type"] == "timeline")
+    assert update["scenario"] == {
+        "due_date": "2027-03-15",
+        "leave_before_birth_weeks": 0,
+        "has_medical_certificate": None,
+    }
+    assert client.get(f"/api/session/{SESSION}").json()["timeline"]["due_date"] == "2027-03-15"
+
+    wrong_year = client.put(f"/api/session/{SESSION}/due-date", json={"due_date": "2024-03-15"})
+    assert wrong_year.status_code == 422
+    assert "Sprawdź datę" in wrong_year.json()["detail"]

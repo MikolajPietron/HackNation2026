@@ -15,6 +15,12 @@ const SUGGESTIONS = [
   'Chcę pracować do dnia porodu',
 ]
 
+const NEXT_SUGGESTIONS = [
+  'Chcę urlop przed porodem',
+  'Będę pracować do dnia porodu',
+  'Od kiedy najwcześniej mogę zacząć urlop?',
+]
+
 const MARKDOWN: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
@@ -30,15 +36,22 @@ const MARKDOWN: Components = {
 interface Props {
   messages: ChatMessage[]
   busy: boolean
-  /** The stored conversation is still loading: do not greet yet. */
-  restoring: boolean
+  /** The due date is already known (onboarding): greet with the next question. */
+  hasTimeline: boolean
   onSend: (text: string) => void
   onStop: () => void
   /** Jump to the timeline (on phones it is a separate tab), optionally to one element. */
   onShowTimeline: (elementId: string | null) => void
 }
 
-export function ChatPanel({ messages, busy, restoring, onSend, onStop, onShowTimeline }: Props) {
+export function ChatPanel({
+  messages,
+  busy,
+  hasTimeline,
+  onSend,
+  onStop,
+  onShowTimeline,
+}: Props) {
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,21 +70,38 @@ export function ChatPanel({ messages, busy, restoring, onSend, onStop, onShowTim
       </div>
 
       <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-3" aria-live="polite">
-        {restoring && messages.length === 0 ? null : messages.length === 0 ? (
-          <ChatEmptyState
-            title="Cześć! Przygotujmy się do porodu."
-            subtitle={
-              <>
-                Na początek:{' '}
-                <strong className="font-black text-navy-900">
-                  jaka jest przewidywana data porodu?
-                </strong>{' '}
-                Podaj dzień, miesiąc i rok.
-              </>
-            }
-            prompts={SUGGESTIONS}
-            onSelectPrompt={onSend}
-          />
+        {messages.length === 0 ? (
+          hasTimeline ? (
+            <ChatEmptyState
+              title="Mam już termin porodu."
+              subtitle={
+                <>
+                  Kolejne pytanie:{' '}
+                  <strong className="font-black text-navy-900">
+                    czy mama chce zacząć urlop macierzyński przed porodem, czy pracować do dnia
+                    porodu?
+                  </strong>
+                </>
+              }
+              prompts={NEXT_SUGGESTIONS}
+              onSelectPrompt={onSend}
+            />
+          ) : (
+            <ChatEmptyState
+              title="Cześć! Przygotujmy się do porodu."
+              subtitle={
+                <>
+                  Na początek:{' '}
+                  <strong className="font-black text-navy-900">
+                    jaka jest przewidywana data porodu?
+                  </strong>{' '}
+                  Podaj dzień, miesiąc i rok.
+                </>
+              }
+              prompts={SUGGESTIONS}
+              onSelectPrompt={onSend}
+            />
+          )
         ) : (
           messages.map((message) =>
             message.role === 'user' ? (

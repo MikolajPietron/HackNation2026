@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { deleteSession, fetchSession, streamChat } from '../api'
+import { deleteSession, fetchSession, startSession, streamChat } from '../api'
 import { currentSessionId, newSessionId } from '../lib/session'
 import type { StoredMessage, StoredPart, Timeline } from '../types'
 
@@ -142,6 +142,18 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     [onTimeline, onFocus],
   )
 
+  /** Onboarding: save the due date in this session and get the first timeline. */
+  const calculate = useCallback(
+    (dueDate: string, signal: AbortSignal) => startSession(sessionId.current, dueDate, signal),
+    [],
+  )
+
+  /** Show a timeline computed outside the chat (onboarding). The assistant continues from it. */
+  const load = useCallback((next: Timeline) => {
+    setTimeline(next)
+    setChanged((c) => ({ ids: [], version: c.version + 1 }))
+  }, [])
+
   /** Stop the answer that is being written. */
   const stop = useCallback(() => request.current?.abort(), [])
 
@@ -157,5 +169,5 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setChanged({ ids: [], version: 0 })
   }, [])
 
-  return { messages, busy, restoring, send, stop, reset, timeline, changed }
+  return { messages, busy, restoring, send, stop, reset, calculate, load, timeline, changed }
 }
