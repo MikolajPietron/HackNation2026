@@ -1,345 +1,37 @@
 {
   "version": "2026.1",
-  "description": "Parametry bazowe na 2026 r. Każda liczba i reguła ma źródło: Przewodnik ZUS (strona) albo przepis. Cytaty z Przewodnika są dosłowne (także z literówkami oryginału).",
+  "description": "Faza 1: Przewodnik ZUS, sekcja A, punkt „Przygotowanie do porodu” (s. 5). Każda liczba i reguła ma dosłowny cytat z tego punktu (z literówkami oryginału). Kolejne punkty dodajemy fazami.",
   "maternity": {
-    "weeks_by_children": {
-      "value": [20, 31, 33, 35, 37],
-      "note": "Indeks = liczba dzieci urodzonych przy jednym porodzie minus 1. Ostatnia wartość dotyczy 5 i więcej dzieci.",
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 5,
-          "quote": "Wymiar zasiłku macierzyńskiego za okres urlopu macierzyńskiego uzależniony jest od liczby dzieci urodzonych przy jednym porodzie (przy urodzeniu jednego dziecka przysługuje 20 tygodni)"
-        },
-        {
-          "doc": "kp",
-          "article": "art. 180 § 1",
-          "quote": "Pracownicy przysługuje urlop macierzyński w wymiarze: 1) 20 tygodni - w przypadku urodzenia jednego dziecka przy jednym porodzie; 2) 31 tygodni - w przypadku urodzenia dwojga dzieci przy jednym porodzie; 3) 33 tygodni - w przypadku urodzenia trojga dzieci przy jednym porodzie; 4) 35 tygodni - w przypadku urodzenia czworga dzieci przy jednym porodzie; 5) 37 tygodni - w przypadku urodzenia pięciorga i więcej dzieci przy jednym porodzie."
-        }
-      ]
-    },
     "max_weeks_before_birth": {
       "value": 6,
       "sources": [
         {
           "doc": "przewodnik",
+          "section": "A.1",
           "page": 5,
-          "quote": "Kobieta może rozpocząć urlop macierzyński maksymalnie 6 tygodni przed przewidywaną data porodu (w tym celu potrzebuje zaświadczenia lekarskiego o przewidywanej dacie porodu)"
-        },
-        {
-          "doc": "kp",
-          "article": "art. 180 § 2–3",
-          "quote": "Przed przewidywaną datą porodu pracownica może wykorzystać nie więcej niż 6 tygodni urlopu macierzyńskiego. Po porodzie przysługuje urlop macierzyński niewykorzystany przed porodem aż do wyczerpania wymiaru, o którym mowa w § 1."
-        }
-      ]
-    },
-    "mother_personal_weeks": {
-      "value": 14,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 5,
-          "quote": "Pierwsze 14 tygodni po porodzie matka musi wykorzystać osobiście."
-        },
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "Podstawowa zasada – matka musi wykorzystać minimum 14 tygodni urlopu macierzyńskiego po porodzie, aby ojciec mógł przejąć jego dalszą część."
-        }
-      ]
-    },
-    "rate_percent": {
-      "value": 100,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 9,
-          "quote": "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego, okres urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego oraz okres urlopu ojcowskiego wynosi 100% podstawy wymiaru zasiłku."
-        },
-        { "doc": "ustawa", "article": "art. 31 ust. 1" }
-      ]
-    }
-  },
-  "parental": {
-    "weeks_single": {
-      "value": 41,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "każdemu z rodziców przysługuje wyłączne, 9 – tygodniowe, nieprzenoszalne prawo do części tego urlopu, ze wspólnej puli 41 lub 43 tygodni urlopu rodzicielskiego."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᵃ § 1",
-          "quote": "Pracownicy - rodzice dziecka mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad dzieckiem w wymiarze do: 1) 41 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 43 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
-        }
-      ]
-    },
-    "weeks_multiple": {
-      "value": 43,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "każdemu z rodziców przysługuje wyłączne, 9 – tygodniowe, nieprzenoszalne prawo do części tego urlopu, ze wspólnej puli 41 lub 43 tygodni urlopu rodzicielskiego."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᵃ § 1",
-          "quote": "Pracownicy - rodzice dziecka mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad dzieckiem w wymiarze do: 1) 41 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 43 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
-        }
-      ]
-    },
-    "reserved_weeks_per_parent": {
-      "value": 9,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "każdemu z rodziców przysługuje wyłączne, 9 – tygodniowe, nieprzenoszalne prawo do części tego urlopu, ze wspólnej puli 41 lub 43 tygodni urlopu rodzicielskiego."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᵃ § 4",
-          "quote": "Każdemu z pracowników - rodziców dziecka przysługuje wyłączne prawo do 9 tygodni urlopu rodzicielskiego z wymiaru urlopu określonego w § 1 i 2. Prawa tego nie można przenieść na drugiego z pracowników - rodziców dziecka."
-        }
-      ]
-    },
-    "max_parts": {
-      "value": 5,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "Okres urlopu rodzicielskiego, za który przysługuje zasiłek macierzyński, rodzice mogą podzielić na maksymalnie 5 części aż do zakończenia roku kalendarzowego, w którym dziecko skończy 6 lat."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᶜ",
-          "quote": "Urlop rodzicielski jest udzielany jednorazowo albo nie więcej niż w 5 częściach nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia."
-        }
-      ]
-    },
-    "last_year_of_child_age": {
-      "value": 6,
-      "note": "Urlop rodzicielski kończy się najpóźniej 31 grudnia roku, w którym dziecko kończy tyle lat.",
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 6,
-          "quote": "Udzielany jest jednorazowo albo nie więcej niż w 5 częściach, nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᶜ",
-          "quote": "Urlop rodzicielski jest udzielany jednorazowo albo nie więcej niż w 5 częściach nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia."
-        }
-      ]
-    },
-    "rate_percent": {
-      "value": 70,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 9,
-          "quote": "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego wynosi 70% podstawy wymiaru zasiłku."
-        },
-        { "doc": "ustawa", "article": "art. 31 ust. 2" }
-      ]
-    },
-    "application_days_before": {
-      "value": 21,
-      "sources": [
-        {
-          "doc": "kp",
-          "article": "art. 182¹ᵈ § 1",
-          "quote": "Urlop rodzicielski jest udzielany na wniosek w postaci papierowej lub elektronicznej składany przez pracownika - rodzica dziecka w terminie nie krótszym niż 21 dni przed rozpoczęciem korzystania z urlopu."
-        }
-      ]
-    }
-  },
-  "paternity": {
-    "days": {
-      "value": 14,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 8,
-          "quote": "Urlop ojcowski wynosi maksymalnie 14 dni kalendarzowych (2 tygodnie), wliczając weekendy."
-        },
-        {
-          "doc": "przewodnik",
-          "page": 8,
-          "quote": "Liczba dzieci (np. bliźniaki) nie wydłuża urlopu."
-        }
-      ]
-    },
-    "min_part_days": {
-      "value": 7,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 8,
-          "quote": "Można go wykorzystać: − jednorazowo (14 dni), albo − w dwóch częściach po minimum 7 dni każda"
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182³ § 1¹",
-          "quote": "Urlop ojcowski może być wykorzystany jednorazowo albo nie więcej niż w 2 częściach, z których żadna nie może być krótsza niż tydzień."
-        }
-      ]
-    },
-    "window_months": {
-      "value": 12,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 8,
-          "quote": "Do ukończenia przez dziecko 12 miesięcy życia."
-        },
-        {
-          "doc": "przewodnik",
-          "page": 8,
-          "quote": "Jeżeli po ww. okresach ojciec nie wykorzysta urlopu ojcowskiego, to prawo do tego urlopu wygasa."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 182³ § 1",
-          "quote": "W celu sprawowania opieki nad dzieckiem pracownik - ojciec ma prawo do urlopu ojcowskiego w wymiarze do 2 tygodni, nie dłużej jednak niż do: 1) ukończenia przez dziecko 12 miesiąca życia (…)"
-        }
-      ]
-    },
-    "rate_percent": {
-      "value": 100,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 9,
-          "quote": "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego, okres urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego oraz okres urlopu ojcowskiego wynosi 100% podstawy wymiaru zasiłku."
-        },
-        { "doc": "ustawa", "article": "art. 31 ust. 1" }
-      ]
-    },
-    "application_days_before": {
-      "value": 7,
-      "sources": [
-        {
-          "doc": "kp",
-          "article": "art. 182³ § 2",
-          "quote": "Urlop ojcowski jest udzielany na wniosek w postaci papierowej lub elektronicznej składany przez pracownika - ojca w terminie nie krótszym niż 7 dni przed rozpoczęciem korzystania z urlopu."
-        }
-      ]
-    }
-  },
-  "flat_rate": {
-    "rate_percent": {
-      "value": 81.5,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 9,
-          "quote": "Jeżeli ubezpieczona-matka, niepóźnej niż 21 dni po porodzie, złoży pisemny wniosek o wypłacenie jej zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze – miesięczny zasiłek macierzyński za cały okres odpowiadający okresowi urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego oraz urlopu rodzicielskiego wynosi 81,5% podstawy wymiaru zasiłku."
-        },
-        { "doc": "ustawa", "article": "art. 31 ust. 3" }
-      ]
-    },
-    "application_days_after_birth": {
-      "value": 21,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 9,
-          "quote": "Jeżeli ubezpieczona-matka, niepóźnej niż 21 dni po porodzie, złoży pisemny wniosek o wypłacenie jej zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze (…)"
-        },
-        {
-          "doc": "ustawa",
-          "article": "art. 30a ust. 1",
-          "quote": "Ubezpieczona - matka dziecka, nie później niż 21 dni po porodzie, może złożyć pisemny wniosek o wypłacenie jej zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze, z wyłączeniem okresu, o którym mowa w art. 182¹ᵃ § 4 Kodeksu pracy, przysługującego ojcu dziecka."
-        }
-      ]
-    },
-    "other_parent_rate_percent": {
-      "value": 70,
-      "sources": [
-        {
-          "doc": "ustawa",
-          "article": "art. 31 ust. 3f",
-          "quote": "Zasiłek macierzyński za okres odpowiadający okresowi urlopu rodzicielskiego w części przysługującej drugiemu rodzicowi dziecka, o której mowa w art. 182¹ᵃ § 4 Kodeksu pracy, wynosi 70% podstawy wymiaru zasiłku."
-        }
-      ]
-    }
-  },
-  "payer": {
-    "employer_pays_above_insured": {
-      "value": 20,
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 1,
-          "quote": "Zgodnie z art 61 ust. 1 pkt 1 ustawy zasiłkowej prawo do zasiłków określonych w ustawie i ich wysokość ustalają oraz zasiłki te wypłacają płatnicy składek na ubezpieczenie chorobowe, którzy zgłaszają do ubezpieczenia chorobowego powyżej 20 ubezpieczonych."
+          "quote": "Kobieta może rozpocząć urlop macierzyński maksymalnie 6 tygodni przed przewidywaną data porodu"
         }
       ]
     }
   },
   "rules": {
-    "maternity_application": {
+    "medical_certificate": {
       "sources": [
         {
           "doc": "przewodnik",
-          "page": 6,
-          "quote": "Kobieta będąca pracownikiem występuje do pracodawcy z wnioskiem o udzielnie urlopu macierzyńskiego, jeżeli planuje skorzystanie bezpośrednio po nim z urlopu rodzicielskiego, to może złożyć jeden wniosek."
-        },
-        {
-          "doc": "przewodnik",
-          "page": 6,
-          "quote": "Kobieta, która nie jest pracownikiem powinna złożyć wniosek o zasiłek macierzyński bezpośrednio do ZUS (wniosek o zasiłek macierzyński ZAM),"
+          "section": "A.1",
+          "page": 5,
+          "quote": "w tym celu potrzebuje zaświadczenia lekarskiego o przewidywanej dacie porodu"
         }
       ]
     },
-    "forms_merged_into_zam": {
+    "work_until_birth": {
       "sources": [
         {
           "doc": "przewodnik",
-          "page": 12,
-          "quote": "Formularz ZUR od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
-        },
-        {
-          "doc": "przewodnik",
-          "page": 12,
-          "quote": "Formularz ZAO od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
-        }
-      ]
-    },
-    "first_day_is_birth": {
-      "sources": [
-        {
-          "doc": "przewodnik",
+          "section": "A.1",
           "page": 5,
           "quote": "Może również pracować do dnia porodu i rozpocząć zasiłek po urodzeniu dziecka."
-        },
-        {
-          "doc": "kp",
-          "article": "art. 183¹ § 2",
-          "quote": "Jeżeli pracownica nie korzysta z urlopu macierzyńskiego przed przewidywaną datą porodu, pierwszym dniem urlopu macierzyńskiego jest dzień porodu."
-        }
-      ]
-    },
-    "week_is_7_days": {
-      "sources": [
-        {
-          "doc": "kp",
-          "article": "art. 183¹ § 1",
-          "quote": "Przy udzielaniu urlopu macierzyńskiego i urlopu na warunkach urlopu macierzyńskiego tydzień urlopu odpowiada 7 dniom kalendarzowym."
-        }
-      ]
-    },
-    "parents_share_parental": {
-      "sources": [
-        {
-          "doc": "przewodnik",
-          "page": 7,
-          "quote": "Rodzice z urlopu rodzicielskiego mogą korzystać jednocześnie lub naprzemiennie lub ojciec może wykorzystać urlop rodzicielski po urlopie wykorzystanym przez matkę i oczywiście pobierać za okres tego urlopu zasiłek macierzyński."
         }
       ]
     }

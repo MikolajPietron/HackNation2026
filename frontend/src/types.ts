@@ -1,38 +1,33 @@
 // Mirrors backend/app/engine/models.py and the /api/chat event protocol. Keep in sync.
+// Phase 1: guide section A, "Przygotowanie do porodu" (page 5).
 
-export type Lane = 'mother' | 'father' | 'child' | 'applications'
-export type Parent = 'mother' | 'father'
-export type DocId = 'przewodnik' | 'kp' | 'ustawa'
+export type Lane = 'mother' | 'child' | 'documents'
+/** leave = leave the mother takes, work = she keeps working, option = possible, not decided. */
+export type Tone = 'leave' | 'work' | 'option'
 
 export interface SourceRef {
-  doc: DocId
-  page: number | null
-  article: string | null
-  quote: string | null
+  doc: 'przewodnik'
+  section: string
+  page: number
+  quote: string
 }
 
 export interface Scenario {
-  birth_date: string | null
-  child_born: boolean
-  children_count: number
-  maternity_weeks_before_birth: number
-  flat_rate: boolean
-  paternity_start: string | null
+  due_date: string | null
+  leave_before_birth_weeks: number | null
+  has_medical_certificate: boolean | null
 }
 
 export interface Segment {
   id: string
   lane: Lane
+  tone: Tone
   title: string
   start: string
   end: string
   days: number
-  rate_percent: number
-  benefit: string
-  payer: string
   summary: string
   details: string[]
-  is_example: boolean
   sources: SourceRef[]
 }
 
@@ -47,47 +42,54 @@ export interface Marker {
   sources: SourceRef[]
 }
 
-export interface Application {
+export interface Document {
   id: string
-  parent: Parent
   label: string
   title: string
-  due: string
-  is_deadline: boolean
+  needed_by: string
+  done: boolean
   rule: string
-  where: string
   segment_id: string | null
-  passed: boolean
   sources: SourceRef[]
-}
-
-export interface Stat {
-  id: string
-  label: string
-  value: number
-  unit: string
-  lane: Lane
-  segment_ids: string[]
 }
 
 export interface Timeline {
   params_version: string
   today: string
-  birth_date: string
-  child_born: boolean
-  children_count: number
-  summary: Stat[]
+  due_date: string
   segments: Segment[]
   markers: Marker[]
-  applications: Application[]
+  documents: Document[]
   warnings: string[]
   assumptions: string[]
 }
 
 export interface ChatRequest {
+  session_id: string
   message: string
-  history: unknown[]
-  scenario?: Scenario
+}
+
+/** A stored conversation, as returned by GET /api/session/{id}. */
+export interface SessionView {
+  messages: StoredMessage[]
+  timeline: Timeline | null
+}
+
+export type StoredPart =
+  | { kind: 'text'; text: string }
+  | {
+      kind: 'tool'
+      id: string
+      name: string
+      args: Record<string, unknown>
+      status: 'running' | 'done' | 'failed'
+    }
+
+export interface StoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  parts: StoredPart[]
+  status: 'streaming' | 'done'
 }
 
 export type ChatEvent =
@@ -102,5 +104,5 @@ export type ChatEvent =
       focus: string | null
     }
   | { type: 'focus'; element_id: string }
-  | { type: 'done'; history: unknown[] }
+  | { type: 'done' }
   | { type: 'error'; message: string }

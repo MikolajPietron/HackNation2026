@@ -1,22 +1,25 @@
-"""Engine input (Scenario) and output (Timeline). The same models are the API schema."""
+"""Engine input (Scenario) and output (Timeline). The same models are the API schema.
+
+Phase 1 covers one point of the guide: section A, "Przygotowanie do porodu" (page 5).
+"""
 
 import datetime as dt
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-DocId = Literal["przewodnik", "kp", "ustawa"]
-"""przewodnik = challenge guide (page), kp = Kodeks pracy, ustawa = ustawa zasiłkowa (article)."""
-
-Lane = Literal["mother", "father", "child", "applications"]
-Parent = Literal["mother", "father"]
+Lane = Literal["mother", "child", "documents"]
+Tone = Literal["leave", "work", "option"]
+"""leave = leave the mother takes, work = she keeps working, option = possible, not decided yet."""
 
 
 class SourceRef(BaseModel):
-    doc: DocId
-    page: int | None = None
-    article: str | None = None
-    quote: str | None = None
+    """A literal quote from the guide: which section, which page."""
+
+    doc: Literal["przewodnik"]
+    section: str
+    page: int
+    quote: str
 
 
 class ScenarioError(ValueError):
@@ -24,41 +27,33 @@ class ScenarioError(ValueError):
 
 
 class Scenario(BaseModel):
-    """Facts and choices of one family. Everything has a default until the parent tells us more."""
+    """What the interview has established so far. None = not asked or not decided yet."""
 
-    birth_date: dt.date | None = None
-    """Actual birth date when `child_born`, otherwise the expected due date."""
-    child_born: bool = False
-    children_count: int = Field(default=1, ge=1, le=10)
-    """Children born in one delivery (twins = 2)."""
-    maternity_weeks_before_birth: int = Field(default=0, ge=0)
-    flat_rate: bool = False
-    """The mother chose 81.5% for the whole maternity and parental leave instead of 100% + 70%."""
-    paternity_start: dt.date | None = None
-    """None = example plan: paternity leave right after the birth."""
+    due_date: dt.date | None = None
+    """Expected due date (przewidywana data porodu)."""
+    leave_before_birth_weeks: int | None = Field(default=None, ge=0)
+    """Weeks of maternity leave before the due date; 0 = the mother works until the birth."""
+    has_medical_certificate: bool | None = None
+    """Medical certificate of the expected due date, needed for leave before the birth."""
 
 
 class Segment(BaseModel):
-    """A period on the timeline (leave + benefit). Dates are inclusive."""
+    """A period on the timeline. Dates are inclusive."""
 
     id: str
     lane: Lane
+    tone: Tone
     title: str
     start: dt.date
     end: dt.date
     days: int
-    rate_percent: float
-    benefit: str
-    payer: str
     summary: str
     details: list[str] = []
-    is_example: bool = False
-    """Placement is an example plan the parents can change (the right itself is not an example)."""
     sources: list[SourceRef]
 
 
 class Marker(BaseModel):
-    """A single day that matters: birth, end of a window, a legal limit."""
+    """A single day that matters."""
 
     id: str
     lane: Lane
@@ -70,52 +65,34 @@ class Marker(BaseModel):
     sources: list[SourceRef]
 
 
-class Application(BaseModel):
-    """An application to file, placed on the timeline at its due date."""
+class Document(BaseModel):
+    """A document the parent needs by a given day."""
 
     id: str
-    parent: Parent
     label: str
     title: str
-    due: dt.date
-    is_deadline: bool
-    """True: `due` is the last legal day. False: when it is needed (no legal deadline)."""
+    needed_by: dt.date
+    done: bool
     rule: str
-    where: str
     segment_id: str | None = None
-    passed: bool = False
     sources: list[SourceRef]
 
 
-TimelineElement = Segment | Marker | Application
-
-
-class Stat(BaseModel):
-    """One headline number for the summary tiles, e.g. 20 weeks of maternity leave."""
-
-    id: str
-    label: str
-    value: int
-    unit: str
-    lane: Lane
-    segment_ids: list[str]
+TimelineElement = Segment | Marker | Document
 
 
 class Timeline(BaseModel):
     params_version: str
     today: dt.date
-    birth_date: dt.date
-    child_born: bool
-    children_count: int
-    summary: list[Stat] = []
+    due_date: dt.date
     segments: list[Segment]
     markers: list[Marker]
-    applications: list[Application]
+    documents: list[Document]
     warnings: list[str] = []
     assumptions: list[str] = []
 
     def elements(self) -> list[TimelineElement]:
-        return [*self.segments, *self.markers, *self.applications]
+        return [*self.segments, *self.markers, *self.documents]
 
     def element(self, element_id: str) -> TimelineElement | None:
         return next((e for e in self.elements() if e.id == element_id), None)

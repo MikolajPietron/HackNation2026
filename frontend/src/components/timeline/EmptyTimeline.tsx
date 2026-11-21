@@ -2,10 +2,8 @@ import { cn } from '@/lib/utils'
 
 // Ghost pills that hint at the shape of the timeline: [offset %, width %, colour].
 const GHOSTS = [
-  [0, 36, 'bg-zus-200'],
-  [0, 8, 'bg-navy-200'],
-  [38, 44, 'bg-zus-100'],
-  [82, 14, 'bg-navy-100'],
+  [8, 52, 'bg-zus-200'],
+  [38, 22, 'bg-zus-100'],
 ] as const
 
 /** Before the birth date is known: one sentence and a quiet preview, nothing to read. */
@@ -15,7 +13,7 @@ export function EmptyTimeline() {
       <div>
         <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
         <p className="mt-2 max-w-md text-navy-500">
-          Podaj w rozmowie datę porodu. Pokażemy tu urlopy mamy i taty, zasiłki i terminy wniosków.
+          Podaj w rozmowie przewidywaną datę porodu. Pokażemy tu, od kiedy mama może zacząć urlop macierzyński.
         </p>
       </div>
       <div className="space-y-3.5" aria-hidden>

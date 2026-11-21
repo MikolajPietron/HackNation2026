@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { dayNumber, durationLabel, formatDate, formatLongDate, formatRange } from '@/lib/dates'
-import { formatPercent, LANE, LANE_ORDER } from '@/lib/ui'
+import { LANE_ORDER, TONE } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import { ElementDetails } from './ElementDetails'
 import type { TimelineItem, TimelineViewProps } from './items'
@@ -36,8 +36,6 @@ export function VerticalTimeline({
       {sorted.map((item, index) => {
         const isSelected = item.id === selectedId
         const changed = changedIds.has(item.id)
-        const passed = item.kind === 'application' && item.element.passed
-        const example = item.kind === 'segment' && item.element.is_example
         return (
           <Fragment key={item.id}>
             {index === todayIndex && <TodayRow date={timeline.today} />}
@@ -53,7 +51,11 @@ export function VerticalTimeline({
                   'absolute top-5 -left-[29px] size-4 border-[3px] border-canvas',
                   item.kind === 'segment' ? 'rounded-full' : 'rounded-[4px]',
                   item.kind === 'marker' && 'rotate-45',
-                  passed ? 'bg-alert-600' : LANE[item.lane].dot,
+                  item.kind === 'segment'
+                    ? TONE[item.element.tone].dot
+                    : item.kind === 'document' && item.element.done
+                      ? 'bg-zus-600'
+                      : 'bg-sun-400',
                 )}
               />
               <button
@@ -70,21 +72,29 @@ export function VerticalTimeline({
                 <p className="text-xs font-bold text-navy-500">{dateText(item)}</p>
                 <p className="mt-0.5 font-black text-navy-900">{item.title}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  <Chip className={LANE[item.lane].chip}>
-                    {item.kind === 'application'
-                      ? `Wniosek · ${item.element.parent === 'mother' ? 'mama' : 'tata'}`
-                      : LANE[item.lane].label}
-                  </Chip>
                   {item.kind === 'segment' && (
-                    <Chip className="bg-navy-50 text-navy-700 ring-navy-100">
-                      {formatPercent(item.element.rate_percent)} · {durationLabel(item.element.days)}
+                    <>
+                      <Chip className={TONE[item.element.tone].chip}>
+                        {TONE[item.element.tone].label}
+                      </Chip>
+                      <Chip className="bg-navy-50 text-navy-700 ring-navy-100">
+                        {durationLabel(item.element.days)}
+                      </Chip>
+                    </>
+                  )}
+                  {item.kind === 'marker' && (
+                    <Chip className="bg-sun-100 text-sun-700 ring-sun-300">Ważny dzień</Chip>
+                  )}
+                  {item.kind === 'document' && (
+                    <Chip
+                      className={
+                        item.element.done
+                          ? 'bg-zus-50 text-zus-700 ring-zus-200'
+                          : 'bg-sun-100 text-sun-700 ring-sun-300'
+                      }
+                    >
+                      {item.element.done ? 'Dokument · mama już go ma' : 'Dokument · do zdobycia'}
                     </Chip>
-                  )}
-                  {example && (
-                    <Chip className="bg-white text-navy-500 ring-navy-200">przykładowy termin</Chip>
-                  )}
-                  {passed && (
-                    <Chip className="bg-alert-50 text-alert-600 ring-alert-600/30">termin minął</Chip>
                   )}
                 </div>
               </button>
@@ -107,10 +117,8 @@ function dateText(item: TimelineItem): string {
       return formatRange(item.element.start, item.element.end)
     case 'marker':
       return formatLongDate(item.element.date)
-    case 'application':
-      return item.element.is_deadline
-        ? `Termin: do ${formatDate(item.element.due)}`
-        : `Potrzebny na: ${formatDate(item.element.due)}`
+    case 'document':
+      return `Potrzebne na: ${formatDate(item.element.needed_by)}`
   }
 }
 

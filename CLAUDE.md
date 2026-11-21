@@ -2,7 +2,7 @@
 
 Projekt na HackNation 2026, wyzwanie ZUS. Opis wyzwania: `docs/Przewodnik_Rodzica_ZUS.pdf` (dalej: **Przewodnik**).
 
-Stan na 21.11.2026: działa pierwszy przekrój. Czat (Pydantic AI + Claude) zbiera datę porodu, narzędzia zmieniają scenariusz, silnik liczy oś (macierzyński, rodzicielski, ojcowski, ważne dni, wnioski), a frontend ją rysuje (poziomo na szerokim ekranie, pionowo na wąskim). Brak: interakcji (wcześniak itd.), kwot, tytułów ubezpieczenia, Supabase i panelu admina.
+Stan na 21.11.2026: budujemy fazami, po jednym punkcie Przewodnika naraz (patrz „Fazy”). Zrobiona jest faza 1: „Przygotowanie do porodu” (sekcja A, s. 5). Wywiad w czacie zbiera przewidywaną datę porodu, decyzję o urlopie przed porodem i zaświadczenie lekarskie; silnik liczy oś, frontend ją rysuje. Wszystko poza fazą 1 zostało usunięte z kodu (jest w historii gita, commit `d2b261d`).
 Aktualizuj ten plik, gdy zmienia się struktura repo albo zapadają decyzje.
 
 ## Komendy (z katalogu głównego)
@@ -14,7 +14,7 @@ Aktualizuj ten plik, gdy zmienia się struktura repo albo zapadają decyzje.
 - `npm run build` — build frontendu
 - `npm run db:start` / `db:status` / `db:reset` / `db:migration <nazwa>` — lokalny Supabase (Docker)
 - `npm run data:zus` — przygotowanie danych ZUS (patrz „Dane i poufność”)
-- `python3 tools/przewodnik/extract_pages.py` — po zmianie PDF Przewodnika odświeża `backend/app/assistant/przewodnik_pages.json` (tekst stron dla narzędzia `read_guide`)
+- `python3 tools/przewodnik/extract_pages.py` — po zmianie PDF Przewodnika odświeża `backend/app/assistant/przewodnik_pages.json` (tekst stron, z którego wycinamy sekcje)
 - Backend sam: `cd backend && uv run …`; zależności: `uv add <pakiet>` (nie pip). Frontend: `npm install <pakiet> --workspace frontend`.
 
 CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i frontend (oxlint, typecheck, build).
@@ -23,19 +23,19 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
 
 - `backend/` — Python 3.13, FastAPI, uv.
   - `app/main.py` — aplikacja, CORS, `/api/health`; `app/config.py` — ustawienia z `.env`; `app/clock.py` — „dziś” w Europe/Warsaw.
-  - `app/api/` — routery: `chat.py` (`POST /api/chat`, strumień NDJSON), `timeline.py` (`POST /api/timeline`, kalkulator bez AI), `deps.py` (zależności: model, parametry, dziś; testy je podmieniają).
-  - `app/engine/` — silnik: `models.py` (`Scenario`, `Timeline`, `SourceRef`), `params.py` (model parametrów), `timeline.py` (reguły bazowe, `changed_element_ids`).
-  - `app/assistant/` — agent Pydantic AI (`agent.py`: narzędzia i zdarzenia), `prompts.py` (instrukcje po polsku i spis treści Przewodnika), `describe.py` (opis osi dla modelu), `przewodnik_pages.json`.
-  - `app/services/params.py` — wczytanie `params/2026.json`. `params/2026.json` — liczby i reguły ze źródłami.
-  - `tests/` — silnik (`test_engine.py`) i API czatu na skryptowanym modelu (`test_chat_api.py`).
+  - `app/api/` — routery: `chat.py` (`POST /api/chat`, strumień NDJSON), `session.py` (`GET`/`DELETE /api/session/{id}`: przywrócenie i usunięcie rozmowy), `timeline.py` (`POST /api/timeline`, kalkulator bez AI), `deps.py` (zależności: model, parametry, dziś, magazyn sesji; testy je podmieniają).
+  - `app/engine/` — silnik: `models.py` (`Scenario`, `Timeline` z odcinkami, ważnymi dniami i dokumentami, `SourceRef`), `params.py` (model parametrów), `timeline.py` (reguły bieżących faz, `changed_element_ids`).
+  - `app/assistant/` — agent Pydantic AI (`agent.py`: narzędzia i zdarzenia), `guide.py` (sekcje Przewodnika wycinane z `przewodnik_pages.json`), `prompts.py` (instrukcje po polsku z dosłownym tekstem sekcji i planem wywiadu), `describe.py` (opis osi dla modelu).
+  - `app/services/params.py` — wczytanie `params/2026.json`. `app/services/sessions.py` — magazyn sesji (Supabase albo pamięć). `app/assistant/transcript.py` — historia modelu jako wiadomości dla UI. `params/2026.json` — liczby i reguły ze źródłami.
+  - `tests/` — silnik (`test_engine.py`), zgodność cytatów z dokumentem (`test_sources.py`) i wywiad przez API na skryptowanym modelu (`test_chat_api.py`).
 - `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, Motion, lucide-react, react-markdown. Alias `@/` = `src/`.
   - `src/index.css` — tokeny motywu ZUS (`@theme`: kolory, cienie, animacje wejścia), font Lato.
   - `src/types.ts` — kopia modeli backendu i protokołu czatu (trzymaj w zgodzie z `engine/models.py` i `api/chat.py`); `src/api.ts` — `streamChat` (NDJSON).
-  - `src/hooks/useAssistant.ts` — stan rozmowy, historia i scenariusz po stronie klienta, `stop` i `reset`.
-  - `src/components/ui/` — komponenty ze Spectrum UI: `number-ticker`, `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
+  - `src/hooks/useAssistant.ts` — stan rozmowy, przywracanie po odświeżeniu, `stop` i `reset`. `src/lib/session.ts` — identyfikator sesji w `localStorage`.
+  - `src/components/ui/` — komponenty ze Spectrum UI: `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
   - `src/components/layout/` — lewy pasek ikon (desktop), dolna nawigacja (telefon), widok założeń.
   - `src/components/timeline/` — `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
-  - `src/components/summary/` — kafelki z liczbami (z `Timeline.summary`) i lista wniosków; `src/components/chat/` — rozmowa.
+  - `src/components/documents/` — lista potrzebnych dokumentów; `src/components/chat/` — rozmowa.
 - `supabase/` — `config.toml`, `migrations/` (SQL), `seed.sql`.
 - `tools/zus-data/` — pipeline danych ZUS (OCR, katalog spraw). `tools/przewodnik/` — tekst Przewodnika dla asystenta.
 - `docs/` — Przewodnik; `docs/dokumentyZUS/` poufne, poza gitem.
@@ -87,10 +87,34 @@ Naszym zadaniem jest pokazać rodzicowi informacje, których potrzebuje. Nic wi�
   - Animacje komponentów bierzemy ze Spectrum UI (Motion). Animacja ma pokazywać zmianę (nowy element, przeliczona oś, otwarte szczegóły), a nie zdobić.
   - Szanuj `prefers-reduced-motion`.
 - **Układ ekranu** (stan na 21.11.2026):
-  - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki urlopów, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (kafelki, wnioski, rozmowa).
+  - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (dokumenty, rozmowa).
   - Telefon: dolna nawigacja Rozmowa / Oś czasu / Założenia; oś jako lista.
-  - Wniosek z terminem jest kółkiem z ikoną przed pigułką swojego urlopu. Jaśniejsza pigułka to przykładowy termin.
+  - Kolor pigułki mówi, czym jest odcinek: zielony = urlop mamy, jasnozielony = do wyboru (jeszcze nie zdecydowano), szaroniebieski = praca. Dokument jest kółkiem z ikoną przed pigułką, której dotyczy.
   - Przeliczona oś tylko podświetla zmianę. Szczegóły otwiera kliknięcie albo narzędzie `explain_timeline_element`.
+
+## Fazy — jeden punkt Przewodnika naraz
+
+Rdzeniem aplikacji jest tłumaczenie procesu na podstawie oficjalnego dokumentu ZUS. To, co pokazuje oś i UI, wynika ściśle z tekstu Przewodnika.
+
+Zasady pracy:
+- Robimy jedną fazę naraz. Faza to jeden punkt Przewodnika: wchodzi do wywiadu, na oś i do testów.
+- W kodzie jest tylko to, co obejmują zrobione fazy. Nie dodawaj elementów „na zapas” z kolejnych punktów ani z innych sekcji. Sekcje „Ściąga domenowa” i „Interakcje” niżej to wiedza na przyszłe fazy, nie lista rzeczy do zaimplementowania teraz.
+- Każdy element osi ma dosłowny cytat z sekcji Przewodnika. `tests/test_sources.py` sprawdza, że cytat istnieje w tekście dokumentu co do znaku (literówki oryginału zostają).
+- Poprzednia, szersza wersja (macierzyński, rodzicielski, ojcowski, wnioski, 81,5%, kafelki) jest w gicie w commicie `d2b261d`. Przenosimy z niej rzeczy dopiero w ich fazie.
+
+Sekcja A „Zasiłek macierzyński dla kobiety” (s. 5–6), podział na fazy:
+
+| Faza | Punkt | Kawałki | Stan |
+|---|---|---|---|
+| 1 | Przygotowanie do porodu (s. 5) | A1 urlop do 6 tyg. przed przewidywaną datą porodu; A2 zaświadczenie lekarskie o przewidywanej dacie porodu; A3 praca do dnia porodu, zasiłek po urodzeniu | zrobiona |
+| 2 | Urodzenie dziecka (s. 5–6) | A4 prawo po porodzie dla ubezpieczonej; A5 wymiar wg liczby dzieci (20 tyg.); A6 14 tyg. osobiście; A7 uzupełniający; A8 rodzicielski; A9 do 5 części; A10 do końca roku 6. urodzin; A11 „Za życiem” | do zrobienia |
+| 3 | Martwe urodzenie albo zgon dziecka (s. 6) | A12 przed 8 tyg. życia; A13 po 8 tyg.; A14 wieloraczki | do zrobienia |
+| 4 | Dokumenty i wnioski (s. 6) | A15 pracownica: wniosek do pracodawcy; A16 ZAM do ZUS, zlecenie z Z-3a; A17 załączniki | do zrobienia |
+
+Faza 1 w szczegółach:
+- Wywiad: (1) przewidywana data porodu, (2) urlop przed porodem (ile tygodni) czy praca do dnia porodu, (3) przy urlopie: czy mama ma zaświadczenie lekarskie.
+- Oś: znacznik terminu porodu; przed decyzją jasna pigułka „do wyboru” na całe okno 6 tygodni; po decyzji zielona pigułka urlopu z dokumentem albo pigułka „praca do dnia porodu”; przy urlopie krótszym niż 6 tygodni znacznik najwcześniejszego startu.
+- Poza zakresem fazy 1: wszystko po porodzie (długość urlopu, stawki, tata, wnioski), dziecko już urodzone.
 
 ## Źródła wiedzy — hierarchia
 
@@ -188,17 +212,21 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 - **Silnik** (`backend/app/engine/`): czysty i deterministyczny Python, bez I/O, bez bazy i bez LLM. Modele Pydantic: wejście `Scenario` (rodzice, tytuły ubezpieczenia i daty, zarobki, data porodu, liczba dzieci, zdarzenia, wybory użytkownika), wyjście `Timeline` (`segments`, `markers`, `applications`, `warnings`, `rights`). Każdy element ma `sources: list[SourceRef]` (`doc`, `page`, `article`, `quote`). Reguły bazowe budują oś, a interakcje nakładają się po nich w jawnej kolejności. Te same modele służą za schemat API (frontend dostaje gotowe odcinki do narysowania).
 - **Parametry**: wszystkie liczby (tygodnie, stawki, limity, kwoty), każda z odnośnikiem do źródła. Wersja bazowa w pliku JSON w repo (np. `backend/params/2026.json`). Panel admina zapisuje zmiany jako nowe wersje w tabeli Supabase. Silnik dostaje parametry jako argument i sam nie czyta bazy. Bez magicznych liczb w kodzie.
 - **Baza**: schemat wyłącznie przez migracje SQL (`npm run db:migration <nazwa>` → `supabase/migrations/`), bez ORM-owych migracji. RLS włączone na każdej tabeli.
+  - Tabela `sessions` (`id`, `scenario`, `history`): rozmowa i odpowiedzi z wywiadu, jeden wiersz na sesję przeglądarki. RLS bez polityk, więc klucz publiczny nie ma do niej dostępu; czyta i zapisuje ją tylko backend kluczem sekretnym.
+  - Migracje na hostowanym projekcie stosujemy przez `npx supabase db push` (po `supabase login` i `supabase link`) albo wklejając plik SQL w SQL Editor. Sam klucz sekretny nie pozwala tworzyć tabel.
+  - Bez ustawień Supabase albo przed zastosowaniem migracji sesje są w pamięci procesu; `/api/health` pokazuje w polu `sessions`, gdzie są (`supabase` albo `memory`).
 - **Daty**: `datetime.date`, tydzień = `timedelta(days=7)` (7 dni kalendarzowych), przedziały liczone włącznie, „dziś” w strefie Europe/Warsaw (`zoneinfo`).
-- **Asystent (czat)**: aplikacja zaczyna się od rozmowy, a pierwszy cel to data porodu. Agent Pydantic AI (`app/assistant/agent.py`) ma narzędzia:
-  - zmieniające `Scenario`: `set_birth_date`, `set_children_count`, `set_maternity_leave_before_birth`, `choose_benefit_variant`, `set_paternity_leave_start`,
-  - `explain_timeline_element` — podświetla element osi i zwraca zasady z cytatami,
-  - `read_guide` — strona Przewodnika.
+- **Asystent (czat)**: aplikacja zaczyna się od rozmowy. Agent Pydantic AI (`app/assistant/agent.py`) prowadzi wywiad: jedno pytanie naraz, w kolejności z `prompts.py`. Dosłowny tekst sekcji bieżących faz jest zawsze w instrukcjach modelu, więc model nie musi niczego wyszukiwać. Narzędzia (faza 1):
+  - zmieniające `Scenario`: `set_due_date`, `set_leave_before_birth`, `set_medical_certificate`,
+  - `explain_timeline_element` — podświetla element osi i zwraca zasadę z dosłownym cytatem.
+
+  Na pytania spoza bieżących faz asystent odpowiada, że ten etap aplikacji ich nie obejmuje. Nie odpowiada z wiedzy ogólnej.
 
   Każde narzędzie zmieniające scenariusz woła `build_timeline` i wysyła zdarzenie `TimelineUpdated` (`ctx.emit`, `CustomEvent`) z osią i listą zmienionych elementów; UI przerysowuje oś w trakcie odpowiedzi. Błąd reguły (`ScenarioError`) zamienia się w `ModelRetry` z polskim komunikatem.
 
-  `POST /api/chat` strumieniuje NDJSON ze zdarzeniami `text`, `tool-call`, `tool-result`, `timeline`, `focus`, `done` i `error`. Klient trzyma historię (zwracaną w `done`) i `scenario` i odsyła je z każdą wiadomością, więc serwer nie ma stanu. Bez klucza LLM czat zwraca 503, a `/api/timeline` działa dalej.
+  `POST /api/chat` przyjmuje `session_id` i `message` i strumieniuje NDJSON ze zdarzeniami `text`, `tool-call`, `tool-result`, `timeline`, `focus`, `done` i `error`. Historię i `scenario` trzyma serwer w tabeli `sessions`: scenariusz zapisuje po każdym narzędziu, historię na końcu tury. Przeglądarka pamięta tylko identyfikator sesji i po odświeżeniu pobiera rozmowę i oś z `GET /api/session/{id}` (oś jest przeliczana od nowa z zapisanych odpowiedzi). Bez klucza LLM czat zwraca 503, a `/api/timeline` działa dalej.
 
-  Nowa sytuacja do obsłużenia to: pole w `Scenario`, reguła w silniku ze źródłem i testem, narzędzie w agencie i etykieta w `toolLabel` (frontend).
+  Nowa faza to: sekcja w `guide.py`, cytaty w `params/2026.json`, pole w `Scenario`, reguła w silniku z testem, pytanie w wywiadzie i narzędzie w agencie, etykieta w `toolLabel` (frontend).
 - **LLM**: Claude przez Pydantic AI (`pydantic-ai-slim[anthropic,openrouter]`, wersja 2.x). Dostawca z `LLM_PROVIDER`: `openrouter` (domyślnie, klucz `OPENROUTER_API_KEY`, model `anthropic/claude-opus-5.5`) albo `anthropic` (klucz `ANTHROPIC_API_KEY`, model `claude-opus-5-5`). `LLM_MODEL` nadpisuje model, `LLM_THINKING` wysiłek myślenia. Wybór modelu: `app/api/deps.py`. API wersji 2.x różni się od 1.x, np. `run_stream_events` jest context managerem, a zdarzenia własne idą przez `ctx.emit`. Przed użyciem sprawdzaj źródła w `backend/.venv`. Do czego używamy LLM:
   - czat zbierający fakty i tłumaczący oś (wyżej),
   - asystent Q&A z cytatami — Claude citations na PDF-ach materiałów zwracają dosłowny `cited_text` i numer strony; nie łączyć z `output_config.format`, bo API zwraca 400,
@@ -212,7 +240,7 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 
 - `docs/dokumentyZUS/` jest w `.gitignore`. Dokumenty ZUS są „wyłącznie na użytek HackNation”: nie commituj ich, nie wklejaj treści do commitów, issue ani PR i nie kopiuj do `public/`.
 - Nazwy plików spraw zawierają imiona. W UI, logach i testach używaj ID `S01–S86` z katalogu.
-- Nie wysyłaj skanów spraw do zewnętrznych API, dopóki mentorzy ZUS tego nie potwierdzą. Hostowany Supabase to też zewnętrzna usługa: danych ze spraw nie trzymamy w nim ani w `seed.sql`. Lokalny Supabase w Dockerze jest OK.
+- Nie wysyłaj skanów spraw do zewnętrznych API, dopóki mentorzy ZUS tego nie potwierdzą. Hostowany Supabase to też zewnętrzna usługa: danych ze spraw nie trzymamy w nim ani w `seed.sql`. Lokalny Supabase w Dockerze jest OK. W tabeli `sessions` są tylko rozmowy użytkowników aplikacji (prosimy w UI, żeby nie podawali danych osobowych).
 - Sprawy to skany bez warstwy tekstowej: odręczne daty, obrócone strony, ok. 15% stron pustych. OCR (tesseract) służy tylko do wyszukiwania i kategorii — **nie do liczb**, bo myli cyfry. Liczby czyta model z obrazu strony.
 - Pipeline: `tools/zus-data/run.sh` → `docs/dokumentyZUS/{materialy,sprawy,ocr,katalog_spraw.md,katalog_spraw.json}`. Duplikat „Dariusz Go_3 … (1)” jest pomijany.
 

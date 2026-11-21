@@ -1,8 +1,9 @@
 """POST /api/chat — one assistant turn, streamed as NDJSON (one JSON event per line).
 
 Events: `text` (delta), `tool-call`, `tool-result`, `timeline` (scenario + recalculated
-timeline), `focus` (element the assistant explains), `done` (history for the next turn), `error`.
-The client keeps `history` and `scenario` and sends them back with the next message.
+timeline), `focus` (element the assistant explains), `done`, `error`.
+The conversation (scenario and message history) is stored per session id; the client only
+sends its session id and the new message.
 """
 
 import datetime as dt
@@ -11,8 +12,9 @@ import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Annotated, Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_ai import (
@@ -33,7 +35,7 @@ from pydantic_ai import (
 )
 from pydantic_ai.models import Model
 
-from app.api.deps import get_chat_model, get_params, get_today
+from app.api.deps import get_chat_model, get_params, get_session_store, get_today
 from app.assistant.agent import (
     USAGE_LIMITS,
     AssistantDeps,
@@ -42,16 +44,24 @@ from app.assistant.agent import (
     assistant,
 )
 from app.engine import Params, Scenario, ScenarioError, build_timeline
+from app.services.sessions import Session, SessionStore
 
 router = APIRouter(prefix="/api", tags=["assistant"])
 logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
+    session_id: UUID
     message: str = Field(min_length=1, max_length=4000)
-    history: list[dict[str, Any]] = Field(default_factory=list, max_length=400)
-    """Opaque message history from the previous `done` event."""
-    scenario: Scenario = Field(default_factory=Scenario)
+
+
+def load_history(session: Session) -> list[ModelMessage]:
+    """The stored history, or an empty one if it can no longer be read."""
+    try:
+        return ModelMessagesTypeAdapter.validate_python(session.history)
+    except ValidationError:
+        logger.warning("Stored history is unreadable; starting the conversation again.")
+        return []
 
 
 @router.post("/chat")
@@ -60,23 +70,38 @@ async def chat(
     model: Annotated[Model, Depends(get_chat_model)],
     params: Annotated[Params, Depends(get_params)],
     today: Annotated[dt.date, Depends(get_today)],
+    store: Annotated[SessionStore, Depends(get_session_store)],
 ) -> StreamingResponse:
-    try:
-        history = ModelMessagesTypeAdapter.validate_python(request.history)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail="Nieprawidłowa historia rozmowy.") from exc
-    deps = AssistantDeps(scenario=request.scenario, params=params, today=today)
-    if request.scenario.birth_date is not None:
+    session = await store.load(request.session_id)
+    deps = AssistantDeps(scenario=session.scenario, params=params, today=today)
+    if session.scenario.due_date is not None:
         try:
-            deps.timeline = build_timeline(request.scenario, params, today)
-        except ScenarioError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-    stream = _stream(request.message, history, deps, model)
+            deps.timeline = build_timeline(session.scenario, params, today)
+        except ScenarioError:
+            # Saved under older rules: keep the conversation, ask for the facts again.
+            deps.scenario = Scenario()
+    turn = _Turn(request.session_id, session, store)
+    stream = _stream(request.message, load_history(session), deps, model, turn)
     return StreamingResponse(stream, media_type="application/x-ndjson")
 
 
+@dataclass
+class _Turn:
+    """Saves the session as the turn goes: the scenario after every tool, the history at the end."""
+
+    session_id: UUID
+    session: Session
+    store: SessionStore
+
+    async def save(self, scenario: Scenario, history: list[ModelMessage] | None = None) -> None:
+        self.session.scenario = scenario
+        if history is not None:
+            self.session.history = ModelMessagesTypeAdapter.dump_python(history, mode="json")
+        await self.store.save(self.session_id, self.session)
+
+
 async def _stream(
-    message: str, history: list[ModelMessage], deps: AssistantDeps, model: Model
+    message: str, history: list[ModelMessage], deps: AssistantDeps, model: Model, turn: _Turn
 ) -> AsyncIterator[str]:
     to_payload = _Translator()
     try:
@@ -88,6 +113,10 @@ async def _stream(
             usage_limits=USAGE_LIMITS,
         ) as events:
             async for event in events:
+                if isinstance(event, TimelineUpdated):
+                    await turn.save(event.scenario)
+                elif isinstance(event, AgentRunResultEvent):
+                    await turn.save(deps.scenario, event.result.all_messages())
                 payload = to_payload(event)
                 if payload is not None:
                     yield _line(payload)
@@ -135,9 +164,8 @@ class _Translator:
                 }
             case ElementFocused(element_id=element_id):
                 return {"type": "focus", "element_id": element_id}
-            case AgentRunResultEvent(result=result):
-                history = ModelMessagesTypeAdapter.dump_python(result.all_messages(), mode="json")
-                return {"type": "done", "history": history}
+            case AgentRunResultEvent():
+                return {"type": "done"}
         return None
 
 
@@ -155,7 +183,7 @@ def _line(payload: dict[str, Any]) -> str:
 def _error_message(exc: Exception) -> str:
     match exc:
         case ModelAuthenticationError():
-            return "Klucz ANTHROPIC_API_KEY jest nieprawidłowy."
+            return "Klucz API modelu jest nieprawidłowy."
         case ModelRateLimitError() | ModelOverloadedError():
             return "Model AI jest teraz przeciążony. Spróbuj za chwilę."
         case UsageLimitExceeded():

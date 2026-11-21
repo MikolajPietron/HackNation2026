@@ -7,12 +7,12 @@ import { ChatEmptyState } from '@/components/ui/chat-empty-state'
 import { PromptComposer } from '@/components/ui/prompt-composer'
 import { TextStates } from '@/components/ui/text-states'
 import type { ChatMessage, MessagePart } from '@/hooks/useAssistant'
-import { TIMELINE_TOOLS, toolLabel } from '@/lib/ui'
+import { toolLabel } from '@/lib/ui'
 
 const SUGGESTIONS = [
-  'Jestem w ciąży, podam termin porodu',
-  'Dziecko już się urodziło',
-  'Spodziewamy się bliźniąt',
+  'Podam przewidywaną datę porodu',
+  'Czy mogę iść na urlop przed porodem?',
+  'Chcę pracować do dnia porodu',
 ]
 
 const MARKDOWN: Components = {
@@ -30,13 +30,15 @@ const MARKDOWN: Components = {
 interface Props {
   messages: ChatMessage[]
   busy: boolean
+  /** The stored conversation is still loading: do not greet yet. */
+  restoring: boolean
   onSend: (text: string) => void
   onStop: () => void
   /** Jump to the timeline (on phones it is a separate tab), optionally to one element. */
   onShowTimeline: (elementId: string | null) => void
 }
 
-export function ChatPanel({ messages, busy, onSend, onStop, onShowTimeline }: Props) {
+export function ChatPanel({ messages, busy, restoring, onSend, onStop, onShowTimeline }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -55,14 +57,14 @@ export function ChatPanel({ messages, busy, onSend, onStop, onShowTimeline }: Pr
       </div>
 
       <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-3" aria-live="polite">
-        {messages.length === 0 ? (
+        {restoring && messages.length === 0 ? null : messages.length === 0 ? (
           <ChatEmptyState
-            title="Cześć! Zaplanujmy urlopy i zasiłki."
+            title="Cześć! Przygotujmy się do porodu."
             subtitle={
               <>
                 Na początek:{' '}
                 <strong className="font-black text-navy-900">
-                  kiedy urodziło się dziecko albo kiedy jest przewidywany poród?
+                  jaka jest przewidywana data porodu?
                 </strong>{' '}
                 Podaj dzień, miesiąc i rok.
               </>
@@ -135,7 +137,7 @@ function AssistantMessage({
           : 'Piszę odpowiedź…'
 
   const toStep = (tool: ToolPart): AgentStep => {
-    const linkable = tool.status === 'done' && TIMELINE_TOOLS.has(tool.name)
+    const linkable = tool.status === 'done'
     const target =
       tool.name === 'explain_timeline_element' && typeof tool.args.element_id === 'string'
         ? tool.args.element_id

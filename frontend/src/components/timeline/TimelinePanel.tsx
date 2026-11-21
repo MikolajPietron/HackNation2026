@@ -42,9 +42,7 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
 
   const selected = items.find((item) => item.id === selectedId) ?? null
   const props = { timeline, items, selectedId, changedIds, changeVersion: changed.version, focus, onSelect }
-  const children =
-    timeline.children_count === 1 ? '1 dziecko' : `${timeline.children_count} dzieci z jednego porodu`
-  const birth = `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`
+  const due = `Przewidywana data porodu: ${formatLongDate(timeline.due_date)}`
 
   return (
     // The pill axis needs room; in a narrow column (phone, small laptop) the list takes over.
@@ -54,7 +52,7 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
           <div>
             <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
             <p className="mt-1 text-sm font-bold text-navy-500">
-              <TextStates text={`${birth} · ${children}`} />
+              <TextStates text={due} />
             </p>
           </div>
           <div className="hidden rounded-full bg-white p-1 shadow-card @2xl:flex" role="tablist">
@@ -124,7 +122,7 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
                   exit={{ opacity: 0 }}
                   className="px-1 text-sm text-navy-500"
                 >
-                  Kliknij urlop albo termin, żeby zobaczyć zasady i źródło.
+                  Kliknij element osi, żeby zobaczyć zasadę i cytat z Przewodnika ZUS.
                 </motion.p>
               )}
             </AnimatePresence>

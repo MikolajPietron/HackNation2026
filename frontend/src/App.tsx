@@ -5,7 +5,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel'
 import { AboutPanel } from '@/components/layout/AboutPanel'
 import { BottomNav, Logo, Rail } from '@/components/layout/Navigation'
 import type { Tab } from '@/components/layout/Navigation'
-import { ApplicationsList, SummaryTiles } from '@/components/summary/Summary'
+import { DocumentsList } from '@/components/documents/DocumentsList'
 import { TimelinePanel } from '@/components/timeline/TimelinePanel'
 import { useAssistant } from '@/hooks/useAssistant'
 import { EASE_OUT } from '@/lib/ease'
@@ -28,7 +28,7 @@ export default function App() {
     setUnseen(true)
     if (focusId) setFocus((f) => ({ id: focusId, tick: f.tick + 1 }))
   }, [])
-  const { messages, busy, send, stop, reset, timeline, changed } = useAssistant({
+  const { messages, busy, restoring, send, stop, reset, timeline, changed } = useAssistant({
     onFocus: focusOn,
     onTimeline: timelineChanged,
   })
@@ -80,13 +80,6 @@ export default function App() {
               <p className="hidden px-8 pt-8 text-xs font-black tracking-widest text-zus-700 uppercase lg:block">
                 {APP_NAME}
               </p>
-              {timeline && (
-                <SummaryTiles
-                  timeline={timeline}
-                  onSelect={focusOn}
-                  className="px-5 pt-5 lg:hidden"
-                />
-              )}
               <TimelinePanel
                 timeline={timeline}
                 changed={changed}
@@ -103,23 +96,23 @@ export default function App() {
             'min-h-0 w-full flex-col gap-4 bg-white lg:flex lg:w-[380px] lg:flex-none lg:border-l lg:border-line lg:p-4',
             tab === 'chat' ? 'flex flex-1' : 'hidden',
           )}
-          aria-label="Podsumowanie i rozmowa z asystentem"
+          aria-label="Dokumenty i rozmowa z asystentem"
         >
-          {timeline && (
+          {timeline && timeline.documents.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="hidden space-y-4 lg:block"
+              className="hidden lg:block"
             >
-              <SummaryTiles timeline={timeline} onSelect={focusOn} />
-              <ApplicationsList timeline={timeline} selectedId={selectedId} onSelect={focusOn} />
+              <DocumentsList timeline={timeline} selectedId={selectedId} onSelect={focusOn} />
             </motion.div>
           )}
           <div className="min-h-0 flex-1 lg:rounded-3xl lg:bg-canvas">
             <ChatPanel
               messages={messages}
               busy={busy}
+              restoring={restoring}
               onSend={send}
               onStop={stop}
               onShowTimeline={showOnTimeline}

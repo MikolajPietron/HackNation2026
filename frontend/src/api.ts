@@ -1,4 +1,4 @@
-import type { ChatEvent, ChatRequest } from './types'
+import type { ChatEvent, ChatRequest, SessionView } from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
 export const API_URL: string = import.meta.env.VITE_API_URL ?? ''
@@ -37,6 +37,17 @@ export async function streamChat(
     }
   }
   if (buffer.trim()) onEvent(JSON.parse(buffer) as ChatEvent)
+}
+
+/** The stored conversation and its timeline; empty for a new session. */
+export async function fetchSession(sessionId: string): Promise<SessionView> {
+  const response = await fetch(`${API_URL}/api/session/${sessionId}`)
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as SessionView
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await fetch(`${API_URL}/api/session/${sessionId}`, { method: 'DELETE' })
 }
 
 async function errorDetail(response: Response): Promise<string> {

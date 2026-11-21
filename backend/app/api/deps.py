@@ -16,6 +16,7 @@ from app.clock import today_in_warsaw
 from app.config import LlmProvider, Settings, ThinkingLevel, get_settings
 from app.engine import Params
 from app.services.params import load_params
+from app.services.sessions import SessionStore, open_session_store
 
 KEY_NAMES: dict[LlmProvider, str] = {
     "openrouter": "OPENROUTER_API_KEY",
@@ -29,6 +30,10 @@ def get_params() -> Params:
 
 def get_today() -> dt.date:
     return today_in_warsaw()
+
+
+async def get_session_store(settings: Annotated[Settings, Depends(get_settings)]) -> SessionStore:
+    return await open_session_store(settings.supabase_url, settings.supabase_secret_key)
 
 
 def get_chat_model(settings: Annotated[Settings, Depends(get_settings)]) -> Model:

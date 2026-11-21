@@ -9,8 +9,8 @@ export function AboutPanel({ timeline }: { timeline: Timeline | null }) {
 
       <Card title="Co robi AI, a co kalkulator">
         <p>
-          Rozmowę prowadzi asystent AI. Daty, długości urlopów i terminy wniosków liczy kalkulator
-          reguł — bez AI. Każda liczba ma źródło z cytatem.
+          Rozmowę prowadzi asystent AI. Daty na osi liczy kalkulator reguł — bez AI. Każdy element
+          osi ma dosłowny cytat z Przewodnika ZUS.
         </p>
       </Card>
 
@@ -22,15 +22,16 @@ export function AboutPanel({ timeline }: { timeline: Timeline | null }) {
             ))}
           </ul>
         ) : (
-          <p>Pojawią się, gdy podasz datę porodu.</p>
+          <p>Pojawią się, gdy podasz przewidywaną datę porodu.</p>
         )}
       </Card>
 
       <Card title="Źródła">
         <ul className="list-disc space-y-1.5 pl-5 marker:text-zus-400">
-          <li>Przewodnik ZUS z opisu wyzwania HackNation 2026 — najważniejsze źródło.</li>
-          <li>Kodeks pracy — wymiary urlopów i terminy wniosków.</li>
-          <li>Ustawa zasiłkowa — wysokość zasiłku macierzyńskiego.</li>
+          <li>
+            Przewodnik ZUS z opisu wyzwania HackNation 2026, sekcja A „Zasiłek macierzyński dla
+            kobiety”, punkt „Przygotowanie do porodu” (s. 5).
+          </li>
         </ul>
         {timeline && (
           <p className="mt-3 text-xs text-navy-500">Wersja parametrów: {timeline.params_version}</p>

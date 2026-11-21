@@ -1,18 +1,12 @@
-import { useCallback, useRef, useState } from 'react'
-import { streamChat } from '../api'
-import type { Scenario, Timeline } from '../types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { deleteSession, fetchSession, streamChat } from '../api'
+import { currentSessionId, newSessionId } from '../lib/session'
+import type { StoredMessage, StoredPart, Timeline } from '../types'
 
-export type ToolStatus = 'running' | 'done' | 'failed'
+export type MessagePart = StoredPart
+export type ToolStatus = Extract<StoredPart, { kind: 'tool' }>['status']
 
-export type MessagePart =
-  | { kind: 'text'; text: string }
-  | { kind: 'tool'; id: string; name: string; args: Record<string, unknown>; status: ToolStatus }
-
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  parts: MessagePart[]
-  status: 'streaming' | 'done'
+export interface ChatMessage extends StoredMessage {
   error?: string
 }
 
@@ -40,17 +34,37 @@ interface Options {
 }
 
 /**
- * Conversation with the assistant. The client keeps the opaque history and the scenario and
- * sends them with every message; the backend streams text, tool calls and timeline updates.
+ * Conversation with the assistant. The backend stores it per session id (Supabase), so a
+ * reload brings the chat and the timeline back. The browser keeps only the id.
  */
 export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
+  const [restoring, setRestoring] = useState(true)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [changed, setChanged] = useState<ChangeSet>({ ids: [], version: 0 })
-  const history = useRef<unknown[]>([])
-  const scenario = useRef<Scenario | undefined>(undefined)
+  const sessionId = useRef(currentSessionId())
   const request = useRef<AbortController | null>(null)
+
+  // Pick up the stored conversation after a reload.
+  useEffect(() => {
+    let cancelled = false
+    fetchSession(sessionId.current)
+      .then((session) => {
+        if (cancelled) return
+        setMessages((current) => (current.length === 0 ? session.messages : current))
+        setTimeline((current) => current ?? session.timeline)
+      })
+      .catch(() => {
+        // Backend unreachable: start empty; sending a message will show the error.
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const send = useCallback(
     async (text: string) => {
@@ -69,7 +83,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
 
       try {
         await streamChat(
-          { message: text, history: history.current, scenario: scenario.current },
+          { session_id: sessionId.current, message: text },
           (event) => {
             switch (event.type) {
               case 'text':
@@ -95,7 +109,6 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
                 }))
                 break
               case 'timeline':
-                scenario.current = event.scenario
                 setTimeline(event.timeline)
                 setChanged((c) => ({ ids: event.changed, version: c.version + 1 }))
                 onTimeline?.(event.focus)
@@ -103,11 +116,10 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
               case 'focus':
                 onFocus?.(event.element_id)
                 break
-              case 'done':
-                history.current = event.history
-                break
               case 'error':
                 patch((m) => ({ ...m, error: event.message }))
+                break
+              case 'done':
                 break
             }
           },
@@ -133,17 +145,17 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   /** Stop the answer that is being written. */
   const stop = useCallback(() => request.current?.abort(), [])
 
-  /** Forget the conversation and the timeline and start again. */
+  /** Forget the conversation and the timeline (also on the server) and start again. */
   const reset = useCallback(() => {
     request.current?.abort()
     request.current = null
-    history.current = []
-    scenario.current = undefined
+    void deleteSession(sessionId.current).catch(() => undefined)
+    sessionId.current = newSessionId()
     setBusy(false)
     setMessages([])
     setTimeline(null)
     setChanged({ ids: [], version: 0 })
   }, [])
 
-  return { messages, busy, send, stop, reset, timeline, changed }
+  return { messages, busy, restoring, send, stop, reset, timeline, changed }
 }

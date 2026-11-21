@@ -8,7 +8,7 @@ Produkt, domena i zasady pracy: [CLAUDE.md](CLAUDE.md).
 
 - **Backend**: Python 3.13, FastAPI, uv — `backend/`
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, komponenty i animacje ze Spectrum UI (Motion), kolory ZUS — `frontend/`
-- **Baza**: Supabase (Postgres), migracje SQL w `supabase/migrations/`
+- **Baza**: Supabase (Postgres) — rozmowy i odpowiedzi z wywiadu w tabeli `sessions`; migracje SQL w `supabase/migrations/` (na hostowanym projekcie: `npx supabase db push` albo SQL Editor)
 - **Asystent AI**: Pydantic AI + Claude (przez OpenRouter) — rozmowa zbiera datę porodu i inne fakty, a narzędzia agenta zmieniają oś czasu. Daty liczy deterministyczny silnik reguł, nie AI.
 
 ## Wymagania
@@ -25,7 +25,7 @@ cp backend/.env.example backend/.env   # uzupełnij klucze
 npm run dev                            # API na :8000 + frontend na :5173
 ```
 
-Otwórz http://localhost:5173 i podaj w czacie datę porodu. Czat potrzebuje klucza LLM w `backend/.env` (domyślnie `OPENROUTER_API_KEY`; Claude przez OpenRouter); bez klucza zwraca komunikat o wyłączonym asystencie. Kalkulator działa bez AI pod `POST /api/timeline` (dokumentacja API: http://localhost:8000/docs).
+Otwórz http://localhost:5173 i podaj w czacie przewidywaną datę porodu. Aplikację budujemy fazami, po jednym punkcie Przewodnika ZUS; zrobiona jest faza 1 „Przygotowanie do porodu” (lista faz w CLAUDE.md). Czat potrzebuje klucza LLM w `backend/.env` (domyślnie `OPENROUTER_API_KEY`; Claude przez OpenRouter); bez klucza zwraca komunikat o wyłączonym asystencie. Kalkulator działa bez AI pod `POST /api/timeline` (dokumentacja API: http://localhost:8000/docs).
 
 ## Komendy
 

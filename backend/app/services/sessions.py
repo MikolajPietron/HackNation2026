@@ -1,0 +1,105 @@
+"""Where a conversation lives between requests: the `sessions` table in Supabase.
+
+Only the backend talks to Supabase, with the secret key. Without Supabase settings, or before
+the migration is applied, sessions are kept in memory so the app still works (and says so in
+/api/health).
+"""
+
+import datetime as dt
+import logging
+from typing import Any, Protocol
+from uuid import UUID
+
+from postgrest.exceptions import APIError
+from pydantic import BaseModel, Field
+from supabase import AsyncClient, acreate_client
+
+from app.engine import Scenario
+
+logger = logging.getLogger(__name__)
+
+TABLE = "sessions"
+TABLE_MISSING = "PGRST205"
+
+
+class Session(BaseModel):
+    scenario: Scenario = Field(default_factory=Scenario)
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    """Pydantic AI message history, as JSON."""
+
+
+class SessionStore(Protocol):
+    name: str
+
+    async def load(self, session_id: UUID) -> Session: ...
+    async def save(self, session_id: UUID, session: Session) -> None: ...
+    async def delete(self, session_id: UUID) -> None: ...
+
+
+class MemorySessionStore:
+    """Sessions in this process only: lost on restart. For tests and as a fallback."""
+
+    def __init__(self, name: str = "memory") -> None:
+        self.name = name
+        self._sessions: dict[UUID, Session] = {}
+
+    async def load(self, session_id: UUID) -> Session:
+        return self._sessions.get(session_id, Session()).model_copy(deep=True)
+
+    async def save(self, session_id: UUID, session: Session) -> None:
+        self._sessions[session_id] = session.model_copy(deep=True)
+
+    async def delete(self, session_id: UUID) -> None:
+        self._sessions.pop(session_id, None)
+
+
+class SupabaseSessionStore:
+    name = "supabase"
+
+    def __init__(self, client: AsyncClient) -> None:
+        self._client = client
+
+    async def load(self, session_id: UUID) -> Session:
+        query = self._client.table(TABLE).select("scenario,history").eq("id", str(session_id))
+        rows = (await query.limit(1).execute()).data
+        return Session.model_validate(rows[0]) if rows else Session()
+
+    async def save(self, session_id: UUID, session: Session) -> None:
+        row = {
+            "id": str(session_id),
+            **session.model_dump(mode="json"),
+            "updated_at": dt.datetime.now(dt.UTC).isoformat(),
+        }
+        await self._client.table(TABLE).upsert(row).execute()
+
+    async def delete(self, session_id: UUID) -> None:
+        await self._client.table(TABLE).delete().eq("id", str(session_id)).execute()
+
+
+_memory = MemorySessionStore()
+_missing_table = MemorySessionStore("memory (brak tabeli sessions w Supabase: zastosuj migrację)")
+_supabase: dict[tuple[str, str], SupabaseSessionStore] = {}
+
+
+async def open_session_store(url: str, secret_key: str) -> SessionStore:
+    """Supabase when it is configured and the table exists, otherwise memory.
+
+    A ready Supabase store is cached. While the table is missing we check again on every call,
+    so the app switches over as soon as the migration is applied, without a restart.
+    """
+    if not url or not secret_key:
+        return _memory
+    cached = _supabase.get((url, secret_key))
+    if cached is not None:
+        return cached
+    client = await acreate_client(url, secret_key)
+    try:
+        await client.table(TABLE).select("id").limit(1).execute()
+    except APIError as exc:
+        if exc.code != TABLE_MISSING:
+            raise
+        logger.warning("Supabase has no `%s` table yet; keeping sessions in memory.", TABLE)
+        return _missing_table
+    store = SupabaseSessionStore(client)
+    _supabase[(url, secret_key)] = store
+    return store

@@ -1,5 +1,5 @@
-import { dayNumber } from '../../lib/dates'
-import type { Application, Lane, Marker, Segment, Timeline } from '../../types'
+import { dayNumber } from '@/lib/dates'
+import type { Document, Lane, Marker, Segment, Timeline } from '@/types'
 
 interface ItemBase {
   id: string
@@ -11,11 +11,11 @@ interface ItemBase {
   endDay: number
 }
 
-/** Segments, markers and applications in one shape, for drawing. */
+/** Segments, markers and documents in one shape, for drawing. */
 export type TimelineItem =
   | (ItemBase & { kind: 'segment'; element: Segment })
   | (ItemBase & { kind: 'marker'; element: Marker })
-  | (ItemBase & { kind: 'application'; element: Application })
+  | (ItemBase & { kind: 'document'; element: Document })
 
 export function timelineItems(timeline: Timeline): TimelineItem[] {
   return [
@@ -45,17 +45,17 @@ export function timelineItems(timeline: Timeline): TimelineItem[] {
         endDay: dayNumber(m.date),
       }),
     ),
-    ...timeline.applications.map(
-      (a): TimelineItem => ({
-        kind: 'application',
-        element: a,
-        id: a.id,
-        lane: 'applications',
-        label: a.label,
-        title: a.title,
-        start: a.due,
-        startDay: dayNumber(a.due),
-        endDay: dayNumber(a.due),
+    ...timeline.documents.map(
+      (d): TimelineItem => ({
+        kind: 'document',
+        element: d,
+        id: d.id,
+        lane: 'documents',
+        label: d.label,
+        title: d.title,
+        start: d.needed_by,
+        startDay: dayNumber(d.needed_by),
+        endDay: dayNumber(d.needed_by),
       }),
     ),
   ]

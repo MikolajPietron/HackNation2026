@@ -1,7 +1,7 @@
 """Plain-text views of the timeline for the model. All dates and numbers come from the engine."""
 
 from app.engine.models import (
-    Application,
+    Document,
     Marker,
     Scenario,
     Segment,
@@ -9,52 +9,39 @@ from app.engine.models import (
     Timeline,
     TimelineElement,
 )
-from app.engine.timeline import fmt, percent
-
-LANES = {"mother": "Mama", "father": "Tata", "child": "Dziecko", "applications": "Wnioski"}
-PARENTS = {"mother": "mama", "father": "tata"}
-DOCS = {"przewodnik": "Przewodnik", "kp": "Kodeks pracy", "ustawa": "ustawa zasiłkowa"}
+from app.engine.timeline import fmt
 
 
 def source_label(source: SourceRef) -> str:
-    where = f"s. {source.page}" if source.page else source.article
-    return f"{DOCS[source.doc]}, {where}" if where else DOCS[source.doc]
+    return f"Przewodnik ZUS, s. {source.page}"
 
 
-def describe_scenario(scenario: Scenario) -> str:
-    """For an empty timeline: what we already know, if anything."""
-    known = []
-    if scenario.children_count > 1:
-        known.append(f"dzieci z jednego porodu: {scenario.children_count}")
-    if scenario.maternity_weeks_before_birth:
-        known.append(f"urlop przed porodem: {scenario.maternity_weeks_before_birth} tyg.")
-    if scenario.flat_rate:
-        known.append("wybrany wariant jednej stawki zasiłku")
-    facts = f" Już wiadomo: {'; '.join(known)}." if known else ""
-    return f"Data porodu nie jest jeszcze ustawiona — oś czasu jest pusta.{facts}"
+def describe_interview(scenario: Scenario) -> str:
+    """What the interview still has to establish."""
+    missing = []
+    if scenario.due_date is None:
+        missing.append("przewidywana data porodu")
+    if scenario.leave_before_birth_weeks is None:
+        missing.append("urlop przed porodem czy praca do dnia porodu")
+    elif scenario.leave_before_birth_weeks > 0 and scenario.has_medical_certificate is None:
+        missing.append("czy mama ma zaświadczenie lekarskie o przewidywanej dacie porodu")
+    if not missing:
+        return "Wywiad: wszystko ustalone."
+    return "Wywiad — do ustalenia: " + "; ".join(missing) + "."
 
 
 def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> str:
-    status = "faktyczna" if timeline.child_born else "przewidywana"
     lines = [
-        f"Data porodu: {fmt(timeline.birth_date)} ({status}). "
-        f"Dzieci z jednego porodu: {timeline.children_count}. Dziś: {fmt(timeline.today)}.",
+        f"Przewidywana data porodu: {fmt(timeline.due_date)}. Dziś: {fmt(timeline.today)}.",
         "",
-        "Odcinki (id w nawiasach):",
+        "Na osi (id w nawiasach):",
     ]
     for s in timeline.segments:
-        example = ", przykładowy termin" if s.is_example else ""
-        lines.append(
-            f"- [{s.id}] {LANES[s.lane]}: {s.title}, {fmt(s.start)}–{fmt(s.end)} ({s.days} dni), "
-            f"zasiłek {percent(s.rate_percent)}{example}"
-        )
-    lines += ["", "Ważne dni:"]
+        lines.append(f"- [{s.id}] {s.title}: {fmt(s.start)}–{fmt(s.end)} ({s.days} dni)")
     lines += [f"- [{m.id}] {fmt(m.date)}: {m.title}" for m in timeline.markers]
-    lines += ["", "Wnioski:"]
-    for a in timeline.applications:
-        when = f"termin: {fmt(a.due)}" if a.is_deadline else f"potrzebny na: {fmt(a.due)}"
-        passed = " — TERMIN MINĄŁ" if a.passed else ""
-        lines.append(f"- [{a.id}] {PARENTS[a.parent]}: {a.title}, {when}{passed}")
+    for d in timeline.documents:
+        status = "mama już je ma" if d.done else "jeszcze potrzebne"
+        lines.append(f"- [{d.id}] {d.title}: potrzebne na {fmt(d.needed_by)} ({status})")
     if timeline.warnings:
         lines += ["", "Ostrzeżenia:", *(f"- {w}" for w in timeline.warnings)]
     if changed:
@@ -67,23 +54,18 @@ def describe_element(element: TimelineElement) -> str:
         case Segment():
             period = f"{fmt(element.start)}–{fmt(element.end)}"
             lines = [
-                f"{element.title} ({LANES[element.lane]}): {period}, {element.days} dni.",
-                f"Świadczenie: {element.benefit}. Kto wypłaca: {element.payer}",
+                f"{element.title}: {period}, {element.days} dni.",
                 element.summary,
                 *element.details,
             ]
         case Marker():
             lines = [f"{element.title}: {fmt(element.date)}.", element.summary, *element.details]
-        case Application():
-            when = ("Termin: " if element.is_deadline else "Potrzebny na: ") + fmt(element.due)
+        case Document():
+            status = "mama już je ma" if element.done else "jeszcze potrzebne"
             lines = [
-                f"{element.title} ({PARENTS[element.parent]}). {when}"
-                f"{' (termin minął)' if element.passed else ''}.",
-                f"Zasada: {element.rule}",
-                f"Gdzie złożyć: {element.where}",
+                f"{element.title}: potrzebne na {fmt(element.needed_by)} ({status}).",
+                element.rule,
             ]
-    lines += ["", "Źródła:"]
-    for s in element.sources:
-        quote = f": „{s.quote}”" if s.quote else ""
-        lines.append(f"- {source_label(s)}{quote}")
+    lines += ["", "Źródła (cytuj dosłownie):"]
+    lines += [f"- {source_label(s)}: „{s.quote}”" for s in element.sources]
     return "\n".join(lines)
