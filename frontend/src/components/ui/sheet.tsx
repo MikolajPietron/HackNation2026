@@ -50,7 +50,8 @@ export function Sheet({
             <motion.div
               animate={{ height: bounds.height || 'auto' }}
               transition={{ duration: 0.35, ease: EASE_DRAWER }}
-              className="scrollbar-soft min-h-0 overflow-y-auto"
+              data-scroll
+              className="scrollbar-soft min-h-0 overflow-y-auto overscroll-contain"
             >
               <div ref={inner} className="px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                 {children}

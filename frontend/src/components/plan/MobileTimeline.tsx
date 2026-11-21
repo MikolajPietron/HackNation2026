@@ -11,7 +11,7 @@ import { dayNumber, durationLabel, formatDayMonthShort, isoFromDay } from '@/lib
 import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { Segment, Timeline } from '@/types'
-import { Readout } from './PlanTimeline'
+import { Readout } from './Readout'
 
 interface Row {
   id: string

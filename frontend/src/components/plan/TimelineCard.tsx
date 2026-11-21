@@ -1,12 +1,16 @@
-// The timeline with its summary underneath, in one card. "Rozwiń" opens the same axis over the
-// whole plan column, zoomed in, for a closer look; Escape or "Zwiń" brings it back.
+// The timeline with what lies ahead underneath, in one card. The switch at the top shows the
+// same plan as a wall calendar. "Rozwiń" opens the axis over the whole plan column, zoomed in,
+// for a closer look; Escape or "Zwiń" brings it back.
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
+import { usePlanView } from '@/hooks/usePlanView'
 import { EASE_OUT } from '@/lib/ease'
 import type { Timeline } from '@/types'
-import { PlanAgenda } from './PlanAgenda'
+import { NextSteps } from './NextSteps'
 import { PlanTimeline } from './PlanTimeline'
+import { ViewSwitch } from './ViewSwitch'
+import { YearCalendar } from './YearCalendar'
 
 interface Props {
   timeline: Timeline
@@ -22,6 +26,7 @@ interface Props {
 export function TimelineCard({ overlayRoot, ...props }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [view, setView] = usePlanView()
 
   useEffect(() => {
     if (!expanded) return
@@ -33,24 +38,16 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [expanded])
 
-  const content = (zoom: number, isExpanded: boolean) => (
-    <>
-      <PlanTimeline
-        {...props}
-        hoveredId={hovered}
-        onHover={setHovered}
-        initialZoom={zoom}
-        expanded={isExpanded}
-        preview
-        onToggleExpanded={() => setExpanded(!isExpanded)}
-      />
-      <PlanAgenda
-        timeline={props.timeline}
-        hoveredId={hovered}
-        onHover={setHovered}
-        onSelect={props.onSelect}
-      />
-    </>
+  const axis = (zoom: number, isExpanded: boolean) => (
+    <PlanTimeline
+      {...props}
+      hoveredId={hovered}
+      onHover={setHovered}
+      initialZoom={zoom}
+      expanded={isExpanded}
+      onToggleExpanded={() => setExpanded(!isExpanded)}
+      toolbarStart={isExpanded ? undefined : <ViewSwitch view={view} onChange={setView} className="mr-2" />}
+    />
   )
 
   const overlay = (
@@ -73,7 +70,7 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
             transition={{ duration: 0.25, ease: EASE_OUT }}
             className="min-h-full rounded-4xl border border-line bg-white px-6 pt-4 pb-3 shadow-[0_24px_60px_-30px_rgb(26_36_56/0.28)]"
           >
-            {content(2.25, true)}
+            {axis(2.25, true)}
           </motion.div>
         </motion.div>
       )}
@@ -82,7 +79,24 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
 
   return (
     <>
-      <div className="rounded-4xl border border-line px-5 pt-4 pb-3">{content(1, false)}</div>
+      <div className="rounded-4xl border border-line px-5 pt-4 pb-5">
+        {view === 'axis' ? (
+          axis(1, false)
+        ) : (
+          <>
+            <ViewSwitch view={view} onChange={setView} className="mb-4 w-fit" />
+            <YearCalendar timeline={props.timeline} onSelect={props.onSelect} />
+          </>
+        )}
+        <NextSteps
+          timeline={props.timeline}
+          changedIds={props.changedIds}
+          changeVersion={props.changeVersion}
+          hoveredId={hovered}
+          onHover={setHovered}
+          onSelect={props.onSelect}
+        />
+      </div>
       {overlayRoot && createPortal(overlay, overlayRoot)}
     </>
   )

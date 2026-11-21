@@ -1,7 +1,8 @@
-// The plan screen, for phones and wide screens. The timeline is the main thing, so everything
-// above it is one line: how long the leave is and when. Then the one decision the family has to
-// make (if any), the "what if" events, the timeline (an editor-style axis on wide screens, a
-// vertical line on phones), plans and risks. Legal text and sources only on demand.
+// The plan screen, for phones and wide screens. On top the situation in one sentence and the
+// answers to the parents' questions (entitled? how much leave together? what now?); then the one
+// decision the family has to make (if any), the "what if" events, the timeline (an editor-style
+// axis on wide screens, a vertical list on phones, or a wall calendar) with what lies ahead,
+// plans and risks. The why, with the sources, opens on demand ("Dlaczego tak?").
 // Wide screens: the assistant is open beside the plan and can be hidden; details are a dialog.
 // Phones: the assistant and the details come up as sheets from the bottom (Vaul).
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -19,26 +20,28 @@ import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
 import { Sheet } from '@/components/ui/sheet'
-import { TextStates } from '@/components/ui/text-states'
-import { CaseNotes } from '@/components/timeline/CaseNotes'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { formatLongDate, formatShortDate } from '@/lib/dates'
+import { usePlanView } from '@/hooks/usePlanView'
 import { EASE_OUT, SPRING_PANEL, SPRING_PRESS } from '@/lib/ease'
 import { nextQuestion } from '@/lib/interview'
 import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
-import { plural, sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, Scenario, Timeline } from '@/types'
 import { Dialog } from './Dialog'
+import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
 import { MobileTimeline } from './MobileTimeline'
+import { NextSteps } from './NextSteps'
+import { Overview } from './Overview'
 import { RiskRadar } from './RiskRadar'
 import { TimelineCard } from './TimelineCard'
+import { ViewSwitch } from './ViewSwitch'
 import { WhatIf } from './WhatIf'
+import { YearCalendar } from './YearCalendar'
 
 /** The chat column grows with the screen: roomy on a big monitor, never squeezing the plan on
  *  a small laptop. */
@@ -91,7 +94,9 @@ export function PlanScreen({
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  const [about, setAbout] = useState(false)
+  /** The explanation window, opened at one point of it or at the top. */
+  const [why, setWhy] = useState<{ focus?: string } | null>(null)
+  const [view, setView] = usePlanView()
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
   const mockTimer = useRef(0)
@@ -157,7 +162,7 @@ export function PlanScreen({
           onLogout={() => setPersona(null)}
           onZusData={() => setZusOpen(true)}
           onCases={() => setCasesOpen(true)}
-          onAbout={() => setAbout(true)}
+          onAbout={() => setWhy({})}
           onStartOver={onStartOver}
           onMock={showMock}
         />
@@ -174,10 +179,13 @@ export function PlanScreen({
             >
               {timeline ? (
                 <>
-                  <Summary
+                  <Overview
                     timeline={timeline}
+                    changed={changed}
                     wide={wide}
-                    onAbout={() => setAbout(true)}
+                    decisionPending={Boolean(next?.title)}
+                    onWhy={(focus) => setWhy({ focus })}
+                    onSelect={onSelect}
                     onStartOver={onStartOver}
                   />
 
@@ -205,12 +213,6 @@ export function PlanScreen({
                     )}
                   </AnimatePresence>
 
-                  {/* The case explained in plain words, short until opened (CLAUDE.md,
-                      "Wyjaśnianie przypadku"); the points an answer changed light up. */}
-                  <motion.div variants={ITEM} className="mt-5 @container">
-                    <CaseNotes notes={timeline.notes} changed={changed} />
-                  </motion.div>
-
                   <motion.div variants={ITEM} className="mt-5">
                     <WhatIf scenario={scenario} busy={busy} onSend={choose} onMock={showMock} />
                   </motion.div>
@@ -226,13 +228,33 @@ export function PlanScreen({
                         overlayRoot={overlayRoot}
                       />
                     ) : (
-                      <MobileTimeline
-                        timeline={timeline}
-                        changedIds={changedIds}
-                        changeVersion={changed.version}
-                        selectedId={selectedId}
-                        onSelect={onSelect}
-                      />
+                      <>
+                        <NextSteps
+                          timeline={timeline}
+                          changedIds={changedIds}
+                          changeVersion={changed.version}
+                          hoveredId={null}
+                          onHover={() => undefined}
+                          onSelect={onSelect}
+                        />
+                        <div className="mt-8 flex items-center justify-between gap-3">
+                          <h3 className="text-lg font-bold text-navy-900">Cały plan</h3>
+                          <ViewSwitch view={view} onChange={setView} axisLabel="Lista" />
+                        </div>
+                        {view === 'axis' ? (
+                          <MobileTimeline
+                            timeline={timeline}
+                            changedIds={changedIds}
+                            changeVersion={changed.version}
+                            selectedId={selectedId}
+                            onSelect={onSelect}
+                          />
+                        ) : (
+                          <div className="mt-4">
+                            <YearCalendar timeline={timeline} onSelect={onSelect} />
+                          </div>
+                        )}
+                      </>
                     )}
                   </motion.section>
 
@@ -255,9 +277,9 @@ export function PlanScreen({
                   <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
                 </Dialog>
               )}
-              {about && timeline && (
-                <Dialog key="about" label="Jak to liczymy" onClose={() => setAbout(false)}>
-                  <HowWeCount timeline={timeline} />
+              {why && timeline && (
+                <Dialog key="why" label="Dlaczego tak?" onClose={() => setWhy(null)}>
+                  <Explanation timeline={timeline} focusId={why.focus} />
                 </Dialog>
               )}
             </AnimatePresence>
@@ -322,8 +344,12 @@ export function PlanScreen({
               <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
             )}
           </Sheet>
-          <Sheet open={about && timeline !== null} onOpenChange={setAbout} title="Jak to liczymy">
-            {timeline && <HowWeCount timeline={timeline} />}
+          <Sheet
+            open={why !== null && timeline !== null}
+            onOpenChange={(open) => !open && setWhy(null)}
+            title="Dlaczego tak?"
+          >
+            {timeline && <Explanation timeline={timeline} focusId={why?.focus} />}
           </Sheet>
         </>
       )}
@@ -359,56 +385,6 @@ export function PlanScreen({
         )}
       </AnimatePresence>
     </div>
-  )
-}
-
-/** The answer in one line: how long the mother's leave is and when. */
-function Summary({
-  timeline,
-  wide,
-  onAbout,
-  onStartOver,
-}: {
-  timeline: Timeline
-  wide: boolean
-  onAbout: () => void
-  onStartOver: () => void
-}) {
-  const leave = timeline.segments.filter((s) => s.lane === 'mother' && s.tone === 'leave')
-  const days = leave.reduce((sum, s) => sum + s.days, 0)
-  const start = leave.map((s) => s.start).sort()[0]
-  const end = leave.map((s) => s.end).sort().at(-1)
-  const amount =
-    days === 0
-      ? 'Twój plan'
-      : days % 7 === 0
-        ? `${days / 7} ${plural(days / 7, 'tydzień', 'tygodnie', 'tygodni')}`
-        : `${days} ${plural(days, 'dzień', 'dni', 'dni')}`
-  const range =
-    start && end
-      ? `${formatShortDate(start)} – ${formatShortDate(end)}`
-      : `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`
-
-  return (
-    <motion.header variants={ITEM} className="flex flex-wrap items-end gap-x-6 gap-y-2">
-      <div className="min-w-0">
-        <p className="text-sm font-bold text-zus-700">Urlop macierzyński</p>
-        <h1 className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-3xl leading-tight font-bold tracking-tight text-navy-900 lg:text-4xl">
-          <TextStates text={amount} />
-          <span className="text-base font-bold tracking-normal text-navy-400 lg:text-xl">
-            <TextStates text={range} />
-          </span>
-        </h1>
-      </div>
-      {wide && (
-        <div className="ml-auto flex items-center gap-1">
-          <GhostButton onClick={onAbout}>Jak to liczymy?</GhostButton>
-          <GhostButton onClick={onStartOver}>
-            <RotateCcw className="size-4" /> Od nowa
-          </GhostButton>
-        </div>
-      )}
-    </motion.header>
   )
 }
 
@@ -481,49 +457,6 @@ function Decision({
         })}
       </div>
     </motion.section>
-  )
-}
-
-/** The case explanation and the calculator's assumptions, out of the way until asked for. */
-function HowWeCount({ timeline }: { timeline: Timeline }) {
-  return (
-    <div className="space-y-6 text-navy-700">
-      <header className="pr-10">
-        <h2 className="text-2xl font-bold tracking-tight text-navy-900">Jak to liczymy</h2>
-        <p className="mt-2">
-          Daty liczy kalkulator reguł, bez AI. Rozmowę prowadzi asystent AI. Każdy element osi ma
-          dosłowny cytat z Przewodnika ZUS albo Kodeksu pracy.
-        </p>
-      </header>
-      {timeline.notes.length > 0 && (
-        <ul className="space-y-4">
-          {timeline.notes.map((note) => (
-            <li key={note.id}>
-              <p className="font-bold text-navy-900">{note.title}</p>
-              <p className="mt-0.5 leading-relaxed">{note.text}</p>
-              {note.sources.length > 0 && (
-                <p className="mt-1 text-sm text-navy-400">
-                  {[...new Set(note.sources.map(sourceLabel))].join(' · ')}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {timeline.assumptions.length > 0 && (
-        <section>
-          <h3 className="font-bold text-navy-900">Założenia kalkulatora</h3>
-          <ul className="mt-2 space-y-1.5">
-            {timeline.assumptions.map((text) => (
-              <li key={text} className="flex gap-3">
-                <span className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-navy-200" />
-                <span>{text}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
   )
 }
 
