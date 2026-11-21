@@ -697,6 +697,45 @@ SCENARIOS = [
         ],
     },
     {
+        "id": "parental-work-and-split",
+        "about": "half-time work extends parental leave; then both parents at once (guide E p. 9, "
+        "B.3 p. 7; KP art. 182¹ᵉ § 1, 182¹ᶠ § 2, 182¹ᵃ § 6)",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Przez pierwsze 20 tygodni urlopu rodzicielskiego będę pracować na pół "
+                "etatu.",
+                "tools": [{"name": "set_parental_work", "args": {"parent": "mother", "weeks": 20}}],
+                "timeline": {
+                    "segments": {
+                        # 32 weeks + 20 x 1/2 = 10 weeks = 294 days: 02.08.2027 + 293 days.
+                        "parental-mother-1": ["2027-08-02", "2028-05-21"],
+                        # The father's 9 weeks right after her: 22.05.2028 + 62 days.
+                        "parental-father": ["2028-05-22", "2028-07-23"],
+                    },
+                    "absent": ["parental"],
+                },
+                "mention": {"dates": ["2028-05-21"]},
+                "question": "leave-before-birth",
+            },
+            {
+                "say": "Zmiana planu: wezmę 20 tygodni urlopu rodzicielskiego bez pracy, a mąż "
+                "w tym samym czasie swoje 9 tygodni.",
+                "tools": [{"name": "set_parental_plan"}],
+                "timeline": {
+                    "segments": {
+                        "parental-mother-1": ["2027-08-02", "2027-12-19"],  # 20 weeks
+                        "parental-father-1": ["2027-08-02", "2027-10-03"],  # 9 weeks, at once
+                    },
+                    "absent": ["parental-father"],
+                },
+                "question": "leave-before-birth",
+            },
+        ],
+    },
+    {
         "id": "traps",
         "about": "out-of-scope questions and wrong premises; nothing may change on the timeline",
         "runs": 1,
@@ -719,9 +758,10 @@ SCENARIOS = [
                 "forbid": [r"21 dni", r"14 dni przed", r"7 dni przed"],
             },
             {
+                # A question, not a plan (guide E p. 9): answered from the source, nothing saved.
                 "say": "Czy mogę łączyć urlop rodzicielski z pracą na pół etatu?",
-                "out_of_scope": True,
-                "forbid": [r"wydłuż", r"proporcjonaln"],
+                "no_tools": ["set_parental_work", "set_parental_plan"],
+                "require": [r"wydłuż"],
             },
             {
                 "say": "Adoptujemy jeszcze drugie dziecko — ile urlopu nam wtedy przysługuje?",

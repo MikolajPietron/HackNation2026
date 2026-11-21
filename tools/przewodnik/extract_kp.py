@@ -4,7 +4,8 @@ The source is the Labour Code excerpt from the ZUS materials (docs/dokumentyZUS/
 Only the provisions listed below are copied: it is public law text, which the app quotes word
 for word. Two things are restored, nothing else is changed:
 - pdftotext glues "nie" to the next word in this PDF ("niewięcej");
-- it flattens superscripts in article numbers ("art. 1831 § 1" is art. 183¹ § 1).
+- it flattens superscripts in article and paragraph numbers ("art. 1831 § 1" is art. 183¹ § 1,
+  "§ 11" in art. 182¹ᶠ § 3 is § 1¹).
 
 Run from the repo root (requires poppler: pdftotext):
     python3 tools/przewodnik/extract_kp.py
@@ -44,7 +45,17 @@ PROVISIONS = {
     "art. 182¹ᵃ § 3": ("Art. 1821a [", "3"),
     "art. 182¹ᵃ § 4": ("Art. 1821a [", "4"),
     "art. 182¹ᵃ § 6": ("Art. 1821a [", "6"),
+    "art. 182¹ᵃ § 7": ("Art. 1821a [", "7"),
     "art. 182¹ᶜ": ("Art. 1821c [", None),
+    "art. 182¹ᵈ § 2": ("Art. 1821d [", "2"),
+    "art. 182¹ᵉ § 1": ("Art. 1821e [", "1"),
+    "art. 182¹ᵉ § 2": ("Art. 1821e [", "2"),
+    "art. 182¹ᶠ § 1": ("Art. 1821f [", "1"),
+    "art. 182¹ᶠ § 1¹": ("Art. 1821f [", "11"),
+    "art. 182¹ᶠ § 2": ("Art. 1821f [", "2"),
+    "art. 182¹ᶠ § 3": ("Art. 1821f [", "3"),
+    "art. 182¹ᶠ § 4": ("Art. 1821f [", "4"),
+    "art. 182¹ᶠ § 5": ("Art. 1821f [", "5"),
     "art. 182¹ᵍ": ("Art. 1821g [", None),
     "art. 182³ § 1": ("Art. 1823 [", "1"),
     "art. 182³ § 1¹": ("Art. 1823 [", "11"),
@@ -56,6 +67,7 @@ PROVISIONS = {
 GLUED = {
     "niewięcej": "nie więcej",
     "niewiększą": "nie większą",
+    "niewyższym": "nie wyższym",
     "niekrótszym": "nie krótszym",
     "niekrócej": "nie krócej",
     "niewcześniej": "nie wcześniej",
@@ -63,9 +75,11 @@ GLUED = {
     "niepóźniej": "nie później",
 }
 
-# Article numbers inside the provisions, as the PDF text has them -> as the Code numbers them.
+# Article and paragraph numbers inside the provisions, as the PDF text has them -> as the Code
+# numbers them.
 FLAT = {
     "art. 1801 § 2": "art. 180¹ § 2",
+    "§ 1 albo § 11,": "§ 1 albo § 1¹,",
     "art. 1831 § 1": "art. 183¹ § 1",
     "art. 1868a": "art. 186⁸ᵃ",
 }

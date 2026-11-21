@@ -10,7 +10,7 @@ import datetime as dt
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import Field, ValidationError
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
 from pydantic_ai.capabilities import PrepareTools
 from pydantic_ai.tools import ToolDefinition
@@ -32,7 +32,16 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
+from app.engine.models import (
+    BirthWeek,
+    ChildLoss,
+    HospitalStay,
+    MotherEvent,
+    ParentalPart,
+    Role,
+    Work,
+)
+from app.engine.parental_plan import default_part, part_ids
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -474,3 +483,98 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
     return describe_element(element)
+
+
+# Parental leave with work (guide sections E and B.3).
+
+
+@assistant.tool(sequential=True)
+async def set_parental_plan(ctx: RunContext[AssistantDeps], parts: list[ParentalPart]) -> str:
+    """Record how the parents split parental leave: who takes how many weeks, in which order,
+    at the same time or one after the other, and where one of them works part-time. Call it
+    only when the user says so; never ask about it. Give the whole plan every time: it replaces
+    the previous one. An empty list removes the plan.
+
+    Args:
+        parts: The parts in the order the parents take them (at most 5 for both together).
+            Each: {"parent": "mother" or "father"; "weeks": weeks of leave taken from the pool,
+            without the extension from work; "start": "YYYY-MM-DD" only if the user gave that
+            date (empty = right after the previous part; the first part: where the timeline
+            shows that parent's parental leave); "with_previous": true = starts on the same day
+            as the previous part (both parents at once); "work_fraction": part of full time
+            worked during this part, e.g. "1/2" (empty = no work); "work_weeks": weeks of work
+            from the first day of the part, only if the user said (empty = the whole part)}.
+    """
+    if ctx.deps.scenario.children_count is None:
+        raise ModelRetry(
+            "Najpierw ustal liczbę dzieci (set_children_count): od niej zależy wymiar urlopu "
+            "rodzicielskiego."
+        )
+    scenario = _with(ctx, parental_parts=[part.model_dump() for part in parts])
+    return await _apply(ctx, scenario, *part_ids(parts), "parental", "parental-father")
+
+
+@assistant.tool(sequential=True)
+async def set_parental_work(
+    ctx: RunContext[AssistantDeps],
+    parent: Role,
+    work_fraction: str | None,
+    weeks: int | None = None,
+    part: int | None = None,
+) -> str:
+    """Record that the mother or the father works part-time during parental leave (or, with an
+    empty work_fraction, that they do not: a correction). Call it only when the user says so;
+    never ask about it. The calculator extends the leave and computes every date. Without a
+    plan, that parent's whole share of parental leave becomes the part they work in.
+
+    Args:
+        parent: "mother" or "father".
+        work_fraction: Part of full time, as the user said it: "1/2", "1/4", "0.4", "40%".
+            Empty = no work during parental leave.
+        weeks: Weeks of work, from the first day of that part of the leave, only if the user
+            said how many (empty = all of it).
+        part: Which of that parent's parts of the plan (1 = the first), only when the plan has
+            more than one part for that parent.
+    """
+    deps = ctx.deps
+    if deps.scenario.children_count is None or deps.timeline is None:
+        raise ModelRetry(
+            "Najpierw ustal datę porodu i liczbę dzieci: od nich zależy urlop rodzicielski."
+        )
+    who = "Mama" if parent == "mother" else "Tata"
+    parts = list(deps.scenario.parental_parts)
+    own = [i for i, p in enumerate(parts) if p.parent == parent]
+    if not own:
+        if work_fraction is None:
+            raise ModelRetry(
+                f"{who} nie ma w planie urlopu rodzicielskiego: nie ma czego zmieniać."
+            )
+        try:
+            parts.append(default_part(deps.scenario, deps.params, deps.timeline, parent))
+        except ScenarioError as exc:
+            raise ModelRetry(f"Nie zmieniono osi: {exc}") from exc
+        own = [len(parts) - 1]
+    if part is None and len(own) > 1:
+        raise ModelRetry(
+            f"{who} ma w planie {len(own)} części urlopu rodzicielskiego: podaj, w której "
+            "pracuje (part)."
+        )
+    number = part or 1
+    if not 1 <= number <= len(own):
+        raise ModelRetry(f"{who} ma w planie {len(own)} części urlopu rodzicielskiego.")
+    index = own[number - 1]
+    try:
+        parts[index] = ParentalPart.model_validate(
+            {
+                **parts[index].model_dump(),
+                "work_fraction": work_fraction,
+                "work_weeks": weeks if work_fraction is not None else None,
+            }
+        )
+    except ValidationError as exc:
+        raise ModelRetry(
+            "Nie rozumiem wymiaru pracy albo liczby tygodni. Podaj wymiar jako ułamek etatu, "
+            "np. „1/2”, a tygodnie jako liczbę całkowitą."
+        ) from exc
+    scenario = _with(ctx, parental_parts=[p.model_dump() for p in parts])
+    return await _apply(ctx, scenario, part_ids(parts)[index])

@@ -86,6 +86,8 @@ def describe_person(scenario: Scenario) -> str:
             "Mama dziecka zmarła. Pisz krótko, z szacunkiem i współczuciem, bez wykrzykników "
             "i gratulacji, i mów tylko o tym, co przysługuje tacie."
         )
+    if scenario.parental_parts:
+        lines.append(describe_parental_plan(scenario))
     if scenario.earnings:
         who = "tata" if scenario.role == "father" else "mama"
         lines.append(
@@ -93,6 +95,30 @@ def describe_person(scenario: Scenario) -> str:
             "posłużą dopiero przy kwotach zasiłku. Nic z nich nie wyliczaj i nie dopytuj o nie."
         )
     return "\n".join(lines)
+
+
+def describe_parental_plan(scenario: Scenario) -> str:
+    """The parents' plan of parental leave as recorded, so a change can restate it whole."""
+    items = []
+    for number, part in enumerate(scenario.parental_parts, 1):
+        if part.start is not None:
+            when = f"od {fmt(part.start)}"
+        elif part.with_previous:
+            when = "razem z poprzednią częścią"
+        elif number > 1:
+            when = "po poprzedniej części"
+        else:
+            when = "tam, gdzie oś pokazuje urlop rodzicielski"
+        work = ""
+        if part.work_fraction is not None:
+            weeks = f"przez {part.work_weeks} tyg." if part.work_weeks else "przez całą część"
+            work = f", praca na {part.work_fraction} etatu {weeks}"
+        who = "mama" if part.parent == "mother" else "tata"
+        items.append(f"{number}) {who}: {part.weeks} tyg., {when}{work}")
+    return (
+        "Zapisany plan urlopu rodzicielskiego (przy zmianie podaj w `set_parental_plan` cały plan "
+        f"od nowa): {'; '.join(items)}. Daty i wydłużenie są na osi."
+    )
 
 
 class Question(NamedTuple):

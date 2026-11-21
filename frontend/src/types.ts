@@ -53,6 +53,24 @@ export interface MotherEvent {
   end: string | null
 }
 
+/**
+ * One part of parental leave as the parents plan it (guide sections B.3 and E). The engine
+ * gives it dates and draws it as `parental-mother-<k>` / `parental-father-<k>`.
+ */
+export interface ParentalPart {
+  parent: Role
+  /** Weeks taken from the pool, without the extension from working. */
+  weeks: number
+  /** null = right after the previous part of the plan. */
+  start: string | null
+  /** Starts on the same day as the previous part: both parents at once. */
+  with_previous: boolean
+  /** Part-time work as a fraction of full time, e.g. "1/2"; null = no work. */
+  work_fraction: string | null
+  /** Weeks combined with work from the first day of the part; null = the whole part. */
+  work_weeks: number | null
+}
+
 /** What the onboarding and the interview have established. null = not known yet. */
 export interface Scenario {
   /** The person filling in. Work and earnings are that person's own. */
@@ -88,6 +106,9 @@ export interface Scenario {
   /** Weeks after the birth the mother uses before the father takes over (default 14). */
   mother_weeks_before_takeover: number | null
   mother_event: MotherEvent | null
+  // Parental leave with work (guide section E)
+  /** How the parents split parental leave and where they work part-time; [] = no plan. */
+  parental_parts: ParentalPart[]
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */

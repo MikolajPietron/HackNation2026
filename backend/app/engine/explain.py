@@ -15,6 +15,7 @@ from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
+from app.engine.parental_plan import parental_plan_notes
 from app.engine.supplementary import describe_case, supplementary_leave
 from app.engine.wording import children_phrase, long_date, multiples, weeks_or_days
 
@@ -23,6 +24,14 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    notes = _case_notes(scenario, timeline, params)
+    # Guide E and B.3: the parents' plan of parental leave, before "Co policzyliśmy".
+    plan = parental_plan_notes(scenario, timeline, params)
+    at = next((i for i, n in enumerate(notes) if n.id == "computed"), len(notes))
+    return notes[:at] + plan + notes[at:]
+
+
+def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     cover = coverage(scenario)
     loss = child_loss(scenario, params, timeline.birth_date, timeline.today)
     if loss is not None:
@@ -233,6 +242,11 @@ def _loss_computed(scenario: Scenario, timeline: Timeline, params: Params, loss:
 
 def _segment(timeline: Timeline, segment_id: str) -> Segment | None:
     return next((s for s in timeline.segments if s.id == segment_id), None)
+
+
+def _mothers_parental(timeline: Timeline) -> bool:
+    """The mother has parental leave on the timeline: the option or parts of the parents' plan."""
+    return any(s.lane == "mother" and s.id.startswith("parental") for s in timeline.segments)
 
 
 def _marker(timeline: Timeline, marker_id: str) -> Marker | None:
@@ -538,7 +552,7 @@ def _before_birth(scenario: Scenario, timeline: Timeline, params: Params) -> Cas
 def _parental(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
     """Phase 2: after maternity leave comes parental leave; how much of it the mother can use."""
     deadline = _marker(timeline, "parental-deadline")
-    if _segment(timeline, "parental") is None or deadline is None:
+    if not _mothers_parental(timeline) or deadline is None:
         return None
     p = params.parental
     total, mothers = parental_weeks(scenario, params)
@@ -583,7 +597,7 @@ def _more_children(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
         f"{_total_weeks(count, params)} tyg. zamiast {weeks.value[0]}"
     )
     sources = [_law(weeks.sources)]
-    if _segment(timeline, "parental") is not None:
+    if _mothers_parental(timeline):
         table = parental_table(scenario, params)
         text += (
             f", a urlop rodzicielski obojga rodziców — do {table.value[1]} tyg. zamiast "
@@ -601,7 +615,7 @@ def _more_children(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
 
 def _za_zyciem(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
     """The "Za życiem" certificate: longer parental leave."""
-    if not scenario.za_zyciem or _segment(timeline, "parental") is None:
+    if not scenario.za_zyciem or not _mothers_parental(timeline):
         return None
     p = params.parental
     count = scenario.children_count
@@ -1141,7 +1155,7 @@ def _father(scenario: Scenario, timeline: Timeline, params: Params, cover: Cover
                 "okres urlopu rodzicielskiego przysługuje tacie."
             )
             sources.append(f.parental_uninsured_mother.sources)
-        elif _segment(timeline, "parental") is not None:
+        elif _mothers_parental(timeline):
             parts.append(
                 f"Z urlopu rodzicielskiego {exclusive} tyg. należy wyłącznie do taty: nie można "
                 "ich przenieść na mamę. Rodzice mogą korzystać z urlopu jednocześnie albo "

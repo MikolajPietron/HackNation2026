@@ -753,14 +753,21 @@ def test_the_fathers_leave_is_in_scope() -> None:
     out_of_scope = next(
         line for line in STATIC_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
     )
-    for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego"):
+    for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego", "łączenie urlopu"):
         assert in_scope_now not in out_of_scope
-    for still_out in ("kwoty zasiłku", "81,5%", "wnioski i ich terminy", "łączenie urlopu"):
+    for still_out in ("kwoty zasiłku", "81,5%", "wnioski i ich terminy"):
         assert still_out in out_of_scope
     assert "przysposobieniu dziecka i w rodzinie zastępczej" in out_of_scope
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
         assert f"`{tool}`" in STATIC_INSTRUCTIONS
     assert "`set_mother_situation`" in STATIC_INSTRUCTIONS
+    # Guide E and B.3: recorded when the parent says so, never asked.
+    assert "łączenie urlopu rodzicielskiego z pracą na część etatu" in scope
+    for tool in ("set_parental_plan", "set_parental_work"):
+        assert f"`{tool}`" in STATIC_INSTRUCTIONS
+    assert "O podział urlopu rodzicielskiego i o pracę w czasie tego urlopu też nie pytaj" in (
+        STATIC_INSTRUCTIONS
+    )
 
 
 def test_the_ui_gets_the_same_next_question(client: TestClient) -> None:
@@ -806,3 +813,80 @@ def test_a_birth_off_the_due_date_keeps_the_real_start_of_the_leave(
     segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
     assert segments.get("maternity-prenatal") == prenatal
     assert segments["maternity"] == (born, maternity_end)
+
+
+# Guide E and B.3: the parents' plan of parental leave, recorded when they say so.
+
+PLANNING = {
+    "role": "mother",
+    "work": "employment",
+    "father_work": "employment",
+    "child_born": False,
+    "due_date": "2027-03-15",
+    "children_count": 1,
+    "leave_before_birth_weeks": 0,
+}
+
+
+def test_work_during_parental_leave_from_the_chat(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """Without a plan, her whole share (32 weeks from 02.08.2027) becomes the part she works in:
+    20 weeks at 1/2 add 10 weeks, so it ends on 12.03.2028 + 70 days = 21.05.2028."""
+    remember(store, PLANNING)
+    returned: list[str] = []
+    args = {"parent": "mother", "work_fraction": "1/2", "weeks": 20}
+    model = scripted("set_parental_work", args, "Zapisane.", returned)
+    out = ask(client, model, "Będę pracować na pół etatu przez 20 tygodni")
+    update = next(e for e in out if e["type"] == "timeline")
+    assert update["focus"] == "parental-mother-1"
+    assert update["scenario"]["parental_parts"] == [
+        {
+            "parent": "mother",
+            "weeks": 32,
+            "start": None,
+            "with_previous": False,
+            "work_fraction": "1/2",
+            "work_weeks": 20,
+        }
+    ]
+    part = next(s for s in update["timeline"]["segments"] if s["id"] == "parental-mother-1")
+    assert (part["start"], part["end"]) == ("2027-08-02", "2028-05-21")
+    assert {"parental-plan", "parental-work", "parental-plan-computed"} <= set(
+        update["changed_notes"]
+    )
+    assert "[parental-mother-1] Urlop rodzicielski z pracą: 02.08.2027–21.05.2028" in returned[0]
+    # The next turn knows the recorded plan, to restate it whole when it changes.
+    assert (
+        "1) mama: 32 tyg., tam, gdzie oś pokazuje urlop rodzicielski, praca na 1/2 etatu przez "
+        "20 tyg."
+    ) in instructions_now(client)
+
+
+def test_a_plan_against_the_rules_is_rejected_in_the_chat(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    remember(store, PLANNING)
+    parts: list[dict[str, Any]] = [{"parent": "mother", "weeks": 32, "work_fraction": "3/4"}]
+    model = scripted("set_parental_plan", {"parts": parts}, "Najwyżej pół etatu.")
+    out = ask(client, model, "Pół roku na 3/4 etatu")
+    assert rejected("set_parental_plan") in out
+    assert not any(e["type"] == "timeline" for e in out)
+
+    # She takes 20 weeks and the father his 9 at the same time: 02.08.2027 + 139 days =
+    # 19.12.2027 and 02.08.2027 + 62 days = 03.10.2027.
+    parts = [
+        {"parent": "mother", "weeks": 20},
+        {"parent": "father", "weeks": 9, "with_previous": True},
+    ]
+    update = timeline_after(client, "set_parental_plan", {"parts": parts})
+    spans = {
+        s["id"]: (s["start"], s["end"])
+        for s in update["timeline"]["segments"]
+        if s["id"].startswith("parental")
+    }
+    assert spans == {
+        "parental-mother-1": ("2027-08-02", "2027-12-19"),
+        "parental-father-1": ("2027-08-02", "2027-10-03"),
+    }
+    assert update["focus"] == "parental-mother-1"

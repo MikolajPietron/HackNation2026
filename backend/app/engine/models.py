@@ -7,9 +7,10 @@ Labour Code provisions behind them.
 """
 
 import datetime as dt
-from typing import Literal, Self
+from fractions import Fraction
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 Lane = Literal["mother", "father", "child", "documents"]
 Tone = Literal["leave", "work", "option"]
@@ -89,6 +90,40 @@ class HospitalStay(BaseModel):
         return self
 
 
+def _exact_fraction(value: object) -> object:
+    """A part of full time as written: 0.4 is 2/5 (not the binary float), "40%" and "0,4" too."""
+    if isinstance(value, float):
+        return Fraction(str(value))
+    if isinstance(value, str):
+        text = value.strip().replace(",", ".")
+        if text.endswith("%"):
+            return Fraction(text[:-1].strip()) / 100
+        return text
+    return value
+
+
+WorkFraction = Annotated[Fraction, BeforeValidator(_exact_fraction)]
+"""Part-time work as a part of full time: "1/2", "2/5", 0.25, "40%"."""
+
+
+class ParentalPart(BaseModel):
+    """One part of parental leave as the parents plan it (guide B.3 and E; Labour Code
+    art. 182¹ᶜ, 182¹ᵉ, 182¹ᶠ). Validated against the rules by the engine (parental_plan.py)."""
+
+    parent: Role
+    weeks: int = Field(ge=1)
+    """Weeks of leave this part takes from the pool, without the extension from working."""
+    start: dt.date | None = None
+    """None = right after the previous part of the plan (the first part: where the timeline
+    shows that parent's parental leave without a plan)."""
+    with_previous: bool = False
+    """Starts on the same day as the previous part of the plan: both parents at once."""
+    work_fraction: WorkFraction | None = None
+    """Part-time work during this part, as a part of full time (at most 1/2)."""
+    work_weeks: int | None = Field(default=None, ge=1)
+    """Weeks of this part combined with work, from its first day; None = the whole part."""
+
+
 class ScenarioError(ValueError):
     """The scenario breaks a rule. Polish message, shown to the parent or the assistant."""
 
@@ -150,6 +185,12 @@ class Scenario(BaseModel):
     mother_weeks_before_takeover: int | None = Field(default=None, ge=1)
     """Weeks after the birth the mother uses before the father takes over (default 14)."""
     mother_event: MotherEvent | None = None
+
+    # Parental leave with work (guide section E)
+    parental_parts: list[ParentalPart] = []
+    """How the parents split parental leave, in the order they take it, and where they combine
+    it with part-time work. Recorded only when the parent says so. Empty = no plan: the timeline
+    shows each parent's share as an option."""
 
     @property
     def anchor_date(self) -> dt.date | None:

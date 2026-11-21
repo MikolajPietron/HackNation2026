@@ -78,7 +78,17 @@ def test_labour_code_provisions() -> None:
         "art. 182¹ᵃ § 3",
         "art. 182¹ᵃ § 4",
         "art. 182¹ᵃ § 6",
+        "art. 182¹ᵃ § 7",
         "art. 182¹ᶜ",
+        "art. 182¹ᵈ § 2",
+        "art. 182¹ᵉ § 1",
+        "art. 182¹ᵉ § 2",
+        "art. 182¹ᶠ § 1",
+        "art. 182¹ᶠ § 1¹",
+        "art. 182¹ᶠ § 2",
+        "art. 182¹ᶠ § 3",
+        "art. 182¹ᶠ § 4",
+        "art. 182¹ᶠ § 5",
         "art. 182¹ᵍ",
         "art. 182³ § 1",
         "art. 182³ § 1¹",
@@ -92,6 +102,8 @@ def test_labour_code_provisions() -> None:
     # Article numbers inside the text carry their superscripts again.
     assert kp_articles()["art. 182¹ᵍ"].endswith("art. 183¹ § 1.")
     assert "art. 183¹ § 1 stosuje się odpowiednio" in kp_articles()["art. 180² § 7"]
+    assert "w wymiarze nie wyższym niż połowa" in kp_articles()["art. 182¹ᵉ § 1"]
+    assert "o którym mowa w § 1 albo § 1¹, odbywa się" in kp_articles()["art. 182¹ᶠ § 3"]
 
 
 def test_every_quote_in_params_is_literal() -> None:
@@ -245,7 +257,41 @@ def father_scenarios() -> list[dict[str, Any]]:
     return cases
 
 
-@pytest.mark.parametrize("answers", scenarios())
+def plan_scenarios() -> list[dict[str, Any]]:
+    """Guide E and B.3: parental leave split between the parents, in parts, with work: whole
+    weeks and days, at once and one after the other, either parent alone, "Za życiem"."""
+    base = {"role": "mother", "work": "employment", "children_count": 1}
+    worked = {"weeks": 32, "work_fraction": "1/2", "work_weeks": 20}
+    plans: list[list[dict[str, Any]]] = [
+        [{"parent": "mother"} | worked],
+        [{"parent": "father", "weeks": 9, "work_fraction": "1/2"}],
+        [
+            {"parent": "mother", "weeks": 20, "work_fraction": "1/4"},
+            {"parent": "father", "weeks": 9, "with_previous": True},
+            {"parent": "mother", "weeks": 12, "start": "2028-06-01"},
+        ],
+        [{"parent": "father", "weeks": 20}],
+    ]
+    cases = [
+        base
+        | {"child_born": born, "due_date": "2027-03-15", "birth_date": "2026-11-10"}
+        | {"parental_parts": plan}
+        | extra
+        for born in (False, True)
+        for plan in plans
+        for extra in ({}, {"za_zyciem": True}, {"father_work": "contract"})
+        # Only an employee combines parental leave with work.
+        if "father_work" not in extra or plan is not plans[1]
+    ]
+    cases.append(
+        {"role": "father", "work": "employment", "mother_work": "none", "children_count": 2}
+        | {"child_born": True, "birth_date": "2026-11-10"}
+        | {"parental_parts": [{"parent": "father", "weeks": 34, "work_fraction": "2/5"}]}
+    )
+    return cases
+
+
+@pytest.mark.parametrize("answers", scenarios() + plan_scenarios())
 def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) -> None:
     timeline = build_timeline(Scenario.model_validate(answers), PARAMS, TODAY)
     for element in timeline.elements():
