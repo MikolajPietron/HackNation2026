@@ -1346,6 +1346,56 @@
           "quote": "Szczególna ochrona o której mowa w Kodeksie Pracy nie dotyczy osób, które nie są pracownikami albo do których nie stosuje się przepisów Kodeksu pracy np. prowadzących pozarolniczą działalność."
         }
       ]
+    },
+    "sick_e_zla": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Zaświadczenie lekarskie e-ZLA wystawiane jest w formie elektronicznej i trafia bezpośrednio do ZUS oraz na profil pracodawcy na PUE/eZUS."
+        }
+      ]
+    },
+    "sick_inform_employer": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Kobiety, które są pracownikami (zatrudnione na umowę o pracę) powinny poinformować pracodawcę o nieobecności w pracy zgodnie z obowiązującymi przepisami Kodeksu pracy"
+        }
+      ]
+    },
+    "sick_employee_payer": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "uprawniony płatnik składek wypłaca zasiłek na podstawie zaświadczenia lekarskiego e-ZLA natomiast gdy nie jest uprawniony do wypłaty świadczeń, przekazuje wniosek o wypłatę zasiłku chorobowego, w tym przypadku Zaświadczenie płatnika składek Z-3 lub ZAS-12 (na dalszy okres) do ZUS"
+        }
+      ]
+    },
+    "sick_contract": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Kobiety, które wykonują pracę na podstawie np. umowy zlecenia powinny powstrzymać się od pracy zawodowej i w celu otrzymania zasiłku powinny złożyć odpowiednie dokumenty do ZUS albo do płatnika składek (uprawniony płatnik składek wypłaca zasiłek na podstawie zaświadczenie lekarskiego e-ZLA, gdy nie jest uprawniony przekazuje wniosek o wypłatę zasiłku chorobowego, w tym przypadku zaświadczenie płatnika składek Z-3a do ZUS)."
+        }
+      ]
+    },
+    "sick_business": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Kobiety, które pracują, ale nie są pracownikami (np. prowadzące pozarolniczą działalność gospodarczą) powinny powstrzymać się od pracy zawodowej, a w celu otrzymania zasiłku powinny złożyć odpowiednie dokumenty do ZUS (wniosek o zasiłek chorobowy ZAS-53)"
+        }
+      ]
     }
   },
   "parental_plan": {

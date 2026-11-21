@@ -366,14 +366,40 @@ export interface Params {
     weeks_by_children: Param<number[]>
     mother_personal_weeks: Param<number>
   }
+  /** Guide section G: the rates of the benefit and the 81,5% request (only what the panel uses). */
+  money: {
+    rate_full: Param<number>
+    rate_parental: Param<number>
+    rate_single: Param<number>
+    request_days: Param<number>
+  }
+  /** The deadlines of the requests (only what the panel uses). */
+  applications: {
+    parental_days_before: Param<number>
+    paternity_days_before: Param<number>
+    supplementary_days_before_end: Param<number>
+  }
   rules: Record<string, { sources: SourceRef[] }>
 }
 
-/** The numbers the admin panel can change. */
+/** The numbers the admin panel can change (backend/app/api/admin.py `ParamValues`). */
 export interface ParamValues {
   max_weeks_before_birth: number
   weeks_by_children: number[]
   mother_personal_weeks: number
+  /** Percent of the base: maternity, supplementary and paternity leave. */
+  rate_full: number
+  /** Percent of the base: parental leave. */
+  rate_parental: number
+  /** Percent of the base after the mother's request (81,5%). */
+  rate_single: number
+  /** The request for the single rate: at the latest this many days after the birth. */
+  rate_single_request_days: number
+  /** Requests for leave: at least this many days before. */
+  parental_request_days: number
+  paternity_request_days: number
+  /** At least this many days before maternity leave ends. */
+  supplementary_request_days: number
 }
 
 export interface ParamVersion {

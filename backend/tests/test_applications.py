@@ -15,6 +15,17 @@ Expected dates were computed by hand, today being 21.11.2026:
   18.02-10.03.2027; its request 21 days before the end of maternity leave: 27.01.2027;
 - born 20.06.2026, 31 days in hospital: maternity leave until 6.11.2026, supplementary leave
   7.11-11.12.2026 (5 weeks); the request was due 16.10.2026.
+
+Sick leave in pregnancy (guide page 3), due 15.03.2027 without leave before the birth, so the
+sick leave runs until 14.03.2027:
+- an employee from 1.12.2026: the employer pays 31 days of December and, in the new calendar
+  year, 33 more (1.01-2.02.2027); the benefit 3.02-14.03.2027. She informs her employer on
+  1.12.2026, the first day;
+- an employee from 1.10.2026: the employer 1.10-2.11.2026 (31 + 2 days), the benefit
+  3.11-31.12.2026, the employer again 1.01-2.02.2027, the benefit 3.02-14.03.2027;
+- a business insured from 1.10.2026: the right after 90 days, from 30.12.2026 (30 + 31 + 29
+  days); ZAS-53 shown on 30.12.2026;
+- the job ended unlawfully on 30.11.2026: the benefit (and the court judgment) from 1.12.2026.
 """
 
 import datetime as dt
@@ -369,3 +380,203 @@ def test_the_notes_end_with_what_to_file() -> None:
         "pracodawcy, do 28 czerwca 2027."
     )
     assert note(t, "payer").title == "Kto wypłaca zasiłek"
+
+
+# Sick leave in pregnancy (guide page 3): who pays, informing the employer, the forms.
+
+
+def sick(timeline: Timeline) -> list[tuple[str, dt.date, dt.date]]:
+    return [(s.id, s.start, s.end) for s in timeline.segments if s.id.startswith("sick-")]
+
+
+def test_an_employee_informs_her_employer_before_the_sick_leave() -> None:
+    t = expecting(
+        **MOTHER,
+        children_count=1,
+        leave_before_birth_weeks=0,
+        mother_payer_size="up-to-20",
+        sick_leave=True,
+        sick_leave_start="2026-12-01",
+    )
+    # 31 days of December and 33 of the new year from the employer, then the benefit.
+    assert sick(t) == [
+        ("sick-pay", dt.date(2026, 12, 1), dt.date(2027, 2, 2)),
+        ("sick-benefit", dt.date(2027, 2, 3), dt.date(2027, 3, 14)),
+    ]
+    notice = document(t, "sick-leave-notice")
+    assert (notice.needed_by, notice.segment_id, notice.done) == (
+        dt.date(2026, 12, 1),
+        "sick-pay",
+        False,
+    )
+    assert "powinna poinformować pracodawcę o nieobecności w pracy" in notice.rule
+    assert "trafia bezpośrednio do ZUS i na profil pracodawcy na PUE/eZUS" in notice.rule
+    assert "zaświadczenie płatnika składek Z-3 (na dalszy okres ZAS-12)" in notice.rule
+    assert sections(notice) >= {"ZC", "W"}
+    # The benefit after the employer's days: ZUS, the employer sends Z-3 (ZAS-12 later).
+    benefit = segment(t, "sick-benefit")
+    assert benefit.details[-1] == (
+        "Zasiłek chorobowy mamy wypłaca ZUS: jej pracodawca zgłasza do ubezpieczenia "
+        "chorobowego nie więcej niż 20 osób, więc przekazuje do ZUS wniosek o wypłatę zasiłku, "
+        "zaświadczenie płatnika składek Z-3 (na dalszy okres ZAS-12)."
+    )
+    assert "ZC" in sections(benefit)
+    # The employer's days say who pays in their summary already: no line added.
+    assert not any("wypłaca ZUS" in line for line in segment(t, "sick-pay").details)
+    payer = note(t, "payer")
+    assert payer.text.startswith(
+        "Za zwolnienie lekarskie w ciąży wynagrodzenie chorobowe za pierwsze 33 dni "
+        "niezdolności do pracy w roku kalendarzowym wypłaca mamie pracodawca. Zasiłek chorobowy "
+        "mamy wypłaca ZUS"
+    )
+    assert note(t, "applications").text.startswith(
+        "Informacja dla pracodawcy o nieobecności w pracy — pierwszego dnia zwolnienia, "
+        "1 grudnia 2026."
+    )
+    assert any("pierwszy dzień zwolnienia" in a for a in t.assumptions)
+
+
+def test_a_sick_leave_already_under_way_needs_no_notice() -> None:
+    t = expecting(
+        **MOTHER,
+        children_count=1,
+        leave_before_birth_weeks=0,
+        mother_payer_size="over-20",
+        sick_leave=True,
+        sick_leave_start="2026-10-01",
+    )
+    # 33 days from 1.10.2026: 31 of October and 2 of November.
+    assert sick(t) == [
+        ("sick-pay", dt.date(2026, 10, 1), dt.date(2026, 11, 2)),
+        ("sick-benefit", dt.date(2026, 11, 3), dt.date(2026, 12, 31)),
+        ("sick-pay-2", dt.date(2027, 1, 1), dt.date(2027, 2, 2)),
+        ("sick-benefit-2", dt.date(2027, 2, 3), dt.date(2027, 3, 14)),
+    ]
+    assert "sick-leave-notice" not in {d.id for d in t.documents}
+    line = (
+        "Zasiłek chorobowy mamy wypłaca jej pracodawca na podstawie zaświadczenia e-ZLA: "
+        "zgłasza do ubezpieczenia chorobowego więcej niż 20 osób."
+    )
+    assert segment(t, "sick-benefit").details[-1] == line
+    assert segment(t, "sick-benefit-2").details[-1] == line
+
+
+def test_on_a_contract_of_mandate_the_payer_sends_z3a() -> None:
+    t = expecting(
+        role="mother",
+        work="contract",
+        mother_insured=True,
+        children_count=1,
+        leave_before_birth_weeks=0,
+        sick_leave=True,
+        sick_leave_start="2026-12-07",
+    )
+    # Not an employee: the benefit from the first day, until the day before the due date.
+    assert sick(t) == [("sick-benefit", dt.date(2026, 12, 7), dt.date(2027, 3, 14))]
+    request = document(t, "sick-benefit-request")
+    assert (request.title, request.needed_by, request.segment_id) == (
+        "Dokumenty do zasiłku chorobowego",
+        dt.date(2026, 12, 7),
+        "sick-benefit",
+    )
+    assert "złożyć odpowiednie dokumenty do ZUS albo do płatnika składek" in request.rule
+    assert "zaświadczenie płatnika składek Z-3a, i zasiłek wypłaca ZUS" in request.rule
+    assert "Materiały nie podają terminu" in request.rule
+    assert "ZC" in sections(request)
+    assert "Dokumenty do zasiłku chorobowego — do płatnika składek albo do ZUS, do 7 grudnia " in (
+        note(t, "applications").text
+    )
+    # The size of the payer is not known yet: the day the number of insured is counted on.
+    assert "według stanu na 30 listopada poprzedniego roku" in note(t, "payer").text
+
+
+def test_with_a_business_zas53_goes_to_zus() -> None:
+    t = expecting(
+        role="mother",
+        work="business",
+        mother_insured=True,
+        children_count=1,
+        leave_before_birth_weeks=0,
+        sick_leave=True,
+        sick_leave_start="2026-11-01",
+        insured_since="2026-10-01",
+    )
+    # 90 days of voluntary insurance from 1.10.2026: the right from 30.12.2026.
+    assert sick(t) == [("sick-benefit", dt.date(2026, 12, 30), dt.date(2027, 3, 14))]
+    request = document(t, "sick-benefit-request")
+    assert (request.title, request.needed_by) == (
+        "Wniosek o zasiłek chorobowy (ZAS-53)",
+        dt.date(2026, 12, 30),
+    )
+    assert "złożyć do ZUS wniosek o zasiłek chorobowy ZAS-53" in request.rule
+    assert segment(t, "sick-benefit").details[-1] == (
+        "Zasiłek chorobowy mamy wypłaca ZUS: przy własnej firmie wniosek o zasiłek chorobowy "
+        "(ZAS-53) składa się do ZUS."
+    )
+    payer = note(t, "payer")
+    assert payer.title == "Zasiłek mamy wypłaca ZUS"
+    assert "Liczbę ubezpieczonych" not in payer.text
+    assert "Wniosek o zasiłek chorobowy (ZAS-53) — do ZUS, do 30 grudnia 2026." in (
+        note(t, "applications").text
+    )
+    assert any("zasiłek chorobowy wypłaca ZUS" in a for a in t.assumptions)
+
+
+def test_no_sick_benefit_documents_after_the_sick_leave_ended() -> None:
+    t = expecting(
+        role="mother",
+        work="contract",
+        mother_insured=True,
+        children_count=1,
+        sick_leave=True,
+        sick_leave_start="2026-10-01",
+        sick_leave_end="2026-10-31",
+    )
+    assert sick(t) == [("sick-benefit", dt.date(2026, 10, 1), dt.date(2026, 10, 31))]
+    assert "sick-benefit-request" not in {d.id for d in t.documents}
+
+
+def test_sick_leave_forms_wait_for_how_the_mother_works() -> None:
+    t = expecting(children_count=1, sick_leave=True, sick_leave_start="2026-12-01")
+    assert not {"sick-leave-notice", "sick-benefit-request"} & {d.id for d in t.documents}
+    assert not any("W" in sections(s) for s in t.segments if s.id.startswith("sick-"))
+
+
+# The benefit after losing the job (guide page 4): the court judgment.
+
+
+def test_an_unlawful_termination_needs_a_final_court_judgment() -> None:
+    pending = expecting(
+        **MOTHER, children_count=1, job_loss={"ended_on": "2026-11-30", "reason": "unlawful"}
+    )
+    judgment = document(pending, "court-judgment")
+    # The benefit would start the day after the employment ended.
+    assert (judgment.needed_by, judgment.segment_id, judgment.done) == (
+        dt.date(2026, 12, 1),
+        "job-loss-benefit",
+        False,
+    )
+    assert "potwierdzi prawomocny wyrok sądu" in judgment.rule
+    assert sections(judgment) == {"ZC.s"}
+    assert note(pending, "applications").text.startswith(
+        "Prawomocny wyrok sądu o naruszeniu prawa przy rozwiązaniu umowy: bez niego zasiłek "
+        "w wysokości zasiłku macierzyńskiego nie przysługuje."
+    )
+    assert any("Do kiedy musi zapaść wyrok sądu" in a for a in pending.assumptions)
+
+    confirmed = expecting(
+        **MOTHER,
+        children_count=1,
+        job_loss={"ended_on": "2026-11-30", "reason": "unlawful", "court_confirmed": True},
+    )
+    assert document(confirmed, "court-judgment").done
+    assert "wyrok" not in note(confirmed, "applications").text
+
+
+def test_bankruptcy_of_the_employer_needs_no_judgment() -> None:
+    t = expecting(
+        **MOTHER, children_count=1, job_loss={"ended_on": "2026-11-30", "reason": "bankruptcy"}
+    )
+    assert "court-judgment" not in {d.id for d in t.documents}
+    # The guide does not say what to file for this benefit or who pays it.
+    assert any("Przewodnik nie podaje, więc oś tego nie pokazuje" in a for a in t.assumptions)
