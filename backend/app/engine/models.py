@@ -343,12 +343,14 @@ class Document(BaseModel):
 
 
 class Payment(BaseModel):
-    """The maternity benefit for one period on the timeline (guide section G): the "Pieniądze"
-    lane. Amounts in PLN, rounded to grosze. `segment_id` is the period it pays for; dates and
-    days are that period's."""
+    """The money for one period on the timeline: the "Pieniądze" lane. The maternity benefit
+    (guide section G) and in pregnancy the employer's sick pay, the sickness benefit and the
+    benefit equal to the maternity benefit (money.py, `PAID`). Amounts in PLN, rounded to grosze.
+    `segment_id` is the period it pays for; dates and days are that period's, or a piece of it
+    when the rate changes within it (part-time work, the other parent's own weeks)."""
 
     id: str
-    """"pay-" + `segment_id`."""
+    """"pay-" + `segment_id`; a later piece of the same period adds "-part-<n>"."""
     segment_id: str
     lane: Literal["mother", "father"]
     """Whose benefit: the parent on that period's lane."""
@@ -357,11 +359,12 @@ class Payment(BaseModel):
     end: dt.date
     days: int
     rate: float
-    """Percent of the benefit base: 100, 70 or 81.5."""
+    """Percent of the benefit base (of the pay, for sick pay): 100, 70 or 81.5."""
     base: float
     """Monthly benefit base (podstawa wymiaru zasiłku)."""
     monthly: float
-    """`base` × `rate`: the benefit for a whole month."""
+    """`base` × `rate`: the benefit for a whole month; while parental leave is combined with
+    part-time work, less in proportion to the working time."""
     daily: float
     """One thirtieth of the monthly benefit."""
     total: float

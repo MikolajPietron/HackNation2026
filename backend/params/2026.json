@@ -1025,6 +1025,112 @@
           "quote": "ZUS po przeprowadzeniu postępowania, może uznać że podwyższenie podstawy wymiaru składek miało wyłącznie na celu uzyskanie wyższych świadczeń i wydać decyzję ustalającą niższą podstawę, co będzie miało wpływ na wysokość zasiłków"
         }
       ]
+    },
+    "job_loss_law": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30 ust. 3",
+          "quote": "Ubezpieczonej będącej pracownicą, której umowa o pracę wygasła z powodu śmierci pracodawcy lub z którą rozwiązano stosunek pracy w okresie ciąży z powodu ogłoszenia upadłości lub likwidacji pracodawcy i której nie zapewniono innego zatrudnienia, przysługuje do dnia porodu zasiłek w wysokości zasiłku macierzyńskiego."
+        }
+      ]
+    },
+    "maternity_after_job_loss": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30 ust. 1",
+          "quote": "Zasiłek macierzyński przysługuje również w razie urodzenia dziecka po ustaniu ubezpieczenia chorobowego, jeżeli ubezpieczenie to ustało w okresie ciąży: 1) wskutek śmierci, ogłoszenia upadłości lub likwidacji pracodawcy; 2) z naruszeniem przepisów prawa, stwierdzonym prawomocnym orzeczeniem sądu."
+        }
+      ]
+    },
+    "benefit_periods": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29a ust. 1",
+          "quote": "Zasiłek macierzyński przysługuje przez okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego, urlopu rodzicielskiego oraz urlopu ojcowskiego."
+        }
+      ]
+    },
+    "fixed_term_after_insurance": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30 ust. 4",
+          "quote": "Ubezpieczonej będącej pracownicą zatrudnioną na podstawie umowy o pracę na czas określony, z którą umowa o pracę na podstawie art. 177 § 3 Kodeksu pracy została przedłużona do dnia porodu - przysługuje prawo do zasiłku macierzyńskiego po ustaniu ubezpieczenia."
+        }
+      ]
+    },
+    "zus_after_insurance": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "Prawo do zasiłków określonych w ustawie i ich wysokość ustalają oraz zasiłki te wypłacają:"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "2) Zakład Ubezpieczeń Społecznych:"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "d) osobom uprawnionym do zasiłków za okres po ustaniu ubezpieczenia"
+        }
+      ]
+    },
+    "sick_after_insurance": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 2,
+          "quote": "osobom podlegającym ubezpieczeniu chorobowemu (w określonych sytuacjach również po ustaniu tego ubezpieczenia)"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 8 ust. 2",
+          "quote": "Za okres niezdolności do pracy lub niemożności wykonywania pracy z przyczyn określonych w art. 6 ust. 2 przypadający po ustaniu tytułu ubezpieczenia chorobowego zasiłek chorobowy przysługuje nie dłużej niż przez 91 dni. Nie dotyczy to niezdolności do pracy, o której mowa w art. 11 ust. 2 pkt 2, oraz spowodowanej gruźlicą lub występującej w trakcie ciąży."
+        }
+      ]
+    },
+    "sick_after_insurance_not": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 13 ust. 1",
+          "quote": "nie przysługuje za okres po ustaniu tytułu ubezpieczenia chorobowego, jeżeli osoba niezdolna do pracy:"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 13 ust. 1",
+          "quote": "nie nabyła prawa do zasiłku w czasie ubezpieczenia, w przypadkach określonych w art. 4 ust. 1;"
+        }
+      ]
+    },
+    "sick_after_end_within_days": {
+      "value": 14,
+      "note": "Niezdolność do pracy powstała po ustaniu tytułu ubezpieczenia: najpóźniej w ciągu tylu dni od jego ustania (art. 7 pkt 1).",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 7",
+          "quote": "Zasiłek chorobowy przysługuje również osobie, która stała się niezdolna do pracy po ustaniu tytułu ubezpieczenia chorobowego, jeżeli niezdolność do pracy trwała bez przerwy co najmniej 30 dni i powstała: 1) nie później niż w ciągu 14 dni od ustania tytułu ubezpieczenia chorobowego;"
+        }
+      ]
+    },
+    "sick_after_end_min_days": {
+      "value": 30,
+      "note": "Niezdolność do pracy powstała po ustaniu tytułu ubezpieczenia musi trwać bez przerwy co najmniej tyle dni (art. 7).",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 7",
+          "quote": "Zasiłek chorobowy przysługuje również osobie, która stała się niezdolna do pracy po ustaniu tytułu ubezpieczenia chorobowego, jeżeli niezdolność do pracy trwała bez przerwy co najmniej 30 dni i powstała: 1) nie później niż w ciągu 14 dni od ustania tytułu ubezpieczenia chorobowego;"
+        }
+      ]
     }
   },
   "rules": {
@@ -2015,6 +2121,73 @@
           "doc": "ustawa",
           "article": "art. 11 ust. 4",
           "quote": "Zasiłek chorobowy przysługuje za każdy dzień niezdolności do pracy, nie wyłączając dni wolnych od pracy."
+        }
+      ]
+    },
+    "sick_pay_rate": {
+      "value": 100,
+      "note": "Wynagrodzenie chorobowe w ciąży: 100% wynagrodzenia.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 92 § 1",
+          "quote": "choroby przypadającej w czasie ciąży - w okresie wskazanym w pkt 1 - pracownik zachowuje prawo do 100% wynagrodzenia"
+        }
+      ]
+    },
+    "sick_pay_base": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 92 § 2",
+          "quote": "Wynagrodzenie, o którym mowa w § 1, oblicza się według zasad obowiązujących przy ustalaniu podstawy wymiaru zasiłku chorobowego i wypłaca za każdy dzień niezdolności do pracy, nie wyłączając dni wolnych od pracy."
+        }
+      ]
+    },
+    "sick_benefit_rate_law": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 11 ust. 2",
+          "quote": "Miesięczny zasiłek chorobowy wynosi 100% podstawy wymiaru zasiłku, jeżeli niezdolność do pracy lub niemożność wykonywania pracy, o której mowa w art. 6 ust. 2: 1) przypada w okresie ciąży;"
+        }
+      ]
+    },
+    "base_job_loss": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 47",
+          "quote": "Przepisy art. 36-42 i art. 45 stosuje się odpowiednio przy ustalaniu podstawy wymiaru świadczenia rehabilitacyjnego, zasiłku wyrównawczego, zasiłku macierzyńskiego, zasiłku w wysokości zasiłku macierzyńskiego i zasiłku opiekuńczego"
+        }
+      ]
+    },
+    "work_reduces": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 4a",
+          "quote": "Wysokość zasiłku macierzyńskiego zmniejsza się proporcjonalnie do wymiaru czasu pracy, w którym pracownik łączy korzystanie z urlopu rodzicielskiego z wykonywaniem pracy u pracodawcy udzielającego takiego urlopu."
+        }
+      ]
+    },
+    "shared_with_father": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30a ust. 3",
+          "quote": "W przypadku złożenia wniosku, o którym mowa w ust. 1, ubezpieczona - matka dziecka może dzielić się z ubezpieczonym - ojcem dziecka korzystaniem z zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego albo jego części, z wyłączeniem okresu, o którym mowa w art. 182¹ᵃ § 4 Kodeksu pracy."
+        }
+      ]
+    },
+    "request_days_taken_in": {
+      "value": 21,
+      "note": "Przyjęcie dziecka na wychowanie: wniosek o 81,5% najpóźniej tyle dni po przyjęciu (art. 30a ust. 2).",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30a ust. 2",
+          "quote": "Ubezpieczony, nie później niż 21 dni po przyjęciu dziecka na wychowanie i wystąpieniu do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka albo po przyjęciu dziecka na wychowanie jako rodzina zastępcza, z wyjątkiem rodziny zastępczej zawodowej, może złożyć pisemny wniosek o wypłacenie mu zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu na warunkach urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze, z wyłączeniem okresu, o którym mowa w art. 182¹ᵃ § 4 Kodeksu pracy, przysługującego drugiemu rodzicowi dziecka."
         }
       ]
     }

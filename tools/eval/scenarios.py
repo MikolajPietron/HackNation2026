@@ -736,6 +736,69 @@ SCENARIOS = [
         ],
     },
     {
+        "id": "job-loss-bankruptcy",
+        "about": "the employer's bankruptcy in pregnancy: the benefit equal to the maternity "
+        "benefit until the birth, then the maternity benefit after the insurance ended, no leave "
+        "before the birth (guide p. 4; ustawa art. 30 ust. 1 and 3, art. 29a ust. 1)",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Pracodawca ogłosił upadłość i 30 listopada 2026 rozwiązał ze mną umowę "
+                "o pracę. Innej pracy mi nie zaproponowano.",
+                "tools": [{"name": "set_job_loss"}],
+                "timeline": {
+                    "segments": {
+                        # From the day after the last day of work to the day before the birth.
+                        "job-loss-benefit": ["2026-12-01", "2027-03-14"],
+                        # The maternity benefit after the insurance ended: 20 weeks from the birth.
+                        "maternity": ["2027-03-15", "2027-08-01"],
+                        "parental": ["2027-08-02", "2028-03-12"],
+                    },
+                    "absent": ["prenatal-window", "protection-end", "earliest-start"],
+                    "notes": ["job-loss", "insurance"],
+                },
+                "mention": {"dates": ["2027-03-14"]},
+                "require": [r"ZUS|po ustaniu ubezpieczenia"],
+                # No leave before the birth to ask about any more.
+                "question": "father-work",
+            },
+        ],
+    },
+    {
+        "id": "money-part-time",
+        "about": "the amount of the benefit, then less of it in the weeks of half-time work "
+        "(guide G p. 9, E p. 9; ustawa art. 31 ust. 1-2, art. 31 ust. 4a, art. 36 ust. 3)",
+        "runs": 1,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Zarabiam 8000 zł brutto miesięcznie, od roku tyle samo.",
+                "tools": [{"name": "set_monthly_pay", "args": {"parent": "mother"}}],
+                # Base 8000 × (1 − 13,71%) = 6903,20 zł: 100% for maternity leave.
+                "require": [r"6\s?903,20"],
+                "question": "leave-before-birth",
+            },
+            {
+                "say": "Przez pierwsze 16 tygodni urlopu rodzicielskiego będę pracować na pół "
+                "etatu.",
+                "tools": [{"name": "set_parental_work", "args": {"parent": "mother", "weeks": 16}}],
+                "timeline": {
+                    "segments": {
+                        # 32 weeks + 16 × 1/2 = 8 weeks = 280 days: 02.08.2027 + 279 days.
+                        "parental-mother-1": ["2027-08-02", "2028-05-07"],
+                    },
+                    "absent": ["parental"],
+                },
+                # 70% = 4832,24 zł, half of it in the weeks of work: 2416,12 zł a month.
+                "require": [r"2\s?416,12"],
+                "question": "leave-before-birth",
+            },
+        ],
+    },
+    {
         "id": "traps",
         "about": "out-of-scope questions and wrong premises; nothing may change on the timeline",
         "runs": 1,

@@ -62,6 +62,7 @@ def test_labour_code_provisions() -> None:
         "art. 177 § 1¹",
         "art. 177 § 3",
         "art. 92 § 1",
+        "art. 92 § 2",
         "art. 92 § 3",
         "art. 92 § 4",
         "art. 92 § 5",
@@ -163,8 +164,18 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert set(ustawa_articles()) == {
         "art. 3 pkt 3",
         "art. 3 pkt 4",
+        "art. 7",
+        "art. 8 ust. 2",
+        "art. 11 ust. 2",
         "art. 11 ust. 4",
+        "art. 13 ust. 1",
+        "art. 29a ust. 1",
+        "art. 30 ust. 1",
+        "art. 30 ust. 3",
+        "art. 30 ust. 4",
         "art. 30a ust. 1",
+        "art. 30a ust. 2",
+        "art. 30a ust. 3",
         "art. 31 ust. 1",
         "art. 31 ust. 2",
         "art. 31 ust. 3",
@@ -172,12 +183,14 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 31 ust. 3f",
         "art. 31 ust. 3g",
         "art. 31 ust. 4",
+        "art. 31 ust. 4a",
         "art. 31 ust. 5",
         "art. 36 ust. 1",
         "art. 36 ust. 3",
         "art. 47",
         "art. 48 ust. 1",
         "art. 52",
+        "art. 61 ust. 1",
     }
     texts = ustawa_articles()
     assert texts["art. 30a ust. 1"].startswith("Ubezpieczona - matka dziecka, nie później niż 21")
@@ -300,6 +313,61 @@ def money_scenarios() -> list[dict[str, Any]]:
         | {"birth_date": "2026-10-01", "mother_pay": 7000, "father_pay": 7000}
         | {"mother_event": {"kind": "death", "start": "2026-11-15"}, "rate_815": True},
     ]
+    return cases + every_paid_period_scenarios()
+
+
+def every_paid_period_scenarios() -> list[dict[str, Any]]:
+    """Every paid period: part-time work, the father's shared weeks, the first year, a child
+    taken in, sick leave, losing the job (ustawa art. 30) and sick leave after it ended."""
+    pays = {"mother_pay": 8000, "father_work": "employment", "father_pay": 6000}
+    born = {"child_born": True, "role": "mother", "work": "employment", "children_count": 1}
+    born |= {"birth_date": "2026-11-10", "leave_before_birth_weeks": 0} | pays
+    cases: list[dict[str, Any]] = [
+        born
+        | {"rate_815": rate}
+        | {"parental_parts": [{"parent": "mother", "weeks": 20, "work_fraction": "1/2"}]}
+        for rate in (None, True)
+    ]
+    cases += [
+        born | {"rate_815": True, "parental_parts": [{"parent": "father", "weeks": 12}]},
+        born
+        | {"rate_815": True}
+        | {"parental_parts": [{"parent": "mother", "weeks": 32, "start": "2027-11-15"}]},
+    ]
+    taken = {"child_born": True, "taken_in_on": "2026-11-02", "birth_date": "2024-05-10"}
+    taken |= {"children_count": 1, "work": "employment"} | pays
+    cases += [
+        taken | {"taken_in": kind, "role": role, "mother_work": "employment", "rate_815": rate}
+        for kind in ("adoption", "foster")
+        for role in ("mother", "father")
+        for rate in (None, True, False)
+    ]
+    expecting = {"due_date": "2027-03-15", "child_born": False, "children_count": 1}
+    expecting |= {"role": "mother", "work": "employment"} | pays
+    ended = "2026-11-30"
+    for reason in ("bankruptcy", "liquidation", "employer-death", "unlawful", "other"):
+        for extra in ({}, {"leave_before_birth_weeks": 6}, {"rate_815": True}):
+            cases.append(expecting | {"job_loss": {"ended_on": ended, "reason": reason}} | extra)
+    cases += [
+        expecting
+        | {"job_loss": {"ended_on": ended, "reason": "unlawful", "court_confirmed": True}},
+        born | {"job_loss": {"ended_on": "2026-08-31", "reason": "employer-death"}},
+        born
+        | {"leave_before_birth_weeks": 2}
+        | {"job_loss": {"ended_on": "2026-10-31", "reason": "liquidation"}},
+    ]
+    other = expecting | {"job_loss": {"ended_on": ended, "reason": "other"}, "sick_leave": True}
+    cases += [
+        other | sick
+        for sick in (
+            {"sick_leave_start": "2026-10-01"},
+            {"sick_leave_start": "2026-12-05"},
+            {"sick_leave_start": "2026-12-20"},
+            {"sick_leave_start": "2026-12-05", "sick_leave_end": "2026-12-20"},
+            {"sick_leave_start": "2026-11-15", "insured_since": "2026-11-10"},
+        )
+    ]
+    cases.append(expecting | {"sick_leave": True, "sick_leave_start": "2026-11-01"})
     return cases
 
 

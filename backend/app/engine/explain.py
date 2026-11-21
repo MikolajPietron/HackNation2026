@@ -8,6 +8,7 @@ Every phase adds its notes here (CLAUDE.md, "Wyjaśnianie przypadku").
 
 import datetime as dt
 
+from app.engine.after_insurance import after_job_loss, insurance_note, leave_before_cut
 from app.engine.applications import application_notes
 from app.engine.draft import DAY, days_between
 from app.engine.explain_adoption import taken_in_notes
@@ -29,7 +30,10 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     if scenario.taken_in is not None:
-        return taken_in_notes(scenario, timeline, params)
+        # Section G for the leave of a child taken in, too.
+        return add_money_notes(
+            taken_in_notes(scenario, timeline, params), scenario, timeline, params
+        )
     notes = _case_notes(scenario, timeline, params)
     # Guide E and B.3: the parents' plan of parental leave, before "Co policzyliśmy".
     plan = parental_plan_notes(scenario, timeline, params)
@@ -56,7 +60,7 @@ def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[
             *_father_computed(scenario, timeline, params),
             *application_notes(scenario, timeline, params),
         ]
-    if not timeline.child_born:
+    if not timeline.child_born and not leave_before_cut(scenario):
         notes.append(_before_birth(scenario, timeline, params))
     optional = [
         _parental(scenario, timeline, params),
@@ -304,8 +308,12 @@ def _situation(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
         "Dziecko urodziło się dzisiaj" if born_today else f"Dziecko urodziło się {long_date(birth)}"
     )
     event = scenario.mother_event
-    if cover in NOT_INSURED or (event is not None and event.kind == "death"):
-        # After the mother's death nothing here is "simpler": just what we count from.
+    if (
+        cover in NOT_INSURED
+        or (event is not None and event.kind == "death")
+        or after_job_loss(scenario) is not None
+    ):
+        # After the mother's death (or her job) nothing here is "simpler": what we count from.
         return CaseNote(
             id="situation",
             kind="situation",
@@ -353,6 +361,9 @@ def _situation(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
 
 def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Coverage) -> CaseNote:
     """Phase 2: the right to the maternity benefit belongs to the insured mother."""
+    after = insurance_note(scenario, timeline, params)  # ustawa art. 30: after losing the job
+    if after is not None:
+        return after
     b = params.benefit
     born = timeline.child_born
     on_the_day = (
@@ -366,10 +377,12 @@ def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
         if born
         else "Po porodzie: prawo do zasiłku macierzyńskiego"
     )
-    # The guide: the benefit is paid "in defined situations also after the insurance has ended".
+    # The guide: the benefit is paid "in defined situations also after the insurance has ended"
+    # (ustawa art. 30 ust. 1: after an employment that ended in pregnancy).
     exceptions = (
-        "Tylko w określonych sytuacjach zasiłek przysługuje także po ustaniu ubezpieczenia; "
-        "dodamy je w kolejnym etapie."
+        "Po ustaniu ubezpieczenia zasiłek macierzyński przysługuje tylko w określonych "
+        "sytuacjach: gdy ubezpieczenie ustało w ciąży wskutek śmierci, upadłości lub likwidacji "
+        "pracodawcy albo z naruszeniem przepisów prawa stwierdzonym prawomocnym orzeczeniem sądu."
     )
     needed = "Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe"
     denied = "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
@@ -455,7 +468,7 @@ def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
                 title=denied,
                 text=(
                     "Prawo do zasiłku macierzyńskiego nabywa po porodzie mama ubezpieczona. Przy "
-                    f"{work} ubezpieczenie chorobowe jest dobrowolne, {state} {exceptions}"
+                    f"{work} ubezpieczenie chorobowe jest dobrowolne, {state}"
                 ),
                 sources=_merge(
                     b.insured_mother.sources,
@@ -485,6 +498,7 @@ def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
                     b.obligatory_insurance.sources,
                     b.voluntary_insurance.sources,
                     b.without_insurance.sources,
+                    params.pregnancy.maternity_after_job_loss.sources,
                 ),
             )
 

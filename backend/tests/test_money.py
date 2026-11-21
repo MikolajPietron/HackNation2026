@@ -11,9 +11,10 @@ parental leave 09.11.2027–10.01.2028 (63 days).
 import datetime as dt
 from decimal import Decimal
 
+from app.assistant.describe import interview_questions
 from app.engine import Scenario, Timeline, build_timeline, changed_element_ids
 from app.engine.models import Payment
-from app.engine.money import cents, percent, pln
+from app.engine.money import cents, paid_for, percent, pln
 from app.services.params import load_params
 
 PARAMS = load_params()
@@ -253,3 +254,234 @@ def test_a_new_amount_highlights_the_payments() -> None:
     changed = changed_element_ids(before, after)
     assert {"pay-maternity", "pay-parental"} <= set(changed)
     assert "maternity" not in changed
+
+
+# Every paid period (money.py, `PAID`): pregnancy, part-time work, sharing, the first year,
+# a child taken in.
+
+
+def expecting(**answers: object) -> Timeline:
+    scenario = Scenario.model_validate(
+        {**MOTHER, "child_born": False, "due_date": "2027-03-15"} | answers
+    )
+    return build_timeline(scenario, PARAMS, TODAY)
+
+
+def articles(p: Payment, doc: str = "ustawa") -> set[str | None]:
+    return {s.article for s in p.sources if s.doc == doc}
+
+
+def test_sick_leave_is_paid_by_the_employer_then_by_the_sickness_benefit() -> None:
+    """Due 15.03.2027, sick leave from 01.11.2026 until the birth, base 6903,20 zł, every day
+    at 100%: 6903,20 / 30 = 230,1067 → 230,11 zł.
+    Employer 01.11–03.12.2026 (33 days): 33 × 230,11 = 7593,63 zł; benefit 04.12–31.12.2026
+    (28 days): 6443,08 zł; employer again 01.01–02.02.2027 (33 days); benefit 03.02–14.03.2027
+    (26 + 14 = 40 days): 40 × 230,11 = 9204,40 zł."""
+    t = expecting(
+        leave_before_birth_weeks=0,
+        sick_leave=True,
+        sick_leave_start="2026-11-01",
+        mother_pay=8000,
+    )
+    sick_pay, benefit = pay(t, "sick-pay"), pay(t, "sick-benefit")
+    assert (sick_pay.start, sick_pay.end) == (dt.date(2026, 11, 1), dt.date(2026, 12, 3))
+    assert amounts(sick_pay) == (100, 6903.2, 230.11, 7593.63, 33)
+    assert amounts(benefit) == (100, 6903.2, 230.11, 6443.08, 28)
+    assert amounts(pay(t, "sick-pay-2"))[3:] == (7593.63, 33)
+    assert amounts(pay(t, "sick-benefit-2"))[3:] == (9204.4, 40)
+    assert sick_pay.title == "Wynagrodzenie chorobowe mamy"
+    assert benefit.title == "Zasiłek chorobowy mamy"
+    assert sick_pay.summary == (
+        "100% wynagrodzenia: 6 903,20 zł miesięcznie. Za 33 dni razem 7 593,63 zł."
+    )
+    assert "Wynagrodzenie chorobowe wypłaca się za każdy dzień" in sick_pay.details[2]
+    # Sick pay: the Labour Code; the sickness benefit: its own provisions, not the maternity
+    # benefit's (art. 47, art. 31 ust. 5).
+    assert articles(sick_pay, "kp") >= {"art. 92 § 1", "art. 92 § 2"}
+    assert {"art. 11 ust. 2", "art. 11 ust. 4", "art. 36 ust. 1"} <= articles(benefit)
+    assert not {"art. 47", "art. 31 ust. 5"} & articles(benefit)
+    # Only the last piece runs to the due date.
+    assert "Liczymy do przewidywanej daty porodu." in pay(t, "sick-benefit-2").details
+    assert "Liczymy do przewidywanej daty porodu." not in sick_pay.details
+    money = note(t, "money")
+    assert "Wynagrodzenie chorobowe w ciąży — 100%: 6 903,20 zł miesięcznie, za 33 dni" in money
+    assert any("Wynagrodzenie chorobowe, zasiłek chorobowy" in a for a in t.assumptions)
+
+
+def test_part_time_work_lowers_the_benefit_for_the_weeks_of_work_only() -> None:
+    """Parental leave of the mother: 20 weeks from 30.03.2027, the first 8 weeks on half time,
+    extended by 8 × 1/2 = 4 weeks: 30.03–13.09.2027 (140 + 28 = 168 days), 100% and 70% chosen.
+    Weeks of work 30.03–24.05.2027 (56 days): 70% = 4832,24 zł less half = 2416,12 zł a month;
+    a day 2416,12 / 30 = 80,5373 → 80,54; 56 × 80,54 = 4510,24 zł.
+    After the work 25.05–13.09.2027 (112 days): a day 161,07; 112 × 161,07 = 18 039,84 zł.
+    Together 22 550,08 zł: the same money as 140 days × 161,07 = 22 549,80 zł but for rounding."""
+    t = born(
+        mother_pay=8000,
+        rate_815=False,
+        parental_parts=[{"parent": "mother", "weeks": 20, "work_fraction": "1/2", "work_weeks": 8}],
+    )
+    work, rest = (p for p in t.payments if p.segment_id == "parental-mother-1")
+    assert (work.id, rest.id) == ("pay-parental-mother-1", "pay-parental-mother-1-part-2")
+    assert (work.start, work.end) == (dt.date(2027, 3, 30), dt.date(2027, 5, 24))
+    assert amounts(work) == (70, 2416.12, 80.54, 4510.24, 56)
+    assert (rest.start, rest.end) == (dt.date(2027, 5, 25), dt.date(2027, 9, 13))
+    assert amounts(rest) == (70, 4832.24, 161.07, 18039.84, 112)
+    assert work.title == "Zasiłek mamy: urlop rodzicielski (praca na 1/2 etatu)"
+    assert rest.title == "Zasiłek mamy: urlop rodzicielski (od 25.05.2027)"
+    assert "4 832,24 zł × (1 − 1/2) = 2 416,12 zł miesięcznie" in work.details[2]
+    assert "art. 31 ust. 4a" in articles(work)
+    assert "urlop rodzicielski (praca na 1/2 etatu) — 70%: 2 416,12 zł" in note(t, "money")
+    assert any("„Proporcjonalnie do wymiaru czasu pracy”" in a for a in t.assumptions)
+
+
+def test_the_father_shares_81_5_percent_beyond_his_own_weeks() -> None:
+    """Mother 81,5%, the father's plan: 12 weeks after the mother's share, which shrinks to
+    41 − 12 = 29 weeks: 30.03–18.10.2027 (203 days) × 187,54 = 38 070,62 zł.
+    The father 19.10.2027–10.01.2028 (84 days): his own 9 weeks are the first 63 days,
+    19.10–20.12.2027, at 70%: 63 × 120,81 = 7611,03 zł; the 21 days the mother shares,
+    21.12.2027–10.01.2028, at 81,5% of 5177,40 = 4219,58 zł a month; a day 4219,581 / 30 =
+    140,6527 → 140,65; 21 × 140,65 = 2953,65 zł."""
+    t = born(
+        mother_pay=8000,
+        rate_815=True,
+        father_work="employment",
+        father_pay=6000,
+        parental_parts=[{"parent": "father", "weeks": 12}],
+    )
+    assert amounts(pay(t, "parental")) == (81.5, 5626.11, 187.54, 38070.62, 203)
+    own, shared = (p for p in t.payments if p.segment_id == "parental-father-1")
+    assert (own.start, own.end, shared.start) == (
+        dt.date(2027, 10, 19),
+        dt.date(2027, 12, 20),
+        dt.date(2027, 12, 21),
+    )
+    assert amounts(own) == (70, 3624.18, 120.81, 7611.03, 63)
+    assert amounts(shared) == (81.5, 4219.58, 140.65, 2953.65, 21)
+    assert "art. 31 ust. 3f" in articles(own)
+    assert "art. 30a ust. 3" in articles(shared)
+    assert any("dzieli się z tatą zasiłkiem" in d for d in shared.details)
+    assert any("pierwsze 63 dni jego urlopu rodzicielskiego" in a for a in t.assumptions)
+
+
+def test_no_day_of_parental_benefit_in_the_first_year_means_70_percent() -> None:
+    """81,5% chosen, but the mother's parental leave starts 15.11.2027, after the first birthday
+    (10.11.2027): 70% for it (art. 31 ust. 3g), 224 days × 161,07 = 36 079,68 zł, and the benefit
+    for maternity leave, paid at 81,5%, is topped up to 100% on her request (ust. 4)."""
+    t = born(
+        mother_pay=8000,
+        rate_815=True,
+        parental_parts=[{"parent": "mother", "weeks": 32, "start": "2027-11-15"}],
+    )
+    parental, maternity = pay(t, "parental-mother-1"), pay(t, "maternity")
+    assert amounts(parental) == (70, 4832.24, 161.07, 36079.68, 224)
+    assert "do 09.11.2027" in parental.details[-1]
+    assert "art. 31 ust. 3g" in articles(parental)
+    assert maternity.rate == 81.5
+    assert "wyrówna się jednorazowo do 100%" in maternity.details[-1]
+
+
+def test_with_a_plan_the_choice_of_rate_stays() -> None:
+    """The mother's parental leave as parts of the plan still opens the 81,5% choice."""
+    t = born(mother_pay=8000, parental_parts=[{"parent": "mother", "weeks": 32}])
+    assert "rate-815" in [n.id for n in t.notes]
+    assert t.element("rate-815-deadline") is not None
+
+
+def test_a_child_taken_in_is_paid_like_maternity_and_parental_leave() -> None:
+    """Adoption: taken in 02.11.2026 (child born 10.05.2024), the mother takes the leave on the
+    terms of maternity leave, 02.11.2026–21.03.2027 (140 days), 100%: 140 × 230,11 =
+    32 215,40 zł; her parental leave 22.03–31.10.2027 (224 days), 70%: 36 079,68 zł; the father's
+    9 weeks 01.11.2027–02.01.2028, 70%: 63 × 120,81 = 7611,03 zł.
+    Her request for 81,5% (art. 30a ust. 2) is due 21 days after taking in: 23.11.2026; then
+    140 × 187,54 = 26 255,60 zł and 224 × 187,54 = 42 008,96 zł, the father's weeks still 70%."""
+    adoption = {
+        "taken_in": "adoption",
+        "child_born": True,
+        "taken_in_on": "2026-11-02",
+        "birth_date": "2024-05-10",
+        "father_work": "employment",
+        "mother_pay": 8000,
+        "father_pay": 6000,
+    }
+    split = build_timeline(Scenario.model_validate({**MOTHER, **adoption}), PARAMS, TODAY)
+    leave = pay(split, "adoption-leave")
+    assert leave.title == "Zasiłek mamy: urlop na warunkach urlopu macierzyńskiego"
+    assert amounts(leave) == (100, 6903.2, 230.11, 32215.4, 140)
+    assert amounts(pay(split, "parental")) == (70, 4832.24, 161.07, 36079.68, 224)
+    assert amounts(pay(split, "parental-father")) == (70, 3624.18, 120.81, 7611.03, 63)
+    deadline = split.element("rate-815-deadline")
+    assert deadline is not None and deadline.date == dt.date(2026, 11, 23)  # type: ignore[union-attr]
+    assert any(s.article == "art. 30a ust. 2" for s in deadline.sources)
+    choice = note(split, "rate-815")
+    assert "najpóźniej 21 dni po przyjęciu dziecka na wychowanie (do 23 listopada 2026)" in choice
+    assert "pierwszym roku życia" not in choice
+    assert note(split, "money").startswith("Mama — podstawa wymiaru zasiłku")
+
+    single = build_timeline(
+        Scenario.model_validate({**MOTHER, **adoption, "rate_815": True}), PARAMS, TODAY
+    )
+    assert amounts(pay(single, "adoption-leave"))[3:] == (26255.6, 140)
+    assert amounts(pay(single, "parental"))[3:] == (42008.96, 224)
+    assert pay(single, "parental-father").rate == 70
+    covers = "urlop na warunkach urlopu macierzyńskiego i rodzicielski"
+    assert any(covers in d for d in pay(single, "parental").details)
+    assert any("nie stosujemy zasady o pierwszym roku" in a for a in single.assumptions)
+
+
+def test_the_interview_asks_the_choice_of_rate_after_taking_a_child_in() -> None:
+    answers = {
+        **MOTHER,
+        "taken_in": "foster",
+        "child_born": True,
+        "taken_in_on": "2026-11-02",
+        "birth_date": "2024-05-10",
+        "father_work": "none",
+        "mother_pay": 8000,
+    }
+    (question,) = interview_questions(Scenario.model_validate(answers))
+    assert question.key == "rate-815"
+    assert "najpóźniej 21 dni po przyjęciu dziecka na wychowanie" in question.text
+
+
+def test_every_period_that_carries_a_benefit_is_paid() -> None:
+    """Every segment on a parent's lane, except the undecided window before the birth and work,
+    has a rule in `PAID` and an amount once both monthly amounts are known."""
+    not_paid = {"prenatal-window", "work-until-birth"}
+    pays = {"mother_pay": 8000, "father_work": "employment", "father_pay": 6000}
+    timelines = [
+        born(**pays),
+        born(**pays, rate_815=True, father_takes_over=True),
+        born(
+            **pays,
+            birth_date="2026-10-01",
+            hospital_care=True,
+            birth_week="28-37",
+            birth_weight_up_to_1000g=False,
+            hospital_stays=[{"start": "2026-10-01", "end": "2026-10-20"}],
+        ),
+        born(
+            **pays,
+            parental_parts=[
+                {"parent": "mother", "weeks": 20, "work_fraction": "1/4"},
+                {"parent": "father", "weeks": 9, "with_previous": True},
+            ],
+        ),
+        expecting(**pays, leave_before_birth_weeks=2, has_medical_certificate=True),
+        expecting(**pays, sick_leave=True, sick_leave_start="2026-11-01"),
+        expecting(**pays, job_loss={"ended_on": "2026-11-30", "reason": "liquidation"}),
+        expecting(
+            **pays,
+            job_loss={"ended_on": "2026-11-30", "reason": "other"},
+            sick_leave=True,
+            sick_leave_start="2026-10-01",
+        ),
+    ]
+    for t in timelines:
+        paid = {p.segment_id for p in t.payments}
+        for s in t.segments:
+            if s.lane in ("mother", "father") and s.id not in not_paid:
+                assert paid_for(s.id) is not None, s.id
+                assert s.id in paid, s.id
+    assert paid_for("sick-pay-3") == paid_for("sick-pay")
+    assert paid_for("parental-mother-2") == paid_for("parental")
+    assert paid_for("prenatal-window") is None

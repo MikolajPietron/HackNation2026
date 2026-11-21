@@ -32,7 +32,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.insurance import NOT_INSURED, coverage, father_coverage
+from app.engine.insurance import NOT_INSURED
 from app.engine.models import (
     BirthWeek,
     ChildLoss,
@@ -45,6 +45,7 @@ from app.engine.models import (
     TakenIn,
     Work,
 )
+from app.engine.money import pay_matters, requester_cover
 from app.engine.parental_plan import default_part, part_ids
 from app.engine.plausibility import (
     birth_date_problem,
@@ -882,10 +883,8 @@ async def set_monthly_pay(
             user does not know it or does not want to give it.
     """
     scenario = ctx.deps.scenario
-    work = scenario.mothers_work if parent == "mother" else scenario.fathers_work
-    cover = coverage(scenario) if parent == "mother" else father_coverage(scenario)
     who = "mama" if parent == "mother" else "tata"
-    if work not in ("employment", "contract", "business") or cover in NOT_INSURED:
+    if not pay_matters(scenario, parent):
         raise ModelRetry(
             f"Kwotę zasiłku liczymy tylko, gdy {who} pracuje i podlega ubezpieczeniu "
             "chorobowemu. Najpierw ustal, jak pracuje."
@@ -898,20 +897,37 @@ async def set_monthly_pay(
     field = "mother_pay" if parent == "mother" else "father_pay"
     updated = _with(ctx, **{field: "unknown" if amount is None else amount})
     first = "pay-maternity" if parent == "mother" else "pay-paternity"
-    return await _apply(ctx, updated, first, "pay-parental", "pay-parental-father")
+    return await _apply(
+        ctx,
+        updated,
+        first,
+        "pay-adoption-leave",
+        "pay-parental",
+        "pay-parental-father",
+        "pay-job-loss-benefit",
+        "pay-sick-pay",
+        "pay-sick-benefit",
+    )
 
 
 @assistant.tool(sequential=True)
 async def set_rate_choice(ctx: RunContext[AssistantDeps], rate_815: bool | None) -> str:
     """Record the mother's choice of the benefit rate: the written request, filed not later than
     21 days after the birth, for 81,5% for the whole of maternity and parental leave (True), or
-    100% for maternity and 70% for parental leave (False). Only what the user said.
+    100% for maternity and 70% for parental leave (False). For a child taken in for upbringing:
+    the same choice of the person who took the child in, within 21 days after taking it in, for
+    the leave on the terms of maternity leave and parental leave. Only what the user said.
 
     Args:
-        rate_815: True = she files (or filed) the request for 81,5%; False = 100% and 70%;
+        rate_815: True = the request for 81,5% is (or was) filed; False = 100% and 70%;
             null = not decided (a correction).
     """
-    if coverage(ctx.deps.scenario) in NOT_INSURED:
-        raise ModelRetry("Mama nie podlega ubezpieczeniu chorobowemu, więc nie ma czego wybierać.")
+    if requester_cover(ctx.deps.scenario) in NOT_INSURED:
+        who = "Ta osoba" if ctx.deps.scenario.taken_in is not None else "Mama"
+        raise ModelRetry(
+            f"{who} nie podlega ubezpieczeniu chorobowemu, więc nie ma czego wybierać."
+        )
     scenario = _with(ctx, rate_815=rate_815)
-    return await _apply(ctx, scenario, "rate-815-deadline", "pay-maternity", "pay-parental")
+    return await _apply(
+        ctx, scenario, "rate-815-deadline", "pay-maternity", "pay-adoption-leave", "pay-parental"
+    )

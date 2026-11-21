@@ -250,13 +250,19 @@ def test_the_interview_asks_only_what_this_path_needs() -> None:
         "adoption-ruling",
     ]
     done = {"taken_in_on": TAKEN, "birth_date": BIRTH, "children_count": 1}
-    assert questions(taken_in="adoption", father_work="employment", **done) == ["adoption-ruling"]
-    assert questions(taken_in="adoption", father_work="none", **done) == []
+    # Section G last: the amounts of both parents (test_money.py: the choice of 81,5%).
+    money = ["mother-pay", "father-pay"]
+    assert questions(taken_in="adoption", father_work="employment", **done) == [
+        "adoption-ruling",
+        *money,
+    ]
+    assert questions(taken_in="adoption", father_work="none", **done) == ["mother-pay"]
     # Foster care: no ruling; postponed schooling only when the age limit of 7 matters.
-    assert questions(taken_in="foster", father_work="employment", **done) == []
+    assert questions(taken_in="foster", father_work="employment", **done) == money
     near_seven = {**done, "taken_in_on": "2026-11-16", "birth_date": "2020-03-15"}
     assert questions(taken_in="foster", father_work="employment", **near_seven) == [
-        "school-postponed"
+        "school-postponed",
+        *money,
     ]
 
 
