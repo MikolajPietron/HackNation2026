@@ -1,6 +1,6 @@
 {
-  "version": "2026.2",
-  "description": "Fazy 1 i 2a: Przewodnik ZUS, sekcja A (s. 5): „Przygotowanie do porodu” oraz wymiar urlopu macierzyńskiego i 14 tygodni po porodzie; Kodeks pracy art. 180 § 1–3 i art. 183¹ § 1–2. Każda liczba i reguła ma dosłowny cytat (z literówkami oryginału Przewodnika).",
+  "version": "2026.3",
+  "description": "Fazy 1 i 2: Przewodnik ZUS, sekcja A (s. 5–6): „Przygotowanie do porodu” i „Urodzenie dziecka” (prawo ubezpieczonej mamy do zasiłku, wymiar urlopu macierzyńskiego, 14 tygodni po porodzie, uzupełniający urlop macierzyński, urlop rodzicielski, „Za życiem”) z fragmentami s. 3–4, 7, 8 i 10, na których ten punkt się opiera; Kodeks pracy art. 180, 180², 182¹ᵃ, 182¹ᶜ, 182¹ᵍ i 183¹. Każda liczba i reguła ma dosłowny cytat (z literówkami oryginału Przewodnika).",
   "maternity": {
     "max_weeks_before_birth": {
       "value": 6,
@@ -19,7 +19,13 @@
       ]
     },
     "weeks_by_children": {
-      "value": [20, 31, 33, 35, 37],
+      "value": [
+        20,
+        31,
+        33,
+        35,
+        37
+      ],
       "note": "Indeks = liczba dzieci urodzonych przy jednym porodzie minus 1; ostatnia wartość dotyczy 5 i więcej dzieci.",
       "sources": [
         {
@@ -43,6 +49,344 @@
           "section": "A.2",
           "page": 5,
           "quote": "Pierwsze 14 tygodni po porodzie matka musi wykorzystać osobiście."
+        }
+      ]
+    }
+  },
+  "benefit": {
+    "insured_mother": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Po porodzie kobieta ubezpieczona nabywa prawo do zasiłku macierzyńskiego za okres urlopu macierzyńskiego"
+        }
+      ]
+    },
+    "paid_to_the_insured": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZM",
+          "page": 4,
+          "quote": "Zasiłek macierzyński jest świadczeniem wypłacanym z Funduszu Ubezpieczeń Społecznych osobom podlegającym ubezpieczeniu chorobowemu (w określonych sytuacjach również po ustaniu tego ubezpieczenia)"
+        }
+      ]
+    },
+    "obligatory_insurance": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.o",
+          "page": 3,
+          "quote": "obowiązkowego ubezpieczenia chorobowego (np. umowa o pracę)"
+        }
+      ]
+    },
+    "voluntary_insurance": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.d",
+          "page": 3,
+          "quote": "dobrowolnego ubezpieczenia chorobowego (np. umowa zlecenie lub działalność gospodarcza)"
+        }
+      ]
+    },
+    "insured_on_birth_day": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.3",
+          "page": 10,
+          "quote": "niepodleganie ubezpieczeniu chorobowemu na dzień porodu"
+        }
+      ]
+    },
+    "voluntary_not_registered": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.3",
+          "page": 10,
+          "quote": "niezgłoszenie się np. do dobrowolnego ubezpieczenia chorobowego"
+        }
+      ]
+    },
+    "work_ended_before_birth": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.3",
+          "page": 10,
+          "quote": "rozwiązanie stosunku pracy, zakończenie prowadzenia pozarolniczej działalności gospodarczej, zakończenie umowy zlecenia przed porodem co powoduje konieczność wyrejestrowania się z ubezpieczenia chorobowego."
+        }
+      ]
+    },
+    "without_insurance": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.1",
+          "page": 10,
+          "quote": "osoba która nie podlega ubezpieczeniu chorobowemu nie ma uprawnień do zasiłków"
+        }
+      ]
+    },
+    "non_employees": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZM",
+          "page": 4,
+          "quote": "Pozostałym, którzy nie świadczą pracy na podstawie umowy o pracę zasiłek macierzyński przysługuje za okres odpowiadający okresowi urlopu związanego z rodzicielstwem (czyli nie jest im udzielany urlop, ale mają prawo do zasiłku macierzyńskiego za ten okres)."
+        }
+      ]
+    },
+    "same_rules_for_non_employees": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZM",
+          "page": 5,
+          "quote": "Zasiłek macierzyński przysługuje zarówno ubezpieczonym pracownikom jak i ubezpieczonym, którzy nie są pracownikami na tych samych zasadach co do wymiaru i wysokości."
+        }
+      ]
+    }
+  },
+  "supplementary": {
+    "limit_weeks_early": {
+      "value": 15,
+      "note": "Dziecko urodzone przed ukończeniem 28. tygodnia ciąży lub z masą urodzeniową nie większą niż 1000 g.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 1",
+          "quote": "przed ukończeniem 28. tygodnia ciąży lub z masą urodzeniową nie większą niż 1000 g - w wymiarze tygodnia uzupełniającego urlopu macierzyńskiego za każdy tydzień pobytu dziecka w szpitalu do upływu 15. tygodnia po porodzie"
+        }
+      ]
+    },
+    "limit_weeks_preterm": {
+      "value": 8,
+      "note": "Dziecko urodzone po ukończeniu 28. i przed ukończeniem 37. tygodnia ciąży, z masą urodzeniową większą niż 1000 g.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 1",
+          "quote": "po ukończeniu 28. tygodnia ciąży i przed ukończeniem 37. tygodnia ciąży i z masą urodzeniową większą niż 1000 g - w wymiarze tygodnia uzupełniającego urlopu macierzyńskiego za każdy tydzień pobytu dziecka w szpitalu do upływu 8. tygodnia po porodzie"
+        }
+      ]
+    },
+    "term": {
+      "limit_weeks": 8,
+      "counted_from_day": 5,
+      "min_consecutive_days": 2,
+      "first_day_from": 5,
+      "first_day_to": 28,
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 1",
+          "quote": "po ukończeniu 37. tygodnia ciąży i jego pobytu w szpitalu, pod warunkiem że pobyt dziecka w szpitalu po porodzie będzie wynosił co najmniej 2 kolejne dni, przy czym pierwszy z tych dni będzie przypadał w okresie od 5. do 28. dnia po porodzie - w wymiarze tygodnia uzupełniającego urlopu macierzyńskiego za każdy tydzień pobytu dziecka w szpitalu w okresie od 5. dnia do upływu 8. tygodnia po porodzie."
+        }
+      ]
+    },
+    "situations": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "zasiłek macierzyński za okres uzupełniającego urlopu macierzyńskiego (w ścisłe określonych sytuacjach)"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "C",
+          "page": 8,
+          "quote": "Uzupełniający urlop macierzyński – urlop przysługujący zarówno matce jak i ojcu (ale może korzystać tylko jedno z nich) w przypadku, urodzenia się dziecka przedwcześnie (wcześniaka) albo dziecka urodzonego o czasie, ale wymagającego hospitalizacji."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 180² § 1",
+          "quote": "Pracownica albo pracownik - ojciec wychowujący dziecko ma prawo bezpośrednio po wykorzystaniu urlopu macierzyńskiego do uzupełniającego urlopu macierzyńskiego - w przypadku urodzenia dziecka:"
+        }
+      ]
+    },
+    "once_after_maternity": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "C",
+          "page": 8,
+          "quote": "Urlop jest udzielany jednorazowo, bez możliwości dzielenia na części. Przysługuje bezpośrednio po urlopie macierzyńskim."
+        }
+      ]
+    },
+    "one_parent": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "C",
+          "page": 8,
+          "quote": "urlop przysługujący zarówno matce jak i ojcu (ale może korzystać tylko jedno z nich)"
+        }
+      ]
+    },
+    "multiples": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 2",
+          "quote": "W przypadku urodzenia więcej niż jednego dziecka przy jednym porodzie przy ustalaniu wymiaru uzupełniającego urlopu macierzyńskiego należy uwzględnić wagę dziecka o najniższej masie urodzeniowej oraz okres pobytu w szpitalu dziecka najdłużej hospitalizowanego."
+        }
+      ]
+    },
+    "sum_and_round": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 3",
+          "quote": "Przy ustalaniu wymiaru uzupełniającego urlopu macierzyńskiego okresy pobytu dziecka w szpitalu do upływu odpowiednio 8. albo 15. tygodnia po porodzie sumuje się. Niepełny tydzień zaokrągla się w górę do pełnego tygodnia."
+        }
+      ]
+    },
+    "week_is_7_days": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180² § 7",
+          "quote": "Do uzupełniającego urlopu macierzyńskiego przepisy art. 45 § 3, art. 47, art. 57 § 2, art. 163 § 3, art. 165 pkt 4, art. 166 pkt 4, art. 180 § 6-17, art. 180¹ § 2, art. 182 zdanie pierwsze i art. 183¹ § 1 stosuje się odpowiednio."
+        }
+      ]
+    }
+  },
+  "parental": {
+    "weeks_by_children": {
+      "value": [
+        41,
+        43
+      ],
+      "note": "Łącznie dla obojga rodziców: przy urodzeniu jednego dziecka, przy urodzeniu więcej niż jednego.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "zasiłek macierzyński za okres urlopu rodzicielskiego. Długość jego trwania uzależniony jest od liczby dzieci oraz od posiadania przez dziecko zaświadczenia „Za życiem”"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 1",
+          "quote": "Pracownicy - rodzice dziecka mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad dzieckiem w wymiarze do: 1) 41 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 43 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
+        }
+      ]
+    },
+    "weeks_by_children_za_zyciem": {
+      "value": [
+        65,
+        67
+      ],
+      "note": "Łącznie dla obojga rodziców, gdy dziecko ma zaświadczenie „Za życiem”.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 6,
+          "quote": "W przypadku gdy dziecko posiada zaświadczenie „Za życiem” rodzice mają prawo do wydłużonego urlopu rodzicielskiego za który przysługuje zasiłek macierzyński."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 2",
+          "quote": "mają prawo do urlopu rodzicielskiego w celu sprawowania opieki nad tym dzieckiem w wymiarze do: 1) 65 tygodni - w przypadku, o którym mowa w art. 180 § 1 pkt 1; 2) 67 tygodni - w przypadkach, o których mowa w art. 180 § 1 pkt 2-5."
+        }
+      ]
+    },
+    "exclusive_weeks": {
+      "value": 9,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "B.3",
+          "page": 7,
+          "quote": "każdemu z rodziców przysługuje wyłączne, 9 – tygodniowe, nieprzenoszalne prawo do części tego urlopu, ze wspólnej puli 41 lub 43 tygodni urlopu rodzicielskiego"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 4",
+          "quote": "Każdemu z pracowników - rodziców dziecka przysługuje wyłączne prawo do 9 tygodni urlopu rodzicielskiego z wymiaru urlopu określonego w § 1 i 2. Prawa tego nie można przenieść na drugiego z pracowników - rodziców dziecka."
+        }
+      ]
+    },
+    "max_parts": {
+      "value": 5,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Udzielany jest jednorazowo albo nie więcej niż w 5 częściach, nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia.",
+          "page_to": 6
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶜ",
+          "quote": "Urlop rodzicielski jest udzielany jednorazowo albo nie więcej niż w 5 częściach nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia."
+        }
+      ]
+    },
+    "deadline_age": {
+      "value": 6,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Udzielany jest jednorazowo albo nie więcej niż w 5 częściach, nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia.",
+          "page_to": 6
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᶜ",
+          "quote": "Urlop rodzicielski jest udzielany jednorazowo albo nie więcej niż w 5 częściach nie później niż do zakończenia roku kalendarzowego, w którym dziecko kończy 6 rok życia."
+        }
+      ]
+    },
+    "after_maternity": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Po wykorzystaniu zasiłku macierzyńskiego za okres urlopu macierzyńskiego kobiecie przysługuje:"
+        }
+      ]
+    },
+    "joint": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 3",
+          "quote": "Urlop rodzicielski w wymiarze, o którym mowa w § 1 i 2, przysługuje łącznie obojgu pracownikom - rodzicom dziecka."
+        }
+      ]
+    },
+    "week_is_7_days": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵍ",
+          "quote": "Do urlopu rodzicielskiego stosuje się odpowiednio przepisy art. 45 § 3, art. 47, art. 57 § 2, art. 163 § 3, art. 165 pkt 4, art. 166 pkt 4, art. 180 § 6-17, art. 180¹ § 2, art. 181, art. 182 zdanie pierwsze i art. 183¹ § 1."
+        }
+      ]
+    },
+    "za_zyciem_certificate": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2-przypis",
+          "page": 5,
+          "quote": "w przypadku ciężkiego i nieodwracalnego upośledzenia albo nieuleczalnej choroby zagrażającej życiu, które powstały w prenatalnym okresie rozwoju dziecka lub w czasie porodu"
         }
       ]
     }

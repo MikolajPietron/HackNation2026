@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { Check, FileText } from 'lucide-react'
+import { ArrowRight, Check, FileText } from 'lucide-react'
 import { dayNumber, formatDate, formatDayMonth, formatRange, monthCells } from '@/lib/dates'
 import { EASE_OUT, SPRING_LAYOUT } from '@/lib/ease'
 import { TONE } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Document, Timeline } from '@/types'
 import type { TimelineItem, TimelineViewProps } from './items'
+import { Pulse } from './Pulse'
 
 const TRACK_MIN_PX = 640
 const ROW_PX = 58
 const MARKER_ROW_PX = 28
 const MARKER_LABEL_PX = 180 // room a marker label needs before the next one in the same row
 const PAD_DAYS = 14 // empty days shown before the first and after the last element
+const PAD_DAYS_ALONE = 75 // around a lone day (no periods), so the strip still shows a few months
 const FULL_PILL_PERCENT = 26 // narrower pills keep only the initial; the title goes outside
 const COMPACT_PILL_PERCENT = 8 // narrower still: an empty pill with everything outside
 const MIN_MONTH_PERCENT = 3.5 // narrower month cells at the edges are not labelled
+const FAR_DAYS = 60 // a marker this long after the last period is pinned to the right edge
 
 // The birth marker sits on the start of the day, like the dashed birth line and the pills.
 const BIRTH_MARKERS = new Set(['due-date', 'birth'])
@@ -36,7 +39,7 @@ export function PillTimeline({
 }: TimelineViewProps) {
   const refs = useRef(new Map<string, HTMLElement>())
   const plan = useMemo(() => layout(timeline, items), [timeline, items])
-  const { from, to, segments, documents, markers, markerRows, months } = plan
+  const { from, to, segments, documents, markers, farMarkers, markerRows, months } = plan
 
   useEffect(() => {
     if (focus.id) {
@@ -110,7 +113,10 @@ export function PillTimeline({
               )}
             </div>
 
-            <div className="relative" style={{ height: markerRows * MARKER_ROW_PX + 6 }}>
+            <div
+              className="relative"
+              style={{ height: (markerRows + farMarkers.length) * MARKER_ROW_PX + 6 }}
+            >
               {markers.map(({ item, row }) => (
                 <MarkerChip
                   key={item.id}
@@ -118,6 +124,16 @@ export function PillTimeline({
                   item={item}
                   left={x(item.startDay + (BIRTH_MARKERS.has(item.id) ? 0 : 0.5))}
                   top={row * MARKER_ROW_PX + 4}
+                  selected={item.id === selectedId}
+                  onClick={() => onSelect(item.id)}
+                />
+              ))}
+              {farMarkers.map((item, index) => (
+                <EdgeMarker
+                  key={item.id}
+                  ref={register(item.id)}
+                  item={item}
+                  top={(markerRows + index) * MARKER_ROW_PX + 4}
                   selected={item.id === selectedId}
                   onClick={() => onSelect(item.id)}
                 />
@@ -211,6 +227,39 @@ function MarkerChip({
     >
       <span className="size-2.5 shrink-0 rotate-45 rounded-[2px] bg-sun-400" />
       {item.label} · {formatDayMonth(item.start)}
+    </button>
+  )
+}
+
+/** A day years past the periods (a distant deadline): at the right edge, with its full date. */
+function EdgeMarker({
+  item,
+  ref,
+  top,
+  selected,
+  onClick,
+}: {
+  item: MarkerItem
+  ref: (node: HTMLElement | null) => void
+  top: number
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      title={`${item.title} — ${formatDate(item.start)}`}
+      className={cn(
+        'absolute right-0 flex h-5 items-center gap-1.5 text-[11px] font-bold whitespace-nowrap transition-colors',
+        selected ? 'text-zus-700 underline underline-offset-2' : 'text-navy-700 hover:text-zus-700',
+      )}
+      style={{ top }}
+    >
+      {item.label} {formatDate(item.start)}
+      <span className="size-2.5 shrink-0 rotate-45 rounded-[2px] bg-sun-400" />
+      <ArrowRight className="size-3.5 text-navy-400" aria-hidden />
     </button>
   )
 }
@@ -335,19 +384,6 @@ function PillRow({
   )
 }
 
-/** One fading ring around an element the last recalculation changed. */
-function Pulse() {
-  return (
-    <motion.span
-      aria-hidden
-      className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-sun-400"
-      initial={{ opacity: 1, scale: 1 }}
-      animate={{ opacity: 0, scale: 1.08 }}
-      transition={{ duration: 1.6, ease: EASE_OUT }}
-    />
-  )
-}
-
 /** Visible range, each pill's document and rows for marker labels. */
 function layout(timeline: Timeline, items: TimelineItem[]) {
   const segments = items
@@ -356,9 +392,15 @@ function layout(timeline: Timeline, items: TimelineItem[]) {
   const allMarkers = items
     .filter((item): item is MarkerItem => item.kind === 'marker')
     .sort((a, b) => a.startDay - b.startDay)
-  const days = items.flatMap((item) => [item.startDay, item.endDay])
-  const from = Math.min(...days) - PAD_DAYS
-  const to = Math.max(...days) + PAD_DAYS
+  // A deadline years away would squeeze the periods into a sliver: it leaves the scale.
+  // Without periods there is no scale to protect, so nothing is far.
+  const lastPeriodEnd = segments.length > 0 ? Math.max(...segments.map((item) => item.endDay)) : Infinity
+  const isFar = (item: TimelineItem) => item.kind === 'marker' && item.startDay > lastPeriodEnd + FAR_DAYS
+  const farMarkers = allMarkers.filter(isFar)
+  const days = items.filter((item) => !isFar(item)).flatMap((item) => [item.startDay, item.endDay])
+  const pad = segments.length > 0 ? PAD_DAYS : PAD_DAYS_ALONE
+  const from = Math.min(...days) - pad
+  const to = Math.max(...days) + pad
 
   const documents = new Map<string, Document>()
   for (const document of timeline.documents) {
@@ -367,7 +409,7 @@ function layout(timeline: Timeline, items: TimelineItem[]) {
 
   const minGap = Math.ceil(((to - from) * MARKER_LABEL_PX) / TRACK_MIN_PX)
   const rowEnds: number[] = []
-  const markers = allMarkers.map((item) => {
+  const markers = allMarkers.filter((item) => !isFar(item)).map((item) => {
     let row = rowEnds.findIndex((end) => end <= item.startDay)
     if (row === -1) row = rowEnds.push(item.startDay + minGap) - 1
     else rowEnds[row] = item.startDay + minGap
@@ -392,5 +434,14 @@ function layout(timeline: Timeline, items: TimelineItem[]) {
       newYear: index === 0 || all[index - 1].year !== month.year,
     }))
 
-  return { from, to, segments, documents, markers, markerRows: Math.max(rowEnds.length, 1), months }
+  return {
+    from,
+    to,
+    segments,
+    documents,
+    markers,
+    farMarkers,
+    markerRows: Math.max(rowEnds.length, 1),
+    months,
+  }
 }

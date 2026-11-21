@@ -1,8 +1,9 @@
 """The guide (Przewodnik ZUS) as sections the app covers so far.
 
 `przewodnik_pages.json` is the text of the PDF, page by page (regenerate with tools/przewodnik/).
-A section is cut out of its page between two anchors, so its text is the document's own wording:
-the model reads it, and every quote shown in the UI is checked against it.
+A section is cut out of its pages between anchors, so its text is the document's own wording:
+the model reads it, and every quote shown in the UI is checked against it. A sentence that runs
+over a page break is joined from two parts, skipping the footnote printed between them.
 """
 
 import json
@@ -14,38 +15,142 @@ from pathlib import Path
 PAGES_FILE = Path(__file__).with_name("przewodnik_pages.json")
 
 
-@dataclass(frozen=True)
-class GuideSection:
-    id: str
-    title: str
-    page: int
-    text: str
-
-    def contains(self, quote: str) -> bool:
-        """True if `quote` is a literal fragment of this section (whitespace aside)."""
-        return normalize(quote) in normalize(self.text)
-
-
-# (id, title, page, first words, last words): the part of each section the phases cover so far.
-_SECTIONS = [
-    # Phase 1.
-    ("A.1", "Przygotowanie do porodu", 5, "Kobieta może rozpocząć", "po urodzeniu dziecka."),
-    # Phase 2a: length of maternity leave and the 14 weeks after the birth.
-    ("A.2", "Urodzenie dziecka", 5, "Wymiar zasiłku macierzyńskiego", "wykorzystać osobiście."),
-]
-
-
 def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+@dataclass(frozen=True)
+class GuideSection:
+    id: str
+    title: str
+    parts: tuple[tuple[int, str], ...]
+    """(page, text) in reading order; consecutive parts continue the same running text."""
+
+    @property
+    def page(self) -> int:
+        return self.parts[0][0]
+
+    @property
+    def last_page(self) -> int:
+        return self.parts[-1][0]
+
+    @property
+    def text(self) -> str:
+        return " ".join(text for _, text in self.parts)
+
+    @property
+    def pages_label(self) -> str:
+        """ "s. 5" or "s. 5–6"."""
+        return page_label(self.page, self.last_page)
+
+    def pages_of(self, quote: str) -> tuple[int, int] | None:
+        """The first and last page of `quote`, or None if it is not a literal fragment of this
+        section (whitespace aside)."""
+        wanted = normalize(quote)
+        start = self.text.find(wanted)
+        if start < 0 or not wanted:
+            return None
+        end = start + len(wanted) - 1
+        pages = []
+        offset = 0
+        for page, text in self.parts:
+            if start < offset + len(text) and end >= offset:
+                pages.append(page)
+            offset += len(text) + 1
+        return pages[0], pages[-1]
+
+    def contains(self, quote: str) -> bool:
+        return self.pages_of(quote) is not None
+
+
+def page_label(first: int | None, last: int | None = None) -> str:
+    return f"s. {first}–{last}" if last and last != first else f"s. {first}"
+
+
+# id, title, parts as (page, first words, last words): what the phases done so far rest on.
+_SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
+    # Who is insured (the sick-benefit chapter names both kinds of sickness insurance).
+    (
+        "ZC.o",
+        "Ubezpieczenie chorobowe obowiązkowe",
+        [(3, "obowiązkowego ubezpieczenia chorobowego", "(np. umowa o pracę)")],
+    ),
+    (
+        "ZC.d",
+        "Ubezpieczenie chorobowe dobrowolne",
+        [(3, "dobrowolnego ubezpieczenia chorobowego", "działalność gospodarcza)")],
+    ),
+    # The maternity benefit chapter, before section A: who gets the benefit and for what periods.
+    (
+        "ZM",
+        "Zasiłek macierzyński",
+        [
+            (4, "Zasiłek macierzyński jest świadczeniem wypłacanym", "następujące okresy urlopu:"),
+            (5, "(w razie porodu)", "co do wymiaru i wysokości."),
+        ],
+    ),
+    # Phase 1.
+    ("A.1", "Przygotowanie do porodu", [(5, "Kobieta może rozpocząć", "po urodzeniu dziecka.")]),
+    # Phase 2: the whole point; its last sentences continue on page 6, after footnote 2.
+    (
+        "A.2",
+        "Urodzenie dziecka",
+        [
+            (5, "Po porodzie kobieta ubezpieczona", "nie więcej niż w"),
+            (6, "5 częściach, nie później", "przysługuje zasiłek macierzyński."),
+        ],
+    ),
+    (
+        "A.2-przypis",
+        "Zaświadczenie „Za życiem” (przypis 2 do punktu „Urodzenie dziecka”)",
+        [
+            (5, "Zaświadczenie „Za życiem” wydawane jest", "posiadający specjalizację"),
+            (6, "II stopnia lub tytuł specjalisty", "lub chirurgii dziecięcej."),
+        ],
+    ),
+    # Section B, only the sentences about the parental leave both parents share (phase 2b).
+    (
+        "B.3",
+        "Urlop rodzicielski: część każdego z rodziców",
+        [(7, "Należy przy tym pamiętać", "dziecko skończy 6 lat.")],
+    ),
+    # Section C (phase 2d).
+    (
+        "C",
+        "Zasiłek macierzyński za okres uzupełniającego urlopu macierzyńskiego",
+        [(8, "Uzupełniający urlop macierzyński – urlop", "po urlopie macierzyńskim.")],
+    ),
+    # Section H, only what "ubezpieczona" in point A.2 depends on (phase 2c).
+    (
+        "H.1",
+        "Zagrożenia: skutek niepodlegania ubezpieczeniu chorobowemu",
+        [(10, "osoba która nie podlega", "nie ma uprawnień do zasiłków")],
+    ),
+    (
+        "H.3",
+        "Zagrożenia: brak ubezpieczenia chorobowego w dniu porodu",
+        [
+            (
+                10,
+                "niepodleganie ubezpieczeniu chorobowemu na dzień porodu",
+                "ubezpieczenia chorobowego.",
+            )
+        ],
+    ),
+]
+
+
 @lru_cache
 def guide_sections() -> dict[str, GuideSection]:
-    pages = json.loads(PAGES_FILE.read_text(encoding="utf-8"))["pages"]
+    raw = json.loads(PAGES_FILE.read_text(encoding="utf-8"))["pages"]
+    pages = {number: normalize(text) for number, text in raw.items()}
     sections = {}
-    for section_id, title, page, first, last in _SECTIONS:
-        text = pages[str(page)]
-        start = text.index(first)
-        end = text.index(last, start) + len(last)
-        sections[section_id] = GuideSection(section_id, title, page, normalize(text[start:end]))
+    for section_id, title, anchors in _SECTIONS:
+        parts = []
+        for page, first, last in anchors:
+            text = pages[str(page)]
+            start = text.index(first)
+            end = text.index(last, start) + len(last)
+            parts.append((page, text[start:end]))
+        sections[section_id] = GuideSection(section_id, title, tuple(parts))
     return sections

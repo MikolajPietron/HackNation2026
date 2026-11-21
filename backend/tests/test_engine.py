@@ -7,7 +7,14 @@ import datetime as dt
 
 import pytest
 
-from app.engine import Scenario, ScenarioError, Timeline, build_timeline, changed_element_ids
+from app.engine import (
+    Scenario,
+    ScenarioError,
+    Timeline,
+    build_timeline,
+    changed_element_ids,
+    changed_note_ids,
+)
 from app.services.params import load_params
 
 PARAMS = load_params()
@@ -131,7 +138,7 @@ def test_without_children_count_the_maternity_leave_waits() -> None:
 
 def test_born_child_counts_from_the_actual_birth() -> None:
     t = born(children_count=1)
-    assert ids(t) == ["maternity", "birth", "personal-weeks"]
+    assert ids(t) == ["maternity", "parental", "birth", "personal-weeks", "parental-deadline"]
     assert span(t, "maternity") == (BORN, dt.date(2027, 3, 29), 140)
     assert t.element("personal-weeks").date == dt.date(2027, 2, 15)  # type: ignore[union-attr]
     assert not t.documents
@@ -161,8 +168,13 @@ def test_due_date_in_the_past_is_flagged() -> None:
 
 def test_changed_elements_after_twins() -> None:
     one, two = expecting(children_count=1), expecting(children_count=2)
-    assert changed_element_ids(one, two) == ["maternity"]
-    assert changed_element_ids(expecting(), one) == ["maternity", "personal-weeks"]
+    assert changed_element_ids(one, two) == ["maternity", "parental"]
+    assert changed_element_ids(expecting(), one) == [
+        "maternity",
+        "parental",
+        "personal-weeks",
+        "parental-deadline",
+    ]
     assert changed_element_ids(None, one) == []
 
 
@@ -180,7 +192,7 @@ def notes(timeline: Timeline) -> dict[str, str]:
 
 def test_explains_the_choice_before_an_expected_birth() -> None:
     explained = notes(expecting(children_count=1))
-    assert list(explained) == ["situation", "before-birth", "computed"]
+    assert list(explained) == ["situation", "insurance", "before-birth", "parental", "computed"]
     assert "Dziecko jest w drodze" in explained["situation"]
     assert "nawet 6 tygodni przed porodem" in explained["before-birth"]
     assert "Najwcześniej 1 lutego 2027" in explained["before-birth"]
@@ -205,17 +217,26 @@ def test_born_today_is_simpler() -> None:
         Scenario(child_born=True, birth_date=TODAY, children_count=1), PARAMS, TODAY
     )
     explained = notes(today)
-    assert list(explained) == ["situation", "computed"]
+    assert list(explained) == ["situation", "insurance", "parental", "computed"]
     assert explained["situation"].startswith("Dziecko urodziło się dzisiaj | To upraszcza sprawę")
     assert "zaczyna się dziś, w dniu porodu" in explained["situation"]
     assert "po porodzie do 9 kwietnia 2027" in explained["computed"]
+
+
+def test_changed_notes_name_what_an_answer_changed() -> None:
+    """Twins bring parental leave onto the timeline, add a relief and change what we computed;
+    the situation stays as it was."""
+    before, after = expecting(), expecting(children_count=2)
+    assert changed_note_ids(before, after) == ["parental", "more-children", "computed"]
+    assert changed_note_ids(after, after) == []
+    assert changed_note_ids(None, after) == []
 
 
 def test_twins_get_a_relief_note() -> None:
     explained = notes(expecting(children_count=2))
     assert explained["more-children"] == (
         "Bliźnięta: dłuższy urlop | Przy urodzeniu dwojga dzieci urlop macierzyński trwa "
-        "31 tyg. zamiast 20."
+        "31 tyg. zamiast 20, a urlop rodzicielski obojga rodziców — do 43 tyg. zamiast 41."
     )
     assert "more-children" not in notes(expecting(children_count=1))
 
@@ -232,3 +253,277 @@ def test_finished_leave_and_unknown_children_are_explained() -> None:
         )["computed"]
     )
     assert notes(expecting())["computed"].startswith("Co jeszcze policzymy")
+
+
+# Phase 2: the right of the insured mother to the benefit (guide A.2, pages 3, 4-5 and 10).
+
+MOTHER_EMPLOYED = {"role": "mother", "work": "employment"}
+
+
+def test_an_employed_mother_is_insured_and_gets_the_benefit() -> None:
+    t = expecting(**MOTHER_EMPLOYED, children_count=1)
+    insurance = t.notes[1]
+    assert (insurance.id, insurance.kind) == ("insurance", "right")
+    assert insurance.title == "Mama ma prawo do zasiłku macierzyńskiego"
+    assert "Umowa o pracę daje obowiązkowe ubezpieczenie chorobowe" in insurance.text
+    assert {s.page for s in insurance.sources} == {3, 5, 10}
+    maternity = next(s for s in t.segments if s.id == "maternity")
+    assert any("ma prawo do zasiłku macierzyńskiego" in d for d in maternity.details)
+
+
+@pytest.mark.parametrize("work", ["contract", "business"])
+def test_contract_or_business_needs_the_voluntary_insurance(work: str) -> None:
+    asked = expecting(role="mother", work=work, children_count=1)
+    assert asked.notes[1].title == "Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe"
+    assert "ubezpieczenie chorobowe jest dobrowolne" in asked.notes[1].text
+    assert "maternity" in ids(asked)  # drawn on the assumption that she is insured
+    assert any("zakładamy, że mama podlega ubezpieczeniu" in a for a in asked.assumptions)
+
+    insured = expecting(role="mother", work=work, mother_insured=True, children_count=1)
+    assert insured.notes[1].kind == "right"
+    assert "Nie jest pracownicą, dlatego nie dostaje urlopu" in insured.notes[1].text
+    maternity = next(s for s in insured.segments if s.id == "maternity")
+    assert any("nie dostaje urlopu" in d for d in maternity.details)
+    assert span(insured, "maternity") == span(asked, "maternity")  # the same length
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        {"role": "mother", "work": "contract", "mother_insured": False},
+        {"role": "mother", "work": "business", "mother_insured": False},
+        {"role": "mother", "work": "none"},
+        {"role": "father", "work": "employment", "mother_work": "none"},
+    ],
+)
+def test_without_sickness_insurance_there_are_no_benefit_periods(
+    answers: dict[str, object],
+) -> None:
+    for t in (
+        expecting(**answers, children_count=1, leave_before_birth_weeks=2),
+        born(**answers, children_count=1),
+    ):
+        assert ids(t) in (["due-date"], ["birth"])
+        assert [n.id for n in t.notes] == ["situation", "insurance"]
+        assert t.notes[1].kind == "risk"
+        assert t.notes[1].title == "Bez ubezpieczenia chorobowego nie ma zasiłku macierzyńskiego"
+        assert "Liczy się, czy w dniu porodu podlega ubezpieczeniu" in t.markers[0].summary
+        assert not t.documents
+
+
+def test_the_fathers_own_work_says_nothing_about_the_mother() -> None:
+    unknown = born(role="father", work="employment", children_count=1)
+    assert unknown.notes[1].title == "Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe"
+    assert "Zależy to od tego, jak mama pracuje" in unknown.notes[1].text
+    known = born(role="father", work="none", mother_work="employment", children_count=1)
+    assert known.notes[1].title == "Mama ma prawo do zasiłku macierzyńskiego"
+
+
+def test_a_mother_not_registered_before_the_birth_hears_that_the_day_of_birth_counts() -> None:
+    answers = {"role": "mother", "work": "contract", "mother_insured": False}
+    assert "Liczy się dzień porodu: jeśli mama nie będzie wtedy podlegać" in (
+        expecting(**answers).notes[1].text
+    )
+    assert "mama nie była do niego zgłoszona" in born(**answers).notes[1].text
+
+
+# Phase 2: parental leave after maternity leave (guide A.2 and B; art. 182¹ᵃ, 182¹ᶜ).
+
+
+def test_parental_leave_follows_maternity_leave() -> None:
+    """One child: 41 weeks for both parents, 9 of them the father's alone, so 32 for her."""
+    t = expecting(children_count=1)
+    assert span(t, "parental") == (dt.date(2027, 8, 2), dt.date(2028, 3, 12), 32 * 7)
+    parental = next(s for s in t.segments if s.id == "parental")
+    assert parental.tone == "option"
+    assert "razem do 41 tyg." in parental.summary
+    assert "najwięcej 32 tyg." in parental.summary
+    assert any("nie więcej niż 5 częściach" in d for d in parental.details)
+
+
+def test_parental_leave_with_twins() -> None:
+    """Twins: 43 weeks for both, 34 for her, after 31 weeks of maternity leave."""
+    t = expecting(children_count=2)
+    assert span(t, "parental") == (dt.date(2027, 10, 18), dt.date(2028, 6, 11), 34 * 7)
+
+
+def test_leave_before_the_birth_moves_parental_leave_earlier() -> None:
+    t = expecting(children_count=1, leave_before_birth_weeks=6)
+    assert span(t, "maternity")[1] == dt.date(2027, 6, 20)
+    assert span(t, "parental") == (dt.date(2027, 6, 21), dt.date(2028, 1, 30), 32 * 7)
+
+
+@pytest.mark.parametrize(
+    ("children", "weeks", "end"),
+    [(1, 56, dt.date(2028, 8, 27)), (3, 58, dt.date(2028, 12, 10))],
+)
+def test_za_zyciem_lengthens_parental_leave(children: int, weeks: int, end: dt.date) -> None:
+    """65 weeks for one child and 67 for more, minus the father's 9. Triplets: 33 weeks of
+    maternity leave end on 31.10.2027, so 58 weeks of parental leave run 1.11.2027-10.12.2028."""
+    t = expecting(children_count=children, za_zyciem=True)
+    assert span(t, "parental")[1:] == (end, weeks * 7)
+    relief = next(n for n in t.notes if n.id == "za-zyciem")
+    assert f"najwięcej {weeks} tyg." in relief.text
+    assert "za-zyciem" not in notes(expecting(children_count=children))
+
+
+def test_parental_leave_must_end_with_the_year_the_child_turns_six() -> None:
+    assert expecting(children_count=1).element("parental-deadline").date == dt.date(2033, 12, 31)  # type: ignore[union-attr]
+    assert born(children_count=1).element("parental-deadline").date == dt.date(2032, 12, 31)  # type: ignore[union-attr]
+    january = build_timeline(
+        Scenario(child_born=False, due_date=dt.date(2027, 1, 5), children_count=1), PARAMS, TODAY
+    )
+    deadline = january.element("parental-deadline")
+    assert deadline.date == dt.date(2033, 12, 31)  # type: ignore[union-attr]
+    assert any("innym roku kalendarzowym" in d for d in deadline.details)  # type: ignore[union-attr]
+
+
+def test_parental_leave_is_gone_after_the_deadline() -> None:
+    late = build_timeline(
+        Scenario(child_born=True, birth_date=dt.date(2020, 12, 1), children_count=1),
+        PARAMS,
+        dt.date(2027, 1, 10),
+    )
+    assert "parental" not in ids(late) and "parental-deadline" not in ids(late)
+    assert any("Czas na urlop rodzicielski minął 31.12.2026" in w for w in late.warnings)
+
+
+def test_parental_leave_is_explained() -> None:
+    explained = notes(expecting(children_count=1))
+    assert explained["parental"].startswith(
+        "Po urlopie macierzyńskim: urlop rodzicielski | Rodzice mają razem do 41 tyg."
+    )
+    assert "najpóźniej do 31 grudnia 2033" in explained["parental"]
+    assert "Z zaświadczeniem „Za życiem” urlop jest dłuższy: do 65 tyg." in explained["parental"]
+    assert "32 tyg., od 2 sierpnia 2027 do 12 marca 2028" in explained["computed"]
+    assert "parental" not in notes(expecting())  # waits for the number of children
+
+
+# Phase 2: supplementary maternity leave (guide A.2 and C; art. 180²).
+
+HOSPITAL_BIRTH = dt.date(2026, 10, 1)
+
+
+def hospital(
+    week: str,
+    light: bool,
+    *stays: tuple[str, str | None],
+    birth: dt.date = HOSPITAL_BIRTH,
+    children: int = 1,
+) -> Timeline:
+    scenario = Scenario.model_validate(
+        {
+            "child_born": True,
+            "birth_date": birth,
+            "children_count": children,
+            "leave_before_birth_weeks": 0,
+            "hospital_care": True,
+            "birth_week": week,
+            "birth_weight_up_to_1000g": light,
+            "hospital_stays": [{"start": start, "end": end} for start, end in stays],
+        }
+    )
+    return build_timeline(scenario, PARAMS, TODAY)
+
+
+def supplementary_weeks(timeline: Timeline) -> int:
+    segment = next((s for s in timeline.segments if s.id == "supplementary"), None)
+    return segment.days // 7 if segment else 0
+
+
+def test_very_premature_child_a_week_for_every_week_in_hospital() -> None:
+    """Born 1.09, in hospital until 5.11: 65 days after the day of birth, so 10 weeks."""
+    t = hospital("before-28", True, ("2026-09-01", "2026-11-05"), birth=dt.date(2026, 9, 1))
+    assert span(t, "maternity")[1] == dt.date(2027, 1, 18)
+    assert span(t, "supplementary") == (dt.date(2027, 1, 19), dt.date(2027, 3, 29), 70)
+    assert span(t, "parental")[0] == dt.date(2027, 3, 30)  # moved by the supplementary leave
+    assert next(s for s in t.segments if s.id == "supplementary").tone == "option"
+
+
+def test_very_premature_child_at_most_fifteen_weeks() -> None:
+    long_stay = ("2026-09-01", "2027-01-31")
+    t = hospital("before-28", False, long_stay, birth=dt.date(2026, 9, 1))
+    assert supplementary_weeks(t) == 15
+
+
+def test_low_birth_weight_counts_like_a_very_premature_birth() -> None:
+    """1000 g or less: the 15-week window whatever the week of pregnancy."""
+    stay = ("2026-10-01", "2026-12-31")
+    assert supplementary_weeks(hospital("after-37", True, stay)) == 13
+    assert supplementary_weeks(hospital("28-37", True, stay)) == 13
+    assert supplementary_weeks(hospital("28-37", False, stay)) == 8
+
+
+def test_premature_child_an_incomplete_week_is_rounded_up() -> None:
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-08"))) == 1
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-09"))) == 2
+    # The day of the birth itself is not a day after the birth.
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-01"))) == 0
+
+
+def test_hospital_stays_are_added_up() -> None:
+    """2-5.10 is 4 days and 20-25.10 is 6: 10 days, so 2 weeks. Overlaps count once."""
+    two = hospital("28-37", False, ("2026-10-01", "2026-10-05"), ("2026-10-20", "2026-10-25"))
+    assert supplementary_weeks(two) == 2
+    same = hospital("28-37", False, ("2026-10-01", "2026-10-08"), ("2026-10-03", "2026-10-08"))
+    assert supplementary_weeks(same) == 1
+
+
+def test_child_born_at_term_needs_two_days_starting_between_day_5_and_28() -> None:
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-12"))) == 1
+    # In hospital on the 5th day only: no two consecutive days from the 5th day on.
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-06"))) == 0
+    # The 28th and 29th day: the first of the two is still inside the window.
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-29", "2026-10-30"))) == 1
+    # From the 29th day: too late.
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-30", "2026-11-05"))) == 0
+
+
+def test_child_born_at_term_counts_from_the_fifth_day_to_the_eighth_week() -> None:
+    """Days 5-56 after the birth are 52 days: at most 8 weeks."""
+    t = hospital("after-37", False, ("2026-10-01", "2026-12-31"))
+    assert supplementary_weeks(t) == 8
+    details = next(s for s in t.segments if s.id == "supplementary").details
+    assert any("52 dni" in d and "06.10.2026 a 26.11.2026" in d for d in details)
+
+
+def test_child_still_in_hospital_is_counted_until_today() -> None:
+    """Born 1.11, today 21.11: 20 days so far, 3 weeks, and the number may still grow."""
+    t = hospital("28-37", False, ("2026-11-01", None), birth=dt.date(2026, 11, 1), children=2)
+    assert supplementary_weeks(t) == 3
+    details = next(s for s in t.segments if s.id == "supplementary").details
+    assert any("jeszcze w szpitalu" in d and "najwyżej do 8 tyg." in d for d in details)
+    assert any("najlżejszego dziecka" in d for d in details)  # twins
+
+
+def test_supplementary_leave_is_explained_also_when_it_is_not_due() -> None:
+    due = notes(hospital("28-37", False, ("2026-10-01", "2026-10-09")))
+    assert due["supplementary"].startswith("Uzupełniający urlop macierzyński: 2 tyg. | ")
+    assert "8 dni to 2 tyg." in due["supplementary"]
+    assert "Uzupełniający urlop macierzyński: 2 tyg., od" in due["computed"]
+
+    not_due = hospital("after-37", False, ("2026-10-01", "2026-10-04"))
+    note = next(n for n in not_due.notes if n.id == "supplementary")
+    assert (note.kind, note.title) == (
+        "risk",
+        "Uzupełniający urlop macierzyński: warunki niespełnione",
+    )
+    assert "supplementary" not in ids(not_due)
+
+    waiting = born(children_count=1, hospital_care=True)
+    assert "potrzebne szczegóły" in notes(waiting)["supplementary"]
+    assert "supplementary" not in notes(born(children_count=1, hospital_care=False))
+
+
+def test_a_stay_before_the_birth_or_in_the_future_is_rejected() -> None:
+    with pytest.raises(ScenarioError, match="przed dniem urodzenia"):
+        hospital("28-37", False, ("2026-09-28", "2026-10-05"))
+    with pytest.raises(ScenarioError, match="w przyszłości"):
+        hospital("28-37", False, ("2026-12-01", "2026-12-05"))
+
+
+def test_no_supplementary_leave_before_the_child_is_born() -> None:
+    t = expecting(children_count=1, hospital_care=True, birth_week="28-37")
+    assert "supplementary" not in ids(t)
+    parental = next(s for s in t.segments if s.id == "parental")
+    assert any("uzupełniający urlop macierzyński" in d for d in parental.details)

@@ -11,12 +11,12 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from pydantic_ai import (
     AgentRunResultEvent,
     FunctionToolCallEvent,
@@ -43,6 +43,8 @@ from app.assistant.agent import (
     TimelineUpdated,
     assistant,
 )
+from app.assistant.describe import interview_questions
+from app.assistant.prompts import timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
 
@@ -51,8 +53,17 @@ logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
+    """A user message, or an app event the assistant reacts to (the user does not see it)."""
+
     session_id: UUID
-    message: str = Field(min_length=1, max_length=4000)
+    message: str | None = Field(default=None, min_length=1, max_length=4000)
+    event: Literal["timeline_ready"] | None = None
+
+    @model_validator(mode="after")
+    def message_or_event(self) -> "ChatRequest":
+        if (self.message is None) == (self.event is None):
+            raise ValueError("Podaj wiadomość albo zdarzenie, jedno z dwóch.")
+        return self
 
 
 def load_history(session: Session) -> list[ModelMessage]:
@@ -81,7 +92,12 @@ async def chat(
             # Saved under older rules: keep the conversation, ask for the facts again.
             deps.scenario = Scenario()
     turn = _Turn(request.session_id, session, store)
-    stream = _stream(request.message, load_history(session), deps, model, turn)
+    if request.message is not None:
+        prompt = request.message
+    else:  # the only event: "timeline_ready"
+        questions = interview_questions(deps.scenario)
+        prompt = timeline_ready_prompt(questions[0].text if questions else None)
+    stream = _stream(prompt, load_history(session), deps, model, turn)
     return StreamingResponse(stream, media_type="application/x-ndjson")
 
 
@@ -160,6 +176,7 @@ class _Translator:
                     "scenario": scenario.model_dump(mode="json"),
                     "timeline": timeline.model_dump(mode="json") if timeline else None,
                     "changed": event.changed,
+                    "changed_notes": event.changed_notes,
                     "focus": event.focus,
                 }
             case ElementFocused(element_id=element_id):

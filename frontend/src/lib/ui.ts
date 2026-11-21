@@ -1,4 +1,4 @@
-import type { Lane, SourceRef, Tone } from '../types'
+import type { Lane, SourceRef, Tone, Work } from '../types'
 import { formatDate } from './dates'
 
 export const LANE_ORDER: Record<Lane, number> = { child: 0, mother: 1, documents: 2 }
@@ -29,7 +29,49 @@ export const TONE: Record<Tone, { label: string; pill: string; avatar: string; d
 }
 
 export const sourceLabel = (source: SourceRef) =>
-  source.doc === 'kp' ? `Kodeks pracy, ${source.article}` : `Przewodnik ZUS, s. ${source.page}`
+  source.doc === 'kp'
+    ? `Kodeks pracy, ${source.article}`
+    : `Przewodnik ZUS, s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
+
+/**
+ * Where a set of quotes comes from, in one short line: the guide's pages and the Labour Code's
+ * articles (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 · Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ".
+ */
+export function sourcesSummary(sources: SourceRef[]): string {
+  const pages = new Set<number>()
+  const articles = new Set<string>()
+  for (const source of sources) {
+    if (source.doc === 'kp') {
+      if (source.article) articles.add(source.article.replace(/^art\. /, '').replace(/ § .*$/, ''))
+    } else if (source.page !== null) {
+      for (let page = source.page; page <= (source.page_to ?? source.page); page++) pages.add(page)
+    }
+  }
+  const parts = []
+  if (pages.size > 0) parts.push(`Przewodnik ZUS, s. ${pageRanges([...pages])}`)
+  if (articles.size > 0) parts.push(`Kodeks pracy, art. ${[...articles].join(', ')}`)
+  return parts.join(' · ')
+}
+
+/** [3, 5, 6, 7, 10] -> "3, 5–7, 10" */
+function pageRanges(pages: number[]): string {
+  const sorted = [...pages].sort((a, b) => a - b)
+  const ranges: string[] = []
+  for (let i = 0; i < sorted.length; i++) {
+    let end = i
+    while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end++
+    ranges.push(end > i ? `${sorted[i]}–${sorted[end]}` : `${sorted[i]}`)
+    i = end
+  }
+  return ranges.join(', ')
+}
+
+export const WORK_LABEL: Record<Work, string> = {
+  employment: 'na etacie (umowa o pracę)',
+  contract: 'na umowie zlecenia',
+  business: 'własna firma (JDG)',
+  none: 'nie pracuje',
+}
 
 /** "jedno dziecko", "bliźnięta", "trojaczki", "4 dzieci" — for headers. */
 export function childrenLabel(count: number): string {
@@ -57,6 +99,18 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return args.has_certificate
         ? 'Zaświadczenie lekarskie: jest'
         : 'Zaświadczenie lekarskie: do zdobycia'
+    case 'set_mother_work':
+      return `Praca mamy: ${WORK_LABEL[args.work as Work] ?? '…'}`
+    case 'set_voluntary_insurance':
+      return args.registered
+        ? 'Dobrowolne ubezpieczenie chorobowe: jest'
+        : 'Dobrowolne ubezpieczenie chorobowe: brak'
+    case 'set_za_zyciem':
+      return args.has_certificate
+        ? 'Zaświadczenie „Za życiem”: jest'
+        : 'Zaświadczenie „Za życiem”: brak'
+    case 'set_hospital_care':
+      return args.applies ? 'Wcześniak albo pobyt w szpitalu' : 'Bez pobytu w szpitalu'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
     default:

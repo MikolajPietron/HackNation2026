@@ -10,15 +10,22 @@ import { Onboarding } from '@/components/onboarding/Onboarding'
 import { TimelinePanel } from '@/components/timeline/TimelinePanel'
 import { useAssistant } from '@/hooks/useAssistant'
 import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
+import { formatLongDate } from '@/lib/dates'
+import { childrenLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { SessionStart } from '@/types'
 
 const APP_NAME = 'Zasiłkowy Przewodnik Przyszłego Rodzica'
+/** From Tailwind's `lg`: the chat sits next to the timeline. */
+const SIDE_BY_SIDE = '(min-width: 64rem)'
 
 export default function App() {
-  const [skippedOnboarding, setSkippedOnboarding] = useState(false)
+  // Every visit starts on the interview's start screen; this turns true once the parent goes on
+  // (finished interview, resumed conversation or chat without the interview).
+  const [entered, setEntered] = useState(false)
   const [tab, setTab] = useState<Tab>('chat')
   const [unseen, setUnseen] = useState(false)
+  const [unseenChat, setUnseenChat] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [focus, setFocus] = useState<{ id: string | null; tick: number }>({ id: null, tick: 0 })
 
@@ -26,24 +33,50 @@ export default function App() {
     setSelectedId(id)
     setFocus((f) => ({ id, tick: f.tick + 1 }))
   }, [])
+  // The assistant highlights what it explains. Phones show one panel at a time, so a parent
+  // reading the timeline is not scrolled away from it; the tab scrolls to the selection later.
+  const assistantFocus = useCallback((id: string) => {
+    setSelectedId(id)
+    if (window.matchMedia(SIDE_BY_SIDE).matches) setFocus((f) => ({ id, tick: f.tick + 1 }))
+  }, [])
   // A recalculated timeline scrolls to what changed but opens nothing: details are on demand.
   const timelineChanged = useCallback((focusId: string | null) => {
     setUnseen(true)
     if (focusId) setFocus((f) => ({ id: focusId, tick: f.tick + 1 }))
   }, [])
-  const { messages, busy, restoring, send, stop, reset, submit, load, scenario, timeline, changed } =
-    useAssistant({ onFocus: focusOn, onTimeline: timelineChanged })
+  const {
+    messages,
+    busy,
+    restoring,
+    send,
+    explain,
+    stop,
+    reset,
+    submit,
+    load,
+    scenario,
+    timeline,
+    changed,
+  } = useAssistant({ onFocus: assistantFocus, onTimeline: timelineChanged })
 
-  // The onboarding runs until its answers are saved: it always saves the role, the chat never
-  // does. A conversation that has started, or a skipped onboarding, goes straight to the app.
-  const onboardingSaved = scenario?.role != null
-  const onboarding = !skippedOnboarding && messages.length === 0 && !onboardingSaved
+  // A saved conversation is offered on the start screen; a new interview replaces it only once
+  // it is finished.
+  const hasSaved = messages.length > 0 || scenario?.role != null
+  const savedSummary = timeline
+    ? [
+        `${timeline.child_born ? 'Data urodzenia' : 'Termin porodu'}: ${formatLongDate(timeline.birth_date)}`,
+        timeline.children_count ? childrenLabel(timeline.children_count) : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : 'Zapisana rozmowa z asystentem'
 
   // Phones show one panel at a time. From `lg` the chat is always on the right and the
   // tab only switches the middle between the timeline and the assumptions.
   const openTab = (next: Tab) => {
     setTab(next)
     setUnseen(false)
+    if (next === 'chat') setUnseenChat(false)
     if (next === 'timeline') setFocus((f) => ({ id: selectedId, tick: f.tick + 1 }))
   }
   const showOnTimeline = (elementId: string | null) => {
@@ -56,16 +89,32 @@ export default function App() {
     reset()
     setSelectedId(null)
     setTab('chat')
-    setSkippedOnboarding(false)
+    setUnseen(false)
+    setUnseenChat(false)
+    setEntered(false)
   }
   const finishOnboarding = (start: SessionStart) => {
     load(start)
     setSelectedId(null)
     setTab('timeline')
+    setEntered(true)
+    // The assistant reacts to the new timeline right away; phones show the timeline, so the
+    // chat tab gets a dot.
+    setUnseenChat(true)
+    void explain()
   }
   const skipOnboarding = () => {
     setTab('chat')
-    setSkippedOnboarding(true)
+    setEntered(true)
+  }
+  const resume = () => {
+    setTab(timeline ? 'timeline' : 'chat')
+    setEntered(true)
+    // A timeline nobody has talked about yet: the assistant explains it first.
+    if (timeline && messages.length === 0) {
+      setUnseenChat(true)
+      void explain()
+    }
   }
 
   // Wait for the stored conversation before choosing between the onboarding and the app.
@@ -74,12 +123,17 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <AnimatePresence mode="wait">
-        {onboarding ? (
+        {!entered ? (
           <motion.div
             key="onboarding"
             exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.3, ease: EASE_IN_OUT } }}
           >
-            <Onboarding submit={submit} onDone={finishOnboarding} onSkip={skipOnboarding} />
+            <Onboarding
+              submit={submit}
+              onDone={finishOnboarding}
+              onSkip={skipOnboarding}
+              saved={hasSaved ? { summary: savedSummary, onResume: resume } : null}
+            />
           </motion.div>
         ) : (
           <motion.div
@@ -149,7 +203,6 @@ export default function App() {
                 <ChatPanel
                   messages={messages}
                   busy={busy}
-                  scenario={scenario}
                   onSend={send}
                   onStop={stop}
                   onShowTimeline={showOnTimeline}
@@ -161,6 +214,7 @@ export default function App() {
               tab={tab}
               onChange={openTab}
               timelineBadge={unseen && tab === 'chat'}
+              chatBadge={unseenChat && tab !== 'chat'}
               className="lg:hidden"
             />
           </motion.div>

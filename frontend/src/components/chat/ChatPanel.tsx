@@ -7,7 +7,6 @@ import { ChatEmptyState } from '@/components/ui/chat-empty-state'
 import { PromptComposer } from '@/components/ui/prompt-composer'
 import { TextStates } from '@/components/ui/text-states'
 import type { ChatMessage, MessagePart } from '@/hooks/useAssistant'
-import type { Scenario } from '@/types'
 import { toolLabel } from '@/lib/ui'
 
 // Without the onboarding the chat asks for the date first.
@@ -16,45 +15,6 @@ const START_SUGGESTIONS = [
   'Dziecko już się urodziło',
   'Spodziewamy się bliźniąt',
 ]
-
-/** The next interview question after the onboarding, worded for whoever is writing. */
-function nextQuestion(scenario: Scenario): { question: string; prompts: string[] } {
-  const mother = scenario.role === 'mother'
-  if (scenario.leave_before_birth_weeks === null && scenario.child_born) {
-    return {
-      question: mother
-        ? 'czy byłaś na urlopie macierzyńskim przed porodem?'
-        : 'czy mama była na urlopie macierzyńskim przed porodem?',
-      prompts: [
-        'Nie, urlop zaczął się w dniu porodu',
-        'Tak, 2 tygodnie przed porodem',
-        'Kiedy kończy się urlop macierzyński?',
-      ],
-    }
-  }
-  if (scenario.leave_before_birth_weeks === null) {
-    return {
-      question: mother
-        ? 'chcesz zacząć urlop macierzyński przed porodem, czy pracować do dnia porodu?'
-        : 'czy mama chce zacząć urlop macierzyński przed porodem, czy pracować do dnia porodu?',
-      prompts: mother
-        ? [
-            'Chcę urlop przed porodem',
-            'Będę pracować do dnia porodu',
-            'Od kiedy najwcześniej mogę zacząć urlop?',
-          ]
-        : [
-            'Mama chce urlop przed porodem',
-            'Mama będzie pracować do porodu',
-            'Od kiedy najwcześniej może zacząć urlop?',
-          ],
-    }
-  }
-  return {
-    question: 'o który element osi chcesz zapytać?',
-    prompts: ['Kiedy kończy się urlop macierzyński?', 'Co oznacza 14 tygodni po porodzie?'],
-  }
-}
 
 const MARKDOWN: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -71,18 +31,14 @@ const MARKDOWN: Components = {
 interface Props {
   messages: ChatMessage[]
   busy: boolean
-  /** What the onboarding saved: greet with the next question instead of asking for the date. */
-  scenario: Scenario | null
   onSend: (text: string) => void
   onStop: () => void
   /** Jump to the timeline (on phones it is a separate tab), optionally to one element. */
   onShowTimeline: (elementId: string | null) => void
 }
 
-export function ChatPanel({ messages, busy, scenario, onSend, onStop, onShowTimeline }: Props) {
+export function ChatPanel({ messages, busy, onSend, onStop, onShowTimeline }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
-  const dateKnown = scenario !== null && (scenario.due_date ?? scenario.birth_date) !== null
-  const next = scenario && dateKnown ? nextQuestion(scenario) : null
 
   useEffect(() => {
     const list = listRef.current
@@ -108,18 +64,6 @@ export function ChatPanel({ messages, busy, scenario, onSend, onStop, onShowTime
               <AssistantMessage key={message.id} message={message} onShowTimeline={onShowTimeline} />
             ),
           )
-        ) : next ? (
-          <ChatEmptyState
-            title="Mam Twoje odpowiedzi."
-            subtitle={
-              <>
-                Co z nich wynika, widać w „Twojej sytuacji” nad osią czasu. Kolejne pytanie:{' '}
-                <strong className="font-black text-navy-900">{next.question}</strong>
-              </>
-            }
-            prompts={next.prompts}
-            onSelectPrompt={onSend}
-          />
         ) : (
           <ChatEmptyState
             title="Cześć! Zaplanujmy urlop macierzyński."

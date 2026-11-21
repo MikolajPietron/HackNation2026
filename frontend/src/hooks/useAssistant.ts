@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { deleteSession, fetchSession, streamChat, submitOnboarding } from '../api'
 import { currentSessionId, newSessionId } from '../lib/session'
-import type { OnboardingAnswers, Scenario, SessionStart, StoredMessage, StoredPart, Timeline } from '../types'
+import type {
+  AppEvent,
+  OnboardingAnswers,
+  Scenario,
+  SessionStart,
+  StoredMessage,
+  StoredPart,
+  Timeline,
+} from '../types'
 
 export type MessagePart = StoredPart
 export type ToolStatus = Extract<StoredPart, { kind: 'tool' }>['status']
@@ -10,8 +18,10 @@ export interface ChatMessage extends StoredMessage {
   error?: string
 }
 
+/** What the last recalculation changed: timeline elements and points of "Twoja sytuacja". */
 export interface ChangeSet {
   ids: string[]
+  notes: string[]
   version: number
 }
 
@@ -43,7 +53,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   const [restoring, setRestoring] = useState(true)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [scenario, setScenario] = useState<Scenario | null>(null)
-  const [changed, setChanged] = useState<ChangeSet>({ ids: [], version: 0 })
+  const [changed, setChanged] = useState<ChangeSet>({ ids: [], notes: [], version: 0 })
   const sessionId = useRef(currentSessionId())
   const request = useRef<AbortController | null>(null)
 
@@ -68,16 +78,21 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     }
   }, [])
 
-  const send = useCallback(
-    async (text: string) => {
+  /** One assistant turn: an answer to the user's message, or a reaction to an app event. */
+  const run = useCallback(
+    async (input: { message: string } | { event: AppEvent }) => {
       if (request.current) return
       const controller = new AbortController()
       request.current = controller
       setBusy(true)
       const assistantId = nextId()
+      const said: ChatMessage[] =
+        'message' in input
+          ? [{ id: nextId(), role: 'user', status: 'done', parts: [{ kind: 'text', text: input.message }] }]
+          : []
       setMessages((all) => [
         ...all,
-        { id: nextId(), role: 'user', status: 'done', parts: [{ kind: 'text', text }] },
+        ...said,
         { id: assistantId, role: 'assistant', status: 'streaming', parts: [] },
       ])
       const patch = (update: (message: ChatMessage) => ChatMessage) =>
@@ -85,7 +100,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
 
       try {
         await streamChat(
-          { session_id: sessionId.current, message: text },
+          { session_id: sessionId.current, ...input },
           (event) => {
             switch (event.type) {
               case 'text':
@@ -113,7 +128,11 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
               case 'timeline':
                 setTimeline(event.timeline)
                 setScenario(event.scenario)
-                setChanged((c) => ({ ids: event.changed, version: c.version + 1 }))
+                setChanged((c) => ({
+                  ids: event.changed,
+                  notes: event.changed_notes,
+                  version: c.version + 1,
+                }))
                 onTimeline?.(event.focus)
                 break
               case 'focus':
@@ -145,6 +164,14 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     [onTimeline, onFocus],
   )
 
+  const send = useCallback((text: string) => run({ message: text }), [run])
+
+  /**
+   * The timeline changed outside the chat (finished interview, resumed timeline without a
+   * conversation): the assistant explains it on its own, without a user message.
+   */
+  const explain = useCallback(() => run({ event: 'timeline_ready' }), [run])
+
   /** Onboarding: save the answers in this session and get the first timeline. */
   const submit = useCallback(
     (answers: OnboardingAnswers, signal: AbortSignal) =>
@@ -152,11 +179,12 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     [],
   )
 
-  /** Show what the onboarding saved. The assistant continues from it. */
+  /** Show what the onboarding saved: a new interview, so a new conversation. */
   const load = useCallback((start: SessionStart) => {
+    setMessages([])
     setScenario(start.scenario)
     setTimeline(start.timeline)
-    setChanged((c) => ({ ids: [], version: c.version + 1 }))
+    setChanged((c) => ({ ids: [], notes: [], version: c.version + 1 }))
   }, [])
 
   /** Stop the answer that is being written. */
@@ -172,8 +200,21 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setMessages([])
     setTimeline(null)
     setScenario(null)
-    setChanged({ ids: [], version: 0 })
+    setChanged({ ids: [], notes: [], version: 0 })
   }, [])
 
-  return { messages, busy, restoring, send, stop, reset, submit, load, scenario, timeline, changed }
+  return {
+    messages,
+    busy,
+    restoring,
+    send,
+    explain,
+    stop,
+    reset,
+    submit,
+    load,
+    scenario,
+    timeline,
+    changed,
+  }
 }

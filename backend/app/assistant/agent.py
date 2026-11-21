@@ -16,6 +16,7 @@ from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
 from app.assistant.describe import (
     describe_element,
     describe_interview,
+    describe_note_changes,
     describe_person,
     describe_timeline,
 )
@@ -27,7 +28,9 @@ from app.engine import (
     Timeline,
     build_timeline,
     changed_element_ids,
+    changed_note_ids,
 )
+from app.engine.models import BirthWeek, HospitalStay, Work
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -49,6 +52,8 @@ class TimelineUpdated(CustomEvent):
     scenario: Scenario
     timeline: Timeline | None
     changed: list[str] = field(default_factory=list)
+    changed_notes: list[str] = field(default_factory=list)
+    """Points of the case explanation that are new or reworded."""
     focus: str | None = None
 
 
@@ -86,8 +91,9 @@ def _with(ctx: RunContext[AssistantDeps], **changes: Any) -> Scenario:
     return Scenario.model_validate({**ctx.deps.scenario.model_dump(), **changes})
 
 
-async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, focus: str | None) -> str:
-    """Rebuild the timeline, push it to the UI and tell the model what it looks like now."""
+async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, *focus: str) -> str:
+    """Rebuild the timeline, push it to the UI and tell the model what it looks like now.
+    `focus`: element ids to scroll to, the first one that is on the new timeline wins."""
     deps = ctx.deps
     timeline = None
     if scenario.anchor_date is not None:
@@ -95,19 +101,29 @@ async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, focus: str 
             timeline = build_timeline(scenario, deps.params, deps.today)
         except ScenarioError as exc:
             raise ModelRetry(f"Nie zmieniono osi: {exc}") from exc
-    changed = changed_element_ids(deps.timeline, timeline) if timeline else []
+    shown = next((i for i in focus if timeline and timeline.element(i)), None)
+    old = deps.timeline
+    changed = changed_element_ids(old, timeline) if timeline else []
+    changed_notes = changed_note_ids(old, timeline) if timeline else []
     deps.scenario, deps.timeline = scenario, timeline
     await ctx.emit(
         TimelineUpdated(
             scenario=scenario,
             timeline=timeline,
             changed=changed,
-            focus=focus if timeline else None,
+            changed_notes=changed_notes,
+            focus=shown,
         )
     )
     if timeline is None:
         return f"Zapisane. Oś pojawi się po ustawieniu daty. {describe_interview(scenario)}"
-    return f"{describe_timeline(timeline, changed)}\n\n{describe_interview(scenario)}"
+    return "\n\n".join(
+        [
+            describe_timeline(timeline, changed),
+            describe_note_changes(timeline, None if old is None else changed_notes),
+            describe_interview(scenario),
+        ]
+    )
 
 
 @assistant.tool(sequential=True)
@@ -122,8 +138,17 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         raise ModelRetry(
             f"Nie ustawiono: {problem} Jeśli dziecko już się urodziło, użyj set_birth_date."
         )
-    scenario = _with(ctx, child_born=False, due_date=due_date)
-    return await _apply(ctx, scenario, focus="due-date")
+    # Nobody can know before the birth whether the child will need hospital.
+    scenario = _with(
+        ctx,
+        child_born=False,
+        due_date=due_date,
+        hospital_care=None,
+        birth_week=None,
+        birth_weight_up_to_1000g=None,
+        hospital_stays=[],
+    )
+    return await _apply(ctx, scenario, "due-date")
 
 
 @assistant.tool(sequential=True)
@@ -138,7 +163,7 @@ async def set_birth_date(ctx: RunContext[AssistantDeps], birth_date: dt.date) ->
         raise ModelRetry(f"Nie ustawiono: {problem}")
     # The certificate is needed only to start leave before an expected birth.
     scenario = _with(ctx, child_born=True, birth_date=birth_date, has_medical_certificate=None)
-    return await _apply(ctx, scenario, focus="birth")
+    return await _apply(ctx, scenario, "birth")
 
 
 @assistant.tool(sequential=True)
@@ -150,7 +175,7 @@ async def set_children_count(
     Args:
         count: Number of children born in one delivery.
     """
-    return await _apply(ctx, _with(ctx, children_count=count), focus="maternity")
+    return await _apply(ctx, _with(ctx, children_count=count), "maternity")
 
 
 @assistant.tool(sequential=True)
@@ -168,11 +193,8 @@ async def set_leave_before_birth(
     changes: dict[str, Any] = {"leave_before_birth_weeks": weeks}
     if weeks == 0:
         changes["has_medical_certificate"] = None
-    if weeks:
-        focus = "maternity-prenatal"
-    else:
-        focus = "birth" if ctx.deps.scenario.child_born else "work-until-birth"
-    return await _apply(ctx, _with(ctx, **changes), focus=focus)
+    scenario = _with(ctx, **changes)
+    return await _apply(ctx, scenario, "maternity-prenatal", "work-until-birth", "birth")
 
 
 @assistant.tool(sequential=True)
@@ -190,7 +212,98 @@ async def set_medical_certificate(ctx: RunContext[AssistantDeps], has_certificat
             "czy mama chce taki urlop (set_leave_before_birth)."
         )
     scenario = _with(ctx, has_medical_certificate=has_certificate)
-    return await _apply(ctx, scenario, focus="medical-certificate")
+    return await _apply(ctx, scenario, "medical-certificate")
+
+
+@assistant.tool(sequential=True)
+async def set_mother_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
+    """Record how the mother works. It decides whether she is covered by sickness insurance
+    and so has the right to the maternity benefit.
+
+    Args:
+        work: "employment" = umowa o pracę (etat), "contract" = umowa zlecenia,
+            "business" = własna działalność gospodarcza, "none" = nie pracuje.
+    """
+    # The mother's own answer lives in `work` when she fills in, else in `mother_work`.
+    field = "work" if ctx.deps.scenario.role == "mother" else "mother_work"
+    changes: dict[str, Any] = {field: work}
+    if work in ("employment", "none"):
+        changes["mother_insured"] = None
+    return await _apply(ctx, _with(ctx, **changes), "maternity", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_voluntary_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
+    """Mother on a contract of mandate or with her own business: record whether she is
+    registered for the voluntary sickness insurance (pays the sickness contribution).
+
+    Args:
+        registered: True if she is registered for it, False if she is not.
+    """
+    if ctx.deps.scenario.mothers_work not in ("contract", "business"):
+        raise ModelRetry(
+            "Dobrowolne ubezpieczenie chorobowe dotyczy umowy zlecenia i własnej działalności. "
+            "Najpierw ustal, jak pracuje mama (set_mother_work)."
+        )
+    scenario = _with(ctx, mother_insured=registered)
+    return await _apply(ctx, scenario, "maternity", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_za_zyciem(ctx: RunContext[AssistantDeps], has_certificate: bool) -> str:
+    """Record whether the child has the "Za życiem" certificate; it lengthens parental leave.
+    Call it only when the user says so: never ask about it yourself.
+
+    Args:
+        has_certificate: True if the child has the certificate.
+    """
+    return await _apply(ctx, _with(ctx, za_zyciem=has_certificate), "parental")
+
+
+@assistant.tool(sequential=True)
+async def set_hospital_care(
+    ctx: RunContext[AssistantDeps],
+    applies: bool,
+    birth_week: BirthWeek | None = None,
+    weight_up_to_1000g: bool | None = None,
+    hospital_stays: list[HospitalStay] | None = None,
+) -> str:
+    """Born child: record whether it was born prematurely or stayed in hospital after the
+    birth, and the facts supplementary maternity leave depends on. With several children born
+    at once: the weight of the lightest and the stay of the one that stayed longest.
+
+    Args:
+        applies: False if the child was born at term and was not in hospital; then leave the
+            rest empty. True otherwise.
+        birth_week: When the child was born: "before-28" = before the end of the 28th week of
+            pregnancy, "28-37" = after the 28th and before the end of the 37th week,
+            "after-37" = after the end of the 37th week.
+        weight_up_to_1000g: True if the birth weight was 1000 g or less.
+        hospital_stays: Every stay in hospital after the birth: first and last day. A child that
+            was in hospital from the birth starts on the date of birth. No `end` = still there.
+    """
+    if not ctx.deps.scenario.child_born:
+        raise ModelRetry(
+            "Dziecko jeszcze się nie urodziło. Uzupełniający urlop macierzyński da się policzyć "
+            "dopiero po porodzie."
+        )
+    if not applies:
+        scenario = _with(
+            ctx,
+            hospital_care=False,
+            birth_week=None,
+            birth_weight_up_to_1000g=None,
+            hospital_stays=[],
+        )
+        return await _apply(ctx, scenario, "parental", "maternity")
+    scenario = _with(
+        ctx,
+        hospital_care=True,
+        birth_week=birth_week,
+        birth_weight_up_to_1000g=weight_up_to_1000g,
+        hospital_stays=[stay.model_dump() for stay in hospital_stays or []],
+    )
+    return await _apply(ctx, scenario, "supplementary", "maternity")
 
 
 @assistant.tool

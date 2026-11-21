@@ -1,14 +1,13 @@
 import type { ReactNode } from 'react'
 import { formatLongDate } from '@/lib/dates'
-import { childrenLabel } from '@/lib/ui'
-import type { Earnings, Scenario, Timeline, Work } from '@/types'
+import { childrenLabel, WORK_LABEL } from '@/lib/ui'
+import type { BirthWeek, Earnings, Scenario, Timeline } from '@/types'
 
 /** What the calculator assumes, what is AI and what is not, and where the rules come from. */
-const WORK: Record<Work, string> = {
-  employment: 'na etacie (umowa o pracę)',
-  contract: 'na umowie zlecenia',
-  business: 'własna firma (JDG)',
-  none: 'nie pracuje',
+const BIRTH_WEEK: Record<BirthWeek, string> = {
+  'before-28': 'przed ukończeniem 28. tygodnia ciąży',
+  '28-37': 'po 28. i przed ukończeniem 37. tygodnia ciąży',
+  'after-37': 'po ukończeniu 37. tygodnia ciąży',
 }
 
 const EARNINGS: Record<Earnings, string> = {
@@ -27,8 +26,36 @@ function answerRows(scenario: Scenario): [string, string][] {
     ['Dziecko', scenario.child_born === null ? null : scenario.child_born ? 'już jest' : 'w drodze'],
     [scenario.child_born ? 'Data urodzenia' : 'Przewidywana data porodu', date && formatLongDate(date)],
     ['Liczba dzieci', scenario.children_count ? childrenLabel(scenario.children_count) : null],
-    ['Praca', scenario.work && WORK[scenario.work]],
+    [
+      scenario.role === 'father' ? 'Praca taty' : 'Praca',
+      scenario.work && WORK_LABEL[scenario.work],
+    ],
     ['Zarobki brutto', scenario.earnings && EARNINGS[scenario.earnings]],
+    ['Praca mamy', scenario.mother_work && WORK_LABEL[scenario.mother_work]],
+    [
+      'Dobrowolne ubezpieczenie chorobowe mamy',
+      scenario.mother_insured === null ? null : scenario.mother_insured ? 'jest' : 'brak',
+    ],
+    ['Zaświadczenie „Za życiem”', scenario.za_zyciem ? 'jest' : null],
+    [
+      'Wcześniak albo szpital po porodzie',
+      scenario.hospital_care === null ? null : scenario.hospital_care ? 'tak' : 'nie',
+    ],
+    ['Dziecko urodziło się', scenario.birth_week && BIRTH_WEEK[scenario.birth_week]],
+    [
+      'Masa urodzeniowa',
+      scenario.birth_weight_up_to_1000g === null
+        ? null
+        : scenario.birth_weight_up_to_1000g
+          ? 'nie więcej niż 1000 g'
+          : 'więcej niż 1000 g',
+    ],
+    [
+      'Pobyt w szpitalu',
+      scenario.hospital_stays
+        .map((stay) => `${formatLongDate(stay.start)} – ${stay.end ? formatLongDate(stay.end) : 'nadal'}`)
+        .join('; ') || null,
+    ],
   ]
   return rows.filter((row): row is [string, string] => Boolean(row[1]))
 }
@@ -62,9 +89,9 @@ export function AboutPanel({
               </div>
             ))}
           </dl>
-          {(scenario?.work || scenario?.earnings) && (
+          {scenario?.earnings && (
             <p className="mt-3 text-xs text-navy-500">
-              Pracę i zarobki wykorzystamy w kolejnych etapach: kto wypłaca zasiłek, wnioski, kwoty.
+              Zarobki wykorzystamy w kolejnym etapie, przy kwotach zasiłku.
             </p>
           )}
         </Card>
@@ -86,10 +113,14 @@ export function AboutPanel({
         <ul className="list-disc space-y-1.5 pl-5 marker:text-zus-400">
           <li>
             Przewodnik ZUS z opisu wyzwania HackNation 2026, sekcja A „Zasiłek macierzyński dla
-            kobiety” (s. 5): przygotowanie do porodu, wymiar urlopu macierzyńskiego, 14 tygodni po
-            porodzie.
+            kobiety” (s. 5–6), punkty „Przygotowanie do porodu” i „Urodzenie dziecka”, oraz
+            fragmenty, na których te punkty się opierają: ubezpieczenie chorobowe (s. 3–5 i 10),
+            urlop rodzicielski obojga rodziców (s. 7), uzupełniający urlop macierzyński (s. 8).
           </li>
-          <li>Kodeks pracy: art. 180 § 1–3 i art. 183¹ § 1–2 (urlop macierzyński).</li>
+          <li>
+            Kodeks pracy: art. 180 i 183¹ (urlop macierzyński), art. 180² (uzupełniający urlop
+            macierzyński), art. 182¹ᵃ, 182¹ᶜ i 182¹ᵍ (urlop rodzicielski).
+          </li>
         </ul>
         {timeline && (
           <p className="mt-3 text-xs text-navy-500">Wersja parametrów: {timeline.params_version}</p>

@@ -68,16 +68,24 @@ function toAnswers(answers: Answers): OnboardingAnswers {
   }
 }
 
+/** A conversation saved in this browser, which the start screen offers to resume. */
+export interface SavedSession {
+  summary: string
+  onResume: () => void
+}
+
 interface Props {
   /** Saves the answers in the session and returns the first timeline. */
   submit: (answers: OnboardingAnswers, signal: AbortSignal) => Promise<SessionStart>
   onDone: (start: SessionStart) => void
   /** Go straight to the assistant. */
   onSkip: () => void
+  /** Set when this browser already has a saved conversation. */
+  saved: SavedSession | null
 }
 
 /** Full-screen questions, one per screen, then the first timeline. No progress bar on purpose. */
-export function Onboarding({ submit, onDone, onSkip }: Props) {
+export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
   const [path, setPath] = useState<StepId[]>(['intro'])
   const [answers, setAnswers] = useState<Answers>(EMPTY)
   const [leaving, setLeaving] = useState(false)
@@ -116,7 +124,7 @@ export function Onboarding({ submit, onDone, onSkip }: Props) {
   let screen: ReactNode
   switch (step) {
     case 'intro':
-      screen = <Intro onStart={() => go('role')} onSkip={onSkip} />
+      screen = <Intro onStart={() => go('role')} onSkip={onSkip} saved={saved} />
       break
     case 'role':
       screen = (
@@ -353,7 +361,15 @@ function Cards({ label, wide, children }: { label: string; wide?: boolean; child
   )
 }
 
-function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
+function Intro({
+  onStart,
+  onSkip,
+  saved,
+}: {
+  onStart: () => void
+  onSkip: () => void
+  saved: SavedSession | null
+}) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-16 text-center">
       <div className="flex items-end justify-center" aria-hidden>
@@ -387,15 +403,29 @@ function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void })
       </motion.p>
       <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
         <PrimaryButton onClick={onStart}>
-          Zaczynamy <ArrowRight className="size-5" />
+          {saved ? 'Zacznij nowy wywiad' : 'Zaczynamy'} <ArrowRight className="size-5" />
         </PrimaryButton>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
-        >
-          Wolę porozmawiać z asystentem AI
-        </button>
+        {saved ? (
+          // The saved conversation stays until a new interview is finished.
+          <button
+            type="button"
+            onClick={saved.onResume}
+            className="rounded-2xl border border-line bg-white px-6 py-3 shadow-card transition-[border-color,transform] duration-150 hover:border-zus-300 active:scale-[0.98]"
+          >
+            <span className="block text-sm font-bold text-navy-900">
+              Wróć do zapisanej osi czasu
+            </span>
+            <span className="block text-xs text-navy-500">{saved.summary}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+          >
+            Wolę porozmawiać z asystentem AI
+          </button>
+        )}
       </motion.div>
     </div>
   )

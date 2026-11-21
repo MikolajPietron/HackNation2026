@@ -1,13 +1,13 @@
 """Engine input (Scenario) and output (Timeline). The same models are the API schema.
 
-Phases covered: 1 "Przygotowanie do porodu" and 2a (length of maternity leave, 14 weeks after
-the birth) from guide section A, page 5, with the Labour Code provisions behind them.
+Phases covered: 1 "Przygotowanie do porodu" and 2 "Urodzenie dziecka" from guide section A
+(pages 5-6), with the Labour Code provisions behind them.
 """
 
 import datetime as dt
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Lane = Literal["mother", "child", "documents"]
 Tone = Literal["leave", "work", "option"]
@@ -16,16 +16,35 @@ Tone = Literal["leave", "work", "option"]
 Role = Literal["mother", "father"]
 Work = Literal["employment", "contract", "business", "none"]
 Earnings = Literal["under-5k", "5k-8k", "8k-12k", "over-12k", "unknown"]
+BirthWeek = Literal["before-28", "28-37", "after-37"]
+"""When the child was born, as the Labour Code art. 180² § 1 divides it: before the end of the
+28th week of pregnancy, after it but before the end of the 37th, or after the 37th."""
 
 
 class SourceRef(BaseModel):
-    """A literal quote: from the guide (section and page) or from the Labour Code (article)."""
+    """A literal quote: from the guide (section and pages) or from the Labour Code (article)."""
 
     doc: Literal["przewodnik", "kp"]
     quote: str
     section: str | None = None
     page: int | None = None
+    page_to: int | None = None
+    """Set when the quote runs over a page break: it starts on `page` and ends on `page_to`."""
     article: str | None = None
+
+
+class HospitalStay(BaseModel):
+    """One stay of the child in hospital after the birth. Dates are inclusive."""
+
+    start: dt.date
+    end: dt.date | None = None
+    """None = the child is still in hospital."""
+
+    @model_validator(mode="after")
+    def ends_after_it_starts(self) -> Self:
+        if self.end is not None and self.end < self.start:
+            raise ValueError("Pobyt w szpitalu nie może skończyć się przed jego początkiem.")
+        return self
 
 
 class ScenarioError(ValueError):
@@ -36,10 +55,12 @@ class Scenario(BaseModel):
     """What the onboarding and the interview have established. None = not known yet."""
 
     # The person filling in (onboarding). Work and earnings are that person's own: the
-    # father's when the father fills in. No phase uses them yet; they are kept for later ones.
+    # father's when the father fills in. Phase 2 uses the mother's work; earnings wait.
     role: Role | None = None
     work: Work | None = None
     earnings: Earnings | None = None
+    mother_work: Work | None = None
+    """How the mother works, asked when somebody else fills in. See `mothers_work`."""
 
     # The child.
     child_born: bool | None = None
@@ -56,10 +77,28 @@ class Scenario(BaseModel):
     has_medical_certificate: bool | None = None
     """Medical certificate of the expected due date, needed for leave before the birth."""
 
+    # Phase 2.
+    mother_insured: bool | None = None
+    """Voluntary sickness insurance of a mother on a contract or with her own business."""
+    za_zyciem: bool | None = None
+    """The child has the "Za życiem" certificate. None = nobody said so (counted as no)."""
+    hospital_care: bool | None = None
+    """Born child: premature, or in hospital after the birth. None = not asked yet."""
+    birth_week: BirthWeek | None = None
+    birth_weight_up_to_1000g: bool | None = None
+    """Birth weight not above 1000 g (the lightest child of a multiple birth)."""
+    hospital_stays: list[HospitalStay] = []
+    """Stays in hospital after the birth (of the child that stayed longest)."""
+
     @property
     def anchor_date(self) -> dt.date | None:
         """The date the timeline counts from: the actual birth once born, else the due date."""
         return self.birth_date if self.child_born else self.due_date
+
+    @property
+    def mothers_work(self) -> Work | None:
+        """The mother's work: her own answer when she fills in, otherwise what was said of her."""
+        return self.work if self.role == "mother" else self.mother_work
 
 
 class Segment(BaseModel):
@@ -105,8 +144,9 @@ class Document(BaseModel):
 
 TimelineElement = Segment | Marker | Document
 
-NoteKind = Literal["situation", "choice", "relief", "computed"]
-"""situation = which case this is, choice = what the family can decide, relief = an easier or
+NoteKind = Literal["situation", "right", "risk", "choice", "relief", "computed"]
+"""situation = which case this is, right = what the mother is entitled to and why, risk = what
+stands in the way of an entitlement, choice = what the family can decide, relief = an easier or
 longer path the rules give them, computed = what exactly we calculated."""
 
 

@@ -42,6 +42,9 @@
   /* Entrances from Spectrum UI's AI blocks (su-msg-in, su-pop). */
   --animate-msg-in: msg-in 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
   --animate-pop: pop 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  /* One fading ring around what the last recalculation changed (EASE_OUT from lib/ease.ts). */
+  --animate-ring: ring 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-ring-still: ring-still 1.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes msg-in {
     from {
@@ -51,6 +54,26 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  @keyframes ring {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.08);
+    }
+  }
+
+  @keyframes ring-still {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
     }
   }
 

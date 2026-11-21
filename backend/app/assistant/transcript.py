@@ -11,6 +11,8 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
+from app.assistant.prompts import EVENT_MARKER
+
 
 def to_chat_messages(history: list[ModelMessage]) -> list[dict[str, Any]]:
     """Same shape as the frontend's `ChatMessage`: user texts, assistant texts and tool steps."""
@@ -27,7 +29,9 @@ def to_chat_messages(history: list[ModelMessage]) -> list[dict[str, Any]]:
         if isinstance(message, ModelRequest):
             for part in message.parts:
                 if isinstance(part, UserPromptPart) and isinstance(part.content, str):
-                    add("user")["parts"].append({"kind": "text", "text": part.content})
+                    # App events are not the user's words: hidden, the reply starts fresh.
+                    if not part.content.startswith(EVENT_MARKER):
+                        add("user")["parts"].append({"kind": "text", "text": part.content})
                     assistant = None
                 elif isinstance(part, ToolReturnPart) and part.tool_call_id in tools:
                     ok = part.outcome == "success"

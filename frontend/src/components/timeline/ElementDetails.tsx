@@ -150,30 +150,47 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
-/** Literal quotes: the guide first, the Labour Code behind a toggle so the card stays short. */
+const GUIDE_QUOTES_SHOWN = 2
+
+/**
+ * Literal quotes. The card stays short: the first quotes from the guide are open, the rest of
+ * them and the Labour Code wait behind toggles.
+ */
 function Sources({ sources }: { sources: SourceRef[] }) {
   const guide = sources.filter((s) => s.doc === 'przewodnik')
   const law = sources.filter((s) => s.doc === 'kp')
   if (sources.length === 0) return null
+  const more = guide.slice(GUIDE_QUOTES_SHOWN)
   return (
     <section className="space-y-2">
       <p className="text-xs font-black tracking-widest text-navy-500 uppercase">Źródło</p>
-      {guide.map((source) => (
+      {guide.slice(0, GUIDE_QUOTES_SHOWN).map((source) => (
         <Quote key={source.quote} source={source} />
       ))}
+      {more.length > 0 && (
+        <More label={`Więcej z Przewodnika ZUS (${more.length})`} sources={more} />
+      )}
       {law.length > 0 && (
-        <details className="group" open={guide.length === 0}>
-          <summary className="cursor-pointer text-sm font-bold text-zus-700">
-            Podstawa prawna: Kodeks pracy ({law.length})
-          </summary>
-          <div className="mt-2 space-y-2">
-            {law.map((source) => (
-              <Quote key={source.quote} source={source} />
-            ))}
-          </div>
-        </details>
+        <More
+          label={`Podstawa prawna: Kodeks pracy (${law.length})`}
+          sources={law}
+          open={guide.length === 0}
+        />
       )}
     </section>
+  )
+}
+
+function More({ label, sources, open }: { label: string; sources: SourceRef[]; open?: boolean }) {
+  return (
+    <details open={open}>
+      <summary className="cursor-pointer text-sm font-bold text-zus-700">{label}</summary>
+      <div className="mt-2 space-y-2">
+        {sources.map((source) => (
+          <Quote key={source.quote} source={source} />
+        ))}
+      </div>
+    </details>
   )
 }
 

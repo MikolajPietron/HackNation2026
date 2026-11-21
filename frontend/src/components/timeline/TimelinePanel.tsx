@@ -86,7 +86,7 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
           </div>
         </header>
 
-        <CaseNotes notes={timeline.notes} />
+        <CaseNotes notes={timeline.notes} changed={changed} />
 
         {timeline.warnings.map((warning) => (
           <p

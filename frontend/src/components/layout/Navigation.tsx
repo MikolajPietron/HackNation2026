@@ -88,11 +88,15 @@ export function BottomNav({
   tab,
   onChange,
   timelineBadge,
+  chatBadge,
   className,
 }: {
   tab: Tab
   onChange: (tab: Tab) => void
+  /** The timeline changed while the parent was in the chat. */
   timelineBadge: boolean
+  /** The assistant is explaining the timeline while the parent looks at it. */
+  chatBadge: boolean
   className?: string
 }) {
   return (
@@ -124,6 +128,12 @@ export function BottomNav({
               <span
                 className="absolute -top-0.5 -right-1.5 size-2 rounded-full bg-sun-400 ring-2 ring-white"
                 aria-label="nowe zmiany"
+              />
+            )}
+            {id === 'chat' && chatBadge && (
+              <span
+                className="absolute -top-0.5 -right-1.5 size-2 rounded-full bg-sun-400 ring-2 ring-white"
+                aria-label="nowa wiadomość"
               />
             )}
           </span>

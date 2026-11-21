@@ -1,5 +1,5 @@
 // Mirrors backend/app/engine/models.py and the /api/chat event protocol. Keep in sync.
-// Phase 1: guide section A, "Przygotowanie do porodu" (page 5).
+// Phases 1 and 2: guide section A, "Przygotowanie do porodu" and "Urodzenie dziecka" (pages 5-6).
 
 export type Lane = 'mother' | 'child' | 'documents'
 /** leave = leave the mother takes, work = she keeps working, option = possible, not decided. */
@@ -8,14 +8,24 @@ export type Tone = 'leave' | 'work' | 'option'
 export type Role = 'mother' | 'father'
 export type Work = 'employment' | 'contract' | 'business' | 'none'
 export type Earnings = 'under-5k' | '5k-8k' | '8k-12k' | 'over-12k' | 'unknown'
+/** When the child was born, as the Labour Code art. 180² § 1 divides it (weeks of pregnancy). */
+export type BirthWeek = 'before-28' | '28-37' | 'after-37'
 
-/** A literal quote: from the guide (section and page) or from the Labour Code (article). */
+/** A literal quote: from the guide (section and pages) or from the Labour Code (article). */
 export interface SourceRef {
   doc: 'przewodnik' | 'kp'
   quote: string
   section: string | null
   page: number | null
+  /** Set when the quote runs over a page break. */
+  page_to: number | null
   article: string | null
+}
+
+/** One stay of the child in hospital after the birth; no `end` = still there. */
+export interface HospitalStay {
+  start: string
+  end: string | null
 }
 
 /** What the onboarding and the interview have established. null = not known yet. */
@@ -24,12 +34,22 @@ export interface Scenario {
   role: Role | null
   work: Work | null
   earnings: Earnings | null
+  /** How the mother works, when somebody else fills in. */
+  mother_work: Work | null
   child_born: boolean | null
   due_date: string | null
   birth_date: string | null
   children_count: number | null
   leave_before_birth_weeks: number | null
   has_medical_certificate: boolean | null
+  /** Voluntary sickness insurance of a mother on a contract or with her own business. */
+  mother_insured: boolean | null
+  za_zyciem: boolean | null
+  /** Born child: premature, or in hospital after the birth. */
+  hospital_care: boolean | null
+  birth_week: BirthWeek | null
+  birth_weight_up_to_1000g: boolean | null
+  hospital_stays: HospitalStay[]
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
@@ -79,12 +99,13 @@ export interface Document {
 }
 
 /**
- * One point of the case explanation: situation = which case this is, choice = what the family
- * can decide, relief = an easier or longer path the rules give them, computed = what we calculated.
+ * One point of the case explanation: situation = which case this is, right = what the mother is
+ * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
+ * decide, relief = an easier or longer path the rules give them, computed = what we calculated.
  */
 export interface CaseNote {
   id: string
-  kind: 'situation' | 'choice' | 'relief' | 'computed'
+  kind: 'situation' | 'right' | 'risk' | 'choice' | 'relief' | 'computed'
   title: string
   text: string
   sources: SourceRef[]
@@ -105,9 +126,14 @@ export interface Timeline {
   assumptions: string[]
 }
 
+/** An app event the assistant reacts to instead of a message; the user does not see it. */
+export type AppEvent = 'timeline_ready'
+
+/** A user message or an app event, one of the two. */
 export interface ChatRequest {
   session_id: string
-  message: string
+  message?: string
+  event?: AppEvent
 }
 
 /** A stored conversation, as returned by GET /api/session/{id}. */
@@ -149,6 +175,7 @@ export type ChatEvent =
       scenario: Scenario
       timeline: Timeline | null
       changed: string[]
+      changed_notes: string[]
       focus: string | null
     }
   | { type: 'focus'; element_id: string }

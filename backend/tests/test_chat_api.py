@@ -22,16 +22,24 @@ TODAY = dt.date(2026, 11, 21)
 SESSION = "7f1c8f0e-4d7a-4b52-9c35-0d8a4f1c2b11"
 
 
-def scripted(tool: str, args: dict[str, Any], reply: str) -> FunctionModel:
-    """First request: call `tool` with `args`. After the tool answers: `reply`."""
+def scripted(
+    tool: str, args: dict[str, Any], reply: str, returned: list[str] | None = None
+) -> FunctionModel:
+    """First request: call `tool` with `args`. After the tool answers: `reply`.
+    What the tool told the model goes into `returned`."""
 
     async def stream(
         messages: list[ModelMessage], info: AgentInfo
     ) -> AsyncIterator[str | DeltaToolCalls]:
         last = messages[-1]
-        if isinstance(last, ModelRequest) and any(
-            isinstance(p, ToolReturnPart) for p in last.parts
-        ):
+        answers = (
+            [p for p in last.parts if isinstance(p, ToolReturnPart)]
+            if isinstance(last, ModelRequest)
+            else []
+        )
+        if answers:
+            if returned is not None:
+                returned.extend(str(p.content) for p in answers)
             yield reply
         else:
             yield {0: DeltaToolCall(tool, json.dumps(args), tool_call_id="call-1")}
@@ -96,7 +104,7 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     update = next(e for e in ask(client, model, "Jedno") if e["type"] == "timeline")
     maternity = next(s for s in update["timeline"]["segments"] if s["id"] == "maternity")
     assert (maternity["start"], maternity["end"]) == ("2027-03-15", "2027-08-01")
-    assert update["changed"] == ["maternity", "personal-weeks"]
+    assert update["changed"] == ["maternity", "parental", "personal-weeks", "parental-deadline"]
 
     model = scripted("set_leave_before_birth", {"weeks": 2}, "Zapisane.")
     update = next(e for e in ask(client, model, "Dwa tygodnie") if e["type"] == "timeline")
@@ -105,6 +113,7 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     assert segments == [
         ("maternity-prenatal", "2027-03-01", "2027-03-14"),
         ("maternity", "2027-03-15", "2027-07-18"),
+        ("parental", "2027-07-19", "2028-02-27"),
     ]
     assert update["timeline"]["documents"][0]["done"] is False
 
@@ -241,8 +250,12 @@ def test_onboarding_answers_are_saved_and_used(client: TestClient) -> None:
     events(client.post("/api/chat", json={"session_id": SESSION, "message": "Cześć"}))
     assert "Rozmawiasz z tatą" in seen[0]
     assert "tata pracuje na etacie" in seen[0]
-    assert "urlop przed porodem (ile tygodni) czy praca do dnia porodu" in seen[0]
-    assert "ile dzieci" not in seen[0]
+    # His own work says nothing about the mother's insurance: that is asked first.
+    assert "Następne pytanie wywiadu (zadaj je dokładnie tak): „Jak pracuje mama:" in seen[0]
+    assert "Potem: Czy mama chce zacząć urlop macierzyński przed porodem" in seen[0]
+    assert "Uprawnienie — Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe." in seen[0]
+    assert "Ułatwienie — Bliźnięta: dłuższy urlop." in seen[0]
+    assert "Ile dzieci" not in seen[0]
 
     restored = client.get(f"/api/session/{SESSION}").json()
     assert restored["scenario"]["earnings"] == "5k-8k"
@@ -260,4 +273,156 @@ def test_onboarding_checks_the_date(client: TestClient) -> None:
     started = client.put(f"/api/session/{SESSION}/onboarding", json=born).json()
     assert started["scenario"]["birth_date"] == "2026-11-10"
     assert started["scenario"]["earnings"] is None
-    assert [s["id"] for s in started["timeline"]["segments"]] == ["maternity"]
+    assert [s["id"] for s in started["timeline"]["segments"]] == ["maternity", "parental"]
+
+
+def test_timeline_ready_event_starts_the_conversation(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)
+    prompts: list[str] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        prompts.append(str(messages[-1].parts[-1].content))  # type: ignore[union-attr]
+        yield "Jako że dziecko jest w drodze, liczymy od przewidywanej daty porodu."
+
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
+    body = {"session_id": SESSION, "event": "timeline_ready"}
+    out = events(client.post("/api/chat", json=body))
+    assert prompts[0].startswith("⟦Zdarzenie z aplikacji⟧")
+    assert "Wyjaśnienia sytuacji" in prompts[0]
+    # The father filled in the interview: the closing question is about the mother.
+    assert prompts[0].endswith(
+        "Na końcu zadaj dokładnie to pytanie: „Jak pracuje mama: na etacie (umowa o pracę), na "
+        "umowie zlecenia, prowadzi własną firmę czy nie pracuje?”"
+    )
+    assert out[-1] == {"type": "done"}
+
+    # The event is not the user's words: after a reload only the assistant's answer shows.
+    restored = client.get(f"/api/session/{SESSION}").json()["messages"]
+    assert [m["role"] for m in restored] == ["assistant"]
+    assert restored[0]["parts"][0]["text"].startswith("Jako że dziecko jest w drodze")
+
+
+def test_the_assistant_reacts_to_what_an_answer_changed(client: TestClient) -> None:
+    """After a recalculation the UI and the model learn which points of the explanation changed;
+    the model talks about those and asks the next question as given."""
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    returned: list[str] = []
+    model = scripted("set_leave_before_birth", {"weeks": 6}, "Urlop od 1 lutego 2027.", returned)
+    out = ask(client, model, "Sześć tygodni przed porodem")
+
+    timeline = next(e for e in out if e["type"] == "timeline")
+    assert timeline["changed_notes"] == ["before-birth", "computed"]
+    assert (
+        "Zmienione punkty wyjaśnienia: „Urlop od 1 lutego 2027, 6 tyg. przed porodem”, "
+        "„Co policzyliśmy”. Omów teraz tylko je" in returned[0]
+    )
+    assert (
+        "„Czy masz już zaświadczenie lekarskie o przewidywanej dacie porodu?” Gdy użytkownik "
+        "odpowie, najpierw zapisz odpowiedź narzędziem `set_medical_certificate`" in returned[0]
+    )
+
+
+def timeline_after(client: TestClient, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    out = ask(client, scripted(tool, args, "Zapisane."), "…")
+    return next(e for e in out if e["type"] == "timeline")
+
+
+def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestClient) -> None:
+    """The father fills in: the chat asks how the mother works, then about the voluntary
+    insurance; without it the benefit periods disappear and the interview ends."""
+    client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)
+    returned: list[str] = []
+    model = scripted("set_mother_work", {"work": "contract"}, "Zlecenie.", returned)
+    update = next(e for e in ask(client, model, "Mama ma zlecenie") if e["type"] == "timeline")
+    assert update["scenario"]["mother_work"] == "contract"
+    assert update["scenario"]["work"] == "employment"  # the father's own answer stays his
+    assert update["changed_notes"] == ["insurance"]
+    assert "„Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego" in returned[0]
+
+    update = timeline_after(client, "set_voluntary_insurance", {"registered": False})
+    assert update["timeline"]["segments"] == []
+    assert [m["id"] for m in update["timeline"]["markers"]] == ["due-date"]
+    assert [n["kind"] for n in update["timeline"]["notes"]] == ["situation", "risk"]
+    assert update["focus"] == "due-date"
+
+    seen: list[str] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        seen.append(info.instructions or "")
+        yield "Rozumiem."
+
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
+    events(client.post("/api/chat", json={"session_id": SESSION, "message": "Dziękuję"}))
+    assert "Wywiad: wszystko ustalone." in seen[0]
+
+    # She registers after all: the timeline is back.
+    update = timeline_after(client, "set_voluntary_insurance", {"registered": True})
+    assert [s["id"] for s in update["timeline"]["segments"]] == [
+        "prenatal-window",
+        "maternity",
+        "parental",
+    ]
+
+
+def test_voluntary_insurance_is_only_for_a_contract_or_a_business(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    out = ask(client, scripted("set_voluntary_insurance", {"registered": True}, "…"), "…")
+    assert not any(e["type"] == "timeline" for e in out)
+
+    # When the mother herself fills in, her work is her own onboarding answer.
+    update = timeline_after(client, "set_mother_work", {"work": "business"})
+    assert (update["scenario"]["work"], update["scenario"]["mother_work"]) == ("business", None)
+
+
+def test_za_zyciem_from_the_chat_lengthens_parental_leave(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    update = timeline_after(client, "set_za_zyciem", {"has_certificate": True})
+    parental = next(s for s in update["timeline"]["segments"] if s["id"] == "parental")
+    assert parental["days"] == 58 * 7  # twins: 67 weeks for both parents, minus the father's 9
+    assert update["focus"] == "parental"
+    assert "za-zyciem" in update["changed_notes"]
+
+
+def test_hospital_stay_from_the_chat_adds_supplementary_leave(client: TestClient) -> None:
+    born = {**ONBOARDING, "role": "mother", "child_born": True, "date": "2026-10-01"}
+    client.put(f"/api/session/{SESSION}/onboarding", json={**born, "children_count": 1})
+    update = timeline_after(client, "set_leave_before_birth", {"weeks": 0})
+    assert "supplementary" not in [s["id"] for s in update["timeline"]["segments"]]
+
+    returned: list[str] = []
+    model = scripted("set_hospital_care", {"applies": True}, "Potrzebuję szczegółów.", returned)
+    ask(client, model, "Tak, był w szpitalu")
+    assert "„W którym tygodniu ciąży urodziło się dziecko, czy ważyło nie więcej niż" in returned[0]
+
+    facts = {
+        "applies": True,
+        "birth_week": "28-37",
+        "weight_up_to_1000g": False,
+        "hospital_stays": [{"start": "2026-10-01", "end": "2026-10-09"}],
+    }
+    update = timeline_after(client, "set_hospital_care", facts)
+    segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
+    # 2-9.10 is 8 days after the day of birth: 2 weeks, right after maternity leave.
+    assert segments["maternity"] == ("2026-10-01", "2027-02-17")
+    assert segments["supplementary"] == ("2027-02-18", "2027-03-03")
+    assert segments["parental"][0] == "2027-03-04"
+    assert update["focus"] == "supplementary"
+
+    update = timeline_after(client, "set_hospital_care", {"applies": False})
+    assert "supplementary" not in [s["id"] for s in update["timeline"]["segments"]]
+    assert update["scenario"]["hospital_stays"] == []
+
+
+def test_hospital_stay_is_not_asked_before_the_birth(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    out = ask(client, scripted("set_hospital_care", {"applies": True}, "…"), "…")
+    assert {"type": "tool-result", "id": "call-1", "name": "set_hospital_care", "ok": False} in out
+
+
+def test_chat_needs_a_message_or_an_event(client: TestClient) -> None:
+    app.dependency_overrides[get_chat_model] = lambda: scripted("set_due_date", {}, "")
+    neither = client.post("/api/chat", json={"session_id": SESSION})
+    both = client.post(
+        "/api/chat", json={"session_id": SESSION, "message": "Cześć", "event": "timeline_ready"}
+    )
+    assert (neither.status_code, both.status_code) == (422, 422)
