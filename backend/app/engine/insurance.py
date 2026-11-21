@@ -9,7 +9,7 @@ voluntary insurance, and a mother who does not work is not covered.
 
 from typing import Literal
 
-from app.engine.models import Scenario
+from app.engine.models import Scenario, Work
 
 Coverage = Literal[
     "obligatory", "voluntary", "not-registered", "not-working", "unknown-work", "unknown-voluntary"
@@ -22,8 +22,8 @@ INSURED: frozenset[Coverage] = frozenset({"obligatory", "voluntary"})
 NOT_INSURED: frozenset[Coverage] = frozenset({"not-registered", "not-working"})
 
 
-def coverage(scenario: Scenario) -> Coverage:
-    match scenario.mothers_work:
+def work_coverage(work: Work | None, insured: bool | None) -> Coverage:
+    match work:
         case None:
             return "unknown-work"
         case "employment":
@@ -31,6 +31,16 @@ def coverage(scenario: Scenario) -> Coverage:
         case "none":
             return "not-working"
         case _:
-            if scenario.mother_insured is None:
+            if insured is None:
                 return "unknown-voluntary"
-            return "voluntary" if scenario.mother_insured else "not-registered"
+            return "voluntary" if insured else "not-registered"
+
+
+def coverage(scenario: Scenario) -> Coverage:
+    """The mother's sickness insurance."""
+    return work_coverage(scenario.mothers_work, scenario.mother_insured)
+
+
+def father_coverage(scenario: Scenario) -> Coverage:
+    """The father's sickness insurance."""
+    return work_coverage(scenario.fathers_work, scenario.father_insured)

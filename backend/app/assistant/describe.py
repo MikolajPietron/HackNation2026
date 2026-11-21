@@ -171,7 +171,10 @@ def interview_questions(scenario: Scenario) -> list[Question]:
         )
 
     # Only a born child can have been premature or in hospital: supplementary maternity leave.
+    # Never after a loss of every child: nothing to plan there, and the question would hurt.
     several = (scenario.children_count or 1) > 1
+    if scenario.losses and len(scenario.losses) >= (scenario.children_count or 1):
+        return questions
     if born and scenario.hospital_care is None:
         questions.append(
             Question(

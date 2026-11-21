@@ -18,22 +18,28 @@ Phase 2, the birth (A.2):
   alone, in one piece or in at most 5 parts, until the end of the calendar year in which the
   child turns 6; longer with the "Za życiem" certificate (art. 182¹ᵃ, 182¹ᶜ).
 
+Phase 3, stillbirth or death of the child (A.3; art. 180¹, see loss.py): maternity leave of
+8 weeks after the birth (not less than 7 days from the death), or kept for 7 days from a later
+death; with more children it follows the number who live. Without a living child there is no
+parental leave, and leave already under way is kept for 7 days from the death.
+
 Pure and deterministic: no I/O, no database, no LLM; `today` is an argument. Every number comes
 from `Params`, every element carries its sources. Later phases add rules after these.
 """
 
 import datetime as dt
-from dataclasses import dataclass, field
+from collections.abc import Callable
 
+from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
 from app.engine.insurance import INSURED, NOT_INSURED, Coverage, coverage
+from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
     Document,
     Marker,
     Scenario,
     ScenarioError,
     Segment,
-    SourceRef,
     Timeline,
     TimelineElement,
 )
@@ -44,17 +50,6 @@ from app.engine.wording import children_phrase, fmt
 
 __all__ = ["DAY", "WEEK", "build_timeline", "changed_element_ids", "fmt"]
 
-DAY = dt.timedelta(days=1)
-WEEK = dt.timedelta(days=7)
-
-
-@dataclass
-class _Draft:
-    segments: list[Segment] = field(default_factory=list)
-    markers: list[Marker] = field(default_factory=list)
-    documents: list[Document] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
 
 def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeline:
     born = scenario.child_born is True
@@ -63,14 +58,21 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         raise ScenarioError("Najpierw potrzebna jest data porodu: przewidywana albo faktyczna.")
     weeks = scenario.leave_before_birth_weeks
     limit = params.maternity.max_weeks_before_birth
-    if weeks is not None and weeks > limit.value:
+    if weeks is not None and weeks > limit.value and not born:
         raise ScenarioError(
             f"Urlop macierzyński można zacząć maksymalnie {limit.value} tyg. przed przewidywaną "
             "datą porodu."
         )
+    table = params.maternity.weeks_by_children.value
+    count = scenario.children_count
+    if born and weeks and count and weeks >= table[min(count, len(table)) - 1]:
+        raise ScenarioError(
+            "Tyle tygodni przed porodem to cały urlop macierzyński. Sprawdź liczbę tygodni."
+        )
 
     cover = coverage(scenario)
-    draft = _Draft()
+    loss = child_loss(scenario, params, birth, today)
+    draft = Draft()
     if cover in NOT_INSURED:
         # No benefit periods to draw: the day of the birth and the rule it stands for.
         draft.markers.append(_birth_marker_uninsured(scenario, params, birth))
@@ -81,9 +83,16 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
             _before_birth_plan(draft, scenario, params, birth)
         draft.markers.append(_birth_marker(scenario, params, birth))
         if scenario.children_count is not None:
-            maternity_end = _maternity_after_birth(draft, scenario, params, birth, today, cover)
-            after = _supplementary(draft, scenario, params, birth, maternity_end, today)
-            _parental(draft, scenario, params, birth, after, today)
+            maternity_end = _maternity_after_birth(
+                draft, scenario, params, birth, today, cover, loss
+            )
+            # A stillbirth or an early death of every child: maternity leave is all there is.
+            if loss is None or not (loss.none_survived and loss.early):
+                after = _supplementary(draft, scenario, params, birth, maternity_end, today)
+                _parental(draft, scenario, params, birth, after, today)
+            if loss is not None and loss.none_survived:
+                _keep_seven_days(draft, loss, params)
+    _for_non_employee(draft, scenario, params, cover)
     draft.markers.sort(key=lambda m: m.date)
 
     if not born and birth < today:
@@ -102,10 +111,35 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         markers=draft.markers,
         documents=draft.documents,
         warnings=draft.warnings,
-        assumptions=_assumptions(scenario, born, cover),
+        assumptions=_assumptions(scenario, born, cover, loss, draft),
     )
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
+
+
+def _for_non_employee(draft: Draft, scenario: Scenario, params: Params, cover: Coverage) -> None:
+    """A mother on a contract or with her own business gets no leave, only the benefit for the
+    same periods (guide page 4); every period of leave on her timeline says so."""
+    if scenario.mothers_work not in ("contract", "business") or cover in NOT_INSURED:
+        return
+    b = params.benefit
+    note = (
+        "Mama nie jest pracownicą, więc nie dostaje urlopu: ma prawo do zasiłku macierzyńskiego "
+        "za okres odpowiadający urlopowi, na tych samych zasadach co do wymiaru."
+    )
+    draft.segments = [
+        segment.model_copy(
+            update={
+                "details": [*segment.details, note],
+                "sources": merge_sources(
+                    segment.sources, b.non_employees.sources, b.same_rules_for_non_employees.sources
+                ),
+            }
+        )
+        if segment.tone != "work"
+        else segment
+        for segment in draft.segments
+    ]
 
 
 def changed_element_ids(old: Timeline | None, new: Timeline) -> list[str]:
@@ -126,7 +160,7 @@ def _signature(e: TimelineElement) -> tuple[object, ...]:
             return ("document", e.needed_by, e.title, e.done)
 
 
-def _before_birth_plan(draft: _Draft, scenario: Scenario, params: Params, due: dt.date) -> None:
+def _before_birth_plan(draft: Draft, scenario: Scenario, params: Params, due: dt.date) -> None:
     """Phase 1 while the child is on the way: leave before the birth or work until the birth."""
     weeks = scenario.leave_before_birth_weeks
     limit = params.maternity.max_weeks_before_birth
@@ -235,11 +269,12 @@ def _before_birth_plan(draft: _Draft, scenario: Scenario, params: Params, due: d
     )
 
 
-def _before_birth_past(draft: _Draft, scenario: Scenario, params: Params, birth: dt.date) -> None:
+def _before_birth_past(draft: Draft, scenario: Scenario, params: Params, birth: dt.date) -> None:
     """Phase 1 once the child is born: leave the mother already took before the birth."""
     weeks = scenario.leave_before_birth_weeks
     if not weeks:
         return
+    limit = params.maternity.max_weeks_before_birth.value
     start = birth - weeks * WEEK
     draft.segments.append(
         Segment(
@@ -251,7 +286,15 @@ def _before_birth_past(draft: _Draft, scenario: Scenario, params: Params, birth:
             end=birth - DAY,
             days=weeks * 7,
             summary=f"Mama była na urlopie macierzyńskim {weeks} tyg. przed porodem.",
-            details=["To część urlopu macierzyńskiego, a nie dodatkowe tygodnie."],
+            details=["To część urlopu macierzyńskiego, a nie dodatkowe tygodnie."]
+            + (
+                [
+                    f"Limit {limit} tyg. dotyczy czasu przed przewidywaną datą porodu, więc gdy "
+                    "dziecko urodziło się później, tygodni przed porodem może być więcej."
+                ]
+                if weeks > limit
+                else []
+            ),
             sources=[
                 *params.maternity.max_weeks_before_birth.sources,
                 *params.rules.rest_after_birth.sources,
@@ -266,7 +309,9 @@ def _birth_marker(scenario: Scenario, params: Params, birth: dt.date) -> Marker:
             id="birth",
             lane="child",
             label="Poród",
-            title="Narodziny dziecka",
+            title="Poród"
+            if any(loss.stillborn for loss in scenario.losses)
+            else "Narodziny dziecka",
             date=birth,
             summary="Od tego dnia liczymy urlop macierzyński po porodzie.",
             sources=params.rules.rest_after_birth.sources,
@@ -303,43 +348,43 @@ def _birth_marker_uninsured(scenario: Scenario, params: Params, birth: dt.date) 
             "Prawo do zasiłku macierzyńskiego nabywa po porodzie mama ubezpieczona. Liczy się, "
             "czy w dniu porodu podlega ubezpieczeniu chorobowemu."
         ),
-        sources=_merge(
+        sources=merge_sources(
             params.benefit.insured_mother.sources, params.benefit.insured_on_birth_day.sources
         ),
     )
 
 
-def _merge(*groups: list[SourceRef]) -> list[SourceRef]:
-    """Sources of several rules in order, each quote once."""
-    seen: set[tuple[str, str]] = set()
-    merged = []
-    for source in (source for group in groups for source in group):
-        if (source.doc, source.quote) not in seen:
-            seen.add((source.doc, source.quote))
-            merged.append(source)
-    return merged
-
-
 def _maternity_after_birth(
-    draft: _Draft,
+    draft: Draft,
     scenario: Scenario,
     params: Params,
     birth: dt.date,
     today: dt.date,
     cover: Coverage,
+    loss: Loss | None,
 ) -> dt.date:
-    """Phase 2: how long maternity leave lasts, the 14 weeks after the birth and the benefit
-    for that period. Returns the last day of the leave."""
+    """Phases 2 and 3: how long maternity leave lasts, the 14 weeks after the birth and the
+    benefit for that period. Returns the last day of the leave."""
     m = params.maternity
     rules = params.rules
     born = scenario.child_born is True
     count = scenario.children_count
     assert count is not None
     table = m.weeks_by_children.value
-    total = table[min(count, len(table)) - 1]
     weeks = scenario.leave_before_birth_weeks
     before = weeks or 0
-    end = birth - before * WEEK + total * WEEK - DAY
+    start = birth - before * WEEK
+
+    def weeks_for(children: int) -> int:
+        return table[min(children, len(table)) - 1]
+
+    def end_for(children: int) -> dt.date:
+        return start + weeks_for(children) * WEEK - DAY
+
+    total = weeks_for(count)
+    end = end_for(count)
+    if loss is not None:
+        end = maternity_end_after_loss(loss, params, birth, end_for)
 
     details = ["Tydzień urlopu to 7 dni kalendarzowych."]
     sources = [*m.weeks_by_children.sources, *rules.week_is_7_days.sources]
@@ -368,10 +413,10 @@ def _maternity_after_birth(
         sources += benefit.insured_mother.sources
     elif cover == "voluntary":
         details.append(
-            "Mama nie jest pracownicą, więc nie dostaje urlopu: ma prawo do zasiłku "
-            "macierzyńskiego za ten okres."
+            "Mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego, więc za ten okres ma "
+            "prawo do zasiłku macierzyńskiego."
         )
-        sources += [*benefit.insured_mother.sources, *benefit.non_employees.sources]
+        sources += [*benefit.insured_mother.sources, *benefit.voluntary_insurance.sources]
     else:
         details.append(
             "Zasiłek macierzyński za ten okres przysługuje mamie ubezpieczonej. Na razie "
@@ -384,6 +429,26 @@ def _maternity_after_birth(
         )
 
     in_total = f", w tym {before} tyg. przed porodem" if before else ""
+    summary = (
+        f"Urlop macierzyński przy urodzeniu {children_phrase(count)} trwa "
+        f"{total} tyg.{in_total}; po porodzie do {fmt(end)}."
+    )
+    if loss is not None:
+        summary, more = _after_loss(loss, params, birth, end, weeks_for)
+        # The loss explains the length; what it replaces would only confuse.
+        details = [
+            d
+            for d in details
+            if not d.startswith("Tydzień urlopu")
+            and not (loss.none_survived and "wliczają się do" in d)
+        ] + more
+        details.append("Tydzień urlopu to 7 dni kalendarzowych.")
+        sources = [
+            *sources,
+            *params.loss.weeks_after_birth.sources,
+            *params.loss.days_after_death.sources,
+            *(params.loss.survivors.sources if loss.survivors or loss.count > 1 else []),
+        ]
     draft.segments.append(
         Segment(
             id="maternity",
@@ -393,15 +458,14 @@ def _maternity_after_birth(
             start=birth,
             end=end,
             days=(end - birth).days + 1,
-            summary=(
-                f"Urlop macierzyński przy urodzeniu {children_phrase(count)} trwa "
-                f"{total} tyg.{in_total}; po porodzie do {fmt(end)}."
-            ),
+            summary=summary,
             details=details,
-            sources=_merge(sources),
+            sources=merge_sources(sources),
         )
     )
 
+    if loss is not None and loss.none_survived:
+        return end
     personal = m.mother_personal_weeks
     estimate = "" if born else " Liczymy od przewidywanej daty porodu."
     draft.markers.append(
@@ -424,8 +488,89 @@ def _maternity_after_birth(
     return end
 
 
+def _after_loss(
+    loss: Loss,
+    params: Params,
+    birth: dt.date,
+    end: dt.date,
+    weeks_for: Callable[[int], int],
+) -> tuple[str, list[str]]:
+    """Phase 3: the summary and details of maternity leave after a stillbirth or a death."""
+    days = params.loss.days_after_death.value
+    weeks = params.loss.weeks_after_birth.value
+    until = loss.until(params)
+    if loss.survivors:
+        living, born = weeks_for(loss.survivors), weeks_for(loss.count + loss.survivors)
+        summary = (
+            "Urlop macierzyński liczy się według liczby dzieci pozostałych przy życiu "
+            f"({loss.survivors}): {living} tyg. zamiast {born}; po porodzie do {fmt(end)}."
+        )
+        more = []
+        if end == until:
+            more.append(
+                f"Urlop trwa nie krócej niż {days} dni od dnia śmierci dziecka, czyli do "
+                f"{fmt(end)}."
+            )
+        return summary, more
+    if loss.early:
+        lost = "urodziło się martwe" if loss.stillborn == loss.count else "zmarło"
+        when = "" if loss.stillborn == loss.count else f" {fmt(loss.last)}"
+        summary = (
+            f"Urlop macierzyński trwa {weeks} tygodni po porodzie, nie krócej jednak niż {days} "
+            f"dni od dnia śmierci dziecka: do {fmt(end)}."
+        )
+        more = [f"Dziecko {lost}{when}."]
+        if end == until and end > birth + (weeks * 7 - 1) * DAY:
+            more.append(
+                f"{days} dni od dnia śmierci mija później niż {weeks} tygodni po porodzie, "
+                f"dlatego urlop trwa do {fmt(end)}."
+            )
+        return summary, more
+    if end < until:
+        summary = (
+            f"Urlop macierzyński trwał do {fmt(end)}: skończył się przed śmiercią dziecka."
+            if end < loss.last
+            else f"Mama zachowuje urlop macierzyński przez {days} dni od dnia śmierci dziecka, "
+            f"ale nie dłużej, niż trwałby bez tej zmiany: do {fmt(end)}."
+        )
+    else:
+        summary = (
+            f"Mama zachowuje urlop macierzyński przez {days} dni od dnia śmierci dziecka: do "
+            f"{fmt(end)}."
+        )
+    return summary, [f"Dziecko zmarło {fmt(loss.last)}, po upływie {weeks} tygodni życia."]
+
+
+def _keep_seven_days(draft: Draft, loss: Loss, params: Params) -> None:
+    """Phase 3, no child lives: supplementary or parental leave under way at the death is kept
+    for 7 days from it; nothing starts later, and the parental leave deadline goes."""
+    until = loss.until(params)
+    days = params.loss.days_after_death.value
+    kept = []
+    for segment in draft.segments:
+        if segment.id not in ("supplementary", "parental") or segment.end <= until:
+            kept.append(segment)
+        elif segment.start <= until:
+            kept.append(
+                segment.model_copy(
+                    update={
+                        "end": until,
+                        "days": (until - segment.start).days + 1,
+                        "summary": (
+                            f"Dziecko zmarło {fmt(loss.last)}. Prawo do tego urlopu zostaje przez "
+                            f"{days} dni od dnia śmierci dziecka: do {fmt(until)}."
+                        ),
+                        "details": ["Tydzień urlopu to 7 dni kalendarzowych."],
+                        "sources": merge_sources(segment.sources, params.loss.other_leaves.sources),
+                    }
+                )
+            )
+    draft.segments = kept
+    draft.markers = [m for m in draft.markers if m.id != "parental-deadline"]
+
+
 def _supplementary(
-    draft: _Draft,
+    draft: Draft,
     scenario: Scenario,
     params: Params,
     birth: dt.date,
@@ -445,13 +590,21 @@ def _supplementary(
     details = [
         describe_case(leave, params),
         f"Policzyliśmy {leave.days} {_days(leave.days)} pobytu dziecka w szpitalu między "
-        f"{fmt(leave.first_day)} a {fmt(leave.last_day)}. Okresy pobytu sumuje się, a niepełny "
-        f"tydzień zaokrągla w górę: stąd {leave.weeks} tyg.",
+        f"{fmt(leave.first_day)} a {fmt(leave.last_day)}. Okresy pobytu sumuje się"
+        + (
+            f", a niepełny tydzień zaokrągla w górę: stąd {leave.weeks} tyg."
+            if leave.days % 7
+            else f": to {leave.weeks} tyg."
+        ),
     ]
     if leave.ongoing:
+        grow = (
+            f" Wymiar może jeszcze wzrosnąć, najwyżej do {leave.max_weeks} tyg."
+            if leave.max_weeks > leave.weeks
+            else ""
+        )
         details.append(
-            f"Dziecko jest jeszcze w szpitalu, więc liczymy do dziś ({fmt(today)}). Wymiar może "
-            f"jeszcze wzrosnąć, najwyżej do {leave.limit_weeks} tyg."
+            f"Dziecko jest jeszcze w szpitalu, więc liczymy do dziś ({fmt(today)}).{grow}"
         )
     count = scenario.children_count or 1
     if count > 1:
@@ -462,8 +615,8 @@ def _supplementary(
     details += [
         "Urlop jest udzielany jednorazowo, bez dzielenia na części, bezpośrednio po urlopie "
         "macierzyńskim.",
-        "Dni po porodzie liczymy od dnia następującego po dniu porodu. Tydzień urlopu to 7 dni "
-        "kalendarzowych.",
+        "Dzień porodu liczymy jako pierwszy dzień po porodzie, jak przy urlopie macierzyńskim. "
+        "Tydzień urlopu to 7 dni kalendarzowych.",
     ]
     case_sources = {
         "early": s.limit_weeks_early.sources,
@@ -485,7 +638,7 @@ def _supplementary(
                 "tydzień pobytu dziecka w szpitalu."
             ),
             details=details,
-            sources=_merge(
+            sources=merge_sources(
                 s.situations.sources,
                 case_sources,
                 s.sum_and_round.sources,
@@ -504,7 +657,7 @@ def _days(count: int) -> str:
 
 
 def _parental(
-    draft: _Draft,
+    draft: Draft,
     scenario: Scenario,
     params: Params,
     birth: dt.date,
@@ -556,8 +709,9 @@ def _parental(
         sources.append(longer.sources)
     if not born:
         details.append(
-            "Jeśli dziecko urodzi się przedwcześnie albo będzie wymagało pobytu w szpitalu, "
-            "przed urlopem rodzicielskim przysługuje jeszcze uzupełniający urlop macierzyński."
+            "Jeśli dziecko urodzi się przedwcześnie albo będzie wymagało pobytu w szpitalu, przed "
+            "urlopem rodzicielskim może przysługiwać jeszcze uzupełniający urlop macierzyński: "
+            "tydzień za każdy tydzień pobytu dziecka w szpitalu."
         )
         sources.append(params.supplementary.situations.sources)
     details.append("Tydzień urlopu to 7 dni kalendarzowych.")
@@ -578,12 +732,12 @@ def _parental(
             days=mothers * 7,
             summary=(
                 f"Po urlopie macierzyńskim mama może wziąć urlop rodzicielski. Rodzice mają razem "
-                f"do {total} tyg.; {exclusive} tyg. z nich należy wyłącznie do taty i nie można "
-                f"ich przenieść, więc mama może wykorzystać najwięcej {mothers} tyg. Wzięte "
+                f"do {total} tyg.; każde z nich ma {exclusive} tyg. wyłącznie dla siebie, których "
+                f"nie można przenieść, więc mama może wykorzystać najwięcej {mothers} tyg. Wzięte "
                 f"w całości od razu, trwałyby do {fmt(end)}."
             ),
             details=details,
-            sources=_merge(*sources),
+            sources=merge_sources(*sources),
         )
     )
     estimate = [] if born else ["Liczymy od przewidywanej daty porodu."]
@@ -609,7 +763,9 @@ def _parental(
     )
 
 
-def _assumptions(scenario: Scenario, born: bool, cover: Coverage) -> list[str]:
+def _assumptions(
+    scenario: Scenario, born: bool, cover: Coverage, loss: Loss | None, draft: Draft
+) -> list[str]:
     assumptions = [
         "Pokazujemy to, co wynika z punktów „Przygotowanie do porodu” i „Urodzenie dziecka” "
         "Przewodnika ZUS. Kolejne części (uprawnienia taty, kwoty zasiłku, wnioski i terminy) "
@@ -641,14 +797,27 @@ def _assumptions(scenario: Scenario, born: bool, cover: Coverage) -> list[str]:
             "Długość urlopów pokażemy, gdy będzie wiadomo, ile dzieci urodzi się przy jednym "
             "porodzie."
         )
-    else:
+    elif any(segment.id == "parental" for segment in draft.segments):
         assumptions.append(
             "Urlop rodzicielski pokazujemy tak, jakby mama wzięła całą swoją część od razu po "
             "urlopie macierzyńskim. Podział na części i udział taty dojdą w kolejnym etapie."
         )
     if scenario.hospital_care:
         assumptions.append(
-            "Przy uzupełniającym urlopie macierzyńskim dni po porodzie liczymy od dnia "
-            "następującego po dniu porodu."
+            "Przy uzupełniającym urlopie macierzyńskim dzień porodu liczymy jako pierwszy dzień "
+            "po porodzie, jak przy urlopie macierzyńskim. Dzień przyjęcia i wypisu ze szpitala "
+            "liczymy jako dni pobytu."
         )
+    if loss is not None:
+        assumptions.append(
+            "7 dni od dnia śmierci dziecka liczymy od następnego dnia. 8 tygodni życia to 56 dni, "
+            "licząc dzień urodzenia jako pierwszy. Te 7 dni nie wydłużają urlopu ponad to, ile "
+            "trwałby bez tej zmiany."
+        )
+        if loss.survivors:
+            assumptions.append(
+                "Długość urlopu rodzicielskiego liczymy według liczby urodzonych dzieci, jak "
+                "w Kodeksie pracy (art. 182¹ᵃ § 1). Czy zmienia się po śmierci jednego z nich, "
+                "materiały nie mówią."
+            )
     return assumptions

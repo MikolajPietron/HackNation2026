@@ -80,6 +80,50 @@ class SupplementaryParams(BaseModel):
     week_is_7_days: Rule
 
 
+class LossParams(BaseModel):
+    """Stillbirth or death of the child (guide point "Szczególna sytuacja"; KP art. 180¹)."""
+
+    life_weeks: Param[int]
+    """A death before the end of this many weeks of life counts as early."""
+    weeks_after_birth: Param[int]
+    """Early death or stillbirth: maternity leave lasts this many weeks after the birth..."""
+    days_after_death: Param[int]
+    """...but not less than this many days from the death; a later death keeps the leave
+    for this many days."""
+    survivors: Rule
+    """More children at once: the leave follows the number of children who live."""
+    other_leaves: Rule
+    """The same 7 days apply to supplementary and parental leave (art. 180² § 7, 182¹ᵍ)."""
+    parental_for_care: Rule
+
+
+class FatherParams(BaseModel):
+    """Guide section B (pages 7-8) and the Labour Code behind it."""
+
+    benefit: Rule
+    """When the father can have the maternity benefit for maternity leave at all."""
+    paternity_days: Param[int]
+    paternity_parts: Param[int]
+    paternity_min_part_days: Param[int]
+    paternity_months: Param[int]
+    """Paternity leave is used before the child completes this many months of life."""
+    paternity_who: Rule
+    paternity_children: Rule
+    paternity_expires: Rule
+    parental_together: Rule
+    parental_uninsured_mother: Rule
+    takeover_after_weeks: Param[int]
+    takeover_starts_after: Rule
+    special_after_weeks: Param[int]
+    """Incapacity, hospital, abandonment: not before the mother used this many weeks."""
+    special: Rule
+    special_incapacity: Rule
+    special_hospital: Rule
+    special_death: Rule
+    special_abandonment: Rule
+    total_cap: Rule
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -95,6 +139,8 @@ class Params(BaseModel):
     benefit: BenefitRules
     supplementary: SupplementaryParams
     parental: ParentalParams
+    loss: LossParams
+    father: FatherParams
     rules: Rules
 
     def sources(self) -> list[SourceRef]:

@@ -194,7 +194,7 @@ def test_explains_the_choice_before_an_expected_birth() -> None:
     explained = notes(expecting(children_count=1))
     assert list(explained) == ["situation", "insurance", "before-birth", "parental", "computed"]
     assert "Dziecko jest w drodze" in explained["situation"]
-    assert "nawet 6 tygodni przed porodem" in explained["before-birth"]
+    assert "nawet 6 tygodni przed przewidywaną datą porodu" in explained["before-birth"]
     assert "Najwcześniej 1 lutego 2027" in explained["before-birth"]
     assert "po porodzie do 1 sierpnia 2027" in explained["computed"]
     assert "do 20 czerwca 2027" in explained["computed"]
@@ -202,9 +202,13 @@ def test_explains_the_choice_before_an_expected_birth() -> None:
 
 def test_explains_the_chosen_leave_and_the_certificate() -> None:
     explained = notes(expecting(children_count=1, leave_before_birth_weeks=2))
-    assert "Urlop od 1 marca 2027, 2 tyg. przed porodem" in explained["before-birth"]
+    assert (
+        "Urlop od 1 marca 2027, 2 tyg. przed przewidywaną datą porodu" in explained["before-birth"]
+    )
     assert "po porodzie zostaje 18 tyg." in explained["before-birth"]
-    assert "Do 1 marca 2027 potrzebne jest zaświadczenie" in explained["before-birth"]
+    assert (
+        "Żeby zacząć urlop 1 marca 2027, potrzebne jest zaświadczenie" in explained["before-birth"]
+    )
     with_certificate = expecting(
         children_count=1, leave_before_birth_weeks=2, has_medical_certificate=True
     )
@@ -264,7 +268,11 @@ def test_an_employed_mother_is_insured_and_gets_the_benefit() -> None:
     t = expecting(**MOTHER_EMPLOYED, children_count=1)
     insurance = t.notes[1]
     assert (insurance.id, insurance.kind) == ("insurance", "right")
-    assert insurance.title == "Mama ma prawo do zasiłku macierzyńskiego"
+    # Before the birth the right is still to come: it arises after the birth.
+    assert insurance.title == "Po porodzie: prawo do zasiłku macierzyńskiego"
+    assert born(**MOTHER_EMPLOYED, children_count=1).notes[1].title == (
+        "Mama ma prawo do zasiłku macierzyńskiego"
+    )
     assert "Umowa o pracę daje obowiązkowe ubezpieczenie chorobowe" in insurance.text
     assert {s.page for s in insurance.sources} == {3, 5, 10}
     maternity = next(s for s in t.segments if s.id == "maternity")
@@ -282,9 +290,17 @@ def test_contract_or_business_needs_the_voluntary_insurance(work: str) -> None:
     insured = expecting(role="mother", work=work, mother_insured=True, children_count=1)
     assert insured.notes[1].kind == "right"
     assert "Nie jest pracownicą, dlatego nie dostaje urlopu" in insured.notes[1].text
-    maternity = next(s for s in insured.segments if s.id == "maternity")
-    assert any("nie dostaje urlopu" in d for d in maternity.details)
+    # Every period of leave says she gets the benefit, not leave (guide page 4), also before
+    # her insurance is confirmed.
+    for t in (asked, insured):
+        leave = [s for s in t.segments if s.tone != "work"]
+        assert [s.id for s in leave] == ["prenatal-window", "maternity", "parental"]
+        for segment in leave:
+            assert any("nie dostaje urlopu" in d for d in segment.details), segment.id
+            assert any(s.page == 4 for s in segment.sources), segment.id
     assert span(insured, "maternity") == span(asked, "maternity")  # the same length
+    employed = expecting(**MOTHER_EMPLOYED, children_count=1)
+    assert not any("nie dostaje urlopu" in d for s in employed.segments for d in s.details)
 
 
 @pytest.mark.parametrize(
@@ -306,7 +322,10 @@ def test_without_sickness_insurance_there_are_no_benefit_periods(
         assert ids(t) in (["due-date"], ["birth"])
         assert [n.id for n in t.notes] == ["situation", "insurance"]
         assert t.notes[1].kind == "risk"
-        assert t.notes[1].title == "Bez ubezpieczenia chorobowego nie ma zasiłku macierzyńskiego"
+        assert t.notes[1].title == "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
+        assert "Tylko w określonych sytuacjach zasiłek przysługuje także po ustaniu" in (
+            t.notes[1].text
+        )
         assert "Liczy się, czy w dniu porodu podlega ubezpieczeniu" in t.markers[0].summary
         assert not t.documents
 
@@ -316,6 +335,7 @@ def test_the_fathers_own_work_says_nothing_about_the_mother() -> None:
     assert unknown.notes[1].title == "Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe"
     assert "Zależy to od tego, jak mama pracuje" in unknown.notes[1].text
     known = born(role="father", work="none", mother_work="employment", children_count=1)
+    assert {s.page for s in unknown.notes[1].sources} == {3, 4, 5}
     assert known.notes[1].title == "Mama ma prawo do zasiłku macierzyńskiego"
 
 
@@ -432,7 +452,7 @@ def supplementary_weeks(timeline: Timeline) -> int:
 
 
 def test_very_premature_child_a_week_for_every_week_in_hospital() -> None:
-    """Born 1.09, in hospital until 5.11: 65 days after the day of birth, so 10 weeks."""
+    """Born 1.09, in hospital until 5.11: 66 days with the day of birth, so 10 weeks."""
     t = hospital("before-28", True, ("2026-09-01", "2026-11-05"), birth=dt.date(2026, 9, 1))
     assert span(t, "maternity")[1] == dt.date(2027, 1, 18)
     assert span(t, "supplementary") == (dt.date(2027, 1, 19), dt.date(2027, 3, 29), 70)
@@ -447,48 +467,51 @@ def test_very_premature_child_at_most_fifteen_weeks() -> None:
 
 
 def test_low_birth_weight_counts_like_a_very_premature_birth() -> None:
-    """1000 g or less: the 15-week window whatever the week of pregnancy."""
+    """1000 g or less: the 15-week window whatever the week of pregnancy. 1.10-31.12 is 92 days,
+    so 14 weeks; the 8-week window (1.10-25.11) caps the other case at 8."""
     stay = ("2026-10-01", "2026-12-31")
-    assert supplementary_weeks(hospital("after-37", True, stay)) == 13
-    assert supplementary_weeks(hospital("28-37", True, stay)) == 13
+    assert supplementary_weeks(hospital("after-37", True, stay)) == 14
+    assert supplementary_weeks(hospital("28-37", True, stay)) == 14
     assert supplementary_weeks(hospital("28-37", False, stay)) == 8
 
 
 def test_premature_child_an_incomplete_week_is_rounded_up() -> None:
-    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-08"))) == 1
-    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-09"))) == 2
-    # The day of the birth itself is not a day after the birth.
-    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-01"))) == 0
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-07"))) == 1
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-08"))) == 2
+    # The day of birth counts, as the first day of maternity leave does.
+    assert supplementary_weeks(hospital("28-37", False, ("2026-10-01", "2026-10-01"))) == 1
 
 
 def test_hospital_stays_are_added_up() -> None:
-    """2-5.10 is 4 days and 20-25.10 is 6: 10 days, so 2 weeks. Overlaps count once."""
+    """1-5.10 is 5 days and 20-25.10 is 6: 11 days, so 2 weeks. Overlaps count once."""
     two = hospital("28-37", False, ("2026-10-01", "2026-10-05"), ("2026-10-20", "2026-10-25"))
     assert supplementary_weeks(two) == 2
-    same = hospital("28-37", False, ("2026-10-01", "2026-10-08"), ("2026-10-03", "2026-10-08"))
+    same = hospital("28-37", False, ("2026-10-01", "2026-10-07"), ("2026-10-03", "2026-10-07"))
     assert supplementary_weeks(same) == 1
 
 
 def test_child_born_at_term_needs_two_days_starting_between_day_5_and_28() -> None:
-    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-12"))) == 1
+    """Born 1.10: the 5th day is 5.10, the 28th is 28.10."""
+    # 5-12.10 is 8 days: 2 weeks.
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-12"))) == 2
     # In hospital on the 5th day only: no two consecutive days from the 5th day on.
-    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-06"))) == 0
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-01", "2026-10-05"))) == 0
     # The 28th and 29th day: the first of the two is still inside the window.
-    assert supplementary_weeks(hospital("after-37", False, ("2026-10-29", "2026-10-30"))) == 1
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-28", "2026-10-29"))) == 1
     # From the 29th day: too late.
-    assert supplementary_weeks(hospital("after-37", False, ("2026-10-30", "2026-11-05"))) == 0
+    assert supplementary_weeks(hospital("after-37", False, ("2026-10-29", "2026-11-05"))) == 0
 
 
 def test_child_born_at_term_counts_from_the_fifth_day_to_the_eighth_week() -> None:
-    """Days 5-56 after the birth are 52 days: at most 8 weeks."""
+    """Days 5-56 after the birth (5.10-25.11) are 52 days: at most 8 weeks."""
     t = hospital("after-37", False, ("2026-10-01", "2026-12-31"))
     assert supplementary_weeks(t) == 8
     details = next(s for s in t.segments if s.id == "supplementary").details
-    assert any("52 dni" in d and "06.10.2026 a 26.11.2026" in d for d in details)
+    assert any("52 dni" in d and "05.10.2026 a 25.11.2026" in d for d in details)
 
 
 def test_child_still_in_hospital_is_counted_until_today() -> None:
-    """Born 1.11, today 21.11: 20 days so far, 3 weeks, and the number may still grow."""
+    """Born 1.11, today 21.11: 21 days so far, 3 weeks. Staying until 26.12 would make 8."""
     t = hospital("28-37", False, ("2026-11-01", None), birth=dt.date(2026, 11, 1), children=2)
     assert supplementary_weeks(t) == 3
     details = next(s for s in t.segments if s.id == "supplementary").details
@@ -496,10 +519,25 @@ def test_child_still_in_hospital_is_counted_until_today() -> None:
     assert any("najlżejszego dziecka" in d for d in details)  # twins
 
 
+def test_a_stay_under_way_can_only_grow_by_what_is_left_of_the_window() -> None:
+    """Born 1.10, still in hospital since 1.10: 52 days so far (8 weeks), the cap: it says
+    nothing about growing. From 20.11 (day 51): 2 days so far, 6 more at most, so 1 week."""
+    full = hospital("28-37", False, ("2026-10-01", None))
+    assert supplementary_weeks(full) == 8
+    assert not any("wzrosnąć" in d for s in full.segments for d in s.details)
+    assert "wzrosnąć" not in notes(full)["supplementary"]
+    late = hospital("28-37", False, ("2026-11-20", None))
+    assert supplementary_weeks(late) == 1
+    assert not any("wzrosnąć" in d for s in late.segments for d in s.details)
+
+
 def test_supplementary_leave_is_explained_also_when_it_is_not_due() -> None:
     due = notes(hospital("28-37", False, ("2026-10-01", "2026-10-09")))
     assert due["supplementary"].startswith("Uzupełniający urlop macierzyński: 2 tyg. | ")
-    assert "8 dni to 2 tyg." in due["supplementary"]
+    assert "9 dni to 2 tyg., bo niepełny tydzień zaokrągla się w górę" in due["supplementary"]
+    whole = notes(hospital("28-37", False, ("2026-10-01", "2026-10-07")))
+    assert "7 dni to 1 tyg.. " not in whole["supplementary"]
+    assert "7 dni to 1 tyg. Urlop" in whole["supplementary"]
     assert "Uzupełniający urlop macierzyński: 2 tyg., od" in due["computed"]
 
     not_due = hospital("after-37", False, ("2026-10-01", "2026-10-04"))
@@ -512,6 +550,11 @@ def test_supplementary_leave_is_explained_also_when_it_is_not_due() -> None:
 
     waiting = born(children_count=1, hospital_care=True)
     assert "potrzebne szczegóły" in notes(waiting)["supplementary"]
+    # Week and weight known, no dates yet: still waiting, not "conditions not met".
+    no_dates = born(
+        children_count=1, hospital_care=True, birth_week="28-37", birth_weight_up_to_1000g=False
+    )
+    assert "potrzebne szczegóły" in notes(no_dates)["supplementary"]
     assert "supplementary" not in notes(born(children_count=1, hospital_care=False))
 
 
@@ -526,4 +569,146 @@ def test_no_supplementary_leave_before_the_child_is_born() -> None:
     t = expecting(children_count=1, hospital_care=True, birth_week="28-37")
     assert "supplementary" not in ids(t)
     parental = next(s for s in t.segments if s.id == "parental")
-    assert any("uzupełniający urlop macierzyński" in d for d in parental.details)
+    assert any("może przysługiwać jeszcze uzupełniający urlop" in d for d in parental.details)
+
+
+# Phase 3: stillbirth or death of the child (guide A.3, page 6; KP art. 180¹).
+
+LOST_BIRTH = dt.date(2026, 11, 10)
+
+
+def lost(*losses: dict[str, object], **answers: object) -> Timeline:
+    scenario = Scenario.model_validate(
+        {
+            "role": "mother",
+            "work": "employment",
+            "child_born": True,
+            "birth_date": LOST_BIRTH,
+            "children_count": 1,
+            "leave_before_birth_weeks": 0,
+            "losses": list(losses),
+            **answers,
+        }
+    )
+    return build_timeline(scenario, PARAMS, TODAY)
+
+
+STILLBORN = {"stillborn": True}
+
+
+def test_stillbirth_gives_eight_weeks_after_the_birth() -> None:
+    """10.11.2026 + 8 weeks = 4.01.2027. Nothing after it: no parental leave, no 14 weeks."""
+    t = lost(STILLBORN)
+    assert ids(t) == ["maternity", "birth"]
+    assert span(t, "maternity") == (LOST_BIRTH, dt.date(2027, 1, 4), 56)
+    assert t.element("birth").title == "Poród"  # type: ignore[union-attr]
+    assert [(n.id, n.kind) for n in t.notes] == [
+        ("situation", "situation"),
+        ("insurance", "right"),
+        ("loss", "right"),
+        ("computed", "computed"),
+    ]
+    assert t.notes[0].title == "Dziecko urodziło się martwe"
+    assert t.notes[0].text.startswith("Bardzo nam przykro.")
+    assert t.notes[2].title == "Urlop macierzyński: 8 tygodni po porodzie"
+    assert "nie krócej jednak niż przez 7 dni od dnia śmierci dziecka" in t.notes[2].text
+    assert {s.article for s in t.notes[2].sources if s.doc == "kp"} >= {"art. 180¹ § 1"}
+
+
+def test_stillbirth_after_leave_before_the_birth_still_gives_eight_weeks_after_it() -> None:
+    """The 8 weeks are counted after the birth, whatever was used before it."""
+    t = lost(STILLBORN, leave_before_birth_weeks=6)
+    assert span(t, "maternity-prenatal") == (dt.date(2026, 9, 29), dt.date(2026, 11, 9), 42)
+    assert span(t, "maternity") == (LOST_BIRTH, dt.date(2027, 1, 4), 56)
+    maternity = next(s for s in t.segments if s.id == "maternity")
+    assert not any("wliczają się" in d for d in maternity.details)
+
+
+def test_early_death_eight_weeks_but_not_less_than_seven_days() -> None:
+    """Born 20.09, died 13.11 (day 55 of life): 8 weeks end 14.11, 7 days from the death end
+    20.11, the later of the two."""
+    t = lost({"died_on": "2026-11-13"}, birth_date=dt.date(2026, 9, 20))
+    assert span(t, "maternity") == (dt.date(2026, 9, 20), dt.date(2026, 11, 20), 62)
+    assert t.notes[0].title == "Dziecko zmarło 13 listopada 2026"
+    assert t.element("birth").title == "Narodziny dziecka"  # type: ignore[union-attr]
+
+
+def test_eight_weeks_of_life_are_fifty_six_days() -> None:
+    """Born 20.09: day 56 of life is 14.11 (still early), 15.11 is after 8 weeks."""
+    birth = dt.date(2026, 9, 20)
+    early = lost({"died_on": "2026-11-14"}, birth_date=birth)
+    assert span(early, "maternity")[1] == dt.date(2026, 11, 21)
+    assert early.notes[2].title == "Urlop macierzyński: 8 tygodni po porodzie"
+    late = lost({"died_on": "2026-11-15"}, birth_date=birth)
+    assert span(late, "maternity")[1] == dt.date(2026, 11, 22)
+    assert late.notes[2].title == "Urlop zostaje jeszcze przez 7 dni"
+
+
+def test_later_death_keeps_the_leave_for_seven_days() -> None:
+    """Born 1.07, died 1.10: maternity leave ends 8.10 instead of 17.11."""
+    t = lost({"died_on": "2026-10-01"}, birth_date=dt.date(2026, 7, 1))
+    assert ids(t) == ["maternity", "birth"]
+    assert span(t, "maternity")[1] == dt.date(2026, 10, 8)
+    assert any(s.article == "art. 180¹ § 2" for s in t.notes[2].sources)
+
+
+def test_death_during_parental_leave_keeps_it_for_seven_days() -> None:
+    """Born 5.01.2026: maternity leave 5.01-24.05; died 1.08, parental leave ends 8.08."""
+    t = lost({"died_on": "2026-08-01"}, birth_date=dt.date(2026, 1, 5))
+    assert span(t, "maternity") == (dt.date(2026, 1, 5), dt.date(2026, 5, 24), 140)
+    assert span(t, "parental") == (dt.date(2026, 5, 25), dt.date(2026, 8, 8), 76)
+    assert "parental-deadline" not in ids(t)
+    parental = next(s for s in t.segments if s.id == "parental")
+    assert {"art. 182¹ᵍ", "art. 180² § 7"} <= {s.article for s in parental.sources}
+    assert (
+        "skończył się przed śmiercią dziecka"
+        in next(s for s in t.segments if s.id == "maternity").summary
+    )
+
+
+def test_twins_one_stillborn_leave_follows_the_living_child() -> None:
+    """20 weeks instead of 31 (10.11.2026-29.03.2027); parental leave as for twins (literal
+    reading of art. 182¹ᵃ, flagged as an assumption)."""
+    t = lost(STILLBORN, children_count=2)
+    assert span(t, "maternity") == (LOST_BIRTH, dt.date(2027, 3, 29), 140)
+    assert span(t, "parental") == (dt.date(2027, 3, 30), dt.date(2027, 11, 22), 34 * 7)
+    assert "personal-weeks" in ids(t)
+    assert t.notes[0].title == "Jedno z dzieci urodziło się martwe"
+    assert t.notes[2].title == "Urlop macierzyński: 20 tyg., według liczby żyjących dzieci"
+    assert "more-children" not in notes(t)
+    assert any("Czy zmienia się po śmierci jednego z nich" in a for a in t.assumptions)
+
+
+def test_twins_one_died_after_eight_weeks_not_less_than_seven_days() -> None:
+    """Born 1.01.2026; one twin died 1.06, when 20 weeks (to 20.05) had passed: the leave runs
+    to 8.06, seven days from the death, not to 5.08 (31 weeks)."""
+    t = lost({"died_on": "2026-06-01"}, birth_date=dt.date(2026, 1, 1), children_count=2)
+    assert span(t, "maternity")[1] == dt.date(2026, 6, 8)
+    assert span(t, "parental")[0] == dt.date(2026, 6, 9)
+
+
+def test_twins_both_stillborn() -> None:
+    t = lost(STILLBORN, STILLBORN, children_count=2)
+    assert span(t, "maternity")[1] == dt.date(2027, 1, 4)
+    assert "parental" not in ids(t)
+    assert t.notes[0].title == "Dzieci zmarły"
+
+
+def test_loss_dates_are_checked() -> None:
+    with pytest.raises(ScenarioError, match="więcej dzieci, które zmarły"):
+        lost(STILLBORN, STILLBORN)
+    with pytest.raises(ScenarioError, match="wcześniejsza niż data porodu"):
+        lost({"died_on": "2026-11-01"})
+    with pytest.raises(ScenarioError, match="w przyszłości"):
+        lost({"died_on": "2026-12-01"})
+
+
+def test_loss_of_an_uninsured_mother_says_only_that() -> None:
+    t = lost(STILLBORN, work="none")
+    assert [n.id for n in t.notes] == ["situation", "insurance"]
+    assert ids(t) == ["birth"]
+
+
+def test_a_loss_never_counts_before_the_birth() -> None:
+    t = expecting(children_count=1, losses=[STILLBORN])
+    assert "maternity" in ids(t) and "parental" in ids(t)

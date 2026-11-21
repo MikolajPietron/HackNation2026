@@ -313,7 +313,8 @@ def test_the_assistant_reacts_to_what_an_answer_changed(client: TestClient) -> N
     timeline = next(e for e in out if e["type"] == "timeline")
     assert timeline["changed_notes"] == ["before-birth", "computed"]
     assert (
-        "Zmienione punkty wyjaśnienia: „Urlop od 1 lutego 2027, 6 tyg. przed porodem”, "
+        "Zmienione punkty wyjaśnienia: „Urlop od 1 lutego 2027, 6 tyg. przed przewidywaną datą "
+        "porodu”, "
         "„Co policzyliśmy”. Omów teraz tylko je" in returned[0]
     )
     assert (
@@ -402,7 +403,7 @@ def test_hospital_stay_from_the_chat_adds_supplementary_leave(client: TestClient
     }
     update = timeline_after(client, "set_hospital_care", facts)
     segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
-    # 2-9.10 is 8 days after the day of birth: 2 weeks, right after maternity leave.
+    # 1-9.10 is 9 days, the day of birth counted: 2 weeks, right after maternity leave.
     assert segments["maternity"] == ("2026-10-01", "2027-02-17")
     assert segments["supplementary"] == ("2027-02-18", "2027-03-03")
     assert segments["parental"][0] == "2027-03-04"
@@ -426,3 +427,34 @@ def test_chat_needs_a_message_or_an_event(client: TestClient) -> None:
         "/api/chat", json={"session_id": SESSION, "message": "Cześć", "event": "timeline_ready"}
     )
     assert (neither.status_code, both.status_code) == (422, 422)
+
+
+def test_a_loss_is_recorded_only_when_the_parent_says_so(client: TestClient) -> None:
+    """The interview never asks; after the loss of the only child it also stops asking about
+    hospital stays."""
+    born = {**ONBOARDING, "role": "mother", "child_born": True, "date": "2026-11-10"}
+    client.put(f"/api/session/{SESSION}/onboarding", json={**born, "children_count": 1})
+    update = timeline_after(client, "set_leave_before_birth", {"weeks": 0})
+    questions = [n for n in update["timeline"]["notes"] if n["id"] == "loss"]
+    assert questions == []
+
+    returned: list[str] = []
+    model = scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "Przykro mi.", returned)
+    update = next(
+        e for e in ask(client, model, "Dziecko urodziło się martwe") if e["type"] == "timeline"
+    )
+    assert [s["id"] for s in update["timeline"]["segments"]] == ["maternity"]
+    assert update["timeline"]["segments"][0]["end"] == "2027-01-04"
+    assert "loss" in update["changed_notes"]
+    assert "Wywiad: wszystko ustalone." in returned[0]
+    assert "szpitalu" not in returned[0].split("Wywiad:")[1]
+
+    # A correction removes it again.
+    update = timeline_after(client, "set_child_loss", {"losses": []})
+    assert "parental" in [s["id"] for s in update["timeline"]["segments"]]
+
+
+def test_a_loss_needs_a_born_child(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
+    out = ask(client, scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "…"), "…")
+    assert {"type": "tool-result", "id": "call-1", "name": "set_child_loss", "ok": False} in out

@@ -108,11 +108,40 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
             (6, "II stopnia lub tytuł specjalisty", "lub chirurgii dziecięcej."),
         ],
     ),
-    # Section B, only the sentences about the parental leave both parents share (phase 2b).
+    # Phase 3: stillbirth or death of the child; two bullets of one point.
+    (
+        "A.3",
+        "Szczególna sytuacja: urodzenie martwego dziecka lub zgon dziecka",
+        [
+            (6, "W razie urodzenia martwego dziecka", "liczby dzieci pozostałych przy życiu."),
+            (6, "W przypadku zgonu dziecka po upływie 8 tygodni", "pozostałych przy życiu."),
+        ],
+    ),
+    # Section B "Zasiłek macierzyński dla mężczyzny (ojca dziecka)", pages 7-8.
+    (
+        "B",
+        "Zasiłek macierzyński dla ojca dziecka",
+        [(7, "Ojciec dziecka może korzystać", "nie korzysta z urlopu macierzyńskiego.")],
+    ),
+    (
+        "B.1",
+        "Przejęcie przez ojca części urlopu macierzyńskiego od matki dziecka",
+        [(7, "Podstawowa zasada – matka musi", "po zakończeniu urlopu matki.")],
+    ),
+    (
+        "B.2",
+        "Sytuacje szczególne – przejęcie urlopu macierzyńskiego wcześniej niż po 14 tygodniach",
+        [(7, "W sytuacjach określonych w Kodeksie pracy", "lub pozostałej części urlopu).")],
+    ),
     (
         "B.3",
-        "Urlop rodzicielski: część każdego z rodziców",
-        [(7, "Należy przy tym pamiętać", "dziecko skończy 6 lat.")],
+        "Zasiłek macierzyński za okres urlopu rodzicielskiego dla ojca",
+        [(7, "Rodzice z urlopu rodzicielskiego mogą", "dziecko skończy 6 lat.")],
+    ),
+    (
+        "B.4",
+        "Zasiłek macierzyński za okres urlopu ojcowskiego",
+        [(8, "Do urlopu ojcowskiego uprawniony jest", "prawo do tego urlopu wygasa.")],
     ),
     # Section C (phase 2d).
     (

@@ -1,7 +1,9 @@
 """Engine input (Scenario) and output (Timeline). The same models are the API schema.
 
-Phases covered: 1 "Przygotowanie do porodu" and 2 "Urodzenie dziecka" from guide section A
-(pages 5-6), with the Labour Code provisions behind them.
+Phases covered: section A of the guide (pages 5-6): 1 "Przygotowanie do porodu", 2 "Urodzenie
+dziecka" and 3 "Szczególna sytuacja" (stillbirth or death of the child); and section B (pages 7-8),
+the father: paternity leave, his part of parental leave, taking over maternity leave. With the
+Labour Code provisions behind them.
 """
 
 import datetime as dt
@@ -9,7 +11,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-Lane = Literal["mother", "child", "documents"]
+Lane = Literal["mother", "father", "child", "documents"]
 Tone = Literal["leave", "work", "option"]
 """leave = leave the mother takes, work = she keeps working, option = possible, not decided yet."""
 
@@ -31,6 +33,46 @@ class SourceRef(BaseModel):
     page_to: int | None = None
     """Set when the quote runs over a page break: it starts on `page` and ends on `page_to`."""
     article: str | None = None
+
+
+MotherEventKind = Literal["incapacity", "hospital", "death", "abandonment"]
+"""Guide section B, "Sytuacje szczególne": the mother has a certificate of inability to live
+independently, is in hospital, died, or abandoned the child."""
+
+
+class MotherEvent(BaseModel):
+    """A special situation in which the father takes over maternity leave early."""
+
+    kind: MotherEventKind
+    start: dt.date
+    """Incapacity: the day the father takes over; hospital: the first day in hospital; death,
+    abandonment: the day it happened."""
+    end: dt.date | None = None
+    """Hospital only: the last day in hospital; None = still there."""
+
+    @model_validator(mode="after")
+    def end_only_for_hospital(self) -> Self:
+        if self.end is not None and self.kind != "hospital":
+            raise ValueError("Datę końca podaje się tylko przy pobycie mamy w szpitalu.")
+        if self.end is not None and self.end < self.start:
+            raise ValueError("Pobyt w szpitalu nie może skończyć się przed jego początkiem.")
+        return self
+
+
+class ChildLoss(BaseModel):
+    """A child of this birth was stillborn or died."""
+
+    stillborn: bool = False
+    died_on: dt.date | None = None
+    """Date of death of a child born alive; None for a stillborn child."""
+
+    @model_validator(mode="after")
+    def date_matches_kind(self) -> Self:
+        if self.stillborn and self.died_on is not None:
+            raise ValueError("Przy martwym urodzeniu nie podaje się osobnej daty śmierci.")
+        if not self.stillborn and self.died_on is None:
+            raise ValueError("Potrzebna jest data śmierci dziecka.")
+        return self
 
 
 class HospitalStay(BaseModel):
@@ -61,6 +103,8 @@ class Scenario(BaseModel):
     earnings: Earnings | None = None
     mother_work: Work | None = None
     """How the mother works, asked when somebody else fills in. See `mothers_work`."""
+    father_work: Work | None = None
+    """How the father works, asked when somebody else fills in. See `fathers_work`."""
 
     # The child.
     child_born: bool | None = None
@@ -90,6 +134,19 @@ class Scenario(BaseModel):
     hospital_stays: list[HospitalStay] = []
     """Stays in hospital after the birth (of the child that stayed longest)."""
 
+    # Phase 3.
+    losses: list[ChildLoss] = []
+    """Children of this birth who were stillborn or died. Recorded only when the parent says so."""
+
+    # Section B: the father.
+    father_insured: bool | None = None
+    """Voluntary sickness insurance of a father on a contract or with his own business."""
+    father_takes_over: bool | None = None
+    """The mother leaves the rest of maternity leave to the father after at least 14 weeks."""
+    mother_weeks_before_takeover: int | None = Field(default=None, ge=1)
+    """Weeks after the birth the mother uses before the father takes over (default 14)."""
+    mother_event: MotherEvent | None = None
+
     @property
     def anchor_date(self) -> dt.date | None:
         """The date the timeline counts from: the actual birth once born, else the due date."""
@@ -99,6 +156,11 @@ class Scenario(BaseModel):
     def mothers_work(self) -> Work | None:
         """The mother's work: her own answer when she fills in, otherwise what was said of her."""
         return self.work if self.role == "mother" else self.mother_work
+
+    @property
+    def fathers_work(self) -> Work | None:
+        """The father's work: his own answer when he fills in, otherwise what was said of him."""
+        return self.work if self.role == "father" else self.father_work
 
 
 class Segment(BaseModel):

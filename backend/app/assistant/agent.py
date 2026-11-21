@@ -30,7 +30,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, HospitalStay, Work
+from app.engine.models import BirthWeek, ChildLoss, HospitalStay, Work
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -147,6 +147,7 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         birth_week=None,
         birth_weight_up_to_1000g=None,
         hospital_stays=[],
+        losses=[],
     )
     return await _apply(ctx, scenario, "due-date")
 
@@ -258,6 +259,24 @@ async def set_za_zyciem(ctx: RunContext[AssistantDeps], has_certificate: bool) -
         has_certificate: True if the child has the certificate.
     """
     return await _apply(ctx, _with(ctx, za_zyciem=has_certificate), "parental")
+
+
+@assistant.tool(sequential=True)
+async def set_child_loss(ctx: RunContext[AssistantDeps], losses: list[ChildLoss]) -> str:
+    """Record that a child of this birth was stillborn or died. Call it only when the user says
+    so; never ask about it. With several children born at once, one entry per child who died.
+
+    Args:
+        losses: One entry per child: {"stillborn": true} for a stillborn child, or
+            {"died_on": "YYYY-MM-DD"} for a child who died after being born alive.
+            An empty list corrects an earlier answer.
+    """
+    if not ctx.deps.scenario.child_born:
+        raise ModelRetry(
+            "Najpierw zapisz datę porodu (set_birth_date): zasady liczą się od dnia porodu."
+        )
+    scenario = _with(ctx, losses=[loss.model_dump() for loss in losses])
+    return await _apply(ctx, scenario, "maternity", "birth")
 
 
 @assistant.tool(sequential=True)

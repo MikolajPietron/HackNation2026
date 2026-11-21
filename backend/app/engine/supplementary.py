@@ -11,7 +11,9 @@ birth that depends on when the child was born and how much it weighed:
 Stays are added up and an incomplete week is rounded up (§ 3).
 
 Our reading, not settled by the materials (CLAUDE.md, open questions): days and weeks "after the
-birth" are counted from the day after the birth, so the n-th day is the date of birth plus n.
+birth" are counted with the day of birth as the first, as everywhere else in the app (the first
+day of maternity leave is the day of birth, 8 weeks of life are 56 days). So the n-th day after
+the birth is the date of birth + (n - 1) days, and the 8th week ends on the date of birth + 55.
 """
 
 import datetime as dt
@@ -38,7 +40,9 @@ class Supplementary:
     """Hospital days inside the window."""
     weeks: int
     ongoing: bool
-    """The child is still in hospital: counted until today, the number may still grow."""
+    """The child is still in hospital: counted until today."""
+    max_weeks: int
+    """The most it can become if a stay still under way lasts to the end of the window."""
     condition_met: bool
     """For a child born after the 37th week: the stay meets the 2-consecutive-days condition."""
     before_28th_week: bool = False
@@ -51,7 +55,7 @@ def supplementary_leave(
 ) -> Supplementary | None:
     """What the hospital stay gives, or None while the facts are not known."""
     week, light = scenario.birth_week, scenario.birth_weight_up_to_1000g
-    if not scenario.hospital_care or week is None or light is None:
+    if not scenario.hospital_care or week is None or light is None or not scenario.hospital_stays:
         return None
     s = params.supplementary
     case: Case
@@ -61,8 +65,8 @@ def supplementary_leave(
         case, limit, first_counted = "preterm", s.limit_weeks_preterm.value, 1
     else:
         case, limit, first_counted = "term", s.term.limit_weeks, s.term.counted_from_day
-    first_day = birth + first_counted * DAY
-    last_day = birth + limit * 7 * DAY
+    first_day = birth + (first_counted - 1) * DAY
+    last_day = birth + (limit * 7 - 1) * DAY
 
     stays = _merged(scenario, birth, today)
     days = sum(
@@ -77,14 +81,19 @@ def supplementary_leave(
         )
         if not condition_met:
             days = 0
+    weeks = -(-days // 7)
+    ongoing = any(stay.end is None for stay in scenario.hospital_stays)
+    # A stay still under way can add the days left in the window after today.
+    left = max(0, (last_day - max(today, first_day - DAY)).days) if ongoing else 0
     return Supplementary(
         case=case,
         limit_weeks=limit,
         first_day=first_day,
         last_day=last_day,
         days=days,
-        weeks=-(-days // 7),
-        ongoing=any(stay.end is None for stay in scenario.hospital_stays),
+        weeks=weeks,
+        ongoing=ongoing,
+        max_weeks=min(limit, -(-(days + left) // 7)) if condition_met else weeks,
         condition_met=condition_met,
         before_28th_week=week == "before-28",
         up_to_1000g=light,
@@ -128,9 +137,9 @@ def describe_case(leave: Supplementary, params: Params) -> str:
 def _meets_term_condition(start: dt.date, end: dt.date, birth: dt.date, params: Params) -> bool:
     """At least N consecutive days in hospital, the first of them within the given days."""
     term = params.supplementary.term
-    first = max(start, birth + term.first_day_from * DAY)
+    first = max(start, birth + (term.first_day_from - 1) * DAY)
     return (
-        first <= birth + term.first_day_to * DAY
+        first <= birth + (term.first_day_to - 1) * DAY
         and first + (term.min_consecutive_days - 1) * DAY <= end
     )
 

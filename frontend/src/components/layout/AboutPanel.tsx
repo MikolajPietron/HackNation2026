@@ -51,6 +51,12 @@ function answerRows(scenario: Scenario): [string, string][] {
           : 'więcej niż 1000 g',
     ],
     [
+      'Dzieci, które zmarły',
+      scenario.losses
+        .map((loss) => (loss.stillborn ? 'urodziło się martwe' : `zmarło ${formatLongDate(loss.died_on ?? '')}`))
+        .join('; ') || null,
+    ],
+    [
       'Pobyt w szpitalu',
       scenario.hospital_stays
         .map((stay) => `${formatLongDate(stay.start)} – ${stay.end ? formatLongDate(stay.end) : 'nadal'}`)

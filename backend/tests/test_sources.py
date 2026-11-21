@@ -59,6 +59,16 @@ def test_labour_code_provisions() -> None:
         "art. 180 § 1",
         "art. 180 § 2",
         "art. 180 § 3",
+        "art. 180 § 4",
+        "art. 180 § 5",
+        "art. 180 § 6",
+        "art. 180 § 10",
+        "art. 180 § 11",
+        "art. 180 § 12",
+        "art. 180 § 13",
+        "art. 180 § 14",
+        "art. 180¹ § 1",
+        "art. 180¹ § 2",
         "art. 180² § 1",
         "art. 180² § 2",
         "art. 180² § 3",
@@ -67,8 +77,12 @@ def test_labour_code_provisions() -> None:
         "art. 182¹ᵃ § 2",
         "art. 182¹ᵃ § 3",
         "art. 182¹ᵃ § 4",
+        "art. 182¹ᵃ § 6",
         "art. 182¹ᶜ",
         "art. 182¹ᵍ",
+        "art. 182³ § 1",
+        "art. 182³ § 1¹",
+        "art. 182³ § 3",
         "art. 183¹ § 1",
         "art. 183¹ § 2",
     }
@@ -130,6 +144,23 @@ def scenarios() -> list[dict[str, Any]]:
         | {"hospital_stays": [{"start": "2026-10-01", "end": "2026-10-03"}]},
         {**born, "children_count": 1, "birth_week": "28-37", "birth_weight_up_to_1000g": False},
     ]
+    # Stillbirth or death: early, late, during parental leave, twins, after leave before birth.
+    lost = {**base, "child_born": True, "role": "mother", "work": "employment"}
+    for birth, losses, children, weeks in [
+        ("2026-11-10", [{"stillborn": True}], 1, 0),
+        ("2026-11-10", [{"stillborn": True}], 1, 6),
+        ("2026-09-20", [{"died_on": "2026-11-13"}], 1, 0),
+        ("2026-07-01", [{"died_on": "2026-10-01"}], 1, None),
+        ("2026-01-05", [{"died_on": "2026-08-01"}], 1, 0),
+        ("2026-11-10", [{"stillborn": True}], 2, 0),
+        ("2026-01-01", [{"died_on": "2026-06-01"}], 2, 0),
+        ("2026-11-10", [{"stillborn": True}, {"stillborn": True}], 2, 0),
+    ]:
+        cases.append(
+            lost
+            | {"birth_date": birth, "losses": losses, "children_count": children}
+            | {"leave_before_birth_weeks": weeks}
+        )
     return cases
 
 

@@ -109,6 +109,8 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return args.has_certificate
         ? 'Zaświadczenie „Za życiem”: jest'
         : 'Zaświadczenie „Za życiem”: brak'
+    case 'set_child_loss':
+      return 'Uwzględniam to na osi czasu'
     case 'set_hospital_care':
       return args.applies ? 'Wcześniak albo pobyt w szpitalu' : 'Bez pobytu w szpitalu'
     case 'explain_timeline_element':

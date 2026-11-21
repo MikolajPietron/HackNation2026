@@ -1,5 +1,6 @@
 // Mirrors backend/app/engine/models.py and the /api/chat event protocol. Keep in sync.
-// Phases 1 and 2: guide section A, "Przygotowanie do porodu" and "Urodzenie dziecka" (pages 5-6).
+// Phases 1-3: guide section A, "Przygotowanie do porodu", "Urodzenie dziecka" and the stillbirth
+// or death of the child (pages 5-6).
 
 export type Lane = 'mother' | 'child' | 'documents'
 /** leave = leave the mother takes, work = she keeps working, option = possible, not decided. */
@@ -20,6 +21,12 @@ export interface SourceRef {
   /** Set when the quote runs over a page break. */
   page_to: number | null
   article: string | null
+}
+
+/** A child of this birth who was stillborn (no date) or died on `died_on`. */
+export interface ChildLoss {
+  stillborn: boolean
+  died_on: string | null
 }
 
 /** One stay of the child in hospital after the birth; no `end` = still there. */
@@ -50,6 +57,8 @@ export interface Scenario {
   birth_week: BirthWeek | null
   birth_weight_up_to_1000g: boolean | null
   hospital_stays: HospitalStay[]
+  /** Recorded only when the parent says so. */
+  losses: ChildLoss[]
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
