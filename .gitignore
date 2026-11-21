@@ -1,0 +1,24 @@
+# Dokumenty od ZUS (przykładowe sprawy i materiały) – poufne, tylko na użytek HackNation.
+# Nie wolno ich kopiować ani rozpowszechniać, więc nigdy nie trafiają do repo.
+docs/dokumentyZUS/
+
+# Sekrety
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# System i edytory
+.DS_Store
+.idea/

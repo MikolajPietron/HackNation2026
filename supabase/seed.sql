@@ -1,0 +1,2 @@
+-- Dane startowe dla lokalnej bazy (supabase db reset).
+-- Uwaga: nie wklejaj tu danych ze spraw ZUS – są poufne.
