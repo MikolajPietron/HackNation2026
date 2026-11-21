@@ -89,6 +89,28 @@ class HospitalStay(BaseModel):
         return self
 
 
+JobLossReason = Literal["bankruptcy", "liquidation", "employer-death", "unlawful", "other"]
+"""Why the mother's work ended in pregnancy. The guide (page 4) names the employer's bankruptcy,
+liquidation or death, and a termination that broke the law; "other" is any other end of work
+(e.g. a contract that ended, a business closed), guide section H, risk 3."""
+
+
+class JobLoss(BaseModel):
+    """The mother's work ended in pregnancy. Recorded only when the parent says so."""
+
+    ended_on: dt.date
+    """The last day of the employment (or of the contract or business)."""
+    reason: JobLossReason
+    court_confirmed: bool | None = None
+    """Unlawful termination only: a final court judgment confirmed it. None = not known."""
+
+    @model_validator(mode="after")
+    def court_only_for_unlawful(self) -> Self:
+        if self.court_confirmed is not None and self.reason != "unlawful":
+            raise ValueError("Wyrok sądu dotyczy tylko rozwiązania umowy z naruszeniem prawa.")
+        return self
+
+
 class ScenarioError(ValueError):
     """The scenario breaks a rule. Polish message, shown to the parent or the assistant."""
 
@@ -163,6 +185,21 @@ class Scenario(BaseModel):
     asked yet. Not asked for a business: the mother files ZAM straight with ZUS."""
     father_payer_size: PayerSize | None = None
     """The same for the father's employer (or principal)."""
+    # Pregnancy (guide: sickness benefit, job loss, risks)
+    sick_leave: bool | None = None
+    """The mother is (or was) on sick leave in this pregnancy. None = not asked."""
+    sick_leave_start: dt.date | None = None
+    sick_leave_end: dt.date | None = None
+    """The last day of the sick leave; None = until the birth."""
+    insured_since: dt.date | None = None
+    """The first day of the mother's uninterrupted sickness insurance (the 30 or 90 days)."""
+    insured_in_pregnancy: bool | None = None
+    """Her contract or business began during this pregnancy (guide section H, risk 1)."""
+    mother_over_50: bool | None = None
+    """An employed mother turned 50 before the calendar year of the sick leave."""
+    contribution_base_raised: bool | None = None
+    """She raised the base of her contributions in pregnancy (section H, risk 2)."""
+    job_loss: JobLoss | None = None
 
     @property
     def anchor_date(self) -> dt.date | None:

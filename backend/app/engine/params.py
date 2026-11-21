@@ -124,6 +124,37 @@ class FatherParams(BaseModel):
     total_cap: Rule
 
 
+class PregnancyParams(BaseModel):
+    """The sickness benefit in pregnancy, the benefit after losing a job in pregnancy and the
+    risks to the right to benefits (guide pages 2-4 and section H, pages 9-10; KP art. 92)."""
+
+    sick_benefit: Rule
+    e_zla: Rule
+    insured_needed: Rule
+    waiting_days_obligatory: Param[int]
+    """The right arises after this many days of uninterrupted obligatory insurance."""
+    waiting_days_voluntary: Param[int]
+    employer_days: Param[int]
+    """Days of incapacity in a calendar year paid by the employer (wynagrodzenie chorobowe)."""
+    employer_days_from_50: Param[int]
+    """The same, after the calendar year in which the employee turned 50."""
+    employer_pay_in_pregnancy: Rule
+    benefit_after_employer: Rule
+    no_pay_without_right: Rule
+    non_employee_from_day_one: Rule
+    rate_percent: Param[int]
+    period: Rule
+    max_days: Param[int]
+    """The benefit period (okres zasiłkowy)."""
+    until_birth: Rule
+    job_loss_benefit: Rule
+    job_loss_employer_gone: Rule
+    job_loss_unlawful: Rule
+    job_loss_rate_percent: Param[int]
+    risk_sham: Rule
+    risk_base_raised: Rule
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -173,6 +204,7 @@ class Params(BaseModel):
     parental: ParentalParams
     loss: LossParams
     father: FatherParams
+    pregnancy: PregnancyParams
     rules: Rules
     applications: ApplicationParams
 

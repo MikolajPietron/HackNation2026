@@ -540,6 +540,12 @@ MOTHER_PAYER_HERSELF = f"Czy Twój pracodawca{PAYER}"
 FATHER_PAYER_CONTRACT = f"Czy płatnik składek z Twojej umowy zlecenia (zleceniodawca){PAYER}"
 
 
+SICK_LEAVE = (
+    "Czy w tej ciąży jesteś albo byłaś na zwolnieniu lekarskim? Jeśli tak, od kiedy i do kiedy "
+    "(albo że do porodu)?"
+)
+
+
 def interview(returned: str) -> str:
     """The interview part of a tool result: it comes last, after the timeline."""
     return returned.split("\n\n")[-1]
@@ -582,7 +588,9 @@ def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
 
     returned.clear()
     ask(client, scripted("set_leave_before_birth", {"weeks": 0}, "Zapisane.", returned), "Nie")
+    # The father next; the mother's sick leave in pregnancy comes next, who pays last.
     assert interview(returned[0]).startswith(next_question(FATHER_WORK, "`set_father_work`"))
+    assert f"Potem: „{SICK_LEAVE}” (narzędzie `set_sick_leave`)." in interview(returned[0])
 
     returned.clear()
     model = scripted("set_father_work", {"work": "contract"}, "Zlecenie.", returned)
@@ -598,9 +606,9 @@ def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
     model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
     update = next(e for e in ask(client, model, "Tak, płaci") if e["type"] == "timeline")
     assert update["scenario"]["father_insured"] is True
-    assert interview(returned[0]).startswith(
-        next_question(MOTHER_PAYER_HERSELF, '`set_payer_size` (parent: "mother")')
-    )
+    # Sick leave in pregnancy first, then who pays.
+    assert interview(returned[0]).startswith(next_question(SICK_LEAVE, "`set_sick_leave`"))
+    assert '`set_payer_size` (parent: "mother")' in interview(returned[0])
 
     # A new job: the voluntary insurance no longer applies.
     update = timeline_after(client, "set_father_work", {"work": "employment"})
@@ -850,6 +858,7 @@ def test_who_pays_is_asked_last_and_recorded(client: TestClient, store: MemorySe
             "due_date": "2027-03-15",
             "children_count": 1,
             "leave_before_birth_weeks": 0,
+            "sick_leave": False,
         },
     )
     assert next_question(MOTHER_PAYER_HERSELF, '`set_payer_size` (parent: "mother")') in (
@@ -905,3 +914,78 @@ def test_the_ui_gets_the_payer_question(client: TestClient, store: MemorySession
     )
     restored = client.get(f"/api/session/{SESSION}").json()
     assert restored["question"] == {"key": "father-payer", "text": FATHER_PAYER_CONTRACT}
+
+
+# Pregnancy (guide pages 2-4 and section H).
+
+EXPECTING_MOTHER = {**ONBOARDING, "role": "mother", "children_count": 1}
+
+
+def test_sick_leave_in_pregnancy_from_the_chat(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=EXPECTING_MOTHER)
+    update = timeline_after(
+        client, "set_sick_leave", {"on_sick_leave": True, "start": "2026-11-02"}
+    )
+    assert update["scenario"]["sick_leave_start"] == "2026-11-02"
+    assert update["focus"] == "sick-pay"
+    segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
+    # 33 days from 02.11.2026 end on 04.12.2026, then the benefit to the end of the year; in the
+    # new year the employer pays again for 33 days (01.01-02.02.2027), then the benefit until
+    # the day before the due date (15.03.2027).
+    assert segments["sick-pay"] == ("2026-11-02", "2026-12-04")
+    assert segments["sick-benefit"] == ("2026-12-05", "2026-12-31")
+    assert segments["sick-pay-2"] == ("2027-01-01", "2027-02-02")
+    assert segments["sick-benefit-2"] == ("2027-02-03", "2027-03-14")
+    # The mother's own questions come first; since when she is insured is asked at the end.
+    assert update["question"]["key"] == "leave-before-birth"
+
+    update = timeline_after(client, "set_insured_since", {"since": "2026-10-20"})
+    # 30 days of insurance from 20.10.2026: the right from 19.11.2026, and 33 days from it end
+    # on 21.12.2026.
+    assert update["scenario"]["insured_since"] == "2026-10-20"
+    segments = {s["id"]: (s["start"], s["end"]) for s in update["timeline"]["segments"]}
+    assert segments["sick-pay"] == ("2026-11-19", "2026-12-21")
+    assert update["focus"] == "sick-benefit-right"
+
+
+def test_sick_leave_needs_its_first_day(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=EXPECTING_MOTHER)
+    out = ask(client, scripted("set_sick_leave", {"on_sick_leave": True}, "…"), "Jestem na L4")
+    assert {"type": "tool-result", "id": "call-1", "name": "set_sick_leave", "ok": False} in out
+
+
+def test_job_loss_is_recorded_when_the_user_says_so(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json=EXPECTING_MOTHER)
+    loss = {"ended_on": "2026-11-30", "reason": "employer-death"}
+    update = timeline_after(client, "set_job_loss", {"job_loss": loss})
+    assert update["scenario"]["job_loss"]["reason"] == "employer-death"
+    assert update["focus"] == "job-loss-benefit"
+    job = next(s for s in update["timeline"]["segments"] if s["id"] == "job-loss-benefit")
+    assert (job["start"], job["end"]) == ("2026-12-01", "2027-03-14")
+
+    update = timeline_after(client, "set_job_loss", {"job_loss": None})
+    assert update["scenario"]["job_loss"] is None
+
+
+def test_employer_reasons_need_an_employment_contract(client: TestClient) -> None:
+    client.put(f"/api/session/{SESSION}/onboarding", json={**EXPECTING_MOTHER, "work": "contract"})
+    loss = {"ended_on": "2026-11-30", "reason": "bankruptcy"}
+    out = ask(client, scripted("set_job_loss", {"job_loss": loss}, "…"), "Firma upadła")
+    assert {"type": "tool-result", "id": "call-1", "name": "set_job_loss", "ok": False} in out
+
+
+def test_pregnancy_is_in_scope() -> None:
+    scope = STATIC_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
+    assert "Ciąża: zwolnienie lekarskie w ciąży" in scope
+    out_of_scope = next(
+        line for line in STATIC_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
+    )
+    assert "zasiłek chorobowy" not in out_of_scope
+    for tool in (
+        "set_sick_leave",
+        "set_insured_since",
+        "set_mother_over_50",
+        "set_job_loss",
+        "set_contribution_base_raised",
+    ):
+        assert f"`{tool}`" in STATIC_INSTRUCTIONS

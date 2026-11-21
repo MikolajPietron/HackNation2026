@@ -16,6 +16,7 @@ from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
+from app.engine.pregnancy import pregnancy_notes
 from app.engine.supplementary import describe_case, supplementary_leave
 from app.engine.wording import children_phrase, long_date, multiples, weeks_or_days
 
@@ -31,6 +32,7 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
     notes = [
         _situation(scenario, timeline, params, cover),
         _insurance(scenario, timeline, params, cover),
+        *pregnancy_notes(scenario, timeline, params),
     ]
     if cover in NOT_INSURED:
         return [

@@ -58,6 +58,8 @@ export function segmentIcon(segment: Segment): string {
   const id = segment.id
   if (segment.tone === 'work' || id.startsWith('work')) return etat
   if (id === 'prenatal-window' || id === 'maternity-prenatal') return odpoczynek
+  if (id.startsWith('sick-')) return zaswiadczenie
+  if (id === 'job-loss-benefit') return parasol
   if (id.includes('paternity')) return tataZDzieckiem
   if (id.includes('parental')) return wozek
   if (id.includes('supplementary') || id.includes('premature')) return inkubator

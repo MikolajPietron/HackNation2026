@@ -58,6 +58,7 @@ from app.engine.parental import (
     parental_table,
     parental_weeks,
 )
+from app.engine.pregnancy import pregnancy_rules
 from app.engine.supplementary import describe_case, supplementary_leave
 from app.engine.wording import children_phrase, fmt, weeks_or_days
 
@@ -110,6 +111,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     # father's lane, also when the mother herself has no benefit periods.
     father_rules(draft, scenario, params, birth, today, cover, loss)
     _for_non_employee(draft, scenario, params, cover)
+    # Pregnancy (guide pages 2-4, section H): sick leave and the benefit after losing the job.
+    pregnancy = pregnancy_rules(draft, scenario, params, birth)
     draft.markers.sort(key=lambda m: m.date)
 
     if not born and birth < today:
@@ -128,7 +131,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         markers=draft.markers,
         documents=draft.documents,
         warnings=draft.warnings,
-        assumptions=_assumptions(scenario, params, born, cover, loss, draft),
+        assumptions=_assumptions(scenario, params, born, cover, loss, draft) + pregnancy,
     )
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)

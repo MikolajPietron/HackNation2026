@@ -98,6 +98,37 @@ export interface Scenario {
   /** The mother's employer (principal): more than 20 insured or not; not asked for a business. */
   mother_payer_size: PayerSize | null
   father_payer_size: PayerSize | null
+  // Pregnancy (guide: sickness benefit, job loss, risks)
+  /** The mother is (or was) on sick leave in this pregnancy. */
+  sick_leave: boolean | null
+  sick_leave_start: string | null
+  /** The last day of the sick leave; null = until the birth. */
+  sick_leave_end: string | null
+  /** The first day of the mother's uninterrupted sickness insurance (the 30 or 90 days). */
+  insured_since: string | null
+  /** Her contract or business began during this pregnancy (guide section H, risk 1). */
+  insured_in_pregnancy: boolean | null
+  /** An employed mother turned 50 before the calendar year of the sick leave. */
+  mother_over_50: boolean | null
+  /** She raised the base of her contributions in pregnancy (section H, risk 2). */
+  contribution_base_raised: boolean | null
+  /** Recorded only when the parent says so. */
+  job_loss: JobLoss | null
+}
+
+/**
+ * Why the mother's work ended in pregnancy: the employer's bankruptcy, liquidation or death, a
+ * termination that broke the law (guide p. 4), or any other end of work (section H, risk 3).
+ */
+export type JobLossReason = 'bankruptcy' | 'liquidation' | 'employer-death' | 'unlawful' | 'other'
+
+/** The mother's work ended in pregnancy. */
+export interface JobLoss {
+  /** The last day of the employment (or of the contract or business). */
+  ended_on: string
+  reason: JobLossReason
+  /** Unlawful termination only: a final court judgment confirmed it. */
+  court_confirmed: boolean | null
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
