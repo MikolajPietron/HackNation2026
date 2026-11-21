@@ -8,7 +8,7 @@ explains it. The model never computes dates.
 
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
@@ -32,6 +32,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
+from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
@@ -474,3 +475,62 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
     return describe_element(element)
+
+
+# Section G: the amounts.
+
+MIN_MONTHLY_PAY = 100
+"""Below this a monthly amount in PLN is almost surely a slip ("8" for 8000)."""
+
+
+@assistant.tool(sequential=True)
+async def set_monthly_pay(
+    ctx: RunContext[AssistantDeps],
+    parent: Literal["mother", "father"],
+    amount: Annotated[float, Field(gt=0)] | None,
+) -> str:
+    """Record the monthly amount a parent's benefit base comes from; the calculator turns it
+    into the benefit for every period. Only an exact amount the user gave: never the range from
+    the onboarding, never your own estimate.
+
+    Args:
+        parent: Whose amount it is.
+        amount: In PLN per month, as the user gave it ("8 tys." = 8000). An employee: gross
+            monthly salary (the average of the last 12 months, if it changed). A contract of
+            mandate or a business: the monthly base of the sickness contribution. Null = the
+            user does not know it or does not want to give it.
+    """
+    scenario = ctx.deps.scenario
+    work = scenario.mothers_work if parent == "mother" else scenario.fathers_work
+    cover = coverage(scenario) if parent == "mother" else father_coverage(scenario)
+    who = "mama" if parent == "mother" else "tata"
+    if work not in ("employment", "contract", "business") or cover in NOT_INSURED:
+        raise ModelRetry(
+            f"Kwotę zasiłku liczymy tylko, gdy {who} pracuje i podlega ubezpieczeniu "
+            "chorobowemu. Najpierw ustal, jak pracuje."
+        )
+    if amount is not None and amount < MIN_MONTHLY_PAY:
+        raise ModelRetry(
+            "To bardzo mała kwota miesięczna. Zapisz ją w złotych (np. 8000, a nie 8) albo "
+            "dopytaj użytkownika."
+        )
+    field = "mother_pay" if parent == "mother" else "father_pay"
+    updated = _with(ctx, **{field: "unknown" if amount is None else amount})
+    first = "pay-maternity" if parent == "mother" else "pay-paternity"
+    return await _apply(ctx, updated, first, "pay-parental", "pay-parental-father")
+
+
+@assistant.tool(sequential=True)
+async def set_rate_choice(ctx: RunContext[AssistantDeps], rate_815: bool | None) -> str:
+    """Record the mother's choice of the benefit rate: the written request, filed not later than
+    21 days after the birth, for 81,5% for the whole of maternity and parental leave (True), or
+    100% for maternity and 70% for parental leave (False). Only what the user said.
+
+    Args:
+        rate_815: True = she files (or filed) the request for 81,5%; False = 100% and 70%;
+            null = not decided (a correction).
+    """
+    if coverage(ctx.deps.scenario) in NOT_INSURED:
+        raise ModelRetry("Mama nie podlega ubezpieczeniu chorobowemu, więc nie ma czego wybierać.")
+    scenario = _with(ctx, rate_815=rate_815)
+    return await _apply(ctx, scenario, "rate-815-deadline", "pay-maternity", "pay-parental")

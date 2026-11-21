@@ -3,11 +3,12 @@
 Phases covered: section A of the guide (pages 5-6): 1 "Przygotowanie do porodu", 2 "Urodzenie
 dziecka" and 3 "Szczególna sytuacja" (stillbirth or death of the child); and section B (pages 7-8),
 the father: paternity leave, his part of parental leave, taking over maternity leave. With the
-Labour Code provisions behind them.
+Labour Code provisions behind them. Section G (page 9), the amount of the benefit, with the
+ustawa zasiłkowa behind it: `Payment`.
 """
 
 import datetime as dt
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -24,9 +25,10 @@ BirthWeek = Literal["before-28", "28-37", "after-37"]
 
 
 class SourceRef(BaseModel):
-    """A literal quote: from the guide (section and pages) or from the Labour Code (article)."""
+    """A literal quote: from the guide (section and pages), from the Labour Code ("kp") or from
+    the ustawa zasiłkowa ("ustawa"; both: article)."""
 
-    doc: Literal["przewodnik", "kp"]
+    doc: Literal["przewodnik", "kp", "ustawa"]
     quote: str
     section: str | None = None
     page: int | None = None
@@ -87,6 +89,10 @@ class HospitalStay(BaseModel):
         if self.end is not None and self.end < self.start:
             raise ValueError("Pobyt w szpitalu nie może skończyć się przed jego początkiem.")
         return self
+
+
+Pay = Annotated[float, Field(gt=0)]
+"""A monthly amount in PLN."""
 
 
 class ScenarioError(ValueError):
@@ -151,6 +157,18 @@ class Scenario(BaseModel):
     """Weeks after the birth the mother uses before the father takes over (default 14)."""
     mother_event: MotherEvent | None = None
 
+    # Amounts (guide section G).
+    mother_pay: Pay | Literal["unknown"] | None = None
+    """The mother's monthly amount the benefit base comes from, in PLN, as she gave it: gross
+    salary for an employee, the base of the sickness contribution on a contract or with a
+    business; the average of the last 12 months. "unknown" = she did not give it (no amounts).
+    Never taken from the onboarding range (`earnings`)."""
+    father_pay: Pay | Literal["unknown"] | None = None
+    """The same for the father."""
+    rate_815: bool | None = None
+    """The mother files (or filed) the written request for 81,5% within 21 days after the
+    birth: True = 81,5% for maternity and parental leave, False = 100% and 70%."""
+
     @property
     def anchor_date(self) -> dt.date | None:
         """The date the timeline counts from: the actual birth once born, else the due date."""
@@ -214,7 +232,37 @@ class Document(BaseModel):
     sources: list[SourceRef]
 
 
-TimelineElement = Segment | Marker | Document
+class Payment(BaseModel):
+    """The maternity benefit for one period on the timeline (guide section G): the "Pieniądze"
+    lane. Amounts in PLN, rounded to grosze. `segment_id` is the period it pays for; dates and
+    days are that period's."""
+
+    id: str
+    """"pay-" + `segment_id`."""
+    segment_id: str
+    lane: Literal["mother", "father"]
+    """Whose benefit: the parent on that period's lane."""
+    title: str
+    start: dt.date
+    end: dt.date
+    days: int
+    rate: float
+    """Percent of the benefit base: 100, 70 or 81.5."""
+    base: float
+    """Monthly benefit base (podstawa wymiaru zasiłku)."""
+    monthly: float
+    """`base` × `rate`: the benefit for a whole month."""
+    daily: float
+    """One thirtieth of the monthly benefit."""
+    total: float
+    """`daily` × `days`: the benefit for the whole period."""
+    summary: str
+    details: list[str] = []
+    """The calculation, step by step."""
+    sources: list[SourceRef]
+
+
+TimelineElement = Segment | Marker | Document | Payment
 
 NoteKind = Literal["situation", "right", "risk", "choice", "relief", "computed"]
 """situation = which case this is, right = what the mother is entitled to and why, risk = what
@@ -246,9 +294,11 @@ class Timeline(BaseModel):
     """The case explanation: situation, options and reliefs, what we computed."""
     warnings: list[str] = []
     assumptions: list[str] = []
+    payments: list[Payment] = []
+    """Section G: the benefit for each period, once the parent's monthly amount is known."""
 
     def elements(self) -> list[TimelineElement]:
-        return [*self.segments, *self.markers, *self.documents]
+        return [*self.segments, *self.markers, *self.documents, *self.payments]
 
     def element(self, element_id: str) -> TimelineElement | None:
         return next((e for e in self.elements() if e.id == element_id), None)

@@ -4,8 +4,9 @@
 import { Fragment } from 'react'
 import { cn } from '@/lib/utils'
 
+// Amounts come grouped by thousands ("6 903,20 zł"): the whole amount is one fact.
 const FACT =
-  /(\d{1,2}\.\d{2}\.\d{4}|\d{1,2} (?:stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|września|października|listopada|grudnia)(?: \d{4})?|\d+(?:[.,]\d+)?\s?(?:tyg\.|tygodni|tygodnie|tydzień|dni|dzień|miesięcy|miesiące|%|zł))/g
+  /(\d{1,2}\.\d{2}\.\d{4}|\d{1,2} (?:stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|września|października|listopada|grudnia)(?: \d{4})?|\d{1,3}(?: \d{3})+(?:,\d+)? zł|\d+(?:[.,]\d+)?\s?(?:tyg\.|tygodni|tygodnie|tydzień|dni|dzień|miesięcy|miesiące|%|zł))/g
 
 export function Emphasis({ text, className }: { text: string; className?: string }) {
   const clean = text.replace(/\.\.(?=\s|$)/g, '.')

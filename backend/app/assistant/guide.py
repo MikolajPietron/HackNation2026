@@ -166,6 +166,36 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
             )
         ],
     ),
+    # Section G "Wysokość zasiłku macierzyńskiego" (page 9): the amounts, three bullets.
+    (
+        "G.1",
+        "Wysokość zasiłku macierzyńskiego: 100% podstawy",
+        [
+            (
+                9,
+                "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu "
+                "macierzyńskiego",
+                "100% podstawy wymiaru zasiłku.",
+            )
+        ],
+    ),
+    (
+        "G.2",
+        "Wysokość zasiłku macierzyńskiego: 70% podstawy za urlop rodzicielski",
+        [
+            (
+                9,
+                "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu "
+                "rodzicielskiego",
+                "70% podstawy wymiaru zasiłku.",
+            )
+        ],
+    ),
+    (
+        "G.3",
+        "Wysokość zasiłku macierzyńskiego: 81,5% podstawy na wniosek złożony po porodzie",
+        [(9, "Jeżeli ubezpieczona-matka", "81,5% podstawy wymiaru zasiłku.")],
+    ),
 ]
 
 

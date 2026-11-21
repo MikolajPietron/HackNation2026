@@ -42,12 +42,14 @@ from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
     Document,
     Marker,
+    Payment,
     Scenario,
     ScenarioError,
     Segment,
     Timeline,
     TimelineElement,
 )
+from app.engine.money import money_assumptions, money_rules
 from app.engine.params import Params
 from app.engine.parental import (
     deadline_marker,
@@ -109,6 +111,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     # father's lane, also when the mother herself has no benefit periods.
     father_rules(draft, scenario, params, birth, today, cover, loss)
     _for_non_employee(draft, scenario, params, cover)
+    # Section G, last: the amount for every period both parents' rules left on the timeline.
+    money_rules(draft, scenario, params, birth, cover, loss)
     draft.markers.sort(key=lambda m: m.date)
 
     if not born and birth < today:
@@ -128,7 +132,9 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         documents=draft.documents,
         warnings=draft.warnings,
         assumptions=_assumptions(scenario, params, born, cover, loss, draft),
+        payments=draft.payments,
     )
+    timeline.assumptions += money_assumptions(scenario, timeline, params)
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
 
@@ -175,6 +181,8 @@ def _signature(e: TimelineElement) -> tuple[object, ...]:
             return ("marker", e.date, e.title)
         case Document():
             return ("document", e.needed_by, e.title, e.done)
+        case Payment():
+            return ("payment", e.start, e.end, e.rate, e.total)
 
 
 def _before_birth_plan(draft: Draft, scenario: Scenario, params: Params, due: dt.date) -> None:
@@ -771,9 +779,9 @@ def _assumptions(
     draft: Draft,
 ) -> list[str]:
     assumptions = [
-        "Pokazujemy to, co wynika z części A i B Przewodnika ZUS: zasiłek macierzyński mamy "
-        "i uprawnienia taty. Kolejne części (kwoty zasiłku, wnioski i terminy, łączenie urlopu "
-        "z pracą, adopcja) dodajemy krok po kroku."
+        "Pokazujemy to, co wynika z części A, B i G Przewodnika ZUS: zasiłek macierzyński mamy, "
+        "uprawnienia taty i wysokość zasiłku. Kolejne części (wnioski i terminy, łączenie "
+        "urlopu z pracą, adopcja) dodajemy krok po kroku."
     ]
     mother = cover not in NOT_INSURED
     father = father_coverage(scenario)

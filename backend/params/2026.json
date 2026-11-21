@@ -810,5 +810,170 @@
         }
       ]
     }
+  },
+  "money": {
+    "rate_full": {
+      "value": 100,
+      "note": "Urlop macierzyński, uzupełniający i ojcowski (oraz urlop na warunkach urlopu macierzyńskiego).",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "G.1",
+          "page": 9,
+          "quote": "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego, okres urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego oraz okres urlopu ojcowskiego wynosi 100% podstawy wymiaru zasiłku."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 1",
+          "quote": "Miesięczny zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego, okres urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego oraz okres urlopu ojcowskiego wynosi 100% podstawy wymiaru zasiłku."
+        }
+      ]
+    },
+    "rate_parental": {
+      "value": 70,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "G.2",
+          "page": 9,
+          "quote": "Zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego wynosi 70% podstawy wymiaru zasiłku."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 2",
+          "quote": "Miesięczny zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego wynosi 70% podstawy wymiaru zasiłku."
+        }
+      ]
+    },
+    "rate_single": {
+      "value": 81.5,
+      "note": "Na pisemny wniosek mamy złożony najpóźniej 21 dni po porodzie: za cały urlop macierzyński i rodzicielski, poza częścią rodzicielskiego drugiego rodzica.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "G.3",
+          "page": 9,
+          "quote": "miesięczny zasiłek macierzyński za cały okres odpowiadający okresowi urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego oraz urlopu rodzicielskiego wynosi 81,5% podstawy wymiaru zasiłku."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 3",
+          "quote": "W przypadku wniosku, o którym mowa w art. 30a, miesięczny zasiłek macierzyński za cały okres odpowiadający okresowi urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego oraz urlopu rodzicielskiego wynosi 81,5% podstawy wymiaru zasiłku, z zastrzeżeniem ust. 3f i 3g."
+        }
+      ]
+    },
+    "request_days": {
+      "value": 21,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "G.3",
+          "page": 9,
+          "quote": "Jeżeli ubezpieczona-matka, niepóźnej niż 21 dni po porodzie, złoży pisemny wniosek o wypłacenie jej zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 30a ust. 1",
+          "quote": "Ubezpieczona - matka dziecka, nie później niż 21 dni po porodzie, może złożyć pisemny wniosek o wypłacenie jej zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze, z wyłączeniem okresu, o którym mowa w art. 182¹ᵃ § 4 Kodeksu pracy, przysługującego ojcu dziecka."
+        }
+      ]
+    },
+    "other_parent_parental": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 3f",
+          "quote": "Zasiłek macierzyński za okres odpowiadający okresowi urlopu rodzicielskiego w części przysługującej drugiemu rodzicowi dziecka, o której mowa w art. 182¹ᵃ § 4 Kodeksu pracy, wynosi 70% podstawy wymiaru zasiłku."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵃ § 4",
+          "quote": "Każdemu z pracowników - rodziców dziecka przysługuje wyłączne prawo do 9 tygodni urlopu rodzicielskiego z wymiaru urlopu określonego w § 1 i 2."
+        }
+      ]
+    },
+    "first_year": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 3g",
+          "quote": "W przypadku niewykorzystania ani jednego dnia zasiłku macierzyńskiego za okres urlopu rodzicielskiego w pierwszym roku życia dziecka zasiłek macierzyński za okres urlopu rodzicielskiego przysługuje w wysokości 70% podstawy wymiaru zasiłku."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 4",
+          "quote": "W przypadku niewykorzystania w pierwszym roku życia dziecka ani jednego dnia zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego w wysokości, o której mowa w art. 31 ust. 3, przysługuje jednorazowe wyrównanie pobranego zasiłku macierzyńskiego za okres urlopu macierzyńskiego do wysokości 100% podstawy wymiaru zasiłku. Jednorazowe wyrównanie zasiłku macierzyńskiego następuje na wniosek ubezpieczonego."
+        }
+      ]
+    },
+    "contributions_percent": {
+      "value": 13.71,
+      "note": "Pracownik: ustawa odlicza potrącone składki na ubezpieczenia emerytalne, rentowe i chorobowe (art. 3 pkt 3), ale ich stawki nie podaje; łączne 13,71% sprawdziliśmy z Załącznikiem ZUS. Osoba niebędąca pracownikiem: 13,71% podaje ustawa (art. 3 pkt 4).",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 3 pkt 3",
+          "quote": "wynagrodzenie - przychód pracownika stanowiący podstawę wymiaru składek na ubezpieczenie chorobowe, po odliczeniu potrąconych przez pracodawcę składek na ubezpieczenie emerytalne, rentowe oraz ubezpieczenie chorobowe;"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 3 pkt 4",
+          "quote": "przychód - kwotę stanowiącą podstawę wymiaru składek na ubezpieczenie chorobowe ubezpieczonego niebędącego pracownikiem, po odliczeniu kwoty odpowiadającej 13,71% podstawy wymiaru składki na ubezpieczenie chorobowe;"
+        }
+      ]
+    },
+    "base_employee": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 36 ust. 1",
+          "quote": "Podstawę wymiaru zasiłku chorobowego przysługującego ubezpieczonemu będącemu pracownikiem stanowi przeciętne miesięczne wynagrodzenie wypłacone za okres 12 miesięcy kalendarzowych poprzedzających miesiąc, w którym powstała niezdolność do pracy."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 47",
+          "quote": "Przepisy art. 36-42 i art. 45 stosuje się odpowiednio przy ustalaniu podstawy wymiaru świadczenia rehabilitacyjnego, zasiłku wyrównawczego, zasiłku macierzyńskiego"
+        }
+      ]
+    },
+    "base_non_employee": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 48 ust. 1",
+          "quote": "Podstawę wymiaru zasiłku chorobowego przysługującego ubezpieczonemu niebędącemu pracownikiem stanowi przeciętny miesięczny przychód za okres 12 miesięcy kalendarzowych poprzedzających miesiąc, w którym powstała niezdolność do pracy."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 52",
+          "quote": "Przy ustalaniu podstawy wymiaru świadczenia rehabilitacyjnego, zasiłku macierzyńskiego i zasiłku opiekuńczego stosuje się odpowiednio przepisy art. 36 ust. 2-4, art. 38 ust. 1, art. 42, art. 43, art. 48 ust. 1"
+        }
+      ]
+    },
+    "days_in_month": {
+      "value": 30,
+      "note": "Podstawa za jeden dzień to jedna trzydziesta miesięcznej.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 36 ust. 3",
+          "quote": "Podstawę wymiaru zasiłku chorobowego za jeden dzień niezdolności do pracy stanowi jedna trzydziesta część wynagrodzenia stanowiącego podstawę wymiaru zasiłku."
+        }
+      ]
+    },
+    "every_day": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 31 ust. 5",
+          "quote": "Do zasiłku macierzyńskiego stosuje się odpowiednio przepisy art. 11 ust. 4 oraz art. 12 ust. 1 i ust. 2 pkt 1 i 3."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 11 ust. 4",
+          "quote": "Zasiłek chorobowy przysługuje za każdy dzień niezdolności do pracy, nie wyłączając dni wolnych od pracy."
+        }
+      ]
+    }
   }
 }

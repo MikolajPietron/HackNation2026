@@ -1,5 +1,5 @@
 // The plan's timeline, built like a video editor's: a ruler with months and week ticks, tracks
-// (Dziecko, Mama, Tata, Dokumenty; Pieniądze joins when the engine computes it) with clips
+// (Dziecko, Mama, Tata, Dokumenty, and Pieniądze once the engine has amounts) with clips
 // for leave and keyframes for important days, and a playhead. Drag the playhead along the ruler
 // and the readout below says what happens on that day; ‹ › jump between events like keyframes.
 // The tracks scroll sideways with momentum (drag them, or use the trackpad) and zoom on a spring
@@ -30,9 +30,10 @@ import { dayNumber, formatDayMonthShort, formatDistance, isoFromDay, monthCells 
 import { SPRING_LAYOUT } from '@/lib/ease'
 import { Illustration } from '@/components/ui/illustration'
 import { documentIcon, ICONS, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
+import { formatPln, formatPlnShort, formatRate } from '@/lib/money'
 import { LANE_ORDER, segmentLook } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Lane, Segment, Timeline } from '@/types'
+import type { Lane, Payment, Segment, Timeline } from '@/types'
 
 /** Days of margin before the first and after the last element. */
 const PAD_DAYS = 14
@@ -145,7 +146,7 @@ interface Props {
   initialZoom?: number
   expanded?: boolean
   onToggleExpanded?: () => void
-  /** Show the Tata and Pieniądze tracks with example data until the engine computes them. */
+  /** Show the Tata track with example data until the engine computes the father's periods. */
   preview?: boolean
 }
 
@@ -267,7 +268,6 @@ export function PlanTimeline({
   }, [timeline])
 
   const birth = dayNumber(timeline.birth_date)
-  const segments = timeline.segments.filter((s) => s.lane === 'mother')
   const laneSegments = (lane: Lane) => timeline.segments.filter((s) => s.lane === lane)
   const hasFather = timeline.segments.some((s) => s.lane === 'father')
   const days = [
@@ -417,14 +417,15 @@ export function PlanTimeline({
     .sort((a, b) => LANE_ORDER[a] - LANE_ORDER[b])
   // The Tata example only stands in while the engine has nothing of the father's.
   const previewFather = preview && !hasFather
-  const previewRows = (preview ? 1 : 0) + (previewFather ? 1 : 0)
-  const rowsBelowRuler = Math.max(1, lanes.length + previewRows)
-
-  // Example data for the preview tracks: tata's paternity leave right after the birth, and the
-  // months the mother's leave is paid. Clearly marked as an example in the UI.
-  const leave = segments.filter((s) => s.tone === 'leave')
-  const leaveStart = leave.length ? Math.min(...leave.map((s) => dayNumber(s.start))) : birth
-  const leaveEnd = leave.length ? Math.max(...leave.map((s) => dayNumber(s.end))) : birth
+  // Pieniądze (guide section G): the benefit for every period the engine priced.
+  const payments = placePayments(timeline.payments)
+  const moneyRows = payments.reduce((n, p) => Math.max(n, p.row + 1), 0)
+  const moneyRow = lanes.length + 2 + (previewFather ? 1 : 0)
+  const rowsBelowRuler = Math.max(
+    1,
+    lanes.length + (previewFather ? 1 : 0) + (payments.length > 0 ? 1 : 0),
+  )
+  const toneOf = (p: Payment) => timeline.segments.find((s) => s.id === p.segment_id)?.tone
 
   const sortedIn = (lane: Lane) =>
     laneSegments(lane).sort((a, b) => a.start.localeCompare(b.start))
@@ -718,36 +719,35 @@ export function PlanTimeline({
               </div>
             </>
           )}
-          {preview && (
+          {payments.length > 0 && (
             <>
-              <PreviewLabel row={lanes.length + 2 + (previewFather ? 1 : 0)} label="Pieniądze">
+              <div
+                className="sticky left-0 z-30 flex items-center gap-2 border-b border-line bg-white pr-3"
+                style={{ gridColumn: 1, gridRow: moneyRow }}
+              >
                 <Illustration src={pieniadze} size="lane" />
-              </PreviewLabel>
+                <span className="text-sm font-bold text-navy-900">Pieniądze</span>
+              </div>
               <div
                 className="relative border-b border-line"
-                style={{ gridColumn: 2, gridRow: lanes.length + 2 + (previewFather ? 1 : 0), height: ROW_HEIGHT }}
+                style={{ gridColumn: 2, gridRow: moneyRow, height: ROW_HEIGHT }}
               >
-                {months
-                  .filter((month) => month.end >= leaveStart && month.start <= leaveEnd)
-                  .map((month) => {
-                    const start = Math.max(month.start, leaveStart)
-                    const end = Math.min(month.end, leaveEnd) + 1
-                    const span = x(end) - x(start)
-                    return (
-                      <span
-                        key={month.start}
-                        className="absolute flex h-11 items-center justify-center rounded-lg border border-dashed border-sun-400 bg-sun-100/70 text-xs font-bold text-sun-700"
-                        style={{
-                          top: (ROW_HEIGHT - 44) / 2,
-                          left: `calc(${x(start)}% + 2px)`,
-                          width: `calc(${span}% - 4px)`,
-                        }}
-                        title="Wypłata zasiłku — przykład"
-                      >
-                        {(span / 100) * width >= 44 ? 'zasiłek' : ''}
-                      </span>
-                    )
-                  })}
+                {payments.map((p) => (
+                  <MoneyClip
+                    key={p.id}
+                    payment={p}
+                    rows={moneyRows}
+                    left={x(dayNumber(p.start))}
+                    span={x(dayNumber(p.end) + 1) - x(dayNumber(p.start))}
+                    trackWidth={width}
+                    option={toneOf(p) === 'option'}
+                    changed={changedIds.has(p.id)}
+                    changeVersion={changeVersion}
+                    active={selectedId === p.id || hoveredId === p.id}
+                    onClick={() => onSelect(p.id)}
+                    onHover={(on) => onHover(on ? p.id : null)}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -756,6 +756,96 @@ export function PlanTimeline({
 
       <Readout timeline={timeline} day={head} onSelect={onSelect} onHover={onHover} />
     </div>
+  )
+}
+
+/** Payments in as few rows as possible without overlapping (the parents' periods may run at the
+ * same time, e.g. paternity leave during maternity leave). */
+function placePayments(payments: Payment[]): (Payment & { row: number })[] {
+  const rowEnds: number[] = []
+  return [...payments]
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .map((p) => {
+      const start = dayNumber(p.start)
+      let row = rowEnds.findIndex((end) => start > end)
+      if (row === -1) row = rowEnds.length
+      rowEnds[row] = dayNumber(p.end)
+      return { ...p, row }
+    })
+}
+
+/** The benefit for one period: amber, the mother's filled, the father's outlined; dashed while
+ * the period is still to decide. Wide enough, it says the rate and the monthly amount. */
+function MoneyClip({
+  payment,
+  rows,
+  left,
+  span,
+  trackWidth,
+  option,
+  changed,
+  changeVersion,
+  active,
+  onClick,
+  onHover,
+}: {
+  payment: Payment & { row: number }
+  rows: number
+  left: number
+  span: number
+  trackWidth: number
+  option: boolean
+  changed: boolean
+  changeVersion: number
+  active: boolean
+  onClick: () => void
+  onHover: (on: boolean) => void
+}) {
+  const gap = 4
+  const height = rows === 1 ? 44 : Math.floor((ROW_HEIGHT - 12 - (rows - 1) * gap) / rows)
+  const top = rows === 1 ? (ROW_HEIGHT - height) / 2 : 6 + payment.row * (height + gap)
+  const px = (span / 100) * trackWidth
+  const monthly = formatPlnShort(payment.monthly)
+  const rate = formatRate(payment.rate)
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      aria-label={`${payment.title}: ${formatPln(payment.monthly)} miesięcznie, ${rate} podstawy`}
+      title={`${payment.title}: ${payment.summary}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, delay: 0.4 }}
+      className={cn(
+        'absolute flex items-center justify-center overflow-hidden rounded-lg px-2 text-xs font-bold whitespace-nowrap text-navy-900',
+        'transition-[left,width,box-shadow] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+        'outline-none focus-visible:ring-2 focus-visible:ring-zus-400',
+        payment.lane === 'father' ? 'border-2 bg-white' : 'border bg-sun-100',
+        option ? 'border-dashed border-sun-400' : 'border-sun-300',
+        active && 'ring-2 ring-navy-900/25 ring-offset-1',
+      )}
+      style={{
+        top,
+        height,
+        left: `calc(${left}% + 2px)`,
+        width: `calc(${span}% - 4px)`,
+      }}
+    >
+      {changed && (
+        <motion.span
+          key={changeVersion}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 1.6, ease: 'easeOut' }}
+          className="absolute inset-0 rounded-[inherit] ring-4 ring-sun-300 ring-inset"
+        />
+      )}
+      <span className="relative truncate">
+        {px >= 170 ? `${rate} · ${monthly}/mies.` : px >= 90 ? monthly : px >= 44 ? rate : ''}
+      </span>
+    </motion.button>
   )
 }
 
@@ -805,6 +895,18 @@ export function Readout({
     const progress =
       s.days % 7 === 0 ? `tydzień ${Math.ceil(elapsed / 7)} z ${s.days / 7}` : `dzień ${elapsed} z ${s.days}`
     lines.push({ key: `a-${s.id}`, id: s.id, icon: segmentIcon(s), title: s.title, rest: `${progress} · do ${formatDayMonthShort(s.end)}` })
+    // Section G: what this period pays, as the engine computed it.
+    const payment = timeline.payments.find((p) => p.segment_id === s.id)
+    if (payment) {
+      lines.push({
+        key: `p-${payment.id}`,
+        id: payment.id,
+        icon: pieniadze,
+        lead: 'Zasiłek',
+        title: `${formatPln(payment.monthly)} miesięcznie`,
+        rest: `${formatRate(payment.rate)} podstawy`,
+      })
+    }
   }
   if (active.length === 0 && upcoming) {
     lines.push({

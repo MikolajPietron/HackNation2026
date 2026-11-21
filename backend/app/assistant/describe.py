@@ -3,7 +3,7 @@
 All dates and numbers come from the engine; the model only reads them.
 """
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     Document,
     Marker,
+    Payment,
     Scenario,
     Segment,
     SourceRef,
@@ -49,6 +50,8 @@ NOTE_KINDS = {
 def source_label(source: SourceRef) -> str:
     if source.doc == "kp":
         return f"Kodeks pracy, {source.article}"
+    if source.doc == "ustawa":
+        return f"Ustawa zasiłkowa, {source.article}"
     return f"Przewodnik ZUS, {page_label(source.page, source.page_to)}"
 
 
@@ -90,7 +93,8 @@ def describe_person(scenario: Scenario) -> str:
         who = "tata" if scenario.role == "father" else "mama"
         lines.append(
             f"Zarobki z onboardingu ({who}, miesięcznie brutto: {EARNINGS[scenario.earnings]}) "
-            "posłużą dopiero przy kwotach zasiłku. Nic z nich nie wyliczaj i nie dopytuj o nie."
+            "to tylko przedział. Nic z nich nie wyliczaj: kwoty zasiłku liczy kalkulator "
+            "z dokładnej kwoty, o którą pyta wywiad (`set_monthly_pay`)."
         )
     return "\n".join(lines)
 
@@ -176,7 +180,9 @@ def interview_questions(scenario: Scenario) -> list[Question]:
     if insured:
         questions += _hospital_questions(scenario)
     # The father's rights do not depend on the mother's insurance.
-    return questions + _father_questions(scenario)
+    questions += _father_questions(scenario)
+    # Section G, last: the amounts.
+    return questions + _money_questions(scenario)
 
 
 def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
@@ -288,6 +294,84 @@ def _father_questions(scenario: Scenario) -> list[Question]:
             return []
 
 
+PAID_WORK = ("employment", "contract", "business")
+
+
+def _money_questions(scenario: Scenario) -> list[Question]:
+    """Guide section G: the monthly amount the mother's benefit base comes from, her choice of
+    81,5%, then the father's amount. Asked only once the periods are drawn (the number of
+    children is known) and only for a parent who has benefit periods. The onboarding's range of
+    earnings is never enough: the amount is asked exactly."""
+    if scenario.children_count is None:
+        return []
+    questions = []
+    mother = coverage(scenario) not in NOT_INSURED and scenario.mothers_work in PAID_WORK
+    if mother and scenario.mother_pay is None:
+        questions.append(_pay_question(scenario, "mother"))
+    event = scenario.mother_event
+    left = event is not None and event.kind in ("death", "abandonment")
+    if mother and scenario.mother_pay is not None and scenario.rate_815 is None and not left:
+        questions.append(_rate_question(scenario))
+    father = father_coverage(scenario) not in NOT_INSURED and scenario.fathers_work in PAID_WORK
+    if father and scenario.father_pay is None:
+        questions.append(_pay_question(scenario, "father"))
+    return questions
+
+
+def _pay_question(scenario: Scenario, parent: Literal["mother", "father"]) -> Question:
+    work = scenario.mothers_work if parent == "mother" else scenario.fathers_work
+    own = scenario.role == parent
+    who, of = ("mama", "mamy") if parent == "mother" else ("tata", "taty")
+    average = " Jeśli się zmieniała, podaj średnią z ostatnich 12 miesięcy."
+    match work:
+        case "employment":
+            text = (
+                "Ile wynosi Twoje miesięczne wynagrodzenie brutto?"
+                if own
+                else f"Ile wynosi miesięczne wynagrodzenie brutto {of}?"
+            ) + " Jeśli w ostatnich 12 miesiącach się zmieniało, podaj średnią z tych miesięcy."
+        case "contract":
+            text = (
+                "Jaka jest Twoja miesięczna podstawa składki na ubezpieczenie chorobowe z umowy "
+                "zlecenia?"
+                if own
+                else f"Jaka jest miesięczna podstawa składki na ubezpieczenie chorobowe {of} "
+                "z umowy zlecenia?"
+            ) + average
+        case _:
+            text = (
+                "Jaką miesięczną podstawę składki na ubezpieczenie chorobowe deklarujesz w swojej "
+                "firmie?"
+                if own
+                else f"Jaką miesięczną podstawę składki na ubezpieczenie chorobowe deklaruje {who} "
+                "w swojej firmie?"
+            ) + average
+    return Question(text, f'`set_monthly_pay` (parent: "{parent}")', f"{parent}-pay")
+
+
+def _rate_question(scenario: Scenario) -> Question:
+    born = scenario.child_born is True
+    if scenario.role == "mother":
+        text = (
+            "Czy złożyłaś albo złożysz (najpóźniej 21 dni po porodzie)"
+            if born
+            else "Czy po porodzie złożysz (najpóźniej 21 dni po nim)"
+        ) + (
+            " wniosek o zasiłek 81,5% za cały urlop macierzyński i rodzicielski, czy wolisz "
+            "100% za macierzyński i 70% za rodzicielski?"
+        )
+    else:
+        text = (
+            "Czy mama złożyła albo złoży (najpóźniej 21 dni po porodzie)"
+            if born
+            else "Czy mama po porodzie złoży (najpóźniej 21 dni po nim)"
+        ) + (
+            " wniosek o zasiłek 81,5% za cały urlop macierzyński i rodzicielski, czy woli 100% "
+            "za macierzyński i 70% za rodzicielski?"
+        )
+    return Question(text, "`set_rate_choice`", "rate-815")
+
+
 def describe_interview(scenario: Scenario) -> str:
     """The next interview question, word for word, the tool for its answer, and what follows."""
     questions = interview_questions(scenario)
@@ -322,6 +406,8 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
     for s in timeline.segments:
         lines.append(f"- [{s.id}] {s.title}: {fmt(s.start)}–{fmt(s.end)} ({s.days} dni)")
     lines += [f"- [{m.id}] {fmt(m.date)}: {m.title}" for m in timeline.markers]
+    for p in timeline.payments:
+        lines.append(f"- [{p.id}] {p.title}: {fmt(p.start)}–{fmt(p.end)}. {p.summary}")
     for d in timeline.documents:
         status = "mama już je ma" if d.done else "jeszcze potrzebne"
         lines.append(f"- [{d.id}] {d.title}: potrzebne na {fmt(d.needed_by)} ({status})")
@@ -371,6 +457,13 @@ def describe_element(element: TimelineElement) -> str:
             lines = [
                 f"{element.title}: potrzebne na {fmt(element.needed_by)} ({status}).",
                 element.rule,
+            ]
+        case Payment():
+            period = f"{fmt(element.start)}–{fmt(element.end)}"
+            lines = [
+                f"{element.title}: {period}, {element.days} dni.",
+                element.summary,
+                *element.details,
             ]
     lines += ["", "Źródła (cytuj dosłownie):"]
     lines += [f"- {source_label(s)}: „{s.quote}”" for s in element.sources]

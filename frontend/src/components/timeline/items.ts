@@ -1,5 +1,5 @@
 import { dayNumber } from '@/lib/dates'
-import type { Document, Lane, Marker, Segment, Timeline } from '@/types'
+import type { Document, Lane, Marker, Payment, Segment, Timeline } from '@/types'
 
 interface ItemBase {
   id: string
@@ -11,11 +11,12 @@ interface ItemBase {
   endDay: number
 }
 
-/** Segments, markers and documents in one shape, for drawing. */
+/** Segments, markers, documents and payments in one shape, for drawing. */
 export type TimelineItem =
   | (ItemBase & { kind: 'segment'; element: Segment })
   | (ItemBase & { kind: 'marker'; element: Marker })
   | (ItemBase & { kind: 'document'; element: Document })
+  | (ItemBase & { kind: 'payment'; element: Payment })
 
 export function timelineItems(timeline: Timeline): TimelineItem[] {
   return [
@@ -56,6 +57,20 @@ export function timelineItems(timeline: Timeline): TimelineItem[] {
         start: d.needed_by,
         startDay: dayNumber(d.needed_by),
         endDay: dayNumber(d.needed_by),
+      }),
+    ),
+    // Section G: the benefit for a period ("Pieniądze"), on the lane of the parent it is paid to.
+    ...timeline.payments.map(
+      (p): TimelineItem => ({
+        kind: 'payment',
+        element: p,
+        id: p.id,
+        lane: p.lane,
+        label: p.title,
+        title: p.title,
+        start: p.start,
+        startDay: dayNumber(p.start),
+        endDay: dayNumber(p.end),
       }),
     ),
   ]

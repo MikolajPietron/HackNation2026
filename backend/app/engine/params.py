@@ -124,6 +124,34 @@ class FatherParams(BaseModel):
     total_cap: Rule
 
 
+class MoneyParams(BaseModel):
+    """Guide section G "Wysokość zasiłku macierzyńskiego" (page 9) and the ustawa zasiłkowa
+    behind it: the rates, the 81,5% request and the benefit base."""
+
+    rate_full: Param[float]
+    """Percent of the base for maternity, supplementary and paternity leave."""
+    rate_parental: Param[float]
+    """Percent of the base for parental leave."""
+    rate_single: Param[float]
+    """Percent of the base for maternity and parental leave after the mother's request."""
+    request_days: Param[int]
+    """The request for `rate_single` is filed not later than this many days after the birth."""
+    other_parent_parental: Rule
+    """The other parent's own weeks of parental leave stay at `rate_parental`."""
+    first_year: Rule
+    """With the request: no day of parental benefit in the first year -> 70%, and a top-up."""
+    contributions_percent: Param[float]
+    """Deducted from the gross pay (employee) or the contribution base (non-employee)."""
+    base_employee: Rule
+    """The base of an employee: the average monthly pay of 12 calendar months."""
+    base_non_employee: Rule
+    """The base of a non-employee: the average monthly income of 12 calendar months."""
+    days_in_month: Param[int]
+    """The base for one day is this fraction of the monthly base."""
+    every_day: Rule
+    """The benefit is due for every day, days off work included."""
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -142,6 +170,7 @@ class Params(BaseModel):
     loss: LossParams
     father: FatherParams
     rules: Rules
+    money: MoneyParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""

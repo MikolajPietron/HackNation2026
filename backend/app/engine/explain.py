@@ -13,6 +13,7 @@ from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
+from app.engine.money import add_money_notes
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
 from app.engine.supplementary import describe_case, supplementary_leave
@@ -23,6 +24,11 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    # Section G: the choice of rate joins the choices, the amounts come after the dates.
+    return add_money_notes(_case_notes(scenario, timeline, params), scenario, timeline, params)
+
+
+def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     cover = coverage(scenario)
     loss = child_loss(scenario, params, timeline.birth_date, timeline.today)
     if loss is not None:
