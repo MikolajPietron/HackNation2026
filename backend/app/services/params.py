@@ -1,6 +1,7 @@
 """Source of legal parameters: the base JSON in the repo (`backend/params/`).
 
-Versions edited in the admin panel (Supabase) will come later; the engine only ever gets a `Params`.
+Versions edited in the admin panel live in `param_versions` (see `param_versions.py`); the API
+picks the one in force (`api/deps.get_params`). The engine only ever gets a `Params`.
 """
 
 from functools import lru_cache

@@ -210,3 +210,11 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return name
   }
 }
+
+/** Polish plural: 1 tydzień, 2 tygodnie, 5 tygodni. */
+export function plural(n: number, one: string, few: string, many: string): string {
+  if (n === 1) return one
+  const last = n % 10
+  const lastTwo = n % 100
+  return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many
+}

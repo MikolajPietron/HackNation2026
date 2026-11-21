@@ -217,3 +217,53 @@ export type ChatEvent =
   | { type: 'focus'; element_id: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
+
+// Admin panel (backend/app/api/admin.py).
+
+export interface Param<T> {
+  value: T
+  note: string | null
+  sources: SourceRef[]
+}
+
+/** The legal parameters as the engine gets them (backend/app/engine/params.py). */
+export interface Params {
+  version: string
+  description: string
+  maternity: {
+    max_weeks_before_birth: Param<number>
+    weeks_by_children: Param<number[]>
+    mother_personal_weeks: Param<number>
+  }
+  rules: Record<string, { sources: SourceRef[] }>
+}
+
+/** The numbers the admin panel can change. */
+export interface ParamValues {
+  max_weeks_before_birth: number
+  weeks_by_children: number[]
+  mother_personal_weeks: number
+}
+
+export interface ParamVersion {
+  id: string
+  version: string
+  effective_from: string
+  note: string
+  created_at: string
+  values: ParamValues
+  status: 'in_force' | 'scheduled' | 'past'
+}
+
+export interface AdminView {
+  today: string
+  base: Params
+  in_force: ParamValues
+  /** Newest first. */
+  versions: ParamVersion[]
+}
+
+export interface ParamPreview {
+  before: Timeline
+  after: Timeline
+}

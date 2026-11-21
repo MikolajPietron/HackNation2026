@@ -1,4 +1,13 @@
-import type { ChatEvent, ChatRequest, OnboardingAnswers, SessionStart, SessionView } from './types'
+import type {
+  AdminView,
+  ChatEvent,
+  ChatRequest,
+  OnboardingAnswers,
+  ParamPreview,
+  ParamValues,
+  SessionStart,
+  SessionView,
+} from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
 export const API_URL: string = import.meta.env.VITE_API_URL ?? ''
@@ -74,6 +83,37 @@ export async function submitOnboarding(
 export async function deleteSession(sessionId: string): Promise<void> {
   await fetch(`${API_URL}/api/session/${sessionId}`, { method: 'DELETE' })
 }
+
+/** JSON request with the same error handling as the rest of the API. */
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+    })
+  } catch (error) {
+    if (init?.signal?.aborted) throw error
+    throw new Error(OFFLINE)
+  }
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as T
+}
+
+/** Admin panel: the base parameters, the numbers in force and every saved version. */
+export const fetchAdminParams = () => requestJson<AdminView>('/api/admin/params')
+
+/** Save a new version of the parameters, valid from a date. */
+export const saveParamVersion = (body: { effective_from: string; note: string; values: ParamValues }) =>
+  requestJson<AdminView>('/api/admin/params', { method: 'POST', body: JSON.stringify(body) })
+
+/** The example family's plan with the parameters in force and with the draft. */
+export const previewParams = (values: ParamValues, childrenCount: number, signal?: AbortSignal) =>
+  requestJson<ParamPreview>('/api/admin/preview', {
+    method: 'POST',
+    body: JSON.stringify({ values, children_count: childrenCount }),
+    signal,
+  })
 
 async function errorDetail(response: Response): Promise<string> {
   try {

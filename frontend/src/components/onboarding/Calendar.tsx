@@ -70,9 +70,16 @@ interface Props {
   today: string
   label: string
   onChange: (value: string) => void
+  /** E.g. a fixed `[--cell:2.5rem]` in a narrow panel. */
+  className?: string
 }
 
-export function Calendar({ value, min, max, today, label, onChange }: Props) {
+/** Day cell size: as big as fits the screen's height and width (the date step must fit 100vh).
+ *  Exported so a row under the calendar can take exactly its width. */
+export const CALENDAR_CELL = '[--cell:clamp(2.25rem,min(5.4dvh,calc((100vw_-_4.5rem)/7)),3.5rem)]'
+export const CALENDAR_WIDTH = 'calc(var(--cell) * 7 + 2.5rem)'
+
+export function Calendar({ value, min, max, today, label, onChange, className }: Props) {
   const clamp = (iso: string) => (iso < min ? min : iso > max ? max : iso)
   const [view, setView] = useState<Month>(() => monthOf(value || clamp(today)))
   const [mode, setMode] = useState<'days' | 'months'>('days')
@@ -134,7 +141,15 @@ export function Calendar({ value, min, max, today, label, onChange }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-100 rounded-4xl border border-line bg-white p-3 sm:p-5 lg:max-w-md">
+    // One day's size follows the window (height and width), so the whole step fits on one screen.
+    <div
+      className={cn(
+        'mx-auto w-full rounded-4xl border border-line bg-white p-3 sm:p-4',
+        CALENDAR_CELL,
+        className,
+      )}
+      style={{ maxWidth: CALENDAR_WIDTH }}
+    >
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
@@ -166,7 +181,7 @@ export function Calendar({ value, min, max, today, label, onChange }: Props) {
         </div>
       </div>
 
-      <div className="relative h-80 overflow-hidden sm:h-86 lg:h-98">
+      <div className="relative overflow-hidden" style={{ height: 'calc(var(--cell) * 6 + 3.5rem + 4px)' }}>
         <AnimatePresence mode="popLayout" initial={false} custom={direction}>
           {mode === 'days' ? (
             <motion.div
@@ -208,7 +223,7 @@ export function Calendar({ value, min, max, today, label, onChange }: Props) {
                       }}
                     />
                   ) : (
-                    <span key={`empty-${index}`} className="size-11 sm:size-12 lg:size-14" />
+                    <span key={`empty-${index}`} className="size-(--cell)" />
                   ),
                 )}
               </div>
@@ -288,7 +303,7 @@ function Day({
       aria-label={dayLabel.format(utc(iso))}
       onClick={onSelect}
       className={cn(
-        'relative grid size-11 place-items-center rounded-full text-base font-bold tabular-nums sm:size-12 lg:size-14 lg:text-lg',
+        'relative grid size-(--cell) place-items-center rounded-full text-base font-bold tabular-nums',
         'transition-[color,background-color,transform] duration-150 active:scale-[0.92]',
         'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
         selected

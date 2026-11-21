@@ -13,9 +13,10 @@ import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
+import { plural } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Earnings, OnboardingAnswers, Role, SessionStart, Work } from '@/types'
-import { Calendar } from './Calendar'
+import { CALENDAR_CELL, CALENDAR_WIDTH, Calendar } from './Calendar'
 import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
 import { ITEM, POP, STEP } from './motion'
 
@@ -319,17 +320,30 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
 function Question({
   title,
   subtitle,
+  compact = false,
   children,
 }: {
   title: string
   subtitle?: string
+  /** Less air around a tall answer (the calendar), so the step fits on one screen. */
+  compact?: boolean
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-5 py-20 text-center sm:px-8">
+    <div
+      className={cn(
+        'flex min-h-full flex-col items-center justify-center px-5 text-center sm:px-8',
+        compact ? 'pt-16 pb-6' : 'py-20',
+      )}
+    >
       <motion.h1
         variants={ITEM}
-        className="max-w-3xl text-[34px] leading-[1.1] font-bold tracking-[-0.02em] text-balance text-navy-900 sm:text-5xl"
+        className={cn(
+          'max-w-3xl leading-[1.1] font-bold tracking-[-0.02em] text-balance text-navy-900',
+          compact
+            ? 'text-[30px] sm:text-4xl [@media(min-height:860px)]:sm:text-5xl'
+            : 'text-[34px] sm:text-5xl',
+        )}
       >
         {title}
       </motion.h1>
@@ -341,7 +355,7 @@ function Question({
           {subtitle}
         </motion.p>
       )}
-      <div className="mt-10 w-full sm:mt-14">{children}</div>
+      <div className={cn('w-full', compact ? 'mt-5 sm:mt-6' : 'mt-10 sm:mt-14')}>{children}</div>
     </div>
   )
 }
@@ -396,10 +410,10 @@ function Intro({
         variants={ITEM}
         className="mt-6 text-4xl leading-[1.05] font-bold tracking-tight text-balance text-navy-900 sm:text-6xl"
       >
-        Zaplanujmy urlop macierzyński
+        Policzmy, co Wam się należy
       </motion.h1>
       <motion.p variants={ITEM} className="mt-4 max-w-md text-lg text-pretty text-navy-500">
-        Od kiedy mama może go zacząć, ile trwa i co przygotować. Kilka pytań, bez logowania.
+        Urlopy, zasiłki i terminy wniosków na jednej osi czasu. Kilka pytań, bez logowania.
       </motion.p>
       <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
         <PrimaryButton onClick={onStart}>
@@ -490,14 +504,6 @@ function MoreChildren({
   )
 }
 
-/** Polish plural: 1 tydzień, 2 tygodnie, 5 tygodni. */
-function plural(n: number, one: string, few: string, many: string): string {
-  if (n === 1) return one
-  const last = n % 10
-  const lastTwo = n % 100
-  return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many
-}
-
 /** "za 17 tygodni" before the birth (pregnancy counts in weeks), "3 miesiące temu" after it. */
 function distance(date: string, today: string): string {
   const days = Math.round((Date.parse(date) - Date.parse(today)) / 86_400_000)
@@ -536,21 +542,28 @@ function DateStep({
     <Question
       title={title}
       subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
+      compact
     >
-      <motion.div variants={ITEM}>
-        <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
-      </motion.div>
-      <motion.div variants={ITEM} className="mt-6 flex flex-col items-center gap-5">
-        <p className="h-7 text-lg" aria-live="polite">
-          <TextStates
-            text={valid ? `${formatLongDate(value)} · ${distance(value, today)}` : 'Wybierz dzień'}
-            className={valid ? 'font-bold text-navy-900' : 'text-navy-400'}
-          />
-        </p>
-        <PrimaryButton disabled={!valid} onClick={onNext}>
-          Dalej <ArrowRight className="size-5" />
-        </PrimaryButton>
-      </motion.div>
+      {/* The row under the calendar takes exactly its width: the date on the left edge, the
+          button on the right edge, so the two line up and the button never moves. */}
+      <div className={cn('mx-auto w-full', CALENDAR_CELL)} style={{ maxWidth: CALENDAR_WIDTH }}>
+        <motion.div variants={ITEM}>
+          <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
+        </motion.div>
+        <motion.div variants={ITEM} className="mt-4 flex items-center justify-between gap-3 pl-2">
+          <p className="min-w-0 text-left leading-tight" aria-live="polite">
+            <span className={cn('block text-lg', valid ? 'font-bold text-navy-900' : 'text-navy-400')}>
+              <TextStates text={valid ? formatLongDate(value) : 'Wybierz dzień'} />
+            </span>
+            <span className="mt-0.5 block text-sm text-navy-500">
+              <TextStates text={valid ? distance(value, today) : '\u00a0'} />
+            </span>
+          </p>
+          <PrimaryButton disabled={!valid} onClick={onNext} className="shrink-0">
+            Dalej <ArrowRight className="size-5" />
+          </PrimaryButton>
+        </motion.div>
+      </div>
     </Question>
   )
 }

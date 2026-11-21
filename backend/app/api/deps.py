@@ -15,6 +15,7 @@ from pydantic_ai.settings import ModelSettings
 from app.clock import today_in_warsaw
 from app.config import LlmProvider, Settings, ThinkingLevel, get_settings
 from app.engine import Params
+from app.services.param_versions import ParamStore, active_params, open_param_store
 from app.services.params import load_params
 from app.services.sessions import SessionStore, open_session_store
 
@@ -24,12 +25,21 @@ KEY_NAMES: dict[LlmProvider, str] = {
 }
 
 
-def get_params() -> Params:
-    return load_params()
-
-
 def get_today() -> dt.date:
     return today_in_warsaw()
+
+
+async def get_param_store(settings: Annotated[Settings, Depends(get_settings)]) -> ParamStore:
+    return await open_param_store(settings.supabase_url, settings.supabase_secret_key)
+
+
+async def get_params(
+    store: Annotated[ParamStore, Depends(get_param_store)],
+    today: Annotated[dt.date, Depends(get_today)],
+) -> Params:
+    """The parameters in force today: the newest admin version whose date has come, else the
+    base file. The engine gets them as an argument and never reads the database itself."""
+    return active_params(load_params(), await store.list(), today)
 
 
 async def get_session_store(settings: Annotated[Settings, Depends(get_settings)]) -> SessionStore:
