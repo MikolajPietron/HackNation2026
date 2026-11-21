@@ -43,7 +43,7 @@ from app.assistant.agent import (
     TimelineUpdated,
     assistant,
 )
-from app.assistant.describe import interview_questions, next_question
+from app.assistant.describe import interview_questions, next_question, opening_notes
 from app.assistant.prompts import timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -97,7 +97,8 @@ async def chat(
     else:  # the only event: "timeline_ready"
         deps.answers_allowed = False
         questions = interview_questions(deps.scenario)
-        points = [note.title for note in deps.timeline.notes] if deps.timeline else []
+        notes = opening_notes(deps.timeline.notes) if deps.timeline else []
+        points = [note.title for note in notes]
         prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
     stream = _stream(prompt, load_history(session), deps, model, turn)
     return StreamingResponse(stream, media_type="application/x-ndjson")

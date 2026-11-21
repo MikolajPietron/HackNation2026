@@ -14,8 +14,10 @@ from pydantic_ai import ModelMessage, ModelRequest, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 
 from app.api.deps import get_chat_model, get_param_store, get_session_store, get_today
+from app.assistant.describe import opening_notes
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.config import Settings, get_settings
+from app.engine.models import CaseNote
 from app.main import app
 from app.services.param_versions import MemoryParamStore
 from app.services.sessions import MemorySessionStore, Session
@@ -310,6 +312,12 @@ def test_timeline_ready_event_starts_the_conversation(client: TestClient) -> Non
     out = events(client.post("/api/chat", json=body))
     assert prompts[0].startswith("⟦Zdarzenie z aplikacji⟧")
     assert "Wyjaśnienia sytuacji" in prompts[0]
+    # No wall of text: only the case and the main entitlement, the rest is on screen.
+    listed = prompts[0].split("tylko te punkty, w tej kolejności: ")[1].split(" Najwyżej")[0]
+    assert listed.startswith("1. „Dziecko jest w drodze”. 2. „")
+    assert "3. „" not in listed
+    assert "Ochrona przed zwolnieniem" not in prompts[0]
+    assert "bez powitania" in prompts[0]
     # The father filled in the interview: the closing question is about the mother.
     assert prompts[0].endswith(
         "Na końcu zadaj dokładnie to pytanie: „Jak pracuje mama: na etacie (umowa o pracę), na "
@@ -325,6 +333,28 @@ def test_timeline_ready_event_starts_the_conversation(client: TestClient) -> Non
     assert restored[0]["parts"][0]["text"].startswith("Jako że dziecko jest w drodze")
 
 
+def test_the_opening_says_the_case_the_entitlement_and_what_stands_in_the_way() -> None:
+    """A new timeline is not retold point by point: the chat opens with which case this is, the
+    first entitlement (or risk), every risk and the points about a loss, in the engine's order."""
+
+    def note(id: str, kind: str) -> CaseNote:
+        return CaseNote(id=id, kind=kind, title=id, text="…")  # type: ignore[arg-type]
+
+    notes = [
+        note("situation", "situation"),
+        note("insurance", "right"),
+        note("job-loss", "risk"),
+        note("loss", "right"),
+        note("parental", "choice"),
+        note("father", "right"),
+        note("computed", "computed"),
+    ]
+    assert [n.id for n in opening_notes(notes)] == ["situation", "insurance", "job-loss", "loss"]
+    # Without an entitlement the first risk is the answer.
+    no_right = [note("situation", "situation"), note("insurance", "risk"), note("father", "right")]
+    assert [n.id for n in opening_notes(no_right)] == ["situation", "insurance"]
+
+
 def test_the_assistant_reacts_to_what_an_answer_changed(client: TestClient) -> None:
     """After a recalculation the UI and the model learn which points of the explanation changed;
     the model talks about those and asks the next question as given."""
@@ -337,11 +367,13 @@ def test_the_assistant_reacts_to_what_an_answer_changed(client: TestClient) -> N
     # The leave starts earlier: the protection ends earlier, the requests are due earlier.
     assert timeline["changed_notes"] == ["before-birth", "computed", "protection", "applications"]
     assert (
-        "Zmienione punkty wyjaśnienia: „Urlop od 1 lutego 2027, 6 tyg. przed przewidywaną datą "
-        "porodu”, "
-        "„Co policzyliśmy”, „Ochrona przed zwolnieniem”, „Co złożyć i do kiedy”. Omów teraz "
-        "tylko je" in returned[0]
+        "Zmienione punkty wyjaśnienia (użytkownik widzi je podświetlone nad osią): „Urlop od "
+        "1 lutego 2027, 6 tyg. przed przewidywaną datą porodu”, „Co policzyliśmy”, „Ochrona "
+        "przed zwolnieniem”, „Co złożyć i do kiedy”. Powiedz tylko, co z tej zmiany wynika dla "
+        "rodzica" in returned[0]
     )
+    # Four points changed, but the chat does not retell them: at most three short sentences.
+    assert "w najwyżej trzech krótkich zdaniach" in returned[0]
     assert (
         "„Czy masz już zaświadczenie lekarskie o przewidywanej dacie porodu?” Gdy użytkownik "
         "odpowie, najpierw zapisz odpowiedź narzędziem `set_medical_certificate`" in returned[0]
