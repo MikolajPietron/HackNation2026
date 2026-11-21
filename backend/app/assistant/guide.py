@@ -26,9 +26,12 @@ class GuideSection:
         return normalize(quote) in normalize(self.text)
 
 
-# (id, title, page, first words, last words). One entry per phase; phase 1 is A.1.
+# (id, title, page, first words, last words): the part of each section the phases cover so far.
 _SECTIONS = [
+    # Phase 1.
     ("A.1", "Przygotowanie do porodu", 5, "Kobieta może rozpocząć", "po urodzeniu dziecka."),
+    # Phase 2a: length of maternity leave and the 14 weeks after the birth.
+    ("A.2", "Urodzenie dziecka", 5, "Wymiar zasiłku macierzyńskiego", "wykorzystać osobiście."),
 ]
 
 

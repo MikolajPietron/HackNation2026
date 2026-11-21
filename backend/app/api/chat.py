@@ -74,7 +74,7 @@ async def chat(
 ) -> StreamingResponse:
     session = await store.load(request.session_id)
     deps = AssistantDeps(scenario=session.scenario, params=params, today=today)
-    if session.scenario.due_date is not None:
+    if session.scenario.anchor_date is not None:
         try:
             deps.timeline = build_timeline(session.scenario, params, today)
         except ScenarioError:

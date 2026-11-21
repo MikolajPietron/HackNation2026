@@ -150,24 +150,38 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
-/** Literal quotes from the guide that this element is based on. */
+/** Literal quotes: the guide first, the Labour Code behind a toggle so the card stays short. */
 function Sources({ sources }: { sources: SourceRef[] }) {
+  const guide = sources.filter((s) => s.doc === 'przewodnik')
+  const law = sources.filter((s) => s.doc === 'kp')
   if (sources.length === 0) return null
   return (
-    <section>
-      <p className="mb-2 text-xs font-black tracking-widest text-navy-500 uppercase">
-        Źródło: {sourceLabel(sources[0])}
-      </p>
-      <div className="space-y-2">
-        {sources.map((source) => (
-          <blockquote
-            key={source.quote}
-            className="rounded-2xl border-l-4 border-zus-300 bg-zus-50 px-4 py-3 text-sm text-navy-700 italic"
-          >
-            „{source.quote}”
-          </blockquote>
-        ))}
-      </div>
+    <section className="space-y-2">
+      <p className="text-xs font-black tracking-widest text-navy-500 uppercase">Źródło</p>
+      {guide.map((source) => (
+        <Quote key={source.quote} source={source} />
+      ))}
+      {law.length > 0 && (
+        <details className="group" open={guide.length === 0}>
+          <summary className="cursor-pointer text-sm font-bold text-zus-700">
+            Podstawa prawna: Kodeks pracy ({law.length})
+          </summary>
+          <div className="mt-2 space-y-2">
+            {law.map((source) => (
+              <Quote key={source.quote} source={source} />
+            ))}
+          </div>
+        </details>
+      )}
     </section>
+  )
+}
+
+function Quote({ source }: { source: SourceRef }) {
+  return (
+    <figure className="rounded-2xl border-l-4 border-zus-300 bg-zus-50 px-4 py-3">
+      <blockquote className="text-sm text-navy-700 italic">„{source.quote}”</blockquote>
+      <figcaption className="mt-1 text-xs font-bold text-zus-700">{sourceLabel(source)}</figcaption>
+    </figure>
   )
 }

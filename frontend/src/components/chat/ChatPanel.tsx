@@ -7,19 +7,54 @@ import { ChatEmptyState } from '@/components/ui/chat-empty-state'
 import { PromptComposer } from '@/components/ui/prompt-composer'
 import { TextStates } from '@/components/ui/text-states'
 import type { ChatMessage, MessagePart } from '@/hooks/useAssistant'
+import type { Scenario } from '@/types'
 import { toolLabel } from '@/lib/ui'
 
-const SUGGESTIONS = [
+// Without the onboarding the chat asks for the date first.
+const START_SUGGESTIONS = [
   'Podam przewidywaną datę porodu',
-  'Czy mogę iść na urlop przed porodem?',
-  'Chcę pracować do dnia porodu',
+  'Dziecko już się urodziło',
+  'Spodziewamy się bliźniąt',
 ]
 
-const NEXT_SUGGESTIONS = [
-  'Chcę urlop przed porodem',
-  'Będę pracować do dnia porodu',
-  'Od kiedy najwcześniej mogę zacząć urlop?',
-]
+/** The next interview question after the onboarding, worded for whoever is writing. */
+function nextQuestion(scenario: Scenario): { question: string; prompts: string[] } {
+  const mother = scenario.role === 'mother'
+  if (scenario.leave_before_birth_weeks === null && scenario.child_born) {
+    return {
+      question: mother
+        ? 'czy byłaś na urlopie macierzyńskim przed porodem?'
+        : 'czy mama była na urlopie macierzyńskim przed porodem?',
+      prompts: [
+        'Nie, urlop zaczął się w dniu porodu',
+        'Tak, 2 tygodnie przed porodem',
+        'Kiedy kończy się urlop macierzyński?',
+      ],
+    }
+  }
+  if (scenario.leave_before_birth_weeks === null) {
+    return {
+      question: mother
+        ? 'chcesz zacząć urlop macierzyński przed porodem, czy pracować do dnia porodu?'
+        : 'czy mama chce zacząć urlop macierzyński przed porodem, czy pracować do dnia porodu?',
+      prompts: mother
+        ? [
+            'Chcę urlop przed porodem',
+            'Będę pracować do dnia porodu',
+            'Od kiedy najwcześniej mogę zacząć urlop?',
+          ]
+        : [
+            'Mama chce urlop przed porodem',
+            'Mama będzie pracować do porodu',
+            'Od kiedy najwcześniej może zacząć urlop?',
+          ],
+    }
+  }
+  return {
+    question: 'o który element osi chcesz zapytać?',
+    prompts: ['Kiedy kończy się urlop macierzyński?', 'Co oznacza 14 tygodni po porodzie?'],
+  }
+}
 
 const MARKDOWN: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -36,23 +71,18 @@ const MARKDOWN: Components = {
 interface Props {
   messages: ChatMessage[]
   busy: boolean
-  /** The due date is already known (onboarding): greet with the next question. */
-  hasTimeline: boolean
+  /** What the onboarding saved: greet with the next question instead of asking for the date. */
+  scenario: Scenario | null
   onSend: (text: string) => void
   onStop: () => void
   /** Jump to the timeline (on phones it is a separate tab), optionally to one element. */
   onShowTimeline: (elementId: string | null) => void
 }
 
-export function ChatPanel({
-  messages,
-  busy,
-  hasTimeline,
-  onSend,
-  onStop,
-  onShowTimeline,
-}: Props) {
+export function ChatPanel({ messages, busy, scenario, onSend, onStop, onShowTimeline }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
+  const dateKnown = scenario !== null && (scenario.due_date ?? scenario.birth_date) !== null
+  const next = scenario && dateKnown ? nextQuestion(scenario) : null
 
   useEffect(() => {
     const list = listRef.current
@@ -70,39 +100,7 @@ export function ChatPanel({
       </div>
 
       <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-3" aria-live="polite">
-        {messages.length === 0 ? (
-          hasTimeline ? (
-            <ChatEmptyState
-              title="Mam już termin porodu."
-              subtitle={
-                <>
-                  Kolejne pytanie:{' '}
-                  <strong className="font-black text-navy-900">
-                    czy mama chce zacząć urlop macierzyński przed porodem, czy pracować do dnia
-                    porodu?
-                  </strong>
-                </>
-              }
-              prompts={NEXT_SUGGESTIONS}
-              onSelectPrompt={onSend}
-            />
-          ) : (
-            <ChatEmptyState
-              title="Cześć! Przygotujmy się do porodu."
-              subtitle={
-                <>
-                  Na początek:{' '}
-                  <strong className="font-black text-navy-900">
-                    jaka jest przewidywana data porodu?
-                  </strong>{' '}
-                  Podaj dzień, miesiąc i rok.
-                </>
-              }
-              prompts={SUGGESTIONS}
-              onSelectPrompt={onSend}
-            />
-          )
-        ) : (
+        {messages.length > 0 ? (
           messages.map((message) =>
             message.role === 'user' ? (
               <UserMessage key={message.id} message={message} />
@@ -110,6 +108,33 @@ export function ChatPanel({
               <AssistantMessage key={message.id} message={message} onShowTimeline={onShowTimeline} />
             ),
           )
+        ) : next ? (
+          <ChatEmptyState
+            title="Mam Twoje odpowiedzi."
+            subtitle={
+              <>
+                Co z nich wynika, widać w „Twojej sytuacji” nad osią czasu. Kolejne pytanie:{' '}
+                <strong className="font-black text-navy-900">{next.question}</strong>
+              </>
+            }
+            prompts={next.prompts}
+            onSelectPrompt={onSend}
+          />
+        ) : (
+          <ChatEmptyState
+            title="Cześć! Zaplanujmy urlop macierzyński."
+            subtitle={
+              <>
+                Na początek:{' '}
+                <strong className="font-black text-navy-900">
+                  kiedy jest przewidywany poród albo kiedy urodziło się dziecko?
+                </strong>{' '}
+                Podaj dzień, miesiąc i rok.
+              </>
+            }
+            prompts={START_SUGGESTIONS}
+            onSelectPrompt={onSend}
+          />
         )}
       </div>
 

@@ -28,7 +28,13 @@ export const TONE: Record<Tone, { label: string; pill: string; avatar: string; d
   },
 }
 
-export const sourceLabel = (source: SourceRef) => `Przewodnik ZUS, s. ${source.page}`
+export const sourceLabel = (source: SourceRef) =>
+  source.doc === 'kp' ? `Kodeks pracy, ${source.article}` : `Przewodnik ZUS, s. ${source.page}`
+
+/** "jedno dziecko", "bliźnięta", "trojaczki", "4 dzieci" — for headers. */
+export function childrenLabel(count: number): string {
+  return { 1: 'jedno dziecko', 2: 'bliźnięta', 3: 'trojaczki' }[count] ?? `${count} dzieci`
+}
 
 const asDate = (value: unknown) => (typeof value === 'string' ? formatDate(value) : '…')
 
@@ -37,9 +43,15 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
   switch (name) {
     case 'set_due_date':
       return `Termin porodu: ${asDate(args.due_date)}`
+    case 'set_birth_date':
+      return `Data urodzenia: ${asDate(args.birth_date)}`
+    case 'set_children_count':
+      return typeof args.count === 'number'
+        ? `Liczba dzieci: ${childrenLabel(args.count)}`
+        : 'Liczba dzieci'
     case 'set_leave_before_birth':
       return args.weeks === 0
-        ? 'Praca do dnia porodu'
+        ? 'Bez urlopu przed porodem'
         : `Urlop przed porodem: ${String(args.weeks)} tyg.`
     case 'set_medical_certificate':
       return args.has_certificate

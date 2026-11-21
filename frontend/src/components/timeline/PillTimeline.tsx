@@ -18,6 +18,9 @@ const FULL_PILL_PERCENT = 26 // narrower pills keep only the initial; the title 
 const COMPACT_PILL_PERCENT = 8 // narrower still: an empty pill with everything outside
 const MIN_MONTH_PERCENT = 3.5 // narrower month cells at the edges are not labelled
 
+// The birth marker sits on the start of the day, like the dashed birth line and the pills.
+const BIRTH_MARKERS = new Set(['due-date', 'birth'])
+
 type SegmentItem = Extract<TimelineItem, { kind: 'segment' }>
 type MarkerItem = Extract<TimelineItem, { kind: 'marker' }>
 
@@ -46,7 +49,7 @@ export function PillTimeline({
   const x = (day: number) => ((day - from) / (to - from)) * 100
   const within = (day: number) => day >= from && day <= to
   const today = dayNumber(timeline.today)
-  const due = dayNumber(timeline.due_date)
+  const birth = dayNumber(timeline.birth_date)
   const register = (id: string) => (node: HTMLElement | null) => {
     if (node) refs.current.set(id, node)
     else refs.current.delete(id)
@@ -58,10 +61,12 @@ export function PillTimeline({
         <div style={{ minWidth: TRACK_MIN_PX }}>
           <div className="relative h-14">
             {months.map((month) => {
-              const hasDue = due >= month.start && due <= month.end
+              const hasBirth = birth >= month.start && birth <= month.end
               const hasToday = today >= month.start && today <= month.end
-              const caption = hasDue
-                ? 'termin'
+              const caption = hasBirth
+                ? timeline.child_born
+                  ? 'poród'
+                  : 'termin'
                 : hasToday
                   ? 'dziś'
                   : month.newYear
@@ -72,7 +77,7 @@ export function PillTimeline({
                   key={month.start}
                   className={cn(
                     'absolute inset-y-1 flex flex-col items-center justify-center rounded-2xl',
-                    hasDue
+                    hasBirth
                       ? 'bg-zus-600 text-white shadow-pill'
                       : hasToday
                         ? 'bg-white text-navy-900 shadow-card'
@@ -82,7 +87,7 @@ export function PillTimeline({
                 >
                   <span className="text-sm leading-4 font-black">{month.label}</span>
                   <span
-                    className={cn('text-[10px] leading-3.5', hasDue ? 'text-white/85' : 'text-navy-500')}
+                    className={cn('text-[10px] leading-3.5', hasBirth ? 'text-white/85' : 'text-navy-500')}
                   >
                     {caption}
                   </span>
@@ -95,7 +100,7 @@ export function PillTimeline({
             <div className="pointer-events-none absolute inset-0" aria-hidden>
               <div
                 className="absolute inset-y-0 border-l-2 border-dashed border-zus-300"
-                style={{ left: `${x(due)}%` }}
+                style={{ left: `${x(birth)}%` }}
               />
               {within(today) && (
                 <div
@@ -111,7 +116,7 @@ export function PillTimeline({
                   key={item.id}
                   ref={register(item.id)}
                   item={item}
-                  left={x(item.startDay + (item.id === 'due-date' ? 0 : 0.5))}
+                  left={x(item.startDay + (BIRTH_MARKERS.has(item.id) ? 0 : 0.5))}
                   top={row * MARKER_ROW_PX + 4}
                   selected={item.id === selectedId}
                   onClick={() => onSelect(item.id)}
@@ -240,6 +245,8 @@ function PillRow({
   const duration = s.days % 7 === 0 ? `${s.days / 7} tyg.` : `${s.days} dni`
   const dates = `${formatDayMonth(s.start)} – ${formatDayMonth(s.end)}`
   const delay = index * 0.07
+  // Each pill has its own row, so the label goes to whichever side has room.
+  const labelOnLeft = left + width / 2 > 50
 
   return (
     <>
@@ -289,8 +296,15 @@ function PillRow({
         <button
           type="button"
           onClick={() => onSelect(item.id)}
-          className="absolute flex h-11 flex-col items-end justify-center text-xs leading-tight whitespace-nowrap"
-          style={{ right: `calc(${100 - left}% + ${document ? 44 : 12}px)`, top }}
+          className={cn(
+            'absolute flex h-11 flex-col justify-center text-xs leading-tight whitespace-nowrap',
+            labelOnLeft ? 'items-end' : 'items-start',
+          )}
+          style={
+            labelOnLeft
+              ? { right: `calc(${100 - left}% + ${document ? 44 : 12}px)`, top }
+              : { left: `calc(${left + width}% + 12px)`, top }
+          }
         >
           <span className="font-bold text-navy-900">{s.title}</span>
           <span className="text-navy-500">

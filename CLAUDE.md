@@ -2,7 +2,7 @@
 
 Projekt na HackNation 2026, wyzwanie ZUS. Opis wyzwania: `docs/Przewodnik_Rodzica_ZUS.pdf` (dalej: **Przewodnik**).
 
-Stan na 21.11.2026: budujemy fazami, po jednym punkcie Przewodnika naraz (patrz „Fazy”). Zrobiona jest faza 1: „Przygotowanie do porodu” (sekcja A, s. 5). Wywiad w czacie zbiera przewidywaną datę porodu, decyzję o urlopie przed porodem i zaświadczenie lekarskie; silnik liczy oś, frontend ją rysuje. Wszystko poza fazą 1 zostało usunięte z kodu (jest w historii gita, commit `d2b261d`).
+Stan na 21.11.2026: budujemy fazami, po jednym punkcie Przewodnika naraz (patrz „Fazy”). Zrobione: faza 1 „Przygotowanie do porodu” i faza 2a (wymiar urlopu macierzyńskiego, 14 tygodni po porodzie). Onboarding zbiera rolę, czy dziecko już jest, liczbę dzieci, datę, pracę i zarobki; wszystko zapisuje się w sesji (Supabase). Wywiad w czacie zbiera resztę, silnik liczy oś, frontend ją rysuje.
 Aktualizuj ten plik, gdy zmienia się struktura repo albo zapadają decyzje.
 
 ## Komendy (z katalogu głównego)
@@ -15,6 +15,7 @@ Aktualizuj ten plik, gdy zmienia się struktura repo albo zapadają decyzje.
 - `npm run db:start` / `db:status` / `db:reset` / `db:migration <nazwa>` — lokalny Supabase (Docker)
 - `npm run data:zus` — przygotowanie danych ZUS (patrz „Dane i poufność”)
 - `python3 tools/przewodnik/extract_pages.py` — po zmianie PDF Przewodnika odświeża `backend/app/assistant/przewodnik_pages.json` (tekst stron, z którego wycinamy sekcje)
+- `python3 tools/przewodnik/extract_kp.py` — odświeża `backend/app/assistant/kodeks_pracy.json`: przepisy Kodeksu pracy, które cytujemy (lista w skrypcie; źródłem jest wyciąg z materiałów ZUS)
 - Backend sam: `cd backend && uv run …`; zależności: `uv add <pakiet>` (nie pip). Frontend: `npm install <pakiet> --workspace frontend`.
 
 CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i frontend (oxlint, typecheck, build).
@@ -23,11 +24,11 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
 
 - `backend/` — Python 3.13, FastAPI, uv.
   - `app/main.py` — aplikacja, CORS, `/api/health`; `app/config.py` — ustawienia z `.env`; `app/clock.py` — „dziś” w Europe/Warsaw.
-  - `app/api/` — routery: `chat.py` (`POST /api/chat`, strumień NDJSON), `session.py` (`GET`/`DELETE /api/session/{id}`: przywrócenie i usunięcie rozmowy), `timeline.py` (`POST /api/timeline`, kalkulator bez AI), `deps.py` (zależności: model, parametry, dziś, magazyn sesji; testy je podmieniają).
-  - `app/engine/` — silnik: `models.py` (`Scenario`, `Timeline` z odcinkami, ważnymi dniami i dokumentami, `SourceRef`), `params.py` (model parametrów), `timeline.py` (reguły bieżących faz, `changed_element_ids`).
-  - `app/assistant/` — agent Pydantic AI (`agent.py`: narzędzia i zdarzenia), `guide.py` (sekcje Przewodnika wycinane z `przewodnik_pages.json`), `prompts.py` (instrukcje po polsku z dosłownym tekstem sekcji i planem wywiadu), `describe.py` (opis osi dla modelu).
+  - `app/api/` — routery: `chat.py` (`POST /api/chat`, strumień NDJSON), `session.py` (`PUT /api/session/{id}/onboarding`: zapis odpowiedzi z onboardingu; `GET`/`DELETE /api/session/{id}`: przywrócenie i usunięcie rozmowy), `timeline.py` (`POST /api/timeline`, kalkulator bez AI), `deps.py` (zależności: model, parametry, dziś, magazyn sesji; testy je podmieniają).
+  - `app/engine/` — silnik: `models.py` (`Scenario`, `Timeline` z odcinkami, ważnymi dniami i dokumentami, `SourceRef`), `params.py` (model parametrów), `timeline.py` (reguły zrobionych faz, `changed_element_ids`), `explain.py` (wyjaśnienie przypadku: `Timeline.notes`), `wording.py` (daty słownie, liczba dzieci), `plausibility.py` (sprawdzenie, czy wpisana data ma sens: literówki w roku itp.).
+  - `app/assistant/` — agent Pydantic AI (`agent.py`: narzędzia i zdarzenia), `guide.py` (sekcje Przewodnika wycinane z `przewodnik_pages.json`), `law.py` i `kodeks_pracy.json` (cytowane przepisy Kodeksu pracy), `prompts.py` (instrukcje po polsku z dosłownym tekstem źródeł i planem wywiadu), `describe.py` (opis osoby, wywiadu i osi dla modelu).
   - `app/services/params.py` — wczytanie `params/2026.json`. `app/services/sessions.py` — magazyn sesji (Supabase albo pamięć). `app/assistant/transcript.py` — historia modelu jako wiadomości dla UI. `params/2026.json` — liczby i reguły ze źródłami.
-  - `tests/` — silnik (`test_engine.py`), zgodność cytatów z dokumentem (`test_sources.py`) i wywiad przez API na skryptowanym modelu (`test_chat_api.py`).
+  - `tests/` — silnik (`test_engine.py`), zgodność cytatów z Przewodnikiem i Kodeksem pracy (`test_sources.py`), onboarding i wywiad przez API na skryptowanym modelu (`test_chat_api.py`).
 - `frontend/` — React 19, TypeScript, Vite 8, Tailwind 4, Oxlint, Motion, lucide-react, react-markdown. Alias `@/` = `src/`.
   - `src/index.css` — tokeny motywu ZUS (`@theme`: kolory, cienie, animacje wejścia), font Lato.
   - `src/types.ts` — kopia modeli backendu i protokołu czatu (trzymaj w zgodzie z `engine/models.py` i `api/chat.py`); `src/api.ts` — `streamChat` (NDJSON).
@@ -35,7 +36,7 @@ CI (`.github/workflows/ci.yml`) uruchamia to samo: backend (ruff, pytest) i fron
   - `src/components/onboarding/` — pełnoekranowy start przed osią (`Onboarding.tsx`: kroki i nawigacja, `Calendar.tsx`: własny kalendarz bez natywnego `input type=date`, `ChoiceCard.tsx`: karty wyboru i przycisk, `motion.ts`: warianty ruchu). Ikony w `src/assets/onboarding/*.webp`.
   - `src/components/ui/` — komponenty ze Spectrum UI: `text-states` (bez zmian) oraz `agent-steps`, `prompt-composer`, `chat-empty-state`, `nav-list-card` (dostosowane; nagłówek pliku mówi, co zmieniono). `src/lib/ease.ts` — tokeny ruchu Spectrum UI, `src/lib/utils.ts` — `cn`.
   - `src/components/layout/` — lewy pasek ikon (desktop), dolna nawigacja (telefon), widok założeń.
-  - `src/components/timeline/` — `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
+  - `src/components/timeline/` — `CaseNotes` (karta „Twoja sytuacja”), `PillTimeline` (oś z pigułek, szeroki ekran), `VerticalTimeline` (lista, telefon i wąska kolumna), `ElementDetails` (szczegóły ze źródłem).
   - `src/components/documents/` — lista potrzebnych dokumentów; `src/components/chat/` — rozmowa.
 - `supabase/` — `config.toml`, `migrations/` (SQL), `seed.sql`.
 - `tools/zus-data/` — pipeline danych ZUS (OCR, katalog spraw). `tools/przewodnik/` — tekst Przewodnika dla asystenta.
@@ -91,7 +92,7 @@ Naszym zadaniem jest pokazać rodzicowi informacje, których potrzebuje. Nic wi�
 - **Układ ekranu** (stan na 21.11.2026):
   - Desktop: pasek ikon | oś czasu (pasek miesięcy, pigułki, legenda, pod spodem szczegóły klikniętego elementu) | prawa kolumna (dokumenty, rozmowa).
   - Telefon: dolna nawigacja Rozmowa / Oś czasu / Założenia; oś jako lista.
-  - Onboarding (nowa rozmowa, przed osią): jedno pytanie na pełnym ekranie, bez paska postępu, przejścia blur + przesunięcie. W fazie 1: powitanie → przewidywana data porodu (kalendarz) → liczenie → oś; dalszy wywiad prowadzi czat. Data zapisuje się w sesji (`PUT /api/session/{id}/due-date`). Kroki spoza fazy 1 (kim jesteś, czy dziecko już jest, ile dzieci, praca, zarobki) są w historii gita w commicie `4092d06` i wracają w swoich fazach. Przywrócona rozmowa pomija onboarding.
+  - Onboarding (nowa rozmowa, przed osią): jedno pytanie na pełnym ekranie, bez paska postępu, przejścia blur + przesunięcie. Kroki: kim jesteś (mama/tata) → czy dziecko już jest → ile dzieci → data (kalendarz: przewidywana albo data urodzenia) → jak pracujesz → zarobki (pomijane, gdy nie pracuje) → liczenie → oś. Odpowiedzi zapisują się w sesji (`PUT /api/session/{id}/onboarding`), a czat zaczyna od następnego pytania wywiadu. Na telefonie po onboardingu otwiera się zakładka osi. Onboarding pokazuje się, dopóki jego odpowiedzi nie są zapisane (w sesji brak `role`, którą zapisuje tylko onboarding) i rozmowa się nie zaczęła; zapisana sesja z odpowiedziami albo z rozmową idzie prosto do aplikacji.
   - Kolor pigułki mówi, czym jest odcinek: zielony = urlop mamy, jasnozielony = do wyboru (jeszcze nie zdecydowano), szaroniebieski = praca. Dokument jest kółkiem z ikoną przed pigułką, której dotyczy.
   - Przeliczona oś tylko podświetla zmianę. Szczegóły otwiera kliknięcie albo narzędzie `explain_timeline_element`.
 
@@ -102,22 +103,45 @@ Rdzeniem aplikacji jest tłumaczenie procesu na podstawie oficjalnego dokumentu 
 Zasady pracy:
 - Robimy jedną fazę naraz. Faza to jeden punkt Przewodnika: wchodzi do wywiadu, na oś i do testów.
 - W kodzie jest tylko to, co obejmują zrobione fazy. Nie dodawaj elementów „na zapas” z kolejnych punktów ani z innych sekcji. Sekcje „Ściąga domenowa” i „Interakcje” niżej to wiedza na przyszłe fazy, nie lista rzeczy do zaimplementowania teraz.
-- Każdy element osi ma dosłowny cytat z sekcji Przewodnika. `tests/test_sources.py` sprawdza, że cytat istnieje w tekście dokumentu co do znaku (literówki oryginału zostają).
+- Każdy element osi ma dosłowny cytat z sekcji Przewodnika albo z przepisu Kodeksu pracy. Przewodnik jest głównym źródłem; Kodeks pracy uzupełnia to, czego Przewodnik nie podaje (np. wymiar przy wieloraczkach). `tests/test_sources.py` sprawdza, że każdy cytat istnieje w tekście źródła co do znaku (literówki oryginału Przewodnika zostają). W UI przepisy są schowane pod „Podstawa prawna”, żeby nie zagracać karty.
 - Poprzednia, szersza wersja (macierzyński, rodzicielski, ojcowski, wnioski, 81,5%, kafelki) jest w gicie w commicie `d2b261d`. Przenosimy z niej rzeczy dopiero w ich fazie.
+- Odpowiedzi z onboardingu zapisujemy wszystkie, także te, których żadna faza jeszcze nie liczy (praca, zarobki). Asystent je zna, nie pyta o nie drugi raz i niczego z nich nie wylicza, dopóki nie dojdzie faza, która ich używa. Praca i zarobki dotyczą osoby wypełniającej: gdy wypełnia tata, to jego praca, nie mamy.
 
 Sekcja A „Zasiłek macierzyński dla kobiety” (s. 5–6), podział na fazy:
 
 | Faza | Punkt | Kawałki | Stan |
 |---|---|---|---|
 | 1 | Przygotowanie do porodu (s. 5) | A1 urlop do 6 tyg. przed przewidywaną datą porodu; A2 zaświadczenie lekarskie o przewidywanej dacie porodu; A3 praca do dnia porodu, zasiłek po urodzeniu | zrobiona |
-| 2 | Urodzenie dziecka (s. 5–6) | A4 prawo po porodzie dla ubezpieczonej; A5 wymiar wg liczby dzieci (20 tyg.); A6 14 tyg. osobiście; A7 uzupełniający; A8 rodzicielski; A9 do 5 części; A10 do końca roku 6. urodzin; A11 „Za życiem” | do zrobienia |
+| 2a | Urodzenie dziecka (s. 5): wymiar i 14 tygodni | A5 wymiar wg liczby dzieci (20/31/33/35/37 tyg., KP art. 180 § 1); A6 14 tyg. po porodzie osobiście; tygodnie przed porodem wliczają się do wymiaru (KP art. 180 § 3); tydzień = 7 dni (KP art. 183¹ § 1); bez urlopu przed porodem start w dniu porodu (KP art. 183¹ § 2) | zrobiona |
+| 2b | Urodzenie dziecka (s. 5–6): rodzicielski | A8 rodzicielski po macierzyńskim (długość z sekcji B i KP); A9 do 5 części; A10 do końca roku 6. urodzin | do zrobienia |
+| 2c | Urodzenie dziecka (s. 5–6): uprawnienia | A4 prawo po porodzie dla ubezpieczonej (tu wejdą odpowiedzi o pracy); A11 „Za życiem” | do zrobienia |
+| 2d | Urodzenie dziecka (s. 5): uzupełniający | A7 uzupełniający urlop macierzyński (tabela z Załącznika, sekcja C) | do zrobienia |
 | 3 | Martwe urodzenie albo zgon dziecka (s. 6) | A12 przed 8 tyg. życia; A13 po 8 tyg.; A14 wieloraczki | do zrobienia |
 | 4 | Dokumenty i wnioski (s. 6) | A15 pracownica: wniosek do pracodawcy; A16 ZAM do ZUS, zlecenie z Z-3a; A17 załączniki | do zrobienia |
 
-Faza 1 w szczegółach:
-- Wywiad: (1) przewidywana data porodu — w onboardingu (kalendarz) albo w czacie, (2) urlop przed porodem (ile tygodni) czy praca do dnia porodu, (3) przy urlopie: czy mama ma zaświadczenie lekarskie.
-- Oś: znacznik terminu porodu; przed decyzją jasna pigułka „do wyboru” na całe okno 6 tygodni; po decyzji zielona pigułka urlopu z dokumentem albo pigułka „praca do dnia porodu”; przy urlopie krótszym niż 6 tygodni znacznik najwcześniejszego startu.
-- Poza zakresem fazy 1: wszystko po porodzie (długość urlopu, stawki, tata, wnioski), dziecko już urodzone.
+Fazy 1 i 2a w szczegółach:
+- Wywiad (pyta tylko o to, czego nie dał onboarding): (1) data: przewidywana data porodu albo data urodzenia, (2) ile dzieci przy jednym porodzie, (3) urlop przed porodem: dziecko w drodze — ile tygodni albo praca do dnia porodu; dziecko urodzone — czy mama była na urlopie przed porodem, (4) tylko dla dziecka w drodze z urlopem przed porodem: zaświadczenie lekarskie.
+- Oś, dziecko w drodze: znacznik terminu porodu; przed decyzją jasna pigułka „do wyboru” na okno 6 tygodni; po decyzji zielona pigułka urlopu z dokumentem albo pigułka „praca do dnia porodu”; przy urlopie krótszym niż 6 tygodni znacznik najwcześniejszego startu.
+- Oś, dziecko urodzone: znacznik narodzin; urlop wzięty przed porodem jako zielona pigułka; bez dokumentu (już niepotrzebny). Gdy urlop się skończył — ostrzeżenie.
+- Oś, gdy znana jest liczba dzieci (faza 2a): pigułka „Urlop macierzyński po porodzie” do końca wymiaru (wymiar liczony od startu urlopu, więc tygodnie sprzed porodu skracają część po porodzie) i znacznik końca 14 tygodni po porodzie.
+- Poza zakresem: rodzicielski, urlop taty, kwoty i stawki, wnioski, ubezpieczenie mamy (2c), wcześniak i szpital.
+
+## Wyjaśnianie przypadku — zasada dla każdej fazy
+
+Sama oś to za mało: rodzic ma zrozumieć, co go dotyczy, dlaczego i co z tego policzyliśmy. Zasada obowiązuje w każdej fazie, także w kolejnych punktach sekcji A i w następnych sekcjach Przewodnika.
+
+Dla każdego przypadku pokazujemy, w tej kolejności:
+1. **Sytuację** — w jakim przypadku jest rodzina i co to zmienia. Np. „Dziecko urodziło się dzisiaj — to upraszcza sprawę: nie trzeba już planować urlopu przed porodem ani zdobywać zaświadczenia…”, „Dziecko jest w drodze — liczymy od przewidywanej daty porodu”.
+2. **Możliwości i ułatwienia** — z czego rodzina może skorzystać i dlaczego. Np. urlop można zacząć nawet 6 tygodni przed przewidywaną datą porodu; przy bliźniętach urlop jest dłuższy (31 tyg. zamiast 20).
+3. **Co policzyliśmy** — konkretne daty i długości oraz reguła, z której wynikają (np. tygodnie sprzed porodu wliczają się do wymiaru, więc po porodzie zostaje mniej).
+4. **Co przygotować**, jeśli coś trzeba (np. zaświadczenie lekarskie do konkretnego dnia).
+
+Jak to robimy:
+- Wyjaśnienie układa silnik, deterministycznie: `backend/app/engine/explain.py` → `Timeline.notes` (`CaseNote` z rodzajem `situation`, `choice`, `relief` albo `computed`). Daty czyta z gotowej osi, nie liczy ich drugi raz.
+- Każde twierdzenie o zasadach ma cytat. Bez źródła może być tylko opis naszego liczenia (punkt `situation`). Pilnuje tego `tests/test_sources.py`.
+- UI pokazuje wyjaśnienie w karcie „Twoja sytuacja” nad osią czasu. Asystent dostaje te same punkty razem z ich źródłami i mówi w tej samej kolejności. Nie dodaje ulg ani możliwości spoza źródeł i każde zdanie podpiera tylko źródłem, które je zawiera.
+- Piszemy dokładnie to, co mówi źródło. Przewodnik mówi, że urlop można **zacząć** 6 tygodni przed przewidywaną datą porodu; nie mówi, kiedy złożyć wniosek (to dojdzie z punktem „Dokumenty i wnioski”).
+- Każda nowa faza dopisuje swoje punkty w `explain.py` i testy w `tests/test_engine.py`.
 
 ## Źródła wiedzy — hierarchia
 
@@ -220,7 +244,7 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
   - Bez ustawień Supabase albo przed zastosowaniem migracji sesje są w pamięci procesu; `/api/health` pokazuje w polu `sessions`, gdzie są (`supabase` albo `memory`).
 - **Daty**: `datetime.date`, tydzień = `timedelta(days=7)` (7 dni kalendarzowych), przedziały liczone włącznie, „dziś” w strefie Europe/Warsaw (`zoneinfo`).
 - **Asystent (czat)**: aplikacja zaczyna się od rozmowy. Agent Pydantic AI (`app/assistant/agent.py`) prowadzi wywiad: jedno pytanie naraz, w kolejności z `prompts.py`. Dosłowny tekst sekcji bieżących faz jest zawsze w instrukcjach modelu, więc model nie musi niczego wyszukiwać. Narzędzia (faza 1):
-  - zmieniające `Scenario`: `set_due_date`, `set_leave_before_birth`, `set_medical_certificate`,
+  - zmieniające `Scenario`: `set_due_date`, `set_birth_date`, `set_children_count`, `set_leave_before_birth`, `set_medical_certificate`,
   - `explain_timeline_element` — podświetla element osi i zwraca zasadę z dosłownym cytatem.
 
   Na pytania spoza bieżących faz asystent odpowiada, że ten etap aplikacji ich nie obejmuje. Nie odpowiada z wiedzy ogólnej.
@@ -229,7 +253,7 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 
   `POST /api/chat` przyjmuje `session_id` i `message` i strumieniuje NDJSON ze zdarzeniami `text`, `tool-call`, `tool-result`, `timeline`, `focus`, `done` i `error`. Historię i `scenario` trzyma serwer w tabeli `sessions`: scenariusz zapisuje po każdym narzędziu, historię na końcu tury. Przeglądarka pamięta tylko identyfikator sesji i po odświeżeniu pobiera rozmowę i oś z `GET /api/session/{id}` (oś jest przeliczana od nowa z zapisanych odpowiedzi). Bez klucza LLM czat zwraca 503, a `/api/timeline` działa dalej.
 
-  Nowa faza to: sekcja w `guide.py`, cytaty w `params/2026.json`, pole w `Scenario`, reguła w silniku z testem, pytanie w wywiadzie i narzędzie w agencie, etykieta w `toolLabel` (frontend).
+  Nowa faza to: sekcja w `guide.py` (albo przepis w `extract_kp.py`), cytaty w `params/2026.json`, pole w `Scenario`, reguła w silniku z testem, punkty wyjaśnienia w `explain.py` z testem, pytanie w wywiadzie (`prompts.py`, `describe_interview`) i narzędzie w agencie, etykieta w `toolLabel` (frontend). Jeśli onboarding już zbiera potrzebną odpowiedź, użyj jej zamiast pytać w czacie.
 - **LLM**: Claude przez Pydantic AI (`pydantic-ai-slim[anthropic,openrouter]`, wersja 2.x). Dostawca z `LLM_PROVIDER`: `openrouter` (domyślnie, klucz `OPENROUTER_API_KEY`, model `anthropic/claude-opus-5.5`) albo `anthropic` (klucz `ANTHROPIC_API_KEY`, model `claude-opus-5-5`). `LLM_MODEL` nadpisuje model, `LLM_THINKING` wysiłek myślenia. Wybór modelu: `app/api/deps.py`. API wersji 2.x różni się od 1.x, np. `run_stream_events` jest context managerem, a zdarzenia własne idą przez `ctx.emit`. Przed użyciem sprawdzaj źródła w `backend/.venv`. Do czego używamy LLM:
   - czat zbierający fakty i tłumaczący oś (wyżej),
   - asystent Q&A z cytatami — Claude citations na PDF-ach materiałów zwracają dosłowny `cited_text` i numer strony; nie łączyć z `output_config.format`, bo API zwraca 400,

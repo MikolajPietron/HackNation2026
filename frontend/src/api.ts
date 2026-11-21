@@ -1,4 +1,4 @@
-import type { ChatEvent, ChatRequest, SessionView, Timeline } from './types'
+import type { ChatEvent, ChatRequest, OnboardingAnswers, SessionStart, SessionView } from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
 export const API_URL: string = import.meta.env.VITE_API_URL ?? ''
@@ -49,18 +49,18 @@ export async function fetchSession(sessionId: string): Promise<SessionView> {
   return (await response.json()) as SessionView
 }
 
-/** Onboarding: store the due date as the first answer of the interview; returns the timeline. */
-export async function startSession(
+/** Onboarding: save all answers in the session; returns them as stored and the timeline. */
+export async function submitOnboarding(
   sessionId: string,
-  dueDate: string,
+  answers: OnboardingAnswers,
   signal?: AbortSignal,
-): Promise<Timeline> {
+): Promise<SessionStart> {
   let response: Response
   try {
-    response = await fetch(`${API_URL}/api/session/${sessionId}/due-date`, {
+    response = await fetch(`${API_URL}/api/session/${sessionId}/onboarding`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ due_date: dueDate }),
+      body: JSON.stringify(answers),
       signal,
     })
   } catch (error) {
@@ -68,7 +68,7 @@ export async function startSession(
     throw new Error(OFFLINE)
   }
   if (!response.ok) throw new Error(await errorDetail(response))
-  return (await response.json()) as Timeline
+  return (await response.json()) as SessionStart
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

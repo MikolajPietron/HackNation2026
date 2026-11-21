@@ -1,6 +1,6 @@
 {
-  "version": "2026.1",
-  "description": "Faza 1: Przewodnik ZUS, sekcja A, punkt „Przygotowanie do porodu” (s. 5). Każda liczba i reguła ma dosłowny cytat z tego punktu (z literówkami oryginału). Kolejne punkty dodajemy fazami.",
+  "version": "2026.2",
+  "description": "Fazy 1 i 2a: Przewodnik ZUS, sekcja A (s. 5): „Przygotowanie do porodu” oraz wymiar urlopu macierzyńskiego i 14 tygodni po porodzie; Kodeks pracy art. 180 § 1–3 i art. 183¹ § 1–2. Każda liczba i reguła ma dosłowny cytat (z literówkami oryginału Przewodnika).",
   "maternity": {
     "max_weeks_before_birth": {
       "value": 6,
@@ -10,6 +10,39 @@
           "section": "A.1",
           "page": 5,
           "quote": "Kobieta może rozpocząć urlop macierzyński maksymalnie 6 tygodni przed przewidywaną data porodu"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 180 § 2",
+          "quote": "Przed przewidywaną datą porodu pracownica może wykorzystać nie więcej niż 6 tygodni urlopu macierzyńskiego."
+        }
+      ]
+    },
+    "weeks_by_children": {
+      "value": [20, 31, 33, 35, 37],
+      "note": "Indeks = liczba dzieci urodzonych przy jednym porodzie minus 1; ostatnia wartość dotyczy 5 i więcej dzieci.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Wymiar zasiłku macierzyńskiego za okres urlopu macierzyńskiego uzależniony jest od liczby dzieci urodzonych przy jednym porodzie (przy urodzeniu jednego dziecka przysługuje 20 tygodni)"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 180 § 1",
+          "quote": "Pracownicy przysługuje urlop macierzyński w wymiarze: 1) 20 tygodni - w przypadku urodzenia jednego dziecka przy jednym porodzie; 2) 31 tygodni - w przypadku urodzenia dwojga dzieci przy jednym porodzie; 3) 33 tygodni - w przypadku urodzenia trojga dzieci przy jednym porodzie; 4) 35 tygodni - w przypadku urodzenia czworga dzieci przy jednym porodzie; 5) 37 tygodni - w przypadku urodzenia pięciorga i więcej dzieci przy jednym porodzie."
+        }
+      ]
+    },
+    "mother_personal_weeks": {
+      "value": 14,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "A.2",
+          "page": 5,
+          "quote": "Pierwsze 14 tygodni po porodzie matka musi wykorzystać osobiście."
         }
       ]
     }
@@ -32,6 +65,33 @@
           "section": "A.1",
           "page": 5,
           "quote": "Może również pracować do dnia porodu i rozpocząć zasiłek po urodzeniu dziecka."
+        }
+      ]
+    },
+    "week_is_7_days": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183¹ § 1",
+          "quote": "Przy udzielaniu urlopu macierzyńskiego i urlopu na warunkach urlopu macierzyńskiego tydzień urlopu odpowiada 7 dniom kalendarzowym."
+        }
+      ]
+    },
+    "first_day_is_birth": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 183¹ § 2",
+          "quote": "Jeżeli pracownica nie korzysta z urlopu macierzyńskiego przed przewidywaną datą porodu, pierwszym dniem urlopu macierzyńskiego jest dzień porodu."
+        }
+      ]
+    },
+    "rest_after_birth": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180 § 3",
+          "quote": "Po porodzie przysługuje urlop macierzyński niewykorzystany przed porodem aż do wyczerpania wymiaru, o którym mowa w § 1."
         }
       ]
     }

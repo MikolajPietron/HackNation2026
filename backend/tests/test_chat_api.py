@@ -79,6 +79,7 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     }
     update = next(e for e in out if e["type"] == "timeline")
     assert update["scenario"]["due_date"] == "2027-03-15"
+    assert update["scenario"]["child_born"] is False
     assert update["focus"] == "due-date"
     window = update["timeline"]["segments"][0]
     assert (window["id"], window["start"], window["end"]) == (
@@ -91,12 +92,21 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     assert out[-1] == {"type": "done"}
 
     # Next answers: the server remembers the session; the client sends only the message.
+    model = scripted("set_children_count", {"count": 1}, "Jedno dziecko.")
+    update = next(e for e in ask(client, model, "Jedno") if e["type"] == "timeline")
+    maternity = next(s for s in update["timeline"]["segments"] if s["id"] == "maternity")
+    assert (maternity["start"], maternity["end"]) == ("2027-03-15", "2027-08-01")
+    assert update["changed"] == ["maternity", "personal-weeks"]
+
     model = scripted("set_leave_before_birth", {"weeks": 2}, "Zapisane.")
     update = next(e for e in ask(client, model, "Dwa tygodnie") if e["type"] == "timeline")
     assert update["scenario"]["leave_before_birth_weeks"] == 2
-    assert [s["id"] for s in update["timeline"]["segments"]] == ["maternity-prenatal"]
+    segments = [(s["id"], s["start"], s["end"]) for s in update["timeline"]["segments"]]
+    assert segments == [
+        ("maternity-prenatal", "2027-03-01", "2027-03-14"),
+        ("maternity", "2027-03-15", "2027-07-18"),
+    ]
     assert update["timeline"]["documents"][0]["done"] is False
-    assert "maternity-prenatal" in update["changed"]
 
     model = scripted("set_medical_certificate", {"has_certificate": True}, "Świetnie.")
     update = next(e for e in ask(client, model, "Mam zaświadczenie") if e["type"] == "timeline")
@@ -105,7 +115,7 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
 
     # After a page reload the UI gets the whole conversation and the timeline back.
     restored = client.get(f"/api/session/{SESSION}").json()
-    assert [m["role"] for m in restored["messages"]] == ["user", "assistant"] * 3
+    assert [m["role"] for m in restored["messages"]] == ["user", "assistant"] * 4
     assert restored["messages"][0]["parts"] == [
         {"kind": "text", "text": "Termin mam na 15 marca 2027"}
     ]
@@ -119,11 +129,29 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
         },
         {"kind": "text", "text": "Mam datę."},
     ]
+    assert restored["scenario"]["has_medical_certificate"] is True
     assert restored["timeline"]["documents"][0]["done"] is True
 
     # "Start over" forgets it.
     assert client.delete(f"/api/session/{SESSION}").status_code == 204
-    assert client.get(f"/api/session/{SESSION}").json() == {"messages": [], "timeline": None}
+    empty = client.get(f"/api/session/{SESSION}").json()
+    assert (empty["messages"], empty["timeline"]) == ([], None)
+
+
+def test_born_child_from_the_chat(client: TestClient) -> None:
+    model = scripted("set_birth_date", {"birth_date": "2026-11-10"}, "Gratulacje!")
+    update = next(
+        e for e in ask(client, model, "Urodził się 10.11.2026") if e["type"] == "timeline"
+    )
+    assert update["focus"] == "birth"
+    assert update["scenario"]["child_born"] is True
+    assert update["timeline"]["birth_date"] == "2026-11-10"
+    assert update["timeline"]["segments"] == []
+
+    model = scripted("set_birth_date", {"birth_date": "2027-01-10"}, "To data z przyszłości.")
+    out = ask(client, model, "Urodził się 10 stycznia 2027")
+    rejected = {"type": "tool-result", "id": "call-1", "name": "set_birth_date", "ok": False}
+    assert rejected in out
 
 
 def test_too_many_weeks_are_rejected(client: TestClient, store: MemorySessionStore) -> None:
@@ -174,21 +202,62 @@ def test_health_says_where_sessions_are_stored(client: TestClient) -> None:
     assert client.get("/api/health").json() == {"status": "ok", "sessions": "memory"}
 
 
-def test_onboarding_starts_the_session_with_the_due_date(client: TestClient) -> None:
-    started = client.put(f"/api/session/{SESSION}/due-date", json={"due_date": "2027-03-15"})
+ONBOARDING = {
+    "role": "father",
+    "child_born": False,
+    "date": "2027-03-15",
+    "children_count": 2,
+    "work": "employment",
+    "earnings": "5k-8k",
+}
+
+
+def test_onboarding_answers_are_saved_and_used(client: TestClient) -> None:
+    started = client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING)
     assert started.status_code == 200
-    assert [s["id"] for s in started.json()["segments"]] == ["prenatal-window"]
-
-    # The chat continues from there: the stored scenario already has the date.
-    model = scripted("set_leave_before_birth", {"weeks": 0}, "Zapisane.")
-    update = next(e for e in ask(client, model, "Pracuję do porodu") if e["type"] == "timeline")
-    assert update["scenario"] == {
-        "due_date": "2027-03-15",
-        "leave_before_birth_weeks": 0,
-        "has_medical_certificate": None,
+    scenario = started.json()["scenario"]
+    assert {k: scenario[k] for k in ("role", "work", "earnings", "children_count")} == {
+        "role": "father",
+        "work": "employment",
+        "earnings": "5k-8k",
+        "children_count": 2,
     }
-    assert client.get(f"/api/session/{SESSION}").json()["timeline"]["due_date"] == "2027-03-15"
+    assert (scenario["due_date"], scenario["child_born"], scenario["birth_date"]) == (
+        "2027-03-15",
+        False,
+        None,
+    )
+    maternity = next(s for s in started.json()["timeline"]["segments"] if s["id"] == "maternity")
+    assert maternity["end"] == "2027-10-17"  # twins: 31 weeks
 
-    wrong_year = client.put(f"/api/session/{SESSION}/due-date", json={"due_date": "2024-03-15"})
-    assert wrong_year.status_code == 422
-    assert "Sprawdź datę" in wrong_year.json()["detail"]
+    # The chat continues from the saved answers, and the assistant knows them.
+    seen: list[str] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        seen.append(info.instructions or "")
+        yield "Kolejne pytanie."
+
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
+    events(client.post("/api/chat", json={"session_id": SESSION, "message": "Cześć"}))
+    assert "Rozmawiasz z tatą" in seen[0]
+    assert "tata pracuje na etacie" in seen[0]
+    assert "urlop przed porodem (ile tygodni) czy praca do dnia porodu" in seen[0]
+    assert "ile dzieci" not in seen[0]
+
+    restored = client.get(f"/api/session/{SESSION}").json()
+    assert restored["scenario"]["earnings"] == "5k-8k"
+    assert restored["timeline"]["children_count"] == 2
+
+
+def test_onboarding_checks_the_date(client: TestClient) -> None:
+    born_in_future = {**ONBOARDING, "child_born": True, "date": "2027-01-10"}
+    response = client.put(f"/api/session/{SESSION}/onboarding", json=born_in_future)
+    assert response.status_code == 422
+    assert "w przyszłości" in response.json()["detail"]
+
+    born = {**ONBOARDING, "child_born": True, "date": "2026-11-10", "work": "none"}
+    del born["earnings"]
+    started = client.put(f"/api/session/{SESSION}/onboarding", json=born).json()
+    assert started["scenario"]["birth_date"] == "2026-11-10"
+    assert started["scenario"]["earnings"] is None
+    assert [s["id"] for s in started["timeline"]["segments"]] == ["maternity"]

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { deleteSession, fetchSession, startSession, streamChat } from '../api'
+import { deleteSession, fetchSession, streamChat, submitOnboarding } from '../api'
 import { currentSessionId, newSessionId } from '../lib/session'
-import type { StoredMessage, StoredPart, Timeline } from '../types'
+import type { OnboardingAnswers, Scenario, SessionStart, StoredMessage, StoredPart, Timeline } from '../types'
 
 export type MessagePart = StoredPart
 export type ToolStatus = Extract<StoredPart, { kind: 'tool' }>['status']
@@ -42,6 +42,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   const [busy, setBusy] = useState(false)
   const [restoring, setRestoring] = useState(true)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
+  const [scenario, setScenario] = useState<Scenario | null>(null)
   const [changed, setChanged] = useState<ChangeSet>({ ids: [], version: 0 })
   const sessionId = useRef(currentSessionId())
   const request = useRef<AbortController | null>(null)
@@ -54,6 +55,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
         if (cancelled) return
         setMessages((current) => (current.length === 0 ? session.messages : current))
         setTimeline((current) => current ?? session.timeline)
+        setScenario((current) => current ?? session.scenario)
       })
       .catch(() => {
         // Backend unreachable: start empty; sending a message will show the error.
@@ -110,6 +112,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
                 break
               case 'timeline':
                 setTimeline(event.timeline)
+                setScenario(event.scenario)
                 setChanged((c) => ({ ids: event.changed, version: c.version + 1 }))
                 onTimeline?.(event.focus)
                 break
@@ -142,15 +145,17 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     [onTimeline, onFocus],
   )
 
-  /** Onboarding: save the due date in this session and get the first timeline. */
-  const calculate = useCallback(
-    (dueDate: string, signal: AbortSignal) => startSession(sessionId.current, dueDate, signal),
+  /** Onboarding: save the answers in this session and get the first timeline. */
+  const submit = useCallback(
+    (answers: OnboardingAnswers, signal: AbortSignal) =>
+      submitOnboarding(sessionId.current, answers, signal),
     [],
   )
 
-  /** Show a timeline computed outside the chat (onboarding). The assistant continues from it. */
-  const load = useCallback((next: Timeline) => {
-    setTimeline(next)
+  /** Show what the onboarding saved. The assistant continues from it. */
+  const load = useCallback((start: SessionStart) => {
+    setScenario(start.scenario)
+    setTimeline(start.timeline)
     setChanged((c) => ({ ids: [], version: c.version + 1 }))
   }, [])
 
@@ -166,8 +171,9 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setBusy(false)
     setMessages([])
     setTimeline(null)
+    setScenario(null)
     setChanged({ ids: [], version: 0 })
   }, [])
 
-  return { messages, busy, restoring, send, stop, reset, calculate, load, timeline, changed }
+  return { messages, busy, restoring, send, stop, reset, submit, load, scenario, timeline, changed }
 }

@@ -13,7 +13,12 @@ from typing import Annotated, Any
 from pydantic import Field
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
 
-from app.assistant.describe import describe_element, describe_interview, describe_timeline
+from app.assistant.describe import (
+    describe_element,
+    describe_interview,
+    describe_person,
+    describe_timeline,
+)
 from app.assistant.prompts import STATIC_INSTRUCTIONS, WEEKDAYS
 from app.engine import (
     Params,
@@ -23,7 +28,7 @@ from app.engine import (
     build_timeline,
     changed_element_ids,
 )
-from app.engine.plausibility import due_date_problem
+from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
 USAGE_LIMITS = UsageLimits(request_limit=12)
@@ -67,6 +72,7 @@ def current_state(ctx: RunContext[AssistantDeps]) -> str:
     today = ctx.deps.today
     lines = [
         f"Dzisiaj jest {WEEKDAYS[today.weekday()]}, {fmt(today)}.",
+        describe_person(ctx.deps.scenario),
         describe_interview(ctx.deps.scenario),
     ]
     if ctx.deps.timeline is None:
@@ -84,7 +90,7 @@ async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, focus: str 
     """Rebuild the timeline, push it to the UI and tell the model what it looks like now."""
     deps = ctx.deps
     timeline = None
-    if scenario.due_date is not None:
+    if scenario.anchor_date is not None:
         try:
             timeline = build_timeline(scenario, deps.params, deps.today)
         except ScenarioError as exc:
@@ -106,34 +112,66 @@ async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, focus: str 
 
 @assistant.tool(sequential=True)
 async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str:
-    """Set the expected due date (przewidywana data porodu) and rebuild the timeline.
+    """The child is on the way: set the expected due date and rebuild the timeline.
 
     Args:
-        due_date: Expected due date, e.g. from the pregnancy card.
+        due_date: Expected due date (przewidywana data porodu), e.g. from the pregnancy card.
     """
     problem = due_date_problem(due_date, ctx.deps.today)
     if problem:
         raise ModelRetry(
-            f"Nie ustawiono: {problem} Jeśli dziecko już się urodziło, wyjaśnij zakres tego etapu."
+            f"Nie ustawiono: {problem} Jeśli dziecko już się urodziło, użyj set_birth_date."
         )
-    return await _apply(ctx, _with(ctx, due_date=due_date), focus="due-date")
+    scenario = _with(ctx, child_born=False, due_date=due_date)
+    return await _apply(ctx, scenario, focus="due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_birth_date(ctx: RunContext[AssistantDeps], birth_date: dt.date) -> str:
+    """The child is already born: set the actual date of birth and rebuild the timeline.
+
+    Args:
+        birth_date: Date of birth, e.g. from the birth certificate.
+    """
+    problem = birth_date_problem(birth_date, ctx.deps.today)
+    if problem:
+        raise ModelRetry(f"Nie ustawiono: {problem}")
+    # The certificate is needed only to start leave before an expected birth.
+    scenario = _with(ctx, child_born=True, birth_date=birth_date, has_medical_certificate=None)
+    return await _apply(ctx, scenario, focus="birth")
+
+
+@assistant.tool(sequential=True)
+async def set_children_count(
+    ctx: RunContext[AssistantDeps], count: Annotated[int, Field(ge=1, le=10)]
+) -> str:
+    """Set how many children are (or will be) born in one delivery (2 = twins).
+
+    Args:
+        count: Number of children born in one delivery.
+    """
+    return await _apply(ctx, _with(ctx, children_count=count), focus="maternity")
 
 
 @assistant.tool(sequential=True)
 async def set_leave_before_birth(
     ctx: RunContext[AssistantDeps], weeks: Annotated[int, Field(ge=0)]
 ) -> str:
-    """Record the mother's decision about maternity leave before the due date.
+    """Record maternity leave before the birth: planned (child on the way) or taken (born).
 
-    The tool rejects more weeks than the guide allows.
+    The tool rejects more weeks than the law allows.
 
     Args:
-        weeks: Whole weeks of maternity leave before the due date. 0 = she works until the birth.
+        weeks: Whole weeks of maternity leave before the birth. 0 = no leave before the birth
+            (she works, or worked, until the birth).
     """
     changes: dict[str, Any] = {"leave_before_birth_weeks": weeks}
     if weeks == 0:
         changes["has_medical_certificate"] = None
-    focus = "maternity-prenatal" if weeks else "work-until-birth"
+    if weeks:
+        focus = "maternity-prenatal"
+    else:
+        focus = "birth" if ctx.deps.scenario.child_born else "work-until-birth"
     return await _apply(ctx, _with(ctx, **changes), focus=focus)
 
 
@@ -144,6 +182,8 @@ async def set_medical_certificate(ctx: RunContext[AssistantDeps], has_certificat
     Args:
         has_certificate: True if she already has it, False if she still needs to get it.
     """
+    if ctx.deps.scenario.child_born:
+        raise ModelRetry("Dziecko już się urodziło: zaświadczenie nie jest już potrzebne.")
     if not ctx.deps.scenario.leave_before_birth_weeks:
         raise ModelRetry(
             "Zaświadczenie jest potrzebne tylko do urlopu przed porodem. Najpierw ustal, "
@@ -164,7 +204,7 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
     """
     timeline = ctx.deps.timeline
     if timeline is None:
-        raise ModelRetry("Oś czasu jest pusta — najpierw ustaw przewidywaną datę porodu.")
+        raise ModelRetry("Oś czasu jest pusta — najpierw ustaw datę porodu.")
     element = timeline.element(element_id)
     if element is None:
         ids = ", ".join(e.id for e in timeline.elements())

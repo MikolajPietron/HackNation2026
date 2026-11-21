@@ -13,7 +13,7 @@ export function EmptyTimeline() {
       <div>
         <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
         <p className="mt-2 max-w-md text-navy-500">
-          Podaj w rozmowie przewidywaną datę porodu. Pokażemy tu, od kiedy mama może zacząć urlop macierzyński.
+          Podaj w rozmowie datę porodu. Pokażemy tu, od kiedy mama może zacząć urlop macierzyński i ile on trwa.
         </p>
       </div>
       <div className="space-y-3.5" aria-hidden>

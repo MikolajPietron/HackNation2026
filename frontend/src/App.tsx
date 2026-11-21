@@ -11,7 +11,7 @@ import { TimelinePanel } from '@/components/timeline/TimelinePanel'
 import { useAssistant } from '@/hooks/useAssistant'
 import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
 import { cn } from '@/lib/utils'
-import type { Timeline } from '@/types'
+import type { SessionStart } from '@/types'
 
 const APP_NAME = 'Zasiłkowy Przewodnik Przyszłego Rodzica'
 
@@ -31,11 +31,13 @@ export default function App() {
     setUnseen(true)
     if (focusId) setFocus((f) => ({ id: focusId, tick: f.tick + 1 }))
   }, [])
-  const { messages, busy, restoring, send, stop, reset, calculate, load, timeline, changed } =
+  const { messages, busy, restoring, send, stop, reset, submit, load, scenario, timeline, changed } =
     useAssistant({ onFocus: focusOn, onTimeline: timelineChanged })
 
-  // The onboarding is the start of a new conversation. A restored one goes straight to the app.
-  const onboarding = !skippedOnboarding && messages.length === 0 && timeline === null
+  // The onboarding runs until its answers are saved: it always saves the role, the chat never
+  // does. A conversation that has started, or a skipped onboarding, goes straight to the app.
+  const onboardingSaved = scenario?.role != null
+  const onboarding = !skippedOnboarding && messages.length === 0 && !onboardingSaved
 
   // Phones show one panel at a time. From `lg` the chat is always on the right and the
   // tab only switches the middle between the timeline and the assumptions.
@@ -56,8 +58,8 @@ export default function App() {
     setTab('chat')
     setSkippedOnboarding(false)
   }
-  const finishOnboarding = (firstTimeline: Timeline) => {
-    load(firstTimeline)
+  const finishOnboarding = (start: SessionStart) => {
+    load(start)
     setSelectedId(null)
     setTab('timeline')
   }
@@ -77,7 +79,7 @@ export default function App() {
             key="onboarding"
             exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.3, ease: EASE_IN_OUT } }}
           >
-            <Onboarding calculate={calculate} onDone={finishOnboarding} onSkip={skipOnboarding} />
+            <Onboarding submit={submit} onDone={finishOnboarding} onSkip={skipOnboarding} />
           </motion.div>
         ) : (
           <motion.div
@@ -109,7 +111,7 @@ export default function App() {
               aria-label={tab === 'about' ? 'Założenia i źródła' : 'Oś czasu'}
             >
               {tab === 'about' ? (
-                <AboutPanel timeline={timeline} />
+                <AboutPanel scenario={scenario} timeline={timeline} />
               ) : (
                 <>
                   <p className="hidden px-8 pt-8 text-xs font-black tracking-widest text-zus-700 uppercase lg:block">
@@ -147,7 +149,7 @@ export default function App() {
                 <ChatPanel
                   messages={messages}
                   busy={busy}
-                  hasTimeline={timeline !== null}
+                  scenario={scenario}
                   onSend={send}
                   onStop={stop}
                   onShowTimeline={showOnTimeline}

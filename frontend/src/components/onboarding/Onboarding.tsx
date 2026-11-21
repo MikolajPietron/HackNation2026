@@ -2,68 +2,267 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
+import blizniaki from '@/assets/onboarding/blizniaki.webp'
+import dom from '@/assets/onboarding/dom.webp'
 import dziecko from '@/assets/onboarding/dziecko.webp'
+import etat from '@/assets/onboarding/etat.webp'
+import firma from '@/assets/onboarding/firma.webp'
+import lozeczko from '@/assets/onboarding/lozeczko.webp'
 import mama from '@/assets/onboarding/mama.webp'
 import tata from '@/assets/onboarding/tata.webp'
+import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-import type { Timeline } from '@/types'
+import type { Earnings, OnboardingAnswers, Role, SessionStart, Work } from '@/types'
 import { Calendar } from './Calendar'
-import { PrimaryButton } from './ChoiceCard'
+import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
 import { ITEM, POP, STEP } from './motion'
 
-// Phase 1 (guide section A.1): the onboarding asks only for the expected due date. The rest of
-// the interview is in the chat. More steps (who is asking, children, work, earnings) come back
-// with the phases that use them; their earlier version is in git history (commit 4092d06).
+/**
+ * What the parent told us, while the questions are being answered. All of it is saved in the
+ * session (see toAnswers): the date, birth and children feed the timeline; role, work and
+ * earnings guide the assistant now and later phases (who pays, applications, amounts).
+ */
+interface Answers {
+  role: Role | null
+  born: boolean | null
+  children: number | null
+  /** ISO date: birth date when `born`, otherwise the due date. */
+  date: string
+  work: Work | null
+  earnings: Earnings | null
+}
 
-const ILLUSTRATIONS = [mama, tata, dziecko]
+const ILLUSTRATIONS = [mama, tata, dziecko, lozeczko, blizniaki, etat, zlecenie, firma, dom]
 
-type StepId = 'intro' | 'date' | 'calculating'
+const EMPTY: Answers = { role: null, born: null, children: null, date: '', work: null, earnings: null }
 
+type StepId = 'intro' | 'role' | 'born' | 'children' | 'date' | 'work' | 'earnings' | 'calculating'
+
+/** Pause after a tap so the choice visibly lands before the step leaves. */
+const CHOICE_DELAY_MS = 320
 /** The calculation is fast; its screen stays long enough to read instead of flashing. */
 const MIN_CALCULATING_MS = 1400
 const DUE_DATE_MAX_DAYS_AHEAD = 300
-const CALCULATING = ['Sprawdzamy termin…', 'Liczymy urlop przed porodem…', 'Układamy oś czasu…']
+const BIRTH_DATE_MAX_DAYS_AGO = 6 * 366
+const CALCULATING = ['Sprawdzamy terminy…', 'Liczymy urlop macierzyński…', 'Układamy oś czasu…']
+
+const EARNINGS: { value: Earnings; label: string }[] = [
+  { value: 'under-5k', label: 'Do 5 000 zł' },
+  { value: '5k-8k', label: '5 000 – 8 000 zł' },
+  { value: '8k-12k', label: '8 000 – 12 000 zł' },
+  { value: 'over-12k', label: 'Powyżej 12 000 zł' },
+  { value: 'unknown', label: 'Nie wiem' },
+]
+
+/** The finished answers, in the shape the backend stores. */
+function toAnswers(answers: Answers): OnboardingAnswers {
+  return {
+    role: answers.role ?? 'mother',
+    child_born: answers.born ?? false,
+    date: answers.date,
+    children_count: answers.children ?? 1,
+    work: answers.work ?? 'none',
+    earnings: answers.work === 'none' ? null : answers.earnings,
+  }
+}
 
 interface Props {
-  /** Stores the due date as the first answer of the interview and returns the timeline. */
-  calculate: (dueDate: string, signal: AbortSignal) => Promise<Timeline>
-  onDone: (timeline: Timeline) => void
+  /** Saves the answers in the session and returns the first timeline. */
+  submit: (answers: OnboardingAnswers, signal: AbortSignal) => Promise<SessionStart>
+  onDone: (start: SessionStart) => void
   /** Go straight to the assistant. */
   onSkip: () => void
 }
 
-/** Full-screen start: one question, then the first timeline. No progress bar on purpose. */
-export function Onboarding({ calculate, onDone, onSkip }: Props) {
+/** Full-screen questions, one per screen, then the first timeline. No progress bar on purpose. */
+export function Onboarding({ submit, onDone, onSkip }: Props) {
   const [path, setPath] = useState<StepId[]>(['intro'])
-  const [date, setDate] = useState('')
+  const [answers, setAnswers] = useState<Answers>(EMPTY)
+  const [leaving, setLeaving] = useState(false)
+  const timer = useRef(0)
   const step = path[path.length - 1]
 
+  useEffect(() => () => window.clearTimeout(timer.current), [])
   useEffect(() => {
     for (const src of ILLUSTRATIONS) new Image().src = src
   }, [])
 
-  const go = (next: StepId) => setPath((p) => [...p, next])
-  const backTo = (target?: StepId) =>
+  const go = (next: StepId) => {
+    setLeaving(false)
+    setPath((p) => [...p, next])
+  }
+  const backTo = (target?: StepId) => {
+    window.clearTimeout(timer.current)
+    setLeaving(false)
     setPath((p) => {
       const index = target ? p.lastIndexOf(target) : p.length - 2
       return index >= 0 ? p.slice(0, index + 1) : p
     })
+  }
+  /** Record an answer, let the selection land, then move on. */
+  const choose = (patch: Partial<Answers>, next: StepId) => {
+    if (leaving) return
+    setAnswers((a) => ({ ...a, ...patch }))
+    setLeaving(true)
+    timer.current = window.setTimeout(() => go(next), CHOICE_DELAY_MS)
+  }
+  const state = <K extends keyof Answers>(key: K, value: Answers[K]) => ({
+    selected: answers[key] === value,
+    dimmed: leaving && answers[key] !== value,
+  })
 
   let screen: ReactNode
   switch (step) {
     case 'intro':
-      screen = <Intro onStart={() => go('date')} onSkip={onSkip} />
+      screen = <Intro onStart={() => go('role')} onSkip={onSkip} />
+      break
+    case 'role':
+      screen = (
+        <Question title="Kim jesteś?" subtitle="Dopasujemy do tego wyjaśnienia.">
+          <Cards label="Kim jesteś?">
+            <ImageChoice
+              image={mama}
+              label="Mamą"
+              {...state('role', 'mother')}
+              onSelect={() => choose({ role: 'mother' }, 'born')}
+            />
+            <ImageChoice
+              image={tata}
+              label="Tatą"
+              {...state('role', 'father')}
+              onSelect={() => choose({ role: 'father' }, 'born')}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    case 'born': {
+      // The date limits differ, so a changed answer clears the date.
+      const pickBorn = (born: boolean) =>
+        choose({ born, date: answers.born === born ? answers.date : '' }, 'children')
+      screen = (
+        <Question title="Czy dziecko jest już na świecie?">
+          <Cards label="Czy dziecko jest już na świecie?">
+            <ImageChoice
+              image={lozeczko}
+              label="Czekamy na nie"
+              hint="Jesteśmy w ciąży"
+              {...state('born', false)}
+              onSelect={() => pickBorn(false)}
+            />
+            <ImageChoice
+              image={dziecko}
+              label="Już jest z nami"
+              hint="Dziecko się urodziło"
+              {...state('born', true)}
+              onSelect={() => pickBorn(true)}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    }
+    case 'children':
+      screen = (
+        <Question
+          title={answers.born ? 'Ile dzieci się urodziło?' : 'Ile dzieci się urodzi?'}
+          subtitle="Przy ciąży mnogiej urlop macierzyński jest dłuższy."
+        >
+          <Cards label="Liczba dzieci">
+            <ImageChoice
+              image={dziecko}
+              label="Jedno"
+              {...state('children', 1)}
+              onSelect={() => choose({ children: 1 }, 'date')}
+            />
+            <ImageChoice
+              image={blizniaki}
+              label="Bliźnięta"
+              {...state('children', 2)}
+              onSelect={() => choose({ children: 2 }, 'date')}
+            />
+          </Cards>
+          <MoreChildren
+            value={answers.children}
+            leaving={leaving}
+            onSelect={(children) => choose({ children }, 'date')}
+          />
+        </Question>
+      )
       break
     case 'date':
-      screen = <DateStep value={date} onChange={setDate} onNext={() => go('calculating')} />
+      screen = (
+        <DateStep
+          born={answers.born ?? false}
+          value={answers.date}
+          onChange={(date) => setAnswers((a) => ({ ...a, date }))}
+          onNext={() => go('work')}
+        />
+      )
+      break
+    case 'work': {
+      const pickWork = (work: Work) => choose({ work }, work === 'none' ? 'calculating' : 'earnings')
+      screen = (
+        <Question
+          title="Jak pracujesz?"
+          subtitle="Od tego zależy, kto wypłaci zasiłek i gdzie złożysz wniosek."
+        >
+          <Cards label="Jak pracujesz?" wide>
+            <ImageChoice
+              image={etat}
+              label="Na etacie"
+              hint="umowa o pracę"
+              {...state('work', 'employment')}
+              onSelect={() => pickWork('employment')}
+            />
+            <ImageChoice
+              image={zlecenie}
+              label="Na zleceniu"
+              hint="umowa zlecenia"
+              {...state('work', 'contract')}
+              onSelect={() => pickWork('contract')}
+            />
+            <ImageChoice
+              image={firma}
+              label="Własna firma"
+              hint="JDG"
+              {...state('work', 'business')}
+              onSelect={() => pickWork('business')}
+            />
+            <ImageChoice
+              image={dom}
+              label="Nie pracuję"
+              {...state('work', 'none')}
+              onSelect={() => pickWork('none')}
+            />
+          </Cards>
+        </Question>
+      )
+      break
+    }
+    case 'earnings':
+      screen = (
+        <Question title="Ile zarabiasz miesięcznie?" subtitle="Brutto, w przybliżeniu. Wystarczy przedział.">
+          <div role="radiogroup" aria-label="Zarobki" className="mx-auto w-full max-w-md space-y-3">
+            {EARNINGS.map((option) => (
+              <TextChoice
+                key={option.value}
+                label={option.label}
+                {...state('earnings', option.value)}
+                onSelect={() => choose({ earnings: option.value }, 'calculating')}
+              />
+            ))}
+          </div>
+        </Question>
+      )
       break
     case 'calculating':
       screen = (
         <Calculating
-          date={date}
-          calculate={calculate}
+          answers={answers}
+          submit={submit}
           onDone={onDone}
           onFix={() => backTo('date')}
         />
@@ -71,7 +270,7 @@ export function Onboarding({ calculate, onDone, onSkip }: Props) {
       break
   }
 
-  const canGoBack = step === 'date'
+  const canGoBack = step !== 'intro' && step !== 'calculating'
 
   return (
     <div className="relative flex h-dvh flex-col bg-white">
@@ -139,6 +338,21 @@ function Question({
   )
 }
 
+function Cards({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn(
+        'mx-auto grid w-full grid-cols-2 gap-3 sm:gap-6',
+        wide ? 'max-w-5xl lg:grid-cols-4' : 'max-w-3xl',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-16 text-center">
@@ -166,10 +380,10 @@ function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void })
         variants={ITEM}
         className="mt-6 text-4xl leading-[1.05] font-bold tracking-tight text-balance text-navy-900 sm:text-6xl"
       >
-        Przygotujmy się do porodu
+        Zaplanujmy urlop macierzyński
       </motion.h1>
       <motion.p variants={ITEM} className="mt-4 max-w-md text-lg text-pretty text-navy-500">
-        Od kiedy mama może zacząć urlop macierzyński i co warto przygotować. Jedno pytanie, bez logowania.
+        Od kiedy mama może go zacząć, ile trwa i co przygotować. Kilka pytań, bez logowania.
       </motion.p>
       <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
         <PrimaryButton onClick={onStart}>
@@ -187,6 +401,66 @@ function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void })
   )
 }
 
+/** Triplets and more are rare: hidden behind a link instead of a third card. */
+function MoreChildren({
+  value,
+  leaving,
+  onSelect,
+}: {
+  value: number | null
+  leaving: boolean
+  onSelect: (children: number) => void
+}) {
+  const [open, setOpen] = useState((value ?? 0) > 2)
+  return (
+    <motion.div variants={ITEM} className="mt-8 flex h-11 justify-center">
+      <AnimatePresence mode="wait" initial={false}>
+        {open ? (
+          <motion.div
+            key="counts"
+            role="radiogroup"
+            aria-label="Więcej dzieci"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-2"
+          >
+            {[3, 4, 5].map((count) => (
+              <button
+                key={count}
+                type="button"
+                role="radio"
+                aria-checked={value === count}
+                onClick={() => onSelect(count)}
+                className={cn(
+                  'h-11 rounded-full border px-5 font-bold transition-[border-color,background-color,opacity,transform] duration-200 active:scale-[0.96]',
+                  value === count
+                    ? 'border-zus-600 bg-zus-50 text-zus-900'
+                    : 'border-line text-navy-900 hover:border-navy-200',
+                  leaving && value !== count && 'opacity-40',
+                )}
+              >
+                {count === 5 ? '5 lub więcej' : count}
+              </button>
+            ))}
+          </motion.div>
+        ) : (
+          <motion.button
+            key="link"
+            type="button"
+            onClick={() => setOpen(true)}
+            exit={{ opacity: 0 }}
+            className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+          >
+            Trojaczki lub więcej?
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+/** Polish plural: 1 tydzień, 2 tygodnie, 5 tygodni. */
 function plural(n: number, one: string, few: string, many: string): string {
   if (n === 1) return one
   const last = n % 10
@@ -211,24 +485,30 @@ function distance(date: string, today: string): string {
 }
 
 function DateStep({
+  born,
   value,
   onChange,
   onNext,
 }: {
+  born: boolean
   value: string
   onChange: (date: string) => void
   onNext: () => void
 }) {
   const today = todayIso()
-  const max = addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD)
+  const min = born ? addDaysIso(today, -BIRTH_DATE_MAX_DAYS_AGO) : today
+  const max = born ? today : addDaysIso(today, DUE_DATE_MAX_DAYS_AHEAD)
   // ISO dates compare correctly as strings.
-  const valid = value !== '' && value >= today && value <= max
-  const title = 'Kiedy jest termin porodu?'
+  const valid = value !== '' && value >= min && value <= max
+  const title = born ? 'Kiedy urodziło się dziecko?' : 'Kiedy jest termin porodu?'
 
   return (
-    <Question title={title} subtitle="Przewidywana data porodu z karty ciąży.">
+    <Question
+      title={title}
+      subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
+    >
       <motion.div variants={ITEM}>
-        <Calendar value={value} min={today} max={max} today={today} label={title} onChange={onChange} />
+        <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
       </motion.div>
       <motion.div variants={ITEM} className="mt-6 flex flex-col items-center gap-5">
         <p className="h-7 text-lg" aria-live="polite">
@@ -248,36 +528,37 @@ function DateStep({
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 function Calculating({
-  date,
-  calculate,
+  answers,
+  submit,
   onDone,
   onFix,
 }: {
-  date: string
-  calculate: Props['calculate']
+  answers: Answers
+  submit: Props['submit']
   onDone: Props['onDone']
   onFix: () => void
 }) {
   const [phase, setPhase] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const callbacks = useRef({ calculate, onDone })
+  const callbacks = useRef({ submit, onDone })
   useEffect(() => {
-    callbacks.current = { calculate, onDone }
+    callbacks.current = { submit, onDone }
   })
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([callbacks.current.calculate(date, controller.signal), wait(MIN_CALCULATING_MS)])
-      .then(([timeline]) => {
-        if (!controller.signal.aborted) callbacks.current.onDone(timeline)
+    const finished = toAnswers(answers)
+    Promise.all([callbacks.current.submit(finished, controller.signal), wait(MIN_CALCULATING_MS)])
+      .then(([start]) => {
+        if (!controller.signal.aborted) callbacks.current.onDone(start)
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return
         setError(reason instanceof Error ? reason.message : 'Nie udało się policzyć osi czasu.')
       })
     return () => controller.abort()
-  }, [date, attempt])
+  }, [answers, attempt])
 
   useEffect(() => {
     const id = window.setInterval(

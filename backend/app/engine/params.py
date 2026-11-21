@@ -19,11 +19,16 @@ class Rule(BaseModel):
 
 class MaternityParams(BaseModel):
     max_weeks_before_birth: Param[int]
+    weeks_by_children: Param[list[int]]
+    mother_personal_weeks: Param[int]
 
 
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
+    week_is_7_days: Rule
+    first_day_is_birth: Rule
+    rest_after_birth: Rule
 
 
 class Params(BaseModel):
@@ -33,9 +38,18 @@ class Params(BaseModel):
     rules: Rules
 
     def sources(self) -> list[SourceRef]:
-        """Every source in the file, for the test that checks quotes against the guide."""
-        return [
-            *self.maternity.max_weeks_before_birth.sources,
-            *self.rules.medical_certificate.sources,
-            *self.rules.work_until_birth.sources,
-        ]
+        """Every source in the file, for the test that checks quotes against the documents."""
+        found: list[SourceRef] = []
+
+        def walk(value: object) -> None:
+            if isinstance(value, SourceRef):
+                found.append(value)
+            elif isinstance(value, BaseModel):
+                for name in type(value).model_fields:
+                    walk(getattr(value, name))
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+
+        walk(self)
+        return found

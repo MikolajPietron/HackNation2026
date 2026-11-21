@@ -5,8 +5,10 @@ import { TextStates } from '@/components/ui/text-states'
 import type { ChangeSet } from '@/hooks/useAssistant'
 import { formatLongDate } from '@/lib/dates'
 import { EASE_OUT, SPRING_LAYOUT } from '@/lib/ease'
+import { childrenLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Timeline } from '@/types'
+import { CaseNotes } from './CaseNotes'
 import { ElementDetails } from './ElementDetails'
 import { EmptyTimeline } from './EmptyTimeline'
 import { timelineItems } from './items'
@@ -42,7 +44,10 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
 
   const selected = items.find((item) => item.id === selectedId) ?? null
   const props = { timeline, items, selectedId, changedIds, changeVersion: changed.version, focus, onSelect }
-  const due = `Przewidywana data porodu: ${formatLongDate(timeline.due_date)}`
+  const date = `${timeline.child_born ? 'Data urodzenia' : 'Przewidywana data porodu'}: ${formatLongDate(timeline.birth_date)}`
+  const subtitle = timeline.children_count
+    ? `${date} · ${childrenLabel(timeline.children_count)}`
+    : date
 
   return (
     // The pill axis needs room; in a narrow column (phone, small laptop) the list takes over.
@@ -52,7 +57,7 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
           <div>
             <h1 className="text-2xl font-black text-navy-900 lg:text-3xl">Twoja oś czasu</h1>
             <p className="mt-1 text-sm font-bold text-navy-500">
-              <TextStates text={due} />
+              <TextStates text={subtitle} />
             </p>
           </div>
           <div className="hidden rounded-full bg-white p-1 shadow-card @2xl:flex" role="tablist">
@@ -80,6 +85,8 @@ export function TimelinePanel({ timeline, changed, selectedId, focus, onSelect }
             ))}
           </div>
         </header>
+
+        <CaseNotes notes={timeline.notes} />
 
         {timeline.warnings.map((warning) => (
           <p
