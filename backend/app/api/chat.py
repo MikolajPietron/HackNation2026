@@ -43,7 +43,7 @@ from app.assistant.agent import (
     TimelineUpdated,
     assistant,
 )
-from app.assistant.describe import interview_questions
+from app.assistant.describe import interview_questions, next_question
 from app.assistant.prompts import timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -178,6 +178,7 @@ class _Translator:
                     "changed": event.changed,
                     "changed_notes": event.changed_notes,
                     "focus": event.focus,
+                    "question": _question(scenario),
                 }
             case ElementFocused(element_id=element_id):
                 return {"type": "focus", "element_id": element_id}
@@ -207,3 +208,8 @@ def _error_message(exc: Exception) -> str:
             return "Asystent potrzebował zbyt wielu kroków. Spróbuj zapytać prościej."
         case _:
             return "Coś poszło nie tak po stronie asystenta. Spróbuj jeszcze raz."
+
+
+def _question(scenario: Scenario) -> dict[str, str] | None:
+    question = next_question(scenario)
+    return question.model_dump() if question else None

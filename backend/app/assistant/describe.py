@@ -5,6 +5,8 @@ All dates and numbers come from the engine; the model only reads them.
 
 from typing import NamedTuple
 
+from pydantic import BaseModel
+
 from app.assistant.guide import page_label
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
@@ -98,6 +100,21 @@ class Question(NamedTuple):
     """Worded for whoever is writing; the assistant asks it word for word."""
     tool: str
     """The tool that saves the answer."""
+    key: str
+    """Which question it is, for the UI's answer cards and suggestions."""
+
+
+class InterviewQuestion(BaseModel):
+    """The next interview question as the UI gets it: the chat and the answer cards ask the
+    same thing as the assistant."""
+
+    key: str
+    text: str
+
+
+def next_question(scenario: Scenario) -> InterviewQuestion | None:
+    questions = interview_questions(scenario)
+    return InterviewQuestion(key=questions[0].key, text=questions[0].text) if questions else None
 
 
 def interview_questions(scenario: Scenario) -> list[Question]:
@@ -114,6 +131,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "Kiedy jest przewidywany poród albo kiedy urodziło się dziecko? Podaj dzień, "
                 "miesiąc i rok.",
                 "`set_due_date` (dziecko w drodze) albo `set_birth_date` (już urodzone)",
+                "date",
             )
         )
     if scenario.children_count is None:
@@ -123,6 +141,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 if born
                 else "Ile dzieci urodzi się przy jednym porodzie?",
                 "`set_children_count`",
+                "children",
             )
         )
     # The mother's insurance first: without it she has no maternity leave to plan.
@@ -132,6 +151,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 "Jak pracuje mama: na etacie (umowa o pracę), na umowie zlecenia, prowadzi "
                 "własną firmę czy nie pracuje?",
                 "`set_mother_work`",
+                "mother-work",
             )
         )
     elif cover == "unknown-voluntary":
@@ -143,6 +163,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
                 else "Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego "
                 "(opłaca składkę chorobową)?",
                 "`set_voluntary_insurance`",
+                "mother-insurance",
             )
         )
     insured = cover not in NOT_INSURED
@@ -179,7 +200,13 @@ def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
                 else "Czy mama chce zacząć urlop macierzyński przed porodem (ile tygodni "
                 "wcześniej?), czy pracować do dnia porodu?"
             )
-        return [Question(text, "`set_leave_before_birth` (0 = bez urlopu przed porodem)")]
+        return [
+            Question(
+                text,
+                "`set_leave_before_birth` (0 = bez urlopu przed porodem)",
+                "leave-before-birth",
+            )
+        ]
     if (
         not born
         and scenario.leave_before_birth_weeks > 0
@@ -191,6 +218,7 @@ def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
                 if mother
                 else "Czy mama ma już zaświadczenie lekarskie o przewidywanej dacie porodu?",
                 "`set_medical_certificate`",
+                "certificate",
             )
         ]
     return []
@@ -211,6 +239,7 @@ def _hospital_questions(scenario: Scenario) -> list[Question]:
                 else "Czy dziecko urodziło się przed ukończeniem 37. tygodnia ciąży albo było "
                 "po porodzie w szpitalu?",
                 "`set_hospital_care` (applies: tak albo nie)",
+                "hospital",
             )
         ]
     if scenario.hospital_care and (
@@ -224,6 +253,7 @@ def _hospital_questions(scenario: Scenario) -> list[Question]:
                 else "W którym tygodniu ciąży urodziło się dziecko, czy ważyło nie więcej niż "
                 "1000 g i od kiedy do kiedy było w szpitalu?",
                 "`set_hospital_care` (ze wszystkimi szczegółami naraz)",
+                "hospital-details",
             )
         ]
     return []
@@ -239,6 +269,7 @@ def _father_questions(scenario: Scenario) -> list[Question]:
                     "Jak pracuje tata: na etacie (umowa o pracę), na umowie zlecenia, prowadzi "
                     "własną firmę czy nie pracuje?",
                     "`set_father_work`",
+                    "father-work",
                 )
             ]
         case "unknown-voluntary":
@@ -250,6 +281,7 @@ def _father_questions(scenario: Scenario) -> list[Question]:
                     else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego "
                     "(opłaca składkę chorobową)?",
                     "`set_father_insurance`",
+                    "father-insurance",
                 )
             ]
         case _:

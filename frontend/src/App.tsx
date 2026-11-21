@@ -43,6 +43,7 @@ function ParentsApp() {
     submit,
     load,
     scenario,
+    question,
     timeline,
     changed,
   } = useAssistant({ onFocus: focusOn })
@@ -119,6 +120,7 @@ function ParentsApp() {
             messages={messages}
             busy={busy}
             scenario={scenario}
+            question={question}
             timeline={timeline}
             changed={changed}
             selectedId={selectedId}

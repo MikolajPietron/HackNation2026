@@ -20,6 +20,7 @@ import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
 import { Sheet } from '@/components/ui/sheet'
 import { TextStates } from '@/components/ui/text-states'
+import { CaseNotes } from '@/components/timeline/CaseNotes'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
@@ -31,7 +32,7 @@ import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { plural, sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Scenario, Timeline } from '@/types'
+import type { InterviewQuestion, Scenario, Timeline } from '@/types'
 import { Dialog } from './Dialog'
 import { GoalPlans } from './GoalPlans'
 import { MobileTimeline } from './MobileTimeline'
@@ -58,6 +59,8 @@ interface Props {
   messages: ChatMessage[]
   busy: boolean
   scenario: Scenario | null
+  /** The next interview question from the backend: the cards ask what the assistant asks. */
+  question: InterviewQuestion | null
   timeline: Timeline | null
   changed: ChangeSet
   selectedId: string | null
@@ -71,6 +74,7 @@ export function PlanScreen({
   messages,
   busy,
   scenario,
+  question,
   timeline,
   changed,
   selectedId,
@@ -98,7 +102,7 @@ export function PlanScreen({
   const items = useMemo(() => (timeline ? timelineItems(timeline) : []), [timeline])
   const changedIds = useMemo(() => new Set(changed.ids), [changed])
   const selected = items.find((item) => item.id === selectedId) ?? null
-  const next = scenario && timeline ? nextQuestion(scenario) : null
+  const next = scenario && timeline ? nextQuestion(scenario, question) : null
 
   useEffect(() => () => window.clearTimeout(mockTimer.current), [])
 
@@ -122,6 +126,7 @@ export function PlanScreen({
       messages={messages}
       busy={busy}
       scenario={scenario}
+      question={question}
       onSend={onSend}
       onStop={onStop}
       onShowTimeline={(id) => {
@@ -199,6 +204,12 @@ export function PlanScreen({
                       />
                     )}
                   </AnimatePresence>
+
+                  {/* The case explained in plain words, short until opened (CLAUDE.md,
+                      "Wyjaśnianie przypadku"); the points an answer changed light up. */}
+                  <motion.div variants={ITEM} className="mt-5 @container">
+                    <CaseNotes notes={timeline.notes} changed={changed} />
+                  </motion.div>
 
                   <motion.div variants={ITEM} className="mt-5">
                     <WhatIf scenario={scenario} busy={busy} onSend={choose} onMock={showMock} />

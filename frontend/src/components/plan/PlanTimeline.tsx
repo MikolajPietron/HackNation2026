@@ -1,5 +1,5 @@
 // The plan's timeline, built like a video editor's: a ruler with months and week ticks, tracks
-// (Dziecko, Mama, Dokumenty; Tata and Pieniądze join when the engine computes them) with clips
+// (Dziecko, Mama, Tata, Dokumenty; Pieniądze joins when the engine computes it) with clips
 // for leave and keyframes for important days, and a playhead. Drag the playhead along the ruler
 // and the readout below says what happens on that day; ‹ › jump between events like keyframes.
 // The tracks scroll sideways with momentum (drag them, or use the trackpad) and zoom on a spring
@@ -30,7 +30,7 @@ import { dayNumber, formatDayMonthShort, formatDistance, isoFromDay, monthCells 
 import { SPRING_LAYOUT } from '@/lib/ease'
 import { Illustration } from '@/components/ui/illustration'
 import { documentIcon, ICONS, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
-import { LANE_ORDER, TONE } from '@/lib/ui'
+import { LANE_ORDER, segmentLook } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Lane, Segment, Timeline } from '@/types'
 
@@ -52,7 +52,7 @@ const MIN_ZOOM = 1
 const MAX_ZOOM = 8
 const ZOOM_STEP = 1.6
 const ZOOM_SPRING = { type: 'spring', stiffness: 260, damping: 32, mass: 0.6 } as const
-/** Example only, for the Tata preview track until the engine computes paternity leave. */
+/** Example only, for the Tata preview track when the engine has no period of the father. */
 const PREVIEW_PATERNITY_DAYS = 14
 /** Momentum after a drag: share of the velocity kept per millisecond. */
 const GLIDE_DECAY = 0.995
@@ -60,14 +60,29 @@ const GLIDE_DECAY = 0.995
 const LANES: Record<Lane, { label: string; image: string }> = {
   child: { label: 'Dziecko', image: dziecko },
   mother: { label: 'Mama', image: mama },
+  father: { label: 'Tata', image: tata },
   documents: { label: 'Dokumenty', image: zaswiadczenie },
 }
 
-const CLIP: Record<Segment['tone'], string> = {
-  leave: 'bg-zus-600 text-white',
-  option: 'border-2 border-dashed border-zus-300 bg-zus-50 text-zus-900',
-  work: 'bg-navy-100 text-navy-700',
+/** Tracks that hold periods (clips); the others hold only keyframes. */
+const PARENTS: Lane[] = ['mother', 'father']
+
+/** Green is the mother, navy the father; a dashed clip is still to decide. */
+const CLIP: Record<'mother' | 'father', Record<Segment['tone'], string>> = {
+  mother: {
+    leave: 'bg-zus-600 text-white',
+    option: 'border-2 border-dashed border-zus-300 bg-zus-50 text-zus-900',
+    work: 'bg-navy-100 text-navy-700',
+  },
+  father: {
+    leave: 'bg-navy-700 text-white',
+    option: 'border-2 border-dashed border-navy-300 bg-navy-50 text-navy-900',
+    work: 'bg-navy-100 text-navy-700',
+  },
 }
+
+const clipClass = (segment: Segment) =>
+  CLIP[segment.lane === 'father' ? 'father' : 'mother'][segment.tone]
 
 const weekdayDate = new Intl.DateTimeFormat('pl-PL', {
   weekday: 'long',
@@ -245,7 +260,7 @@ export function PlanTimeline({
     if (!before) return
     const moved = before.filter(
       (old) =>
-        old.lane === 'mother' &&
+        PARENTS.includes(old.lane) &&
         !timeline.segments.some((s) => s.start === old.start && s.end === old.end && s.tone === old.tone),
     )
     if (moved.length > 0) setShadow({ segments: moved, key: Date.now() })
@@ -253,6 +268,8 @@ export function PlanTimeline({
 
   const birth = dayNumber(timeline.birth_date)
   const segments = timeline.segments.filter((s) => s.lane === 'mother')
+  const laneSegments = (lane: Lane) => timeline.segments.filter((s) => s.lane === lane)
+  const hasFather = timeline.segments.some((s) => s.lane === 'father')
   const days = [
     today,
     birth,
@@ -373,7 +390,7 @@ export function PlanTimeline({
   }
 
   // Keyframes per track. The birth is a keyframe on the child's track and a line through all.
-  const flags: Record<Lane, Flag[]> = { child: [], mother: [], documents: [] }
+  const flags: Record<Lane, Flag[]> = { child: [], mother: [], father: [], documents: [] }
   for (const m of timeline.markers) {
     flags[m.lane === 'documents' ? 'documents' : 'child'].push({
       id: m.id,
@@ -396,9 +413,11 @@ export function PlanTimeline({
     })
   }
   const lanes = (Object.keys(LANES) as Lane[])
-    .filter((lane) => flags[lane].length > 0 || (lane === 'mother' && segments.length > 0))
+    .filter((lane) => flags[lane].length > 0 || laneSegments(lane).length > 0)
     .sort((a, b) => LANE_ORDER[a] - LANE_ORDER[b])
-  const previewRows = preview ? 2 : 0
+  // The Tata example only stands in while the engine has nothing of the father's.
+  const previewFather = preview && !hasFather
+  const previewRows = (preview ? 1 : 0) + (previewFather ? 1 : 0)
   const rowsBelowRuler = Math.max(1, lanes.length + previewRows)
 
   // Example data for the preview tracks: tata's paternity leave right after the birth, and the
@@ -407,7 +426,8 @@ export function PlanTimeline({
   const leaveStart = leave.length ? Math.min(...leave.map((s) => dayNumber(s.start))) : birth
   const leaveEnd = leave.length ? Math.max(...leave.map((s) => dayNumber(s.end))) : birth
 
-  const sorted = [...segments].sort((a, b) => a.start.localeCompare(b.start))
+  const sortedIn = (lane: Lane) =>
+    laneSegments(lane).sort((a, b) => a.start.localeCompare(b.start))
   const joins = (a: Segment | undefined, b: Segment | undefined) =>
     Boolean(a && b && a.tone === b.tone && dayNumber(a.end) + 1 === dayNumber(b.start))
 
@@ -587,7 +607,8 @@ export function PlanTimeline({
           {lanes.map((lane, laneIndex) => {
             const placed = placeFlags(flags[lane], x, width)
             const rows = placed.reduce((n, f) => Math.max(n, f.row + 1), 0)
-            const hasClips = lane === 'mother' && segments.length > 0
+            const sorted = sortedIn(lane)
+            const hasClips = sorted.length > 0
             const height = ROW_HEIGHT
             const clipTop = CLIP_TOP
             // Rows of fixed height, centred in the track; a chip is centred in its row.
@@ -623,7 +644,7 @@ export function PlanTimeline({
                   {hasClips && (
                     <>
                       <AnimatePresence>
-                        {shadow?.segments.map((s) => (
+                        {shadow?.segments.filter((s) => s.lane === lane).map((s) => (
                           <motion.span
                             key={`${shadow.key}-${s.id}`}
                             initial={{ opacity: 0.8 }}
@@ -666,7 +687,7 @@ export function PlanTimeline({
             )
           })}
 
-          {preview && (
+          {previewFather && (
             <>
               <PreviewLabel row={lanes.length + 2} label="Tata">
                 <Illustration src={tata} size="lane" />
@@ -695,10 +716,17 @@ export function PlanTimeline({
                   Urlop ojcowski · przykład
                 </span>
               </div>
-              <PreviewLabel row={lanes.length + 3} label="Pieniądze">
+            </>
+          )}
+          {preview && (
+            <>
+              <PreviewLabel row={lanes.length + 2 + (previewFather ? 1 : 0)} label="Pieniądze">
                 <Illustration src={pieniadze} size="lane" />
               </PreviewLabel>
-              <div className="relative border-b border-line" style={{ gridColumn: 2, gridRow: lanes.length + 3, height: ROW_HEIGHT }}>
+              <div
+                className="relative border-b border-line"
+                style={{ gridColumn: 2, gridRow: lanes.length + 2 + (previewFather ? 1 : 0), height: ROW_HEIGHT }}
+              >
                 {months
                   .filter((month) => month.end >= leaveStart && month.start <= leaveEnd)
                   .map((month) => {
@@ -960,7 +988,7 @@ function Clip({
 }) {
   const px = (span / 100) * trackWidth
   const weeks = segment.days % 7 === 0 ? `${segment.days / 7} tyg.` : `${segment.days} dni`
-  const label = TONE[segment.tone].label
+  const label = segmentLook(segment).label
   return (
     <motion.button
       type="button"
@@ -981,7 +1009,7 @@ function Clip({
         // A recalculated plan glides into place (rare, so animating left/width is fine here).
         'transition-[left,width,filter,box-shadow] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
         'outline-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2',
-        CLIP[segment.tone],
+        clipClass(segment),
         joinLeft && 'rounded-l-none border-l-0',
         joinRight && 'rounded-r-none',
         active && 'ring-2 ring-navy-900/25 ring-offset-2 brightness-[0.96]',

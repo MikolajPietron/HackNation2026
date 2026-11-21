@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.api.chat import load_history
 from app.api.deps import get_params, get_session_store, get_today
+from app.assistant.describe import InterviewQuestion, next_question
 from app.assistant.transcript import to_chat_messages
 from app.engine import Params, Scenario, ScenarioError, Timeline, build_timeline
 from app.engine.models import Earnings, Role, Work
@@ -24,6 +25,8 @@ class SessionView(BaseModel):
     messages: list[dict[str, Any]]
     scenario: Scenario
     timeline: Timeline | None
+    question: InterviewQuestion | None = None
+    """The next interview question, for the answer cards (the assistant asks the same)."""
 
 
 class OnboardingAnswers(BaseModel):
@@ -42,6 +45,7 @@ class OnboardingAnswers(BaseModel):
 class SessionStart(BaseModel):
     scenario: Scenario
     timeline: Timeline
+    question: InterviewQuestion | None = None
 
 
 @router.put("/session/{session_id}/onboarding")
@@ -68,7 +72,7 @@ async def start_from_onboarding(
     )
     timeline = build_timeline(scenario, params, today)
     await store.save(session_id, Session(scenario=scenario))
-    return SessionStart(scenario=scenario, timeline=timeline)
+    return SessionStart(scenario=scenario, timeline=timeline, question=next_question(scenario))
 
 
 @router.get("/session/{session_id}")
@@ -90,6 +94,7 @@ async def get_session(
         messages=to_chat_messages(load_history(session)),
         scenario=session.scenario,
         timeline=timeline,
+        question=next_question(session.scenario),
     )
 
 

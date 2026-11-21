@@ -12,7 +12,7 @@ import type { ChatMessage, MessagePart } from '@/hooks/useAssistant'
 import { nextQuestion } from '@/lib/interview'
 import { toolLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Scenario } from '@/types'
+import type { InterviewQuestion, Scenario } from '@/types'
 
 // Without the onboarding the chat asks for the date first.
 const START_SUGGESTIONS = [
@@ -28,6 +28,15 @@ const PLAN_TOOLS = new Set([
   'set_children_count',
   'set_leave_before_birth',
   'set_medical_certificate',
+  'set_mother_work',
+  'set_voluntary_insurance',
+  'set_za_zyciem',
+  'set_hospital_care',
+  'set_child_loss',
+  'set_father_work',
+  'set_father_insurance',
+  'set_father_takeover',
+  'set_mother_situation',
 ])
 
 const MARKDOWN: Components = {
@@ -65,6 +74,8 @@ interface Props {
   busy: boolean
   /** What the onboarding saved: greet with the next question instead of asking for the date. */
   scenario: Scenario | null
+  /** The next interview question from the backend: the chips answer what the assistant asks. */
+  question: InterviewQuestion | null
   onSend: (text: string) => void
   onStop: () => void
   /** Jump to the timeline (on phones it is a separate tab), optionally to one element. */
@@ -80,6 +91,7 @@ export function ChatPanel({
   messages,
   busy,
   scenario,
+  question,
   onSend,
   onStop,
   onShowTimeline,
@@ -89,7 +101,7 @@ export function ChatPanel({
 }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const dateKnown = scenario !== null && (scenario.due_date ?? scenario.birth_date) !== null
-  const next = scenario && dateKnown ? nextQuestion(scenario) : null
+  const next = scenario && dateKnown ? nextQuestion(scenario, question) : null
   const last = messages.at(-1)
   const replies =
     !busy && (messages.length === 0 || (last?.role === 'assistant' && last.status === 'done'))

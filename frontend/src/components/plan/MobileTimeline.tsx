@@ -22,12 +22,13 @@ interface Row {
   when: string
   text: string
   tone?: Segment['tone']
+  lane?: Segment['lane']
 }
 
-const TONE_BAR: Record<Segment['tone'], string> = {
-  leave: 'bg-zus-600',
-  option: 'bg-zus-200',
-  work: 'bg-navy-200',
+/** The coloured edge of a period: green for the mother, navy for the father. */
+const TONE_BAR: Record<'mother' | 'father', Record<Segment['tone'], string>> = {
+  mother: { leave: 'bg-zus-600', option: 'bg-zus-200', work: 'bg-navy-200' },
+  father: { leave: 'bg-navy-700', option: 'bg-navy-200', work: 'bg-navy-200' },
 }
 
 const monthTitle = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric', timeZone: 'UTC' })
@@ -43,6 +44,7 @@ function rows(timeline: Timeline): Row[] {
       when: `${formatDayMonthShort(s.start)} – ${formatDayMonthShort(s.end)} · ${durationLabel(s.days)}`,
       text: s.summary,
       tone: s.tone,
+      lane: s.lane,
     })),
     ...timeline.markers.map((m) => ({
       id: m.id,
@@ -122,7 +124,10 @@ export function MobileTimeline({
                   )}
                 >
                   {row.tone && (
-                    <span aria-hidden className={cn('absolute inset-y-0 left-0 w-1.5', TONE_BAR[row.tone])} />
+                    <span aria-hidden className={cn(
+                        'absolute inset-y-0 left-0 w-1.5',
+                        TONE_BAR[row.lane === 'father' ? 'father' : 'mother'][row.tone],
+                      )} />
                   )}
                   {changedIds.has(row.id) && (
                     <motion.span

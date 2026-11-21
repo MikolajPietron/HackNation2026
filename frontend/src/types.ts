@@ -172,17 +172,25 @@ export interface ChatRequest {
   event?: AppEvent
 }
 
+/** The next interview question, as the assistant asks it; `key` picks the answer cards. */
+export interface InterviewQuestion {
+  key: string
+  text: string
+}
+
 /** A stored conversation, as returned by GET /api/session/{id}. */
 export interface SessionView {
   messages: StoredMessage[]
   scenario: Scenario
   timeline: Timeline | null
+  question: InterviewQuestion | null
 }
 
 /** The onboarding answers as stored, and the first timeline. */
 export interface SessionStart {
   scenario: Scenario
   timeline: Timeline
+  question: InterviewQuestion | null
 }
 
 export type StoredPart =
@@ -213,6 +221,7 @@ export type ChatEvent =
       changed: string[]
       changed_notes: string[]
       focus: string | null
+      question: InterviewQuestion | null
     }
   | { type: 'focus'; element_id: string }
   | { type: 'done' }

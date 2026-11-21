@@ -4,6 +4,7 @@ import { currentSessionId, newSessionId } from '../lib/session'
 import type {
   AppEvent,
   OnboardingAnswers,
+  InterviewQuestion,
   Scenario,
   SessionStart,
   StoredMessage,
@@ -53,6 +54,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   const [restoring, setRestoring] = useState(true)
   const [timeline, setTimeline] = useState<Timeline | null>(null)
   const [scenario, setScenario] = useState<Scenario | null>(null)
+  const [question, setQuestion] = useState<InterviewQuestion | null>(null)
   const [changed, setChanged] = useState<ChangeSet>({ ids: [], notes: [], version: 0 })
   const sessionId = useRef(currentSessionId())
   const request = useRef<AbortController | null>(null)
@@ -66,6 +68,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
         setMessages((current) => (current.length === 0 ? session.messages : current))
         setTimeline((current) => current ?? session.timeline)
         setScenario((current) => current ?? session.scenario)
+        setQuestion((current) => current ?? session.question)
       })
       .catch(() => {
         // Backend unreachable: start empty; sending a message will show the error.
@@ -128,6 +131,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
               case 'timeline':
                 setTimeline(event.timeline)
                 setScenario(event.scenario)
+                setQuestion(event.question)
                 setChanged((c) => ({
                   ids: event.changed,
                   notes: event.changed_notes,
@@ -183,6 +187,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
   const load = useCallback((start: SessionStart) => {
     setMessages([])
     setScenario(start.scenario)
+    setQuestion(start.question)
     setTimeline(start.timeline)
     setChanged((c) => ({ ids: [], notes: [], version: c.version + 1 }))
   }, [])
@@ -200,6 +205,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setMessages([])
     setTimeline(null)
     setScenario(null)
+    setQuestion(null)
     setChanged({ ids: [], notes: [], version: 0 })
   }, [])
 
@@ -214,6 +220,7 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     submit,
     load,
     scenario,
+    question,
     timeline,
     changed,
   }
