@@ -1,9 +1,9 @@
 // Mirrors backend/app/engine/models.py and the /api/chat event protocol. Keep in sync.
 // Phases 1-3: guide section A, "Przygotowanie do porodu", "Urodzenie dziecka" and the stillbirth
-// or death of the child (pages 5-6).
+// or death of the child (pages 5-6). Section B: the father (pages 7-8).
 
-export type Lane = 'mother' | 'child' | 'documents'
-/** leave = leave the mother takes, work = she keeps working, option = possible, not decided. */
+export type Lane = 'mother' | 'father' | 'child' | 'documents'
+/** leave = leave a parent takes, work = the mother keeps working, option = possible, not decided. */
 export type Tone = 'leave' | 'work' | 'option'
 
 export type Role = 'mother' | 'father'
@@ -35,6 +35,24 @@ export interface HospitalStay {
   end: string | null
 }
 
+/**
+ * Guide section B, "Sytuacje szczególne": the mother has a certificate of inability to live
+ * independently, is in hospital, died, or abandoned the child.
+ */
+export type MotherEventKind = 'incapacity' | 'hospital' | 'death' | 'abandonment'
+
+/** A special situation in which the father takes over maternity leave early. */
+export interface MotherEvent {
+  kind: MotherEventKind
+  /**
+   * Incapacity: the day the father takes over; hospital: the first day in hospital; death,
+   * abandonment: the day it happened.
+   */
+  start: string
+  /** Hospital only: the last day in hospital; null = still there. */
+  end: string | null
+}
+
 /** What the onboarding and the interview have established. null = not known yet. */
 export interface Scenario {
   /** The person filling in. Work and earnings are that person's own. */
@@ -43,6 +61,8 @@ export interface Scenario {
   earnings: Earnings | null
   /** How the mother works, when somebody else fills in. */
   mother_work: Work | null
+  /** How the father works, when somebody else fills in. */
+  father_work: Work | null
   child_born: boolean | null
   due_date: string | null
   birth_date: string | null
@@ -59,6 +79,13 @@ export interface Scenario {
   hospital_stays: HospitalStay[]
   /** Recorded only when the parent says so. */
   losses: ChildLoss[]
+  /** Voluntary sickness insurance of a father on a contract or with his own business. */
+  father_insured: boolean | null
+  /** The mother leaves the rest of maternity leave to the father after at least 14 weeks. */
+  father_takes_over: boolean | null
+  /** Weeks after the birth the mother uses before the father takes over (default 14). */
+  mother_weeks_before_takeover: number | null
+  mother_event: MotherEvent | null
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */

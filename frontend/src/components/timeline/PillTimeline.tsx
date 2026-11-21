@@ -4,9 +4,9 @@ import { motion } from 'motion/react'
 import { ArrowRight, Check, FileText } from 'lucide-react'
 import { dayNumber, formatDate, formatDayMonth, formatRange, monthCells } from '@/lib/dates'
 import { EASE_OUT, SPRING_LAYOUT } from '@/lib/ease'
-import { TONE } from '@/lib/ui'
+import { LANE_ORDER, segmentLook } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Document, Timeline } from '@/types'
+import type { Document, Segment, Timeline } from '@/types'
 import type { TimelineItem, TimelineViewProps } from './items'
 import { Pulse } from './Pulse'
 
@@ -40,6 +40,11 @@ export function PillTimeline({
   const refs = useRef(new Map<string, HTMLElement>())
   const plan = useMemo(() => layout(timeline, items), [timeline, items])
   const { from, to, segments, documents, markers, farMarkers, markerRows, months } = plan
+  // The father's colours join the legend only when his periods are on the axis.
+  const fatherTones = useMemo(
+    () => new Set(timeline.segments.filter((s) => s.lane === 'father').map((s) => s.tone)),
+    [timeline],
+  )
 
   useEffect(() => {
     if (focus.id) {
@@ -162,9 +167,21 @@ export function PillTimeline({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-3xl bg-white px-5 py-3 text-xs text-navy-700 shadow-card">
-        <Legend swatch={<span className="h-2.5 w-5 rounded-full bg-zus-600" />}>Urlop mamy</Legend>
-        <Legend swatch={<span className="h-2.5 w-5 rounded-full bg-zus-200" />}>Do wyboru</Legend>
-        <Legend swatch={<span className="h-2.5 w-5 rounded-full bg-navy-200" />}>Praca</Legend>
+        <Legend swatch={<Swatch lane="mother" tone="leave" />}>Urlop mamy</Legend>
+        {fatherTones.has('leave') && (
+          <Legend swatch={<Swatch lane="father" tone="leave" />}>Urlop taty</Legend>
+        )}
+        <Legend
+          swatch={
+            <>
+              <Swatch lane="mother" tone="option" />
+              {fatherTones.has('option') && <Swatch lane="father" tone="option" />}
+            </>
+          }
+        >
+          Do wyboru
+        </Legend>
+        <Legend swatch={<Swatch lane="mother" tone="work" />}>Praca</Legend>
         <Legend swatch={<span className="size-2 rotate-45 rounded-[2px] bg-sun-400" />}>
           Ważny dzień
         </Legend>
@@ -185,10 +202,14 @@ export function PillTimeline({
 function Legend({ swatch, children }: { swatch: ReactNode; children: ReactNode }) {
   return (
     <span className="flex items-center gap-2">
-      {swatch}
+      <span className="flex items-center gap-1">{swatch}</span>
       {children}
     </span>
   )
+}
+
+function Swatch(segment: Pick<Segment, 'lane' | 'tone'>) {
+  return <span className={cn('h-2.5 w-5 rounded-full', segmentLook(segment).swatch)} />
 }
 
 function MarkerChip({
@@ -288,7 +309,7 @@ function PillRow({
   onSelect: (id: string) => void
 }) {
   const s = item.element
-  const tone = TONE[s.tone]
+  const look = segmentLook(s)
   const size = width >= FULL_PILL_PERCENT ? 'full' : width >= COMPACT_PILL_PERCENT ? 'compact' : 'tiny'
   const top = index * ROW_PX + 7
   const duration = s.days % 7 === 0 ? `${s.days / 7} tyg.` : `${s.days} dni`
@@ -314,7 +335,7 @@ function PillRow({
         style={{ top }}
         className={cn(
           'absolute flex h-11 min-w-3 items-center rounded-full shadow-pill',
-          tone.pill,
+          look.pill,
           item.id === selectedId && 'ring-2 ring-navy-900 ring-offset-2 ring-offset-canvas',
         )}
       >
@@ -324,10 +345,11 @@ function PillRow({
             <span
               className={cn(
                 'grid size-8 shrink-0 place-items-center rounded-full text-xs font-black',
-                tone.avatar,
+                look.avatar,
               )}
+              aria-hidden
             >
-              M
+              {look.initial}
             </span>
             {size === 'full' && (
               <span className="min-w-0 flex-1 pr-3 text-left leading-tight">
@@ -386,9 +408,10 @@ function PillRow({
 
 /** Visible range, each pill's document and rows for marker labels. */
 function layout(timeline: Timeline, items: TimelineItem[]) {
+  // Rows cascade by start; on the same day the mother's period comes before the father's.
   const segments = items
     .filter((item): item is SegmentItem => item.kind === 'segment')
-    .sort((a, b) => a.startDay - b.startDay)
+    .sort((a, b) => a.startDay - b.startDay || LANE_ORDER[a.lane] - LANE_ORDER[b.lane])
   const allMarkers = items
     .filter((item): item is MarkerItem => item.kind === 'marker')
     .sort((a, b) => a.startDay - b.startDay)

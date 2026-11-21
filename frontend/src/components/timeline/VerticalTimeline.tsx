@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { dayNumber, durationLabel, formatDate, formatLongDate, formatRange } from '@/lib/dates'
-import { LANE_ORDER, TONE } from '@/lib/ui'
+import { LANE_ORDER, segmentLook } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import { ElementDetails } from './ElementDetails'
 import type { TimelineItem, TimelineViewProps } from './items'
@@ -36,6 +36,7 @@ export function VerticalTimeline({
       {sorted.map((item, index) => {
         const isSelected = item.id === selectedId
         const changed = changedIds.has(item.id)
+        const look = item.kind === 'segment' ? segmentLook(item.element) : null
         return (
           <Fragment key={item.id}>
             {index === todayIndex && <TodayRow date={timeline.today} />}
@@ -51,8 +52,8 @@ export function VerticalTimeline({
                   'absolute top-5 -left-[29px] size-4 border-[3px] border-canvas',
                   item.kind === 'segment' ? 'rounded-full' : 'rounded-[4px]',
                   item.kind === 'marker' && 'rotate-45',
-                  item.kind === 'segment'
-                    ? TONE[item.element.tone].dot
+                  look
+                    ? look.dot
                     : item.kind === 'document' && item.element.done
                       ? 'bg-zus-600'
                       : 'bg-sun-400',
@@ -72,11 +73,9 @@ export function VerticalTimeline({
                 <p className="text-xs font-bold text-navy-500">{dateText(item)}</p>
                 <p className="mt-0.5 font-black text-navy-900">{item.title}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {item.kind === 'segment' && (
+                  {item.kind === 'segment' && look && (
                     <>
-                      <Chip className={TONE[item.element.tone].chip}>
-                        {TONE[item.element.tone].label}
-                      </Chip>
+                      <Chip className={look.chip}>{look.label}</Chip>
                       <Chip className="bg-navy-50 text-navy-700 ring-navy-100">
                         {durationLabel(item.element.days)}
                       </Chip>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { durationLabel, formatDate, formatLongDate, formatRange } from '@/lib/dates'
-import { sourceLabel, TONE } from '@/lib/ui'
+import { segmentLook, sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { SourceRef, Timeline } from '@/types'
 import type { TimelineItem } from './items'
@@ -26,12 +26,13 @@ function Body({ item, timeline, onSelect }: Props) {
   switch (item.kind) {
     case 'segment': {
       const s = item.element
+      const look = segmentLook(s)
       const documents = timeline.documents.filter((d) => d.segment_id === s.id)
       return (
         <>
           <Header
-            eyebrow={`Mama · ${TONE[s.tone].label.toLowerCase()}`}
-            eyebrowClass={s.tone === 'work' ? 'text-navy-500' : 'text-zus-700'}
+            eyebrow={`${look.who} · ${look.kind}`}
+            eyebrowClass={look.eyebrow}
             title={s.title}
             subtitle={
               <>
