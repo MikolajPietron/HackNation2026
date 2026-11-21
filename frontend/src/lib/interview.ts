@@ -124,21 +124,25 @@ function leaveBeforeBirth(scenario: Scenario, question: string): NextQuestion {
     question,
     prompts: mother
       ? [
-          'Chcę urlop przed porodem',
+          'Chcę krótszy urlop przed porodem',
           'Będę pracować do dnia porodu',
           'Od kiedy najwcześniej mogę zacząć urlop?',
         ]
       : [
-          'Mama chce urlop przed porodem',
+          'Mama chce krótszy urlop przed porodem',
           'Mama będzie pracować do porodu',
           'Od kiedy najwcześniej może zacząć urlop?',
         ],
     title: mother ? 'Co wybierasz?' : 'Co wybiera mama?',
     choices: [
       {
-        label: 'Urlop przed porodem',
-        hint: 'odpoczynek przed porodem',
-        prompt: mother ? 'Chcę urlop przed porodem' : 'Mama chce urlop przed porodem',
+        // A whole answer (the longest leave the law allows): the model must not guess a number.
+        // A shorter leave goes through the chat, where the assistant asks for the weeks.
+        label: 'Urlop 6 tyg. przed porodem',
+        hint: 'najwcześniej, jak można',
+        prompt: mother
+          ? 'Chcę zacząć urlop 6 tygodni przed porodem'
+          : 'Mama chce zacząć urlop 6 tygodni przed porodem',
         image: 'rest',
       },
       {

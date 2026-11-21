@@ -629,14 +629,19 @@ SCENARIOS = [
                     "segments": {
                         "maternity": ["2026-10-01", "2026-11-10"],
                         "maternity-father": ["2026-11-11", "2027-02-17"],
-                        # the mother's 9 weeks cannot be transferred (KP art. 182¹ᵃ § 4): 32
-                        "parental-father": ["2027-02-18", "2027-09-29"],
+                        # he cannot be on paternity leave during his part of maternity leave:
+                        # it follows (18.02-3.03.2027); then his parental leave, 41 - 9 = 32
+                        # weeks (the mother's 9 cannot be transferred, KP art. 182¹ᵃ § 4)
+                        "paternity": ["2027-02-18", "2027-03-03"],
+                        "parental-father": ["2027-03-04", "2027-10-13"],
                     }
                 },
                 "mention": {"dates": ["2026-11-11", "2027-02-17"]},
                 "require": [r"180\s*§\s*12|s\.\s*7\b"],
-                # the father's 9 weeks after the mother's parental leave: the state before
-                "forbid": [r"30 września 2027|30\.09\.2027"],
+                # the father's 9 weeks after the mother's parental leave (to 1.12.2027): the
+                # state before the death was recorded. (30.09.2027 is right: the last day of
+                # paternity leave, the day before the first birthday.)
+                "forbid": [r"1 grudnia 2027|01\.12\.2027"],
                 "sensitive": True,
                 "question": "hospital",
             },

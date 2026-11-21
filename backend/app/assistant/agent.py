@@ -221,11 +221,14 @@ async def set_leave_before_birth(
 ) -> str:
     """Record maternity leave before the birth: planned (child on the way) or taken (born).
 
-    The tool rejects more weeks than the law allows.
+    Call it only with what the user said: a number of weeks, or that the mother works (worked)
+    until the birth (0). "I want leave before the birth" without a number is not an answer:
+    do not call the tool, ask how many weeks before the due date (at most 6). The tool rejects
+    more weeks than the law allows.
 
     Args:
-        weeks: Whole weeks of maternity leave before the birth. 0 = no leave before the birth
-            (she works, or worked, until the birth).
+        weeks: Whole weeks of maternity leave before the birth, as the user said them. 0 = no
+            leave before the birth (she works, or worked, until the birth).
     """
     # Weeks the user gives now count back from the birth (or the due date): no stored start.
     changes: dict[str, Any] = {"leave_before_birth_weeks": weeks, "leave_start": None}

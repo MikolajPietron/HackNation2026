@@ -33,7 +33,10 @@ NUM_DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
 ISO_DATE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 WEEKS = re.compile(r"\b(\d{1,3})\s*(?:tyg\.?|tygodni(?:e|a)?|tydzień)", re.IGNORECASE)
 QUOTE = re.compile(r"„([^”]{12,}?)”")
-SYMPATHY = re.compile(r"przykro|współczu|wyrazy|bardzo nam", re.IGNORECASE)
+# A human first sentence after a loss: "Bardzo mi przykro", "Rozumiem, że to trudne", …
+SYMPATHY = re.compile(
+    r"przykro|współczu|wyrazy|bardzo nam|trudn|ciężk|bolesn|rozumiem, że", re.IGNORECASE
+)
 OUT_OF_SCOPE = re.compile(
     r"nie obejmuje|jeszcze nie obejmuj|nie obejmuj|poza zakresem|nie mogę (?:jeszcze )?"
     r"(?:tego )?(?:policzyć|odpowiedzieć|podać|wyliczyć)|kolejn\w+ (?:etap|częś)|dojd\w+ wkrótce|"
