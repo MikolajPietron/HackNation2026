@@ -312,17 +312,30 @@ export function Onboarding({ submit, onDone, onSkip }: Props) {
 function Question({
   title,
   subtitle,
+  compact = false,
   children,
 }: {
   title: string
   subtitle?: string
+  /** Less air around a tall answer (the calendar), so the step fits on one screen. */
+  compact?: boolean
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-5 py-20 text-center sm:px-8">
+    <div
+      className={cn(
+        'flex min-h-full flex-col items-center justify-center px-5 text-center sm:px-8',
+        compact ? 'pt-16 pb-6' : 'py-20',
+      )}
+    >
       <motion.h1
         variants={ITEM}
-        className="max-w-3xl text-[34px] leading-[1.1] font-bold tracking-[-0.02em] text-balance text-navy-900 sm:text-5xl"
+        className={cn(
+          'max-w-3xl leading-[1.1] font-bold tracking-[-0.02em] text-balance text-navy-900',
+          compact
+            ? 'text-[30px] sm:text-4xl [@media(min-height:860px)]:sm:text-5xl'
+            : 'text-[34px] sm:text-5xl',
+        )}
       >
         {title}
       </motion.h1>
@@ -334,7 +347,7 @@ function Question({
           {subtitle}
         </motion.p>
       )}
-      <div className="mt-10 w-full sm:mt-14">{children}</div>
+      <div className={cn('w-full', compact ? 'mt-5 sm:mt-6' : 'mt-10 sm:mt-14')}>{children}</div>
     </div>
   )
 }
@@ -499,12 +512,18 @@ function DateStep({
     <Question
       title={title}
       subtitle={born ? 'Data z aktu urodzenia.' : 'Przewidywana data porodu z karty ciąży.'}
+      compact
     >
       <motion.div variants={ITEM}>
         <Calendar value={value} min={min} max={max} today={today} label={title} onChange={onChange} />
       </motion.div>
-      <motion.div variants={ITEM} className="mt-6 flex flex-col items-center gap-5">
-        <p className="h-7 text-lg" aria-live="polite">
+      {/* The button stays under the calendar's centre; the date grows to its left, so picking
+          a day never moves the button. */}
+      <motion.div
+        variants={ITEM}
+        className="mt-4 flex flex-col items-center gap-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-6"
+      >
+        <p className="text-lg sm:justify-self-end sm:text-right" aria-live="polite">
           <TextStates
             text={valid ? `${formatLongDate(value)} · ${distance(value, today)}` : 'Wybierz dzień'}
             className={valid ? 'font-bold text-navy-900' : 'text-navy-400'}

@@ -747,8 +747,8 @@ function PreviewLabel({ row, label, children }: { row: number; label: string; ch
   )
 }
 
-/** What happens on the playhead's day, in a few bold facts. */
-function Readout({
+/** What happens on a day (the playhead's, or today on phones), in a few bold facts. */
+export function Readout({
   timeline,
   day,
   onSelect,
@@ -815,13 +815,16 @@ function Readout({
   const label = weekdayDate.format(new Date(`${iso}T00:00:00Z`))
   const comma = label.indexOf(', ')
   return (
-    <div className="mt-3 flex gap-6 rounded-3xl bg-navy-50/60 px-5 py-4" aria-live="polite">
-      <div className="w-44 shrink-0">
+    <div
+      className="mt-3 flex flex-col gap-3 rounded-3xl bg-navy-50/60 px-4 py-4 sm:flex-row sm:gap-6 sm:px-5"
+      aria-live="polite"
+    >
+      <div className="shrink-0 sm:w-44">
         <p className="text-xs font-bold text-navy-500 capitalize">{label.slice(0, comma)}</p>
         <p className="mt-0.5 text-lg leading-tight font-bold text-navy-900">{label.slice(comma + 2)}</p>
         <p className="mt-0.5 text-sm text-navy-500">{formatDistance(timeline.today, iso)}</p>
       </div>
-      <ul className="min-w-0 flex-1 space-y-0.5">
+      <ul className="-mx-2 min-w-0 flex-1 space-y-0.5 sm:mx-0">
         {lines.length === 0 && <li className="pt-1 text-navy-500">Tego dnia nic się nie zmienia.</li>}
         {lines.map((line) => (
           <li key={line.key}>

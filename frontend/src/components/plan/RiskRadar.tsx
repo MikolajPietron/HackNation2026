@@ -91,30 +91,47 @@ function risks(scenario: Scenario | null, onCheckZus: () => void): Risk[] {
 
 export function RiskRadar({ scenario, onCheckZus }: { scenario: Scenario | null; onCheckZus: () => void }) {
   return (
-    <motion.section variants={ITEM} className="mt-12" aria-label="Na co uważać">
+    <motion.section variants={ITEM} className="mt-10 lg:mt-12" aria-label="Na co uważać">
       <h2 className="text-2xl leading-tight font-bold tracking-tight text-navy-900">Na co uważać</h2>
       <p className="mt-1 text-navy-500">Wstępnie, na podstawie Twoich odpowiedzi · Przewodnik ZUS, s. 9–10</p>
       <ul className="mt-5 divide-y divide-line rounded-3xl border border-line">
         {risks(scenario, onCheckZus).map((risk) => (
-          <li key={risk.id} className="flex items-center gap-4 px-5 py-4">
+          <li key={risk.id} className="flex items-start gap-3 px-4 py-4 sm:items-center sm:gap-4 sm:px-5">
             <img src={RISK_ICON[risk.id]} alt="" draggable={false} className="size-12 shrink-0 object-contain" />
             <span
               className={cn(
-                'w-28 shrink-0 rounded-full px-2.5 py-1 text-center text-xs font-bold',
+                'hidden w-28 shrink-0 rounded-full px-2.5 py-1 text-center text-xs font-bold sm:block',
                 LEVEL[risk.level].className,
               )}
             >
               {LEVEL[risk.level].label}
             </span>
             <div className="min-w-0 flex-1">
+              <span
+                className={cn(
+                  'mb-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-bold sm:hidden',
+                  LEVEL[risk.level].className,
+                )}
+              >
+                {LEVEL[risk.level].label}
+              </span>
               <p className="font-bold text-navy-900">{risk.title}</p>
               <p className="mt-0.5 text-sm leading-relaxed text-navy-500">{risk.text}</p>
+              {risk.action && (
+                <button
+                  type="button"
+                  onClick={risk.action.onClick}
+                  className="mt-1.5 text-sm font-bold text-zus-700 sm:hidden"
+                >
+                  {risk.action.label}
+                </button>
+              )}
             </div>
             {risk.action && (
               <button
                 type="button"
                 onClick={risk.action.onClick}
-                className="shrink-0 text-sm font-bold text-zus-700 underline-offset-2 hover:underline"
+                className="hidden shrink-0 text-sm font-bold text-zus-700 underline-offset-2 hover:underline sm:block"
               >
                 {risk.action.label}
               </button>

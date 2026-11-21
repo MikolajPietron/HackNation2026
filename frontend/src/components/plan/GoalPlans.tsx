@@ -16,7 +16,7 @@ const PLAN_ICON: Record<string, string> = {
 
 export function GoalPlans({ onMock }: { onMock: (message: string) => void }) {
   return (
-    <motion.section variants={ITEM} className="mt-12" aria-label="Plany dla Was">
+    <motion.section variants={ITEM} className="mt-10 lg:mt-12" aria-label="Plany dla Was">
       <div className="flex items-end gap-4">
         <div className="flex-1">
           <h2 className="text-2xl leading-tight font-bold tracking-tight text-navy-900">Plany dla Was</h2>
@@ -24,7 +24,7 @@ export function GoalPlans({ onMock }: { onMock: (message: string) => void }) {
         </div>
         <SimBadge>przykład</SimBadge>
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-3 sm:gap-4">
         {GOAL_PLANS.map((plan) => (
           <div key={plan.id} className="flex flex-col rounded-3xl border border-line p-5">
             <img src={PLAN_ICON[plan.id]} alt="" draggable={false} className="mb-3 size-16 object-contain" />

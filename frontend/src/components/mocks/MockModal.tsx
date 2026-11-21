@@ -32,7 +32,7 @@ export function MockModal({
           exit={{ opacity: 0, transition: { duration: 0.15 } }}
           transition={{ duration: 0.2, ease: EASE_OUT }}
           onClick={onClose}
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-navy-900/15 px-6 pt-[8vh] pb-10 backdrop-blur-[3px]"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-navy-900/15 backdrop-blur-[3px] sm:items-start sm:px-6 sm:pt-[8vh] sm:pb-10"
         >
           <Panel label={label} onClose={onClose} className={className}>
             {children}
@@ -73,12 +73,13 @@ function Panel({
       aria-label={label}
       tabIndex={-1}
       onClick={(event) => event.stopPropagation()}
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+      initial={{ opacity: 0, scale: 0.96, y: 24 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98, y: 12, transition: { duration: 0.15 } }}
       transition={{ duration: 0.25, ease: EASE_OUT }}
       className={cn(
-        'relative w-full max-w-lg rounded-4xl border border-line bg-white p-8 shadow-[0_32px_80px_-32px_rgb(26_36_56/0.35)] outline-none',
+        'relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-4xl border border-line bg-white p-6 shadow-[0_32px_80px_-32px_rgb(26_36_56/0.35)] outline-none',
+        'sm:max-h-none sm:overflow-visible sm:rounded-4xl sm:p-8',
         className,
       )}
     >

@@ -199,7 +199,8 @@ def test_timeline_endpoint_without_ai(client: TestClient) -> None:
 
 
 def test_health_says_where_sessions_are_stored(client: TestClient) -> None:
-    assert client.get("/api/health").json() == {"status": "ok", "sessions": "memory"}
+    health = client.get("/api/health").json()
+    assert health == {"status": "ok", "sessions": "memory", "params": "memory"}
 
 
 ONBOARDING = {

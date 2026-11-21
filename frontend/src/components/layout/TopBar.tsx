@@ -22,12 +22,11 @@ import {
   Type,
   Volume2,
 } from 'lucide-react'
+import { useLargeText } from '@/hooks/useLargeText'
 import { EASE_OUT } from '@/lib/ease'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import { Brand } from './Brand'
-
-const LARGE_TEXT = '112.5%'
 
 interface TopBarProps {
   onMock: (message: string) => void
@@ -195,12 +194,7 @@ function LanguageMenu({ onMock }: { onMock: (message: string) => void }) {
 }
 
 function AccessibilityMenu({ onMock }: { onMock: (message: string) => void }) {
-  const [largeText, setLargeText] = useState(
-    () => document.documentElement.style.fontSize === LARGE_TEXT,
-  )
-  useEffect(() => {
-    document.documentElement.style.fontSize = largeText ? LARGE_TEXT : ''
-  }, [largeText])
+  const [largeText, setLargeText] = useLargeText()
 
   return (
     <Menu label="Dostępność" trigger={<Accessibility className="size-5" />} icon>
@@ -219,7 +213,7 @@ function AccessibilityMenu({ onMock }: { onMock: (message: string) => void }) {
           <MenuItem
             icon={<Type className="size-4" />}
             checked={largeText}
-            onClick={() => setLargeText((on) => !on)}
+            onClick={() => setLargeText(!largeText)}
           >
             Większy tekst
           </MenuItem>

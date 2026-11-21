@@ -1,39 +1,58 @@
-// The plan screen on wide screens. The timeline is the main thing, so everything above it is
-// one line: how long the leave is and when. Then the one decision the family has to make (if
-// any), then the timeline with its playhead readout and the summary underneath. Legal text and
-// sources only on demand. The assistant is open beside the plan by default and can be hidden.
+// The plan screen, for phones and wide screens. The timeline is the main thing, so everything
+// above it is one line: how long the leave is and when. Then the one decision the family has to
+// make (if any), the "what if" events, the timeline (an editor-style axis on wide screens, a
+// vertical line on phones), plans and risks. Legal text and sources only on demand.
+// Wide screens: the assistant is open beside the plan and can be hidden; details are a dialog.
+// Phones: the assistant and the details come up as sheets from the bottom (Vaul).
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
+import { ExternalLink, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
 import etat from '@/assets/onboarding/etat.webp'
 import mama from '@/assets/onboarding/mama.webp'
 import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
 import { ChatPanel } from '@/components/chat/ChatPanel'
+import { MobileBar } from '@/components/layout/MobileBar'
 import { TopBar } from '@/components/layout/TopBar'
 import { CasesDialog } from '@/components/mocks/Cases'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
+import { Sheet } from '@/components/ui/sheet'
 import { TextStates } from '@/components/ui/text-states'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { formatLongDate, formatShortDate } from '@/lib/dates'
 import { EASE_OUT, SPRING_PANEL, SPRING_PRESS } from '@/lib/ease'
 import { nextQuestion } from '@/lib/interview'
-import type { Persona } from '@/lib/mockData'
 import type { Choice } from '@/lib/interview'
+import type { Persona } from '@/lib/mockData'
 import { plural, sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Scenario, Timeline } from '@/types'
 import { Dialog } from './Dialog'
 import { GoalPlans } from './GoalPlans'
+import { MobileTimeline } from './MobileTimeline'
 import { RiskRadar } from './RiskRadar'
 import { TimelineCard } from './TimelineCard'
 import { WhatIf } from './WhatIf'
 
-const CHAT_WIDTH = 420
+/** The chat column grows with the screen: roomy on a big monitor, never squeezing the plan on
+ *  a small laptop. */
+const chatWidth = (viewport: number) => Math.round(Math.min(600, Math.max(440, viewport * 0.34)))
+const WIDE = '(min-width: 1024px)'
+
+/** Where the brief sends parents for more (FUNKCJE F29). */
+const LINKS = [
+  { label: 'ZUS', href: 'https://www.zus.pl' },
+  { label: 'Urlop rodzicielski · gov.pl', href: 'https://www.gov.pl/web/rodzina/urlop-rodzicielski' },
+  {
+    label: 'Rodzicielstwo · PIP',
+    href: 'https://www.pip.gov.pl/dla-pracodawcow/porady-prawne/rodzicielstwo',
+  },
+]
 
 interface Props {
   messages: ChatMessage[]
@@ -60,7 +79,14 @@ export function PlanScreen({
   onStop,
   onStartOver,
 }: Props) {
-  const [chatOpen, setChatOpen] = useState(true)
+  const wide = useMediaQuery(WIDE)
+  const [chatOpen, setChatOpen] = useState(() => window.matchMedia(WIDE).matches)
+  const [chatPx, setChatPx] = useState(() => chatWidth(window.innerWidth))
+  useEffect(() => {
+    const onResize = () => setChatPx(chatWidth(window.innerWidth))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const [about, setAbout] = useState(false)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -91,30 +117,61 @@ export function PlanScreen({
     onSend(prompt)
   }
 
+  const chat = (
+    <ChatPanel
+      messages={messages}
+      busy={busy}
+      scenario={scenario}
+      onSend={onSend}
+      onStop={onStop}
+      onShowTimeline={(id) => {
+        if (!wide) setChatOpen(false)
+        if (id) onSelect(id)
+      }}
+      planBeside={wide}
+      onCollapse={wide ? () => setChatOpen(false) : undefined}
+      onVoice={() => showMock('Rozmowę głosową przygotowujemy z ElevenLabs.')}
+    />
+  )
+
   return (
     <div className="flex h-dvh flex-col bg-white">
-      <TopBar
-        onMock={showMock}
-        persona={persona}
-        onLogin={() => setLoginOpen(true)}
-        onLogout={() => setPersona(null)}
-        onZusData={() => setZusOpen(true)}
-        onCases={() => setCasesOpen(true)}
-      />
+      {wide ? (
+        <TopBar
+          onMock={showMock}
+          persona={persona}
+          onLogin={() => setLoginOpen(true)}
+          onLogout={() => setPersona(null)}
+          onZusData={() => setZusOpen(true)}
+          onCases={() => setCasesOpen(true)}
+        />
+      ) : (
+        <MobileBar
+          persona={persona}
+          onLogin={() => setLoginOpen(true)}
+          onLogout={() => setPersona(null)}
+          onZusData={() => setZusOpen(true)}
+          onCases={() => setCasesOpen(true)}
+          onAbout={() => setAbout(true)}
+          onStartOver={onStartOver}
+          onMock={showMock}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         <div className="relative flex min-w-0 flex-1 flex-col">
-          <main className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <main className="scrollbar-soft min-h-0 flex-1 overflow-y-auto lg:[scrollbar-gutter:stable]">
             <motion.div
               variants={STEP}
               initial="enter"
               animate="center"
-              className="mx-auto w-full max-w-[1400px] px-8 pt-6 pb-32"
+              className="mx-auto w-full max-w-[1400px] px-4 pt-5 pb-28 lg:px-8 lg:pt-6 lg:pb-16"
             >
               {timeline ? (
                 <>
                   <Summary
                     timeline={timeline}
+                    wide={wide}
                     onAbout={() => setAbout(true)}
                     onStartOver={onStartOver}
                   />
@@ -123,7 +180,7 @@ export function PlanScreen({
                     <motion.p
                       key={warning}
                       variants={ITEM}
-                      className="mt-4 flex gap-3 rounded-2xl bg-sun-100 px-5 py-3 text-sun-700"
+                      className="mt-4 flex gap-3 rounded-2xl bg-sun-100 px-4 py-3 text-sun-700 lg:px-5"
                     >
                       <TriangleAlert className="mt-0.5 size-5 shrink-0" />
                       {warning}
@@ -148,18 +205,29 @@ export function PlanScreen({
                   </motion.div>
 
                   <motion.section variants={ITEM} aria-label="Oś czasu" className="mt-4">
-                    <TimelineCard
-                      timeline={timeline}
-                      changedIds={changedIds}
-                      changeVersion={changed.version}
-                      selectedId={selectedId}
-                      onSelect={onSelect}
-                      overlayRoot={overlayRoot}
-                    />
+                    {wide ? (
+                      <TimelineCard
+                        timeline={timeline}
+                        changedIds={changedIds}
+                        changeVersion={changed.version}
+                        selectedId={selectedId}
+                        onSelect={onSelect}
+                        overlayRoot={overlayRoot}
+                      />
+                    ) : (
+                      <MobileTimeline
+                        timeline={timeline}
+                        changedIds={changedIds}
+                        changeVersion={changed.version}
+                        selectedId={selectedId}
+                        onSelect={onSelect}
+                      />
+                    )}
                   </motion.section>
 
                   <GoalPlans onMock={showMock} />
                   <RiskRadar scenario={scenario} onCheckZus={checkZus} />
+                  <Footer />
                 </>
               ) : (
                 <Empty onStartOver={onStartOver} />
@@ -169,18 +237,20 @@ export function PlanScreen({
 
           <div ref={setOverlayRoot} className="pointer-events-none absolute inset-0 z-20" />
 
-          <AnimatePresence>
-            {selected && timeline && (
-              <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
-                <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
-              </Dialog>
-            )}
-            {about && timeline && (
-              <Dialog key="about" label="Jak to liczymy" onClose={() => setAbout(false)}>
-                <HowWeCount timeline={timeline} />
-              </Dialog>
-            )}
-          </AnimatePresence>
+          {wide && (
+            <AnimatePresence>
+              {selected && timeline && (
+                <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
+                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+                </Dialog>
+              )}
+              {about && timeline && (
+                <Dialog key="about" label="Jak to liczymy" onClose={() => setAbout(false)}>
+                  <HowWeCount timeline={timeline} />
+                </Dialog>
+              )}
+            </AnimatePresence>
+          )}
 
           <AnimatePresence>
             {!chatOpen && (
@@ -193,7 +263,7 @@ export function PlanScreen({
                 exit={{ opacity: 0, y: 16, scale: 0.94 }}
                 whileTap={{ scale: 0.96, transition: SPRING_PRESS }}
                 transition={SPRING_PANEL}
-                className="absolute right-8 bottom-8 z-20 flex h-14 items-center gap-3 rounded-full bg-zus-600 pr-5 pl-5 font-bold text-white shadow-[0_18px_40px_-18px_rgb(2_90_40/0.8)] transition-colors hover:bg-zus-700 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="absolute right-4 bottom-4 z-20 flex h-14 items-center gap-3 rounded-full bg-zus-600 pr-5 pl-5 font-bold text-white shadow-[0_18px_40px_-18px_rgb(2_90_40/0.8)] transition-colors hover:bg-zus-700 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2 focus-visible:outline-none lg:right-8 lg:bottom-8"
               >
                 <Sparkles className="size-5" />
                 Zapytaj asystenta
@@ -206,34 +276,46 @@ export function PlanScreen({
           </AnimatePresence>
         </div>
 
-        <AnimatePresence initial={false}>
-          {chatOpen && (
-            <motion.aside
-              key="chat"
-              aria-label="Rozmowa z asystentem"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: CHAT_WIDTH, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={SPRING_PANEL}
-              className="h-full shrink-0 overflow-hidden border-l border-line bg-white"
-            >
-              <div className="h-full py-2" style={{ width: CHAT_WIDTH }}>
-                <ChatPanel
-                  messages={messages}
-                  busy={busy}
-                  scenario={scenario}
-                  onSend={onSend}
-                  onStop={onStop}
-                  onShowTimeline={(id) => id && onSelect(id)}
-                  planBeside
-                  onCollapse={() => setChatOpen(false)}
-                  onVoice={() => showMock('Rozmowę głosową przygotowujemy z ElevenLabs.')}
-                />
-              </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
+        {wide && (
+          <AnimatePresence initial={false}>
+            {chatOpen && (
+              <motion.aside
+                key="chat"
+                aria-label="Rozmowa z asystentem"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: chatPx, opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={SPRING_PANEL}
+                className="h-full shrink-0 overflow-hidden border-l border-line bg-white"
+              >
+                <div className="h-full py-2" style={{ width: chatPx }}>
+                  {chat}
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+        )}
       </div>
+
+      {!wide && (
+        <>
+          <Sheet open={chatOpen} onOpenChange={setChatOpen} title="Rozmowa z asystentem" fullHeight>
+            {chat}
+          </Sheet>
+          <Sheet
+            open={selected !== null && timeline !== null}
+            onOpenChange={(open) => !open && onSelect(null)}
+            title={selected?.title ?? 'Szczegóły'}
+          >
+            {selected && timeline && (
+              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+            )}
+          </Sheet>
+          <Sheet open={about && timeline !== null} onOpenChange={setAbout} title="Jak to liczymy">
+            {timeline && <HowWeCount timeline={timeline} />}
+          </Sheet>
+        </>
+      )}
 
       <MObywatelLogin
         open={loginOpen}
@@ -256,9 +338,11 @@ export function PlanScreen({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }}
             transition={{ duration: 0.25, ease: EASE_OUT }}
-            className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-navy-900 py-3 pr-5 pl-3 text-sm font-bold text-white shadow-[0_18px_40px_-18px_rgb(26_36_56/0.6)]"
+            className="fixed inset-x-4 bottom-24 z-[60] flex items-center gap-3 rounded-3xl bg-navy-900 py-3 pr-5 pl-3 text-sm font-bold text-white shadow-[0_18px_40px_-18px_rgb(26_36_56/0.6)] lg:inset-x-auto lg:bottom-6 lg:left-1/2 lg:-translate-x-1/2 lg:rounded-full"
           >
-            <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] tracking-wide">atrapa</span>
+            <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] tracking-wide">
+              atrapa
+            </span>
             {mock.text}
           </motion.div>
         )}
@@ -270,10 +354,12 @@ export function PlanScreen({
 /** The answer in one line: how long the mother's leave is and when. */
 function Summary({
   timeline,
+  wide,
   onAbout,
   onStartOver,
 }: {
   timeline: Timeline
+  wide: boolean
   onAbout: () => void
   onStartOver: () => void
 }) {
@@ -296,19 +382,21 @@ function Summary({
     <motion.header variants={ITEM} className="flex flex-wrap items-end gap-x-6 gap-y-2">
       <div className="min-w-0">
         <p className="text-sm font-bold text-zus-700">Urlop macierzyński</p>
-        <h1 className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-4xl leading-tight font-bold tracking-tight text-navy-900">
+        <h1 className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-3xl leading-tight font-bold tracking-tight text-navy-900 lg:text-4xl">
           <TextStates text={amount} />
-          <span className="text-xl font-bold tracking-normal text-navy-400">
+          <span className="text-base font-bold tracking-normal text-navy-400 lg:text-xl">
             <TextStates text={range} />
           </span>
         </h1>
       </div>
-      <div className="ml-auto flex items-center gap-1">
-        <GhostButton onClick={onAbout}>Jak to liczymy?</GhostButton>
-        <GhostButton onClick={onStartOver}>
-          <RotateCcw className="size-4" /> Od nowa
-        </GhostButton>
-      </div>
+      {wide && (
+        <div className="ml-auto flex items-center gap-1">
+          <GhostButton onClick={onAbout}>Jak to liczymy?</GhostButton>
+          <GhostButton onClick={onStartOver}>
+            <RotateCcw className="size-4" /> Od nowa
+          </GhostButton>
+        </div>
+      )}
     </motion.header>
   )
 }
@@ -334,13 +422,13 @@ function Decision({
       initial="enter"
       animate="center"
       exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2 } }}
-      className="mt-5 flex items-center gap-5 rounded-3xl border border-line py-3 pr-3 pl-6"
+      className="mt-5 flex flex-col gap-3 rounded-3xl border border-line p-3 lg:flex-row lg:items-center lg:gap-5 lg:py-3 lg:pr-3 lg:pl-6"
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 px-2 pt-1 lg:p-0">
         <h2 className="text-lg leading-tight font-bold text-navy-900">{title}</h2>
         {subtitle && <p className="mt-0.5 text-sm text-navy-500">{subtitle}</p>}
       </div>
-      <div role="radiogroup" aria-label={title} className="flex gap-2">
+      <div role="radiogroup" aria-label={title} className="grid grid-cols-2 gap-2 lg:flex">
         {choices.map((choice) => {
           const selected = picked === choice.prompt
           return (
@@ -356,7 +444,7 @@ function Decision({
               }}
               whileTap={{ scale: 0.97, transition: SPRING_PRESS }}
               className={cn(
-                'group flex items-center gap-3 rounded-2xl border bg-white py-1.5 pr-5 pl-1.5 text-left',
+                'group flex flex-col items-start gap-1 rounded-2xl border bg-white p-2 text-left lg:flex-row lg:items-center lg:gap-3 lg:py-1.5 lg:pr-5 lg:pl-1.5',
                 'transition-[border-color,background-color,box-shadow,opacity] duration-200',
                 'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
                 selected
@@ -369,11 +457,13 @@ function Decision({
                 src={choice.image === 'rest' ? odpoczynek : etat}
                 alt=""
                 draggable={false}
-                className="size-14 object-contain transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] select-none group-hover:-translate-y-0.5"
+                className="size-12 object-contain transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] select-none group-hover:-translate-y-0.5 lg:size-14"
               />
-              <span>
-                <span className="block font-bold text-navy-900">{choice.label}</span>
-                <span className="block text-sm text-navy-500">{choice.hint}</span>
+              <span className="px-1 pb-1 lg:p-0">
+                <span className="block text-sm leading-snug font-bold text-navy-900 lg:text-base">
+                  {choice.label}
+                </span>
+                <span className="block text-xs text-navy-500 lg:text-sm">{choice.hint}</span>
               </span>
             </motion.button>
           )
@@ -426,11 +516,41 @@ function HowWeCount({ timeline }: { timeline: Timeline }) {
   )
 }
 
+/** Links from the brief, and the way into the admin panel. */
+function Footer() {
+  return (
+    <motion.footer
+      variants={ITEM}
+      className="mt-14 flex flex-col gap-4 border-t border-line pt-6 text-sm lg:flex-row lg:items-center"
+    >
+      <p className="font-bold text-navy-900">Więcej informacji</p>
+      <ul className="flex flex-wrap gap-2">
+        {LINKS.map((link) => (
+          <li key={link.href}>
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-full border border-line px-3.5 py-2 font-bold text-navy-700 transition-[border-color,background-color] duration-150 hover:border-navy-200 hover:bg-navy-50"
+            >
+              {link.label}
+              <ExternalLink className="size-3.5 text-navy-400" />
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a href="/admin" className="font-bold text-navy-500 hover:text-navy-900 lg:ml-auto">
+        Panel administracyjny (demo)
+      </a>
+    </motion.footer>
+  )
+}
+
 function Empty({ onStartOver }: { onStartOver: () => void }) {
   return (
     <section className="flex min-h-[60vh] flex-col items-center justify-center text-center">
       <motion.img variants={POP} src={mama} alt="" className="w-24 select-none" draggable={false} />
-      <motion.h1 variants={ITEM} className="mt-6 text-4xl font-bold tracking-tight text-navy-900">
+      <motion.h1 variants={ITEM} className="mt-6 text-3xl font-bold tracking-tight text-navy-900 lg:text-4xl">
         Zacznijmy od daty
       </motion.h1>
       <motion.p variants={ITEM} className="mt-3 max-w-md text-lg text-pretty text-navy-500">
