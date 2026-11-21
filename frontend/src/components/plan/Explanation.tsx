@@ -18,8 +18,13 @@ const KIND: Record<CaseNote['kind'], { label: string; className: string }> = {
 
 export function Explanation({ timeline, focusId }: { timeline: Timeline; focusId?: string }) {
   const focused = useRef<HTMLLIElement>(null)
+  // Start at the clicked point: scroll only the dialog's own content, never the page under it.
   useEffect(() => {
-    focused.current?.scrollIntoView({ block: 'center' })
+    const point = focused.current
+    const box = point?.closest<HTMLElement>('[data-scroll]')
+    if (!point || !box) return
+    const offset = point.getBoundingClientRect().top - box.getBoundingClientRect().top
+    box.scrollTop += offset - Math.max(0, (box.clientHeight - point.clientHeight) / 2)
   }, [focusId])
 
   return (
