@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, chat, session, timeline
+from app.api import admin, cases, chat, session, timeline
 from app.api.deps import get_param_store, get_session_store
 from app.config import get_settings
 from app.services.param_versions import ParamStore
@@ -24,6 +24,7 @@ app.include_router(timeline.router)
 app.include_router(chat.router)
 app.include_router(session.router)
 app.include_router(admin.router)
+app.include_router(cases.router)
 
 
 @app.get("/api/health")

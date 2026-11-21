@@ -128,6 +128,7 @@ function ParentsApp() {
             onSend={sendMessage}
             onStop={stop}
             onStartOver={startOver}
+            onLoadCase={finishOnboarding}
           />
         </motion.div>
       )}

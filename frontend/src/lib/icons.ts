@@ -15,6 +15,7 @@ import noworodek from '@/assets/onboarding/noworodek.webp'
 import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
 import parasol from '@/assets/onboarding/parasol.webp'
 import pieniadze from '@/assets/onboarding/pieniadze.webp'
+import przyjecie from '@/assets/onboarding/przyjecie.webp'
 import serce from '@/assets/onboarding/serce.webp'
 import skarbonka from '@/assets/onboarding/skarbonka.webp'
 import szpital from '@/assets/onboarding/szpital.webp'
@@ -42,6 +43,7 @@ export const ICONS = {
   odpoczynek,
   parasol,
   pieniadze,
+  przyjecie,
   serce,
   skarbonka,
   szpital,

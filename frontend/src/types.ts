@@ -398,3 +398,128 @@ export interface ParamPreview {
   before: Timeline
   after: Timeline
 }
+
+// ---------------------------------------------------------------------------------------------
+// Example cases from ZUS (backend/app/cases/models.py, api/cases.py)
+
+export type InsuranceTitle = 'employment' | 'contract' | 'business' | 'other'
+export type SicknessInsurance = 'mandatory' | 'voluntary' | 'none' | 'unknown'
+export type LeaveKind = 'maternity' | 'parental' | 'paternity' | 'supplementary' | 'sick' | 'other'
+export type CaseOutcome = 'granted' | 'refused' | 'partial' | 'unknown'
+
+export interface CaseDocument {
+  kind: string
+  pages: number[]
+}
+
+export interface InsurancePeriod {
+  person: Role
+  title: InsuranceTitle
+  label: string
+  start: string | null
+  end: string | null
+  sickness: SicknessInsurance
+  pages: number[]
+}
+
+export interface LeavePeriod {
+  person: Role
+  kind: LeaveKind
+  start: string
+  end: string | null
+  pages: number[]
+}
+
+export interface PayMonth {
+  month: string
+  amount: number
+  kind: 'salary' | 'contribution_base'
+  person: Role
+  full_month: boolean | null
+  note: string
+  pages: number[]
+}
+
+export interface CaseDecision {
+  outcome: CaseOutcome
+  benefit: string
+  reason: string
+  pages: number[]
+}
+
+export interface HospitalPeriod {
+  start: string
+  end: string | null
+  pages: number[]
+}
+
+/** What the case says, as read from its scans: transcription only, with page numbers. */
+export interface CaseFacts {
+  /** A short title AI gave the case (empty for cases read before it existed). */
+  title: string
+  summary: string
+  applicant: Role | null
+  benefit_requested: string
+  child_born: boolean | null
+  birth_date: string | null
+  due_date: string | null
+  children_count: number | null
+  stillborn: boolean | null
+  taken_in: TakenIn | null
+  taken_in_on: string | null
+  za_zyciem: boolean | null
+  hospital_after_birth: boolean | null
+  birth_week: number | null
+  birth_weight_grams: number | null
+  hospital_stays: HospitalPeriod[]
+  payer_over_20: boolean | null
+  documents: CaseDocument[]
+  insurance: InsurancePeriod[]
+  leaves: LeavePeriod[]
+  pay: PayMonth[]
+  decision: CaseDecision | null
+  unreadable: string[]
+}
+
+export interface CaseListItem {
+  id: string
+  category: string
+  /** The title AI gave the case once read; empty before. */
+  title: string
+  pages: number
+  read: boolean
+}
+
+export interface CaseList {
+  configured: boolean
+  cases: CaseListItem[]
+}
+
+export interface InsuranceCheck {
+  person: Role
+  on: string | null
+  covered: boolean | null
+  period: InsurancePeriod | null
+  text: string
+}
+
+export interface CaseComparison {
+  ours: CaseOutcome
+  zus: CaseOutcome
+  match: boolean | null
+  text: string
+}
+
+export interface CaseResult {
+  id: string | null
+  pages: number
+  pages_read: number
+  cached: boolean
+  facts: CaseFacts
+  scenario: Scenario
+  timeline: Timeline | null
+  insurance: InsuranceCheck
+  comparison: CaseComparison
+  notes: string[]
+  problem: string | null
+}
