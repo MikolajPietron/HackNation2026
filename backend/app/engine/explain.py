@@ -8,6 +8,7 @@ Every phase adds its notes here (CLAUDE.md, "Wyjaśnianie przypadku").
 
 import datetime as dt
 
+from app.engine.applications import application_notes
 from app.engine.draft import DAY, days_between
 from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
@@ -36,6 +37,7 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
             *notes,
             *_father_notes(scenario, timeline, params, cover, loss),
             *_father_computed(scenario, timeline, params),
+            *application_notes(scenario, timeline, params),
         ]
     if not timeline.child_born:
         notes.append(_before_birth(scenario, timeline, params))
@@ -48,7 +50,7 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
     notes += [note for note in optional if note is not None]
     notes += _father_notes(scenario, timeline, params, cover, loss)
     notes.append(_computed(scenario, timeline, params))
-    return notes
+    return notes + application_notes(scenario, timeline, params)
 
 
 def changed_note_ids(old: Timeline | None, new: Timeline) -> list[str]:
@@ -74,6 +76,7 @@ def _after_loss(
             *notes,
             *_father_notes(scenario, timeline, params, cover, loss),
             *_father_computed(scenario, timeline, params),
+            *application_notes(scenario, timeline, params),
         ]
     notes.append(_loss_rule(scenario, timeline, params, loss))
     if loss.survivors:
@@ -85,7 +88,7 @@ def _after_loss(
         notes += [note for note in optional if note is not None]
     notes += _father_notes(scenario, timeline, params, cover, loss)
     notes.append(_loss_computed(scenario, timeline, params, loss))
-    return notes
+    return notes + application_notes(scenario, timeline, params)
 
 
 def _loss_situation(scenario: Scenario, timeline: Timeline, loss: Loss) -> CaseNote:

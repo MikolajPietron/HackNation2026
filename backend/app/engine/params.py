@@ -132,6 +132,38 @@ class Rules(BaseModel):
     rest_after_birth: Rule
 
 
+class ApplicationParams(BaseModel):
+    """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 12, section I page
+    10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1, 182³ § 2)."""
+
+    paid_by_payer_or_zus: Rule
+    payer_more_than_insured: Param[int]
+    """The payer pays the benefit itself when it reports more insured than this; else ZUS."""
+    payer_count_day: Rule
+    employee_request: Rule
+    one_request: Rule
+    employer_pays_or_z3: Rule
+    non_employee_zam: Rule
+    contract_zam: Rule
+    attachments: Rule
+    zam_form: Rule
+    parental_days_before: Param[int]
+    supplementary_days_before_end: Param[int]
+    supplementary_hospital_certificate: Rule
+    paternity_days_before: Param[int]
+    father_maternity_days_before: Param[int]
+    """Taking over after 14 weeks, or the mother's incapacity (art. 180 § 9)."""
+    father_maternity_on_request: Rule
+    """The mother in hospital, dead or gone: a request with no deadline (art. 180 § 16)."""
+    resignation_days_before: Param[int]
+    protection: Rule
+    protection_early_request_days: Param[list[int]]
+    """An early request: the ban starts this many days before a part of maternity leave,
+    supplementary or parental leave, paternity leave."""
+    fixed_term_extended: Rule
+    protection_employees_only: Rule
+
+
 class Params(BaseModel):
     version: str
     description: str
@@ -142,6 +174,7 @@ class Params(BaseModel):
     loss: LossParams
     father: FatherParams
     rules: Rules
+    applications: ApplicationParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""

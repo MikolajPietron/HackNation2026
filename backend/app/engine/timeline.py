@@ -34,6 +34,7 @@ from `Params`, every element carries its sources. Later phases add rules after t
 import datetime as dt
 from collections.abc import Callable
 
+from app.engine.applications import add_applications
 from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
 from app.engine.father import father_rules
@@ -129,6 +130,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         warnings=draft.warnings,
         assumptions=_assumptions(scenario, params, born, cover, loss, draft),
     )
+    # Applications and protection (guide A.4, I): who pays, requests, protection.
+    add_applications(timeline, scenario, params)
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
 
@@ -772,8 +775,8 @@ def _assumptions(
 ) -> list[str]:
     assumptions = [
         "Pokazujemy to, co wynika z części A i B Przewodnika ZUS: zasiłek macierzyński mamy "
-        "i uprawnienia taty. Kolejne części (kwoty zasiłku, wnioski i terminy, łączenie urlopu "
-        "z pracą, adopcja) dodajemy krok po kroku."
+        "i uprawnienia taty, z wnioskami, ich terminami i szczególną ochroną. Kolejne części "
+        "(kwoty zasiłku, łączenie urlopu z pracą, adopcja) dodajemy krok po kroku."
     ]
     mother = cover not in NOT_INSURED
     father = father_coverage(scenario)

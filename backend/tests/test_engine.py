@@ -360,14 +360,18 @@ def test_without_sickness_insurance_there_are_no_benefit_periods(
         assert not [s for s in t.segments if s.lane == "mother"]
         assert [s.id for s in t.segments] == ["paternity", "parental-father"]
         assert t.markers[0].id in ("due-date", "birth")
-        assert [n.id for n in t.notes] == ["situation", "insurance", "father", "computed"]
+        # An employed father has his requests, who pays and his protection (guide A.4, I).
+        employed = answers.get("role") == "father"
+        extra = ["protection", "payer", "applications"] if employed else []
+        assert [n.id for n in t.notes] == ["situation", "insurance", "father", "computed", *extra]
         assert t.notes[1].kind == "risk"
         assert t.notes[1].title == "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
         assert "Tylko w określonych sytuacjach zasiłek przysługuje także po ustaniu" in (
             t.notes[1].text
         )
         assert "Liczy się, czy w dniu porodu podlega ubezpieczeniu" in t.markers[0].summary
-        assert not t.documents
+        requests = ["paternity-request", "parental-father-request"] if employed else []
+        assert [d.id for d in t.documents] == requests
 
 
 def test_the_fathers_own_work_says_nothing_about_the_mother() -> None:
@@ -639,7 +643,8 @@ STILLBORN = {"stillborn": True}
 def test_stillbirth_gives_eight_weeks_after_the_birth() -> None:
     """10.11.2026 + 8 weeks = 4.01.2027. Nothing after it: no parental leave, no 14 weeks."""
     t = lost(STILLBORN)
-    assert ids(t) == ["maternity", "birth"]
+    # The employed mother's request and the end of her protection (guide A.4, I).
+    assert ids(t) == ["maternity", "birth", "protection-end", "maternity-request"]
     assert span(t, "maternity") == (LOST_BIRTH, dt.date(2027, 1, 4), 56)
     assert t.element("birth").title == "Poród"  # type: ignore[union-attr]
     assert [(n.id, n.kind) for n in t.notes] == [
@@ -647,6 +652,9 @@ def test_stillbirth_gives_eight_weeks_after_the_birth() -> None:
         ("insurance", "right"),
         ("loss", "right"),
         ("computed", "computed"),
+        ("protection", "right"),
+        ("payer", "computed"),
+        ("applications", "computed"),
     ]
     assert t.notes[0].title == "Dziecko urodziło się martwe"
     assert t.notes[0].text.startswith("Bardzo nam przykro.")
@@ -1009,7 +1017,14 @@ def test_the_father_takes_over_after_fourteen_weeks() -> None:
     assert span(t, "maternity-father") == (dt.date(2027, 2, 16), dt.date(2027, 3, 29), 42)
     assert span(t, "parental") == span(before, "parental")
     assert t.element("personal-weeks").date == dt.date(2027, 2, 15)  # type: ignore[union-attr]
-    assert changed_element_ids(before, t) == ["maternity", "maternity-father"]
+    # Also: the mother's protection now ends with her part, and two requests (guide A.4, I).
+    assert changed_element_ids(before, t) == [
+        "maternity",
+        "maternity-father",
+        "protection-end",
+        "maternity-resignation",
+        "maternity-father-request",
+    ]
     assert {"art. 180 § 4", "art. 180 § 5", "art. 180 § 14"} <= {s.article for s in father.sources}
     mother = segment(t, "maternity")
     assert "Dalszą część, od 16.02.2027 do 29.03.2027, przejmuje tata" in mother.summary
@@ -1130,6 +1145,9 @@ def test_incapacity_the_father_takes_the_rest_after_eight_weeks() -> None:
         "mother-event",
         "father",
         "computed",
+        "protection",
+        "payer",
+        "applications",
     ]
     assert any("8 tygodni urlopu po porodzie liczymy jako 56 dni" in a for a in t.assumptions)
 
@@ -1338,7 +1356,7 @@ def test_special_situations_of_an_uninsured_mother_or_without_a_living_child_are
     assert "mother-event" not in notes(uninsured)
     assert any("oś nie uwzględnia sytuacji szczególnych" in a for a in uninsured.assumptions)
     stillborn = event("hospital", "2026-12-01", losses=[STILLBORN])
-    assert ids(stillborn) == ["maternity", "birth"]
+    assert ids(stillborn) == ["maternity", "birth", "protection-end", "maternity-request"]
     assert span(stillborn, "maternity")[1] == dt.date(2026, 11, 25)  # 8 weeks, untouched
     assert any("Gdy żadne dziecko nie żyje" in a for a in stillborn.assumptions)
 

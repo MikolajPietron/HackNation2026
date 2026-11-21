@@ -56,22 +56,30 @@ def test_a_sentence_over_a_page_break_is_whole_and_knows_its_pages() -> None:
 
 def test_labour_code_provisions() -> None:
     assert set(kp_articles()) == {
+        "art. 177 § 1",
+        "art. 177 § 1¹",
+        "art. 177 § 3",
         "art. 180 § 1",
         "art. 180 § 2",
         "art. 180 § 3",
         "art. 180 § 4",
         "art. 180 § 5",
         "art. 180 § 6",
+        "art. 180 § 8",
+        "art. 180 § 9",
         "art. 180 § 10",
         "art. 180 § 11",
         "art. 180 § 12",
         "art. 180 § 13",
         "art. 180 § 14",
+        "art. 180 § 16",
         "art. 180¹ § 1",
         "art. 180¹ § 2",
         "art. 180² § 1",
         "art. 180² § 2",
         "art. 180² § 3",
+        "art. 180² § 4",
+        "art. 180² § 5",
         "art. 180² § 7",
         "art. 182¹ᵃ § 1",
         "art. 182¹ᵃ § 2",
@@ -79,9 +87,11 @@ def test_labour_code_provisions() -> None:
         "art. 182¹ᵃ § 4",
         "art. 182¹ᵃ § 6",
         "art. 182¹ᶜ",
+        "art. 182¹ᵈ § 1",
         "art. 182¹ᵍ",
         "art. 182³ § 1",
         "art. 182³ § 1¹",
+        "art. 182³ § 2",
         "art. 182³ § 3",
         "art. 183¹ § 1",
         "art. 183¹ § 2",
@@ -92,6 +102,22 @@ def test_labour_code_provisions() -> None:
     # Article numbers inside the text carry their superscripts again.
     assert kp_articles()["art. 182¹ᵍ"].endswith("art. 183¹ § 1.")
     assert "art. 183¹ § 1 stosuje się odpowiednio" in kp_articles()["art. 180² § 7"]
+    assert "art. 180² § 4, art. 182¹ᵈ § 1, art. 182³ § 2 oraz" in kp_articles()["art. 177 § 1¹"]
+    assert kp_articles()["art. 182¹ᵈ § 1"].count("art. 186⁸ᵃ") == 1
+    assert "nie krótszym niż 7 dni przed przystąpieniem do pracy" in kp_articles()["art. 180 § 8"]
+
+
+def test_applications_and_protection_sections() -> None:
+    """Who pays (page 1 and footnote 1), the documents (A.4), the forms (page 12) and the
+    special protection (section I)."""
+    assert SECTIONS["W"].text.endswith("w którym dokonali takiego zgłoszenia).")
+    assert "powyżej 20 ubezpieczonych" in SECTIONS["W"].text
+    a4 = SECTIONS["A.4"]
+    assert a4.text.startswith("Kobieta będąca pracownikiem występuje do pracodawcy")
+    assert a4.text.endswith("podstawę do uzupełniającego urlopu macierzyńskiego).")
+    assert (a4.page, a4.last_page) == (6, 6)
+    assert SECTIONS["I"].text.endswith("prowadzących pozarolniczą działalność.")
+    assert "Formularz ZAO od 24 października 2026 r." in SECTIONS["F"].text
 
 
 def test_every_quote_in_params_is_literal() -> None:
@@ -161,7 +187,7 @@ def scenarios() -> list[dict[str, Any]]:
             | {"birth_date": birth, "losses": losses, "children_count": children}
             | {"leave_before_birth_weeks": weeks}
         )
-    return cases + father_scenarios()
+    return cases + father_scenarios() + application_scenarios()
 
 
 def father_scenarios() -> list[dict[str, Any]]:
@@ -241,6 +267,60 @@ def father_scenarios() -> list[dict[str, Any]]:
         later | {"mother_event": {"kind": kind, "start": "2026-08-01"}} | father
         for kind in ("death", "abandonment")
         for father in ({}, {"father_work": "none"})
+    ]
+    return cases
+
+
+def application_scenarios() -> list[dict[str, Any]]:
+    """Applications and protection: how each parent works and how many people the payer reports,
+    a passed deadline, attachments, taking over and the special situations."""
+    cases: list[dict[str, Any]] = []
+    works = [
+        {"work": "employment"},
+        {"work": "contract"},
+        {"work": "business", "mother_insured": True},
+    ]
+    fathers = [
+        {"father_work": "employment"},
+        {"father_work": "contract"},
+        {"father_work": "business"},
+        {"father_work": "none"},
+    ]
+    for child_born in (False, True):
+        base = {"due_date": "2027-03-15", "birth_date": "2026-11-10", "child_born": child_born}
+        cases += [
+            base
+            | {"role": "mother", "children_count": 1, "leave_before_birth_weeks": weeks}
+            | work
+            | father
+            | {"mother_payer_size": size, "father_payer_size": size}
+            for work in works
+            for father in fathers
+            for size in ("over-20", "up-to-20", "unknown", None)
+            for weeks in (0, 2)
+        ]
+    born = {"child_born": True, "role": "mother", "work": "employment", "children_count": 1}
+    born |= {"father_work": "employment", "leave_before_birth_weeks": 0}
+    cases += [
+        born | {"birth_date": "2026-11-10", "father_takes_over": True},
+        born | {"birth_date": "2026-11-10", "za_zyciem": True, "work": "contract"},
+        born | {"birth_date": "2026-11-10", "losses": [{"stillborn": True}]},
+        born | {"birth_date": "2026-11-10", "losses": [{"stillborn": True}], "work": "business"},
+        born
+        | {"birth_date": "2026-06-20", "hospital_care": True, "birth_week": "28-37"}
+        | {"birth_weight_up_to_1000g": False}
+        | {"hospital_stays": [{"start": "2026-06-20", "end": "2026-07-20"}]},
+    ]
+    events = [
+        {"kind": "incapacity", "start": "2026-12-01"},
+        {"kind": "hospital", "start": "2026-12-01", "end": "2026-12-20"},
+        {"kind": "death", "start": "2026-11-15"},
+        {"kind": "abandonment", "start": "2026-11-10"},
+    ]
+    cases += [
+        born | {"birth_date": "2026-10-01", "mother_event": e} | father
+        for e in events
+        for father in ({}, {"father_work": "contract"}, {"father_work": "business"})
     ]
     return cases
 

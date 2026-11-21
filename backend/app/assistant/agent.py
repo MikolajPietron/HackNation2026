@@ -8,7 +8,7 @@ explains it. The model never computes dates.
 
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
@@ -32,7 +32,14 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
+from app.engine.models import (
+    BirthWeek,
+    ChildLoss,
+    HospitalStay,
+    MotherEvent,
+    PayerSize,
+    Work,
+)
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -474,3 +481,36 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
     return describe_element(element)
+
+
+# Applications and protection (guide A.4, I).
+
+
+@assistant.tool(sequential=True)
+async def set_payer_size(
+    ctx: RunContext[AssistantDeps], parent: Literal["mother", "father"], size: PayerSize
+) -> str:
+    """Record whether the employer (or the principal of a contract of mandate) of the mother or
+    the father reports more than 20 people to sickness insurance. It decides who pays the
+    benefit (the payer or ZUS) and where the request goes. Only for employment or a contract
+    of mandate: with her (his) own business the request goes straight to ZUS.
+
+    Args:
+        parent: "mother" or "father": whose employer (principal) it is.
+        size: "over-20" = more than 20 people, "up-to-20" = 20 or fewer, "unknown" = the user
+            does not know.
+    """
+    work = ctx.deps.scenario.mothers_work if parent == "mother" else ctx.deps.scenario.fathers_work
+    if work not in ("employment", "contract"):
+        whose, who = ("mamy", "mama") if parent == "mother" else ("taty", "tata")
+        raise ModelRetry(
+            f"To pytanie dotyczy pracodawcy albo zleceniodawcy {whose}, a {who} nie pracuje na "
+            "etacie ani na umowie zlecenia (przy własnej firmie wniosek ZAM idzie prosto do ZUS)."
+        )
+    scenario = _with(ctx, **{f"{parent}_payer_size": size})
+    focus = (
+        ("maternity-request", "maternity")
+        if parent == "mother"
+        else ("paternity-request", "father-benefit-request", "paternity")
+    )
+    return await _apply(ctx, scenario, *focus)

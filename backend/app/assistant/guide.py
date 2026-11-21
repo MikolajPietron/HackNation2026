@@ -166,6 +166,34 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
             )
         ],
     ),
+    # Applications and protection (guide A.4, I): who pays, what to file and where.
+    (
+        "W",
+        "Kto wypłaca zasiłki (wprowadzenie i przypis 1)",
+        [
+            (1, "zasiłki są wypłacane przez płatników", "albo ZUS)"),
+            (1, "Zgodnie z art 61", "takiego zgłoszenia)."),
+        ],
+    ),
+    (
+        "A.4",
+        "Dokumenty stanowiące podstawę do ustalenia zasiłku",
+        [(6, "Kobieta będąca pracownikiem występuje", "uzupełniającego urlopu macierzyńskiego).")],
+    ),
+    (
+        "I",
+        "Szczególna ochrona kobiet – pracownic w ciąży oraz pracowników w okresie urlopów "
+        "związanych z rodzicielstwem",
+        [(10, "W okresie ciąży oraz w okresie urlopu", "prowadzących pozarolniczą działalność.")],
+    ),
+    (
+        "F",
+        "Formularze: ZAM, zaświadczenia płatnika składek i formularze zlikwidowane",
+        [
+            (12, "ZAM – wniosek o zasiłek macierzyński", "i wysokość zasiłku)"),
+            (12, "Formularz ZUR od 24", "Z-3b od 24 października 2026 r. zlikwidowany"),
+        ],
+    ),
 ]
 
 

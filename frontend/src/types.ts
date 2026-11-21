@@ -53,6 +53,12 @@ export interface MotherEvent {
   end: string | null
 }
 
+/**
+ * How many people the payer (employer, or the principal of a contract of mandate) reports to
+ * sickness insurance: more than 20 = it pays the benefit itself, otherwise ZUS (guide page 1).
+ */
+export type PayerSize = 'over-20' | 'up-to-20' | 'unknown'
+
 /** What the onboarding and the interview have established. null = not known yet. */
 export interface Scenario {
   /** The person filling in. Work and earnings are that person's own. */
@@ -88,6 +94,10 @@ export interface Scenario {
   /** Weeks after the birth the mother uses before the father takes over (default 14). */
   mother_weeks_before_takeover: number | null
   mother_event: MotherEvent | null
+  // Applications and protection (guide A.4, I)
+  /** The mother's employer (principal): more than 20 insured or not; not asked for a business. */
+  mother_payer_size: PayerSize | null
+  father_payer_size: PayerSize | null
 }
 
 /** Everything the onboarding asks, as sent to PUT /api/session/{id}/onboarding. */
