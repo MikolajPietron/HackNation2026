@@ -13,10 +13,11 @@ from fastapi.testclient import TestClient
 from pydantic_ai import ModelMessage, ModelRequest, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 
-from app.api.deps import get_chat_model, get_session_store, get_today
+from app.api.deps import get_chat_model, get_param_store, get_session_store, get_today
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.config import Settings, get_settings
 from app.main import app
+from app.services.param_versions import MemoryParamStore
 from app.services.sessions import MemorySessionStore, Session
 
 TODAY = dt.date(2026, 11, 21)
@@ -57,6 +58,9 @@ def store() -> MemorySessionStore:
 def client(store: MemorySessionStore) -> Iterator[TestClient]:
     app.dependency_overrides[get_today] = lambda: TODAY
     app.dependency_overrides[get_session_store] = lambda: store
+    # Tests never reach the hosted Supabase: parameter versions stay in memory too.
+    params = MemoryParamStore()
+    app.dependency_overrides[get_param_store] = lambda: params
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -105,7 +109,15 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     update = next(e for e in ask(client, model, "Jedno") if e["type"] == "timeline")
     maternity = next(s for s in update["timeline"]["segments"] if s["id"] == "maternity")
     assert (maternity["start"], maternity["end"]) == ("2027-03-15", "2027-08-01")
-    assert update["changed"] == ["maternity", "parental", "personal-weeks", "parental-deadline"]
+    assert update["changed"] == [
+        "maternity",
+        "parental",
+        "paternity",
+        "parental-father",
+        "personal-weeks",
+        "paternity-deadline",
+        "parental-deadline",
+    ]
 
     model = scripted("set_leave_before_birth", {"weeks": 2}, "Zapisane.")
     update = next(e for e in ask(client, model, "Dwa tygodnie") if e["type"] == "timeline")
@@ -115,6 +127,10 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
         ("maternity-prenatal", "2027-03-01", "2027-03-14"),
         ("maternity", "2027-03-15", "2027-07-18"),
         ("parental", "2027-07-19", "2028-02-27"),
+        # The father: 14 days from the due date; his 9 weeks after the mother's parental leave
+        # (28.02.2028 + 63 days - 1 = 30.04.2028, 2028 is a leap year).
+        ("paternity", "2027-03-15", "2027-03-28"),
+        ("parental-father", "2028-02-28", "2028-04-30"),
     ]
     assert update["timeline"]["documents"][0]["done"] is False
 
@@ -343,9 +359,21 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
     assert "„Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego" in returned[0]
 
     update = timeline_after(client, "set_voluntary_insurance", {"registered": False})
-    assert update["timeline"]["segments"] == []
-    assert [m["id"] for m in update["timeline"]["markers"]] == ["due-date"]
-    assert [n["kind"] for n in update["timeline"]["notes"]] == ["situation", "risk"]
+    # The mother has no benefit periods; the father, who works on a contract of employment,
+    # keeps his paternity leave and parental leave (guide B.3, B.4).
+    assert [s["id"] for s in update["timeline"]["segments"]] == ["paternity", "parental-father"]
+    assert {s["lane"] for s in update["timeline"]["segments"]} == {"father"}
+    assert [m["id"] for m in update["timeline"]["markers"]] == [
+        "due-date",
+        "paternity-deadline",
+        "parental-deadline",
+    ]
+    assert [n["kind"] for n in update["timeline"]["notes"]] == [
+        "situation",
+        "risk",
+        "right",
+        "computed",
+    ]
     assert update["focus"] == "due-date"
 
     seen: list[str] = []
@@ -364,6 +392,8 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
         "prenatal-window",
         "maternity",
         "parental",
+        "paternity",
+        "parental-father",
     ]
 
 
@@ -711,3 +741,17 @@ def test_the_fathers_leave_is_in_scope() -> None:
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
         assert f"`{tool}`" in STATIC_INSTRUCTIONS
     assert "`set_mother_situation`" in STATIC_INSTRUCTIONS
+
+
+def test_the_ui_gets_the_same_next_question(client: TestClient) -> None:
+    """The answer cards and chips follow the assistant's interview: one source of questions."""
+    started = client.put(f"/api/session/{SESSION}/onboarding", json=ONBOARDING).json()
+    assert started["question"]["key"] == "mother-work"  # the father filled in
+    assert started["question"]["text"].startswith("Jak pracuje mama")
+    update = timeline_after(client, "set_mother_work", {"work": "employment"})
+    assert update["question"] == {
+        "key": "leave-before-birth",
+        "text": "Czy mama chce zacząć urlop macierzyński przed porodem (ile tygodni wcześniej?), "
+        "czy pracować do dnia porodu?",
+    }
+    assert client.get(f"/api/session/{SESSION}").json()["question"]["key"] == "leave-before-birth"
