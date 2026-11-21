@@ -152,8 +152,16 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
     # Section H, only what "ubezpieczona" in point A.2 depends on (phase 2c).
     (
         "H.1",
-        "Zagrożenia: skutek niepodlegania ubezpieczeniu chorobowemu",
-        [(10, "osoba która nie podlega", "nie ma uprawnień do zasiłków")],
+        "Zagrożenia: umowa albo działalność dla pozoru",
+        [
+            (9, "zawarcie umowy albo podjęcie działalności", "decyzję o niepodleganiu"),
+            (10, "ubezpieczeniom społecznym; w konsekwencji", "nie ma uprawnień do zasiłków"),
+        ],
+    ),
+    (
+        "H.2",
+        "Zagrożenia: podwyższenie podstawy wymiaru składek w ciąży",
+        [(10, "podwyższenie podstawy wymiaru składek", "wpływ na wysokość zasiłków;")],
     ),
     (
         "H.3",
@@ -165,6 +173,21 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
                 "ubezpieczenia chorobowego.",
             )
         ],
+    ),
+    # The sick-benefit chapter before section A (pages 2-4): sick leave in pregnancy.
+    (
+        "ZC",
+        "Zasiłek chorobowy dla kobiety w ciąży",
+        [
+            (2, "Zasiłek chorobowy jest świadczeniem wypłacanym", "spowodowanej chorobą."),
+            (3, "Kobieta w ciąży zgłasza się", "pracodawca wypłaca"),
+            (4, "wynagrodzenie za czas niezdolności", "okres pobierania zasiłku macierzyńskiego."),
+        ],
+    ),
+    (
+        "ZC.s",
+        "Szczególna sytuacja – zasiłek w wysokości zasiłku macierzyńskiego",
+        [(4, "Zasiłek w wysokości zasiłku macierzyńskiego to", "za okres urlopu macierzyńskiego.")],
     ),
 ]
 

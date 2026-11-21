@@ -762,6 +762,271 @@
       ]
     }
   },
+  "pregnancy": {
+    "sick_benefit": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 2,
+          "quote": "Zasiłek chorobowy jest świadczeniem wypłacanym z Funduszu Ubezpieczeń Społecznych osobom podlegającym ubezpieczeniu chorobowemu (w określonych sytuacjach również po ustaniu tego ubezpieczenia) przez ZUS albo uprawnionych płatników składek"
+        }
+      ]
+    },
+    "e_zla": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Jeżeli stan zdrowia uzasadnia niezdolność do pracy, lekarz wystawia zaświadczenie lekarskie (e-ZLA)."
+        },
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "W zaświadczeniu lekarskim e-ZLA stan ciąży oznaczany jest kodem literowym „B”."
+        },
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Zaświadczenie lekarskie e-ZLA wystawiane jest w formie elektronicznej i trafia bezpośrednio do ZUS oraz na profil pracodawcy na PUE/eZUS."
+        }
+      ]
+    },
+    "insured_needed": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "Aby otrzymać zasiłek chorobowy, kobieta musi podlegać ubezpieczeniu chorobowemu"
+        }
+      ]
+    },
+    "waiting_days_obligatory": {
+      "value": 30,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "obowiązkowego ubezpieczenia chorobowego (np. umowa o pracę) prawo do zasiłku co do zasady powstaje po 30 dniach nieprzerwanego ubezpieczenia"
+        }
+      ]
+    },
+    "waiting_days_voluntary": {
+      "value": 90,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "dobrowolnego ubezpieczenia chorobowego (np. umowa zlecenie lub działalność gospodarcza) prawo do zasiłku co do zasady powstaje po 90 dniach ubezpieczenia"
+        }
+      ]
+    },
+    "employer_days": {
+      "value": 33,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "page_to": 4,
+          "quote": "Przez pierwsze 33 dni niezdolności do pracy w roku kalendarzowym (lub 14 dni w przypadku pracowników po ukończeniu 50. roku życia) pracodawca wypłaca wynagrodzenie za czas niezdolności do pracy (nazywane wynagrodzeniem chorobowym)"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 92 § 1",
+          "quote": "trwającej łącznie do 33 dni w ciągu roku kalendarzowego, a w przypadku pracownika, który ukończył 50 rok życia - trwającej łącznie do 14 dni w ciągu roku kalendarzowego"
+        }
+      ]
+    },
+    "employer_days_from_50": {
+      "value": 14,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "page_to": 4,
+          "quote": "Przez pierwsze 33 dni niezdolności do pracy w roku kalendarzowym (lub 14 dni w przypadku pracowników po ukończeniu 50. roku życia) pracodawca wypłaca wynagrodzenie za czas niezdolności do pracy (nazywane wynagrodzeniem chorobowym)"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 92 § 5",
+          "quote": "dotyczą niezdolności pracownika do pracy przypadającej po roku kalendarzowym, w którym pracownik ukończył 50 rok życia"
+        }
+      ]
+    },
+    "employer_pay_in_pregnancy": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 92 § 1",
+          "quote": "choroby przypadającej w czasie ciąży - w okresie wskazanym w pkt 1 - pracownik zachowuje prawo do 100% wynagrodzenia"
+        }
+      ]
+    },
+    "benefit_after_employer": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "w przypadku pracownicy, od kolejnego dnia niezdolności wypłacany jest zasiłek chorobowy."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 92 § 4",
+          "quote": "pracownikowi przysługuje zasiłek chorobowy na zasadach określonych w odrębnych przepisach"
+        }
+      ]
+    },
+    "no_pay_without_right": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 92 § 3",
+          "quote": "nie przysługuje w przypadkach, w których pracownik nie ma prawa do zasiłku chorobowego"
+        }
+      ]
+    },
+    "non_employee_from_day_one": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "W przypadku kobiet, które nie są pracownikami, zasiłek wypłacany jest od pierwszego dnia niezdolności do pracy."
+        }
+      ]
+    },
+    "rate_percent": {
+      "value": 100,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "Zasiłek chorobowy w okresie ciąży wynosi 100% podstawy wymiaru zasiłku (jeżeli zaświadczenie lekarskie zawiera kod literowy „B”)"
+        }
+      ]
+    },
+    "period": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "Zasiłek przysługuje za okres orzeczonej niezdolności do pracy, wskazany w zaświadczeniu lekarskim e-ZLA"
+        }
+      ]
+    },
+    "max_days": {
+      "value": 270,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "Przysługuje przez maksymalny okres zwany „okresem zasiłkowym”, tj. 270 dni"
+        }
+      ]
+    },
+    "until_birth": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 4,
+          "quote": "jeżeli niezdolność do pracy trwa do porodu, po porodzie rozpoczyna się okres urlopu macierzyńskiego/ okres pobierania zasiłku macierzyńskiego."
+        }
+      ]
+    },
+    "job_loss_benefit": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.s",
+          "page": 4,
+          "quote": "Zasiłek w wysokości zasiłku macierzyńskiego to szczególny rodzaj świadczenia wypłacanego gdy kobieta w ciąży utraciła zatrudnienie w okolicznościach przewidzianych w ustawie zasiłkowej; jest wypłacany do dnia porodu, po ustaniu ubezpieczenia."
+        }
+      ]
+    },
+    "job_loss_employer_gone": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.s",
+          "page": 4,
+          "quote": "jeśli w okresie ciąży rozwiązano umowę o pracę z kobietą w ciąży z powodu upadłości lub likwidacji albo śmierci pracodawcy i nie zapewniono jej innego zatrudnienia"
+        }
+      ]
+    },
+    "job_loss_unlawful": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.s",
+          "page": 4,
+          "quote": "naruszenia przepisów prawa przy rozwiązaniu umowy o pracę z kobietą w ciąży, (fakt ten musi być potwierdzony prawomocnym wyrokiem sądu,)."
+        }
+      ]
+    },
+    "job_loss_rate_percent": {
+      "value": 100,
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC.s",
+          "page": 4,
+          "quote": "Wynosi 100% podstawy wymiaru zasiłku – tak jak zasiłek macierzyński za okres urlopu macierzyńskiego."
+        }
+      ]
+    },
+    "risk_sham": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.1",
+          "page": 9,
+          "quote": "zawarcie umowy albo podjęcie działalności gospodarczej dla pozoru"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "H.1",
+          "page": 9,
+          "page_to": 10,
+          "quote": "ZUS po przeprowadzeniu postępowania, może uznać, że umowa została zawarta wyłącznie dla pozoru i wydać decyzję o niepodleganiu ubezpieczeniom społecznym"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "H.1",
+          "page": 10,
+          "quote": "osoba która nie podlega ubezpieczeniu chorobowemu nie ma uprawnień do zasiłków"
+        }
+      ]
+    },
+    "risk_base_raised": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "H.2",
+          "page": 10,
+          "quote": "podwyższenie podstawy wymiaru składek na ubezpieczenia społeczne w okresie ciąży wyłącznie w celu nabycia uprawnień do wyższej podstawy wymiaru zasiłków"
+        },
+        {
+          "doc": "przewodnik",
+          "section": "H.2",
+          "page": 10,
+          "quote": "ZUS po przeprowadzeniu postępowania, może uznać że podwyższenie podstawy wymiaru składek miało wyłącznie na celu uzyskanie wyższych świadczeń i wydać decyzję ustalającą niższą podstawę, co będzie miało wpływ na wysokość zasiłków"
+        }
+      ]
+    }
+  },
   "rules": {
     "medical_certificate": {
       "sources": [

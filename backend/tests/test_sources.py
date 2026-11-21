@@ -56,6 +56,10 @@ def test_a_sentence_over_a_page_break_is_whole_and_knows_its_pages() -> None:
 
 def test_labour_code_provisions() -> None:
     assert set(kp_articles()) == {
+        "art. 92 § 1",
+        "art. 92 § 3",
+        "art. 92 § 4",
+        "art. 92 § 5",
         "art. 180 § 1",
         "art. 180 § 2",
         "art. 180 § 3",
@@ -87,6 +91,8 @@ def test_labour_code_provisions() -> None:
         "art. 183¹ § 2",
     }
     assert "nie więcej niż 6 tygodni" in kp_articles()["art. 180 § 2"]
+    # The excerpt's "(…)" and the next chapter's heading are not part of § 5.
+    assert kp_articles()["art. 92 § 5"].endswith("ukończył 50 rok życia.")
     assert "nie większą niż 1000 g" in kp_articles()["art. 180² § 1"]
     assert "nie później niż do zakończenia roku" in kp_articles()["art. 182¹ᶜ"]
     # Article numbers inside the text carry their superscripts again.
@@ -161,7 +167,7 @@ def scenarios() -> list[dict[str, Any]]:
             | {"birth_date": birth, "losses": losses, "children_count": children}
             | {"leave_before_birth_weeks": weeks}
         )
-    return cases + father_scenarios()
+    return cases + father_scenarios() + pregnancy_scenarios()
 
 
 def father_scenarios() -> list[dict[str, Any]]:
@@ -245,6 +251,61 @@ def father_scenarios() -> list[dict[str, Any]]:
     return cases
 
 
+def pregnancy_scenarios() -> list[dict[str, Any]]:
+    """Sick leave in pregnancy for every kind of work, before the right arises, over 270 days and
+    into maternity leave; every way of losing the job; the risks of section H."""
+    cases: list[dict[str, Any]] = []
+    works = [
+        {"role": "mother", "work": "employment"},
+        {"role": "mother", "work": "employment", "mother_over_50": True},
+        {"role": "mother", "work": "contract", "mother_insured": True},
+        {"role": "mother", "work": "business"},
+        {"role": "mother", "work": "contract", "mother_insured": False},
+        {"role": "mother", "work": "none"},
+        {"role": "father", "work": "employment"},
+    ]
+    sick = [
+        {"sick_leave_start": "2026-06-01"},
+        {"sick_leave_start": "2026-11-01", "sick_leave_end": "2026-11-20"},
+        {"sick_leave_start": "2026-11-01", "insured_since": "2026-10-25"},
+        {"sick_leave_start": "2026-11-01", "sick_leave_end": "2026-11-20"}
+        | {"insured_since": "2026-10-25"},
+        {"sick_leave_start": "2026-12-20", "insured_since": "2026-09-01"},
+    ]
+    for child_born in (False, True):
+        base = {"due_date": "2027-03-15", "birth_date": "2027-01-10", "child_born": child_born}
+        cases += [
+            base | who | {"children_count": 1, "sick_leave": True} | answers | weeks
+            for who in works
+            for answers in sick
+            for weeks in ({}, {"leave_before_birth_weeks": 0}, {"leave_before_birth_weeks": 1})
+        ]
+    expecting = {"due_date": "2027-03-15", "child_born": False, "children_count": 1}
+    employed = expecting | {"role": "mother", "work": "employment"}
+    losses = [
+        {"ended_on": "2026-11-30", "reason": reason}
+        for reason in ("bankruptcy", "liquidation", "employer-death", "unlawful", "other")
+    ] + [{"ended_on": "2026-11-30", "reason": "unlawful", "court_confirmed": True}]
+    cases += [
+        employed | {"job_loss": loss} | sick
+        for loss in losses
+        for sick in (
+            {},
+            *[
+                {"sick_leave": True, "sick_leave_start": "2026-10-01"},
+                {"sick_leave": True, "sick_leave_start": "2026-12-05"},
+            ],
+        )
+    ]
+    cases += [
+        expecting
+        | {"role": "mother", "work": work, "mother_insured": True}
+        | {"insured_in_pregnancy": True, "contribution_base_raised": True}
+        for work in ("contract", "business", "employment")
+    ]
+    return cases
+
+
 @pytest.mark.parametrize("answers", scenarios())
 def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) -> None:
     timeline = build_timeline(Scenario.model_validate(answers), PARAMS, TODAY)
@@ -270,8 +331,11 @@ def test_the_model_always_has_the_source_text() -> None:
         assert text in STATIC_INSTRUCTIONS
 
 
-def test_the_model_does_not_see_the_sick_benefit_waiting_periods() -> None:
-    """Page 3 is quoted only for the two kinds of sickness insurance: the 30 and 90 days there
-    are a sick-benefit rule and must not reach an answer about the maternity benefit."""
-    assert "30 dniach" not in STATIC_INSTRUCTIONS
-    assert "90 dniach" not in STATIC_INSTRUCTIONS
+def test_the_sick_benefit_rules_stay_with_the_sick_benefit() -> None:
+    """The sick-benefit chapter (pages 2-4) is in scope now, so the model sees its 30 and 90
+    days; it is told they are a sick-benefit rule and never reach the maternity benefit."""
+    assert SECTIONS["ZC"].contains("prawo do zasiłku co do zasady powstaje po 30 dniach")
+    assert (SECTIONS["ZC"].page, SECTIONS["ZC"].last_page) == (2, 4)
+    rule = next(line for line in STATIC_INSTRUCTIONS.splitlines() if "30 albo 90 dni" in line)
+    assert rule.startswith("- Zasady zasiłku chorobowego ze s. 2–4")
+    assert rule.endswith("Nigdy nie stosuj ich do zasiłku macierzyńskiego.")

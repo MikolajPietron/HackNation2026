@@ -22,6 +22,10 @@ OUT = ROOT / "backend" / "app" / "assistant" / "kodeks_pracy.json"
 # Key shown in the app -> (article heading in the PDF text, paragraph number or None for an
 # article without paragraphs). Superscripts are flat in the PDF text: "Art. 1831" is art. 183¹.
 PROVISIONS = {
+    "art. 92 § 1": ("Art. 92 [", "1"),
+    "art. 92 § 3": ("Art. 92 [", "3"),
+    "art. 92 § 4": ("Art. 92 [", "4"),
+    "art. 92 § 5": ("Art. 92 [", "5"),
     "art. 180 § 1": ("Art. 180 [", "1"),
     "art. 180 § 2": ("Art. 180 [", "2"),
     "art. 180 § 3": ("Art. 180 [", "3"),
@@ -86,6 +90,8 @@ def paragraph(text: str, number: str | None) -> str:
         if not match:
             raise SystemExit(f"§ {number} not found")
         body = match.group(1)
+    # The excerpt marks omitted provisions with "(…)"; what follows is not this paragraph.
+    body = body.split("(…)")[0]
     body = re.sub(r"\s+", " ", body).strip()
     for found, restored in (GLUED | FLAT).items():
         body = body.replace(found, restored)

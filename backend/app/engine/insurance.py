@@ -37,8 +37,19 @@ def work_coverage(work: Work | None, insured: bool | None) -> Coverage:
 
 
 def coverage(scenario: Scenario) -> Coverage:
-    """The mother's sickness insurance."""
+    """The mother's sickness insurance on the day of the birth."""
+    if work_ended_before_birth(scenario):
+        return "not-working"
     return work_coverage(scenario.mothers_work, scenario.mother_insured)
+
+
+def work_ended_before_birth(scenario: Scenario) -> bool:
+    """Guide section H, risk 3: her work ended before the birth for a reason that gives no
+    benefit until the birth (see pregnancy.py), so she is not insured on the day of the birth."""
+    loss, birth = scenario.job_loss, scenario.anchor_date
+    return (
+        loss is not None and loss.reason == "other" and birth is not None and loss.ended_on < birth
+    )
 
 
 def father_coverage(scenario: Scenario) -> Coverage:

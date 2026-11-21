@@ -206,6 +206,20 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
         : 'Tata przejmuje urlop macierzyński'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
+    case 'set_sick_leave':
+      return args.on_sick_leave
+        ? `Zwolnienie lekarskie od ${asDate(args.start)}`
+        : 'Bez zwolnienia lekarskiego w ciąży'
+    case 'set_insured_since':
+      return typeof args.since === 'string'
+        ? `Ubezpieczenie chorobowe od ${asDate(args.since)}`
+        : 'Ubezpieczenie chorobowe'
+    case 'set_mother_over_50':
+      return 'Wiek mamy'
+    // Losing the job and the risks of section H: a neutral step, no details.
+    case 'set_job_loss':
+    case 'set_contribution_base_raised':
+      return 'Uwzględniam to na osi czasu'
     default:
       return name
   }

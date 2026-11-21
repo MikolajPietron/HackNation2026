@@ -32,7 +32,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, MotherEvent, Work
+from app.engine.models import BirthWeek, ChildLoss, HospitalStay, JobLoss, MotherEvent, Work
 from app.engine.plausibility import birth_date_problem, due_date_problem
 from app.engine.timeline import fmt
 
@@ -474,3 +474,118 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
     return describe_element(element)
+
+
+# Pregnancy (guide pages 2-4 and section H): sick leave, losing the job, risks.
+
+SICK_LEAVE_FOCUS = ("sick-pay", "sick-benefit", "sick-benefit-right")
+
+
+@assistant.tool(sequential=True)
+async def set_sick_leave(
+    ctx: RunContext[AssistantDeps],
+    on_sick_leave: bool,
+    start: dt.date | None = None,
+    end: dt.date | None = None,
+) -> str:
+    """Record whether the mother is (or was) on sick leave (e-ZLA) in this pregnancy, and when.
+
+    Args:
+        on_sick_leave: False if she is not and was not on sick leave in this pregnancy.
+        start: The first day of the sick leave, as the user gave it.
+        end: The last day of the sick leave as the user gave it. Leave it empty when it lasts
+            until the birth or the user does not know the end yet.
+    """
+    scenario = ctx.deps.scenario
+    if on_sick_leave and start is None:
+        raise ModelRetry("Potrzebna jest data początku zwolnienia lekarskiego: dopytaj o nią.")
+    if on_sick_leave and scenario.mothers_work is None:
+        raise ModelRetry(
+            "Najpierw ustal, jak pracuje mama (set_mother_work): od tego zależy, kto płaci za "
+            "zwolnienie lekarskie."
+        )
+    changes: dict[str, Any] = {
+        "sick_leave": on_sick_leave,
+        "sick_leave_start": start if on_sick_leave else None,
+        "sick_leave_end": end if on_sick_leave else None,
+    }
+    if not on_sick_leave:
+        changes["mother_over_50"] = None
+    return await _apply(ctx, _with(ctx, **changes), *SICK_LEAVE_FOCUS)
+
+
+@assistant.tool(sequential=True)
+async def set_insured_since(
+    ctx: RunContext[AssistantDeps],
+    since: dt.date | None = None,
+    started_in_pregnancy: bool | None = None,
+) -> str:
+    """Record since when the mother is covered by sickness insurance without a break (the day
+    her employment contract, contract of mandate or business began, or she registered for the
+    voluntary insurance), and whether it began in this pregnancy. Give what the user said; the
+    other argument stays as it was.
+
+    Args:
+        since: The first day of her uninterrupted sickness insurance.
+        started_in_pregnancy: True only if the user said the contract or business began during
+            this pregnancy; never ask about it.
+    """
+    if since is None and started_in_pregnancy is None:
+        raise ModelRetry(
+            "Podaj datę początku ubezpieczenia albo to, co użytkownik o nim powiedział."
+        )
+    changes: dict[str, Any] = {}
+    if since is not None:
+        changes["insured_since"] = since
+    if started_in_pregnancy is not None:
+        changes["insured_in_pregnancy"] = started_in_pregnancy
+    return await _apply(ctx, _with(ctx, **changes), "sick-benefit-right", *SICK_LEAVE_FOCUS)
+
+
+@assistant.tool(sequential=True)
+async def set_mother_over_50(ctx: RunContext[AssistantDeps], over_50: bool) -> str:
+    """Record whether the mother turned 50 before the calendar year in which her sick leave
+    began: the employer then pays for fewer days of sick leave.
+
+    Args:
+        over_50: True if she turned 50 before that year.
+    """
+    return await _apply(ctx, _with(ctx, mother_over_50=over_50), *SICK_LEAVE_FOCUS)
+
+
+@assistant.tool(sequential=True)
+async def set_job_loss(ctx: RunContext[AssistantDeps], job_loss: JobLoss | None) -> str:
+    """Record that the mother's work ended during this pregnancy, and why. Call it only when the
+    user says so; never ask about it. If she now works elsewhere, record her work instead
+    (set_mother_work).
+
+    Args:
+        job_loss: {"ended_on": the last day of work, "reason": ...}. Reasons: "bankruptcy" =
+            the employer went bankrupt, "liquidation" = the employer was liquidated,
+            "employer-death" = the employer died, "unlawful" = the employment contract was
+            terminated in breach of the law (then "court_confirmed": true if a final court
+            judgment confirmed it, false if not or not yet, empty if unknown), "other" = any
+            other end of work (a contract that ended, she quit, a business closed). Null
+            corrects an earlier answer.
+    """
+    reason = job_loss.reason if job_loss is not None else None
+    work = ctx.deps.scenario.mothers_work
+    if reason not in (None, "other") and work not in ("employment", None):
+        raise ModelRetry(
+            "Ta przyczyna dotyczy rozwiązania umowy o pracę, a mama nie pracowała na umowie "
+            "o pracę: zapisz koniec pracy z przyczyną „other”."
+        )
+    scenario = _with(ctx, job_loss=None if job_loss is None else job_loss.model_dump())
+    return await _apply(ctx, scenario, "job-loss-benefit", "birth", "due-date")
+
+
+@assistant.tool(sequential=True)
+async def set_contribution_base_raised(ctx: RunContext[AssistantDeps], raised: bool) -> str:
+    """Record that the mother raised the base of her social insurance contributions during this
+    pregnancy (or, False, that she did not: a correction). Call it only when the user says so;
+    never ask about it.
+
+    Args:
+        raised: True if the contribution base was raised during the pregnancy.
+    """
+    return await _apply(ctx, _with(ctx, contribution_base_raised=raised))

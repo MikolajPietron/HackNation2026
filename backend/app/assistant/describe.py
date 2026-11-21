@@ -13,12 +13,15 @@ from app.engine.models import (
     Document,
     Marker,
     Scenario,
+    ScenarioError,
     Segment,
     SourceRef,
     Timeline,
     TimelineElement,
 )
+from app.engine.pregnancy import employer_days_by_year, sick_leave
 from app.engine.timeline import fmt
+from app.services.params import load_params
 
 WORK = {
     "employment": "pracuje na etacie (umowa o pracę)",
@@ -176,7 +179,7 @@ def interview_questions(scenario: Scenario) -> list[Question]:
     if insured:
         questions += _hospital_questions(scenario)
     # The father's rights do not depend on the mother's insurance.
-    return questions + _father_questions(scenario)
+    return questions + _father_questions(scenario) + _pregnancy_questions(scenario)
 
 
 def _leave_before_birth_questions(scenario: Scenario) -> list[Question]:
@@ -286,6 +289,73 @@ def _father_questions(scenario: Scenario) -> list[Question]:
             ]
         case _:
             return []
+
+
+def _pregnancy_questions(scenario: Scenario) -> list[Question]:
+    """While the child is on the way: the mother's sick leave and, for the sickness benefit,
+    since when she is insured and, past the shorter employer's limit, her age. Losing the job,
+    a contract begun in pregnancy and a raised contribution base are never asked."""
+    if scenario.child_born is not False or scenario.anchor_date is None:
+        return []
+    work = scenario.mothers_work
+    if work is None or coverage(scenario) in NOT_INSURED | {"unknown-voluntary"}:
+        return []
+    mother = scenario.role == "mother"
+    if scenario.sick_leave is None:
+        return [
+            Question(
+                "Czy w tej ciąży jesteś albo byłaś na zwolnieniu lekarskim? Jeśli tak, od kiedy "
+                "i do kiedy (albo że do porodu)?"
+                if mother
+                else "Czy mama w tej ciąży jest albo była na zwolnieniu lekarskim? Jeśli tak, "
+                "od kiedy i do kiedy (albo że do porodu)?",
+                "`set_sick_leave`",
+                "sick-leave",
+            )
+        ]
+    if not scenario.sick_leave:
+        return []
+    if scenario.insured_since is None:
+        if work == "employment":
+            text = (
+                "Od kiedy bez przerwy pracujesz na umowie o pracę (podlegasz ubezpieczeniu "
+                "chorobowemu)?"
+                if mother
+                else "Od kiedy mama bez przerwy pracuje na umowie o pracę (podlega ubezpieczeniu "
+                "chorobowemu)?"
+            )
+        else:
+            text = (
+                "Od kiedy jesteś zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
+                if mother
+                else "Od kiedy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
+            )
+        return [Question(text, "`set_insured_since`", "insured-since")]
+    params = load_params()
+    try:
+        sick = sick_leave(scenario, params, scenario.anchor_date)
+    except ScenarioError:
+        sick = None
+    shorter = params.pregnancy.employer_days_from_50.value
+    paid = employer_days_by_year(sick) if sick is not None else {}
+    if (
+        work == "employment"
+        and scenario.mother_over_50 is None
+        and max(paid.values(), default=0) > shorter
+    ):
+        year = min(paid)
+        return [
+            Question(
+                f"Czy skończyłaś 50 lat przed rokiem {year}? Od tego zależy, za ile dni "
+                "zwolnienia płaci pracodawca."
+                if mother
+                else f"Czy mama skończyła 50 lat przed rokiem {year}? Od tego zależy, za ile "
+                "dni zwolnienia płaci pracodawca.",
+                "`set_mother_over_50`",
+                "mother-over-50",
+            )
+        ]
+    return []
 
 
 def describe_interview(scenario: Scenario) -> str:
