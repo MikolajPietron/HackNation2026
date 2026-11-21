@@ -60,9 +60,9 @@ export function ImageChoice({ image, label, hint, selected, dimmed, onSelect }: 
       <AnimatePresence>
         {selected && (
           <motion.span
-            initial={{ scale: 0, opacity: 0 }}
+            initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
+            exit={{ scale: 0.6, opacity: 0, transition: { duration: 0.12 } }}
             transition={SPRING_SWAP}
             className="absolute top-4 right-4 grid size-8 place-items-center rounded-full bg-zus-600 text-white"
           >
@@ -111,8 +111,8 @@ export function TextChoice({ label, hint, selected, dimmed, onSelect }: ChoicePr
         >
           <span
             className={cn(
-              'size-2.5 rounded-full bg-zus-600 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
-              selected ? 'scale-100' : 'scale-0',
+              'size-2.5 rounded-full bg-zus-600 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)]',
+              selected ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
             )}
           />
         </span>

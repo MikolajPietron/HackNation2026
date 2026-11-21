@@ -13,6 +13,7 @@ import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
+import { plural } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Earnings, OnboardingAnswers, Role, SessionStart, Work } from '@/types'
 import { Calendar } from './Calendar'
@@ -380,10 +381,10 @@ function Intro({ onStart, onSkip }: { onStart: () => void; onSkip: () => void })
         variants={ITEM}
         className="mt-6 text-4xl leading-[1.05] font-bold tracking-tight text-balance text-navy-900 sm:text-6xl"
       >
-        Zaplanujmy urlop macierzyński
+        Policzmy, co Wam się należy
       </motion.h1>
       <motion.p variants={ITEM} className="mt-4 max-w-md text-lg text-pretty text-navy-500">
-        Od kiedy mama może go zacząć, ile trwa i co przygotować. Kilka pytań, bez logowania.
+        Urlopy, zasiłki i terminy wniosków na jednej osi czasu. Kilka pytań, bez logowania.
       </motion.p>
       <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
         <PrimaryButton onClick={onStart}>
@@ -458,14 +459,6 @@ function MoreChildren({
       </AnimatePresence>
     </motion.div>
   )
-}
-
-/** Polish plural: 1 tydzień, 2 tygodnie, 5 tygodni. */
-function plural(n: number, one: string, few: string, many: string): string {
-  if (n === 1) return one
-  const last = n % 10
-  const lastTwo = n % 100
-  return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many
 }
 
 /** "za 17 tygodni" before the birth (pregnancy counts in weeks), "3 miesiące temu" after it. */

@@ -4,11 +4,14 @@ import { RotateCcw } from 'lucide-react'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { DocumentsList } from '@/components/documents/DocumentsList'
 import { AboutPanel } from '@/components/layout/AboutPanel'
-import { BottomNav, Logo, Rail } from '@/components/layout/Navigation'
+import { BrandMark } from '@/components/layout/Brand'
+import { BottomNav, Rail } from '@/components/layout/Navigation'
 import type { Tab } from '@/components/layout/Navigation'
 import { Onboarding } from '@/components/onboarding/Onboarding'
+import { PlanScreen } from '@/components/plan/PlanScreen'
 import { TimelinePanel } from '@/components/timeline/TimelinePanel'
 import { useAssistant } from '@/hooks/useAssistant'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
 import { cn } from '@/lib/utils'
 import type { SessionStart } from '@/types'
@@ -38,6 +41,8 @@ export default function App() {
   // does. A conversation that has started, or a skipped onboarding, goes straight to the app.
   const onboardingSaved = scenario?.role != null
   const onboarding = !skippedOnboarding && messages.length === 0 && !onboardingSaved
+  // Wide screens get the plan screen (onboarding style); phones keep the tabbed layout for now.
+  const desktop = useMediaQuery('(min-width: 1024px)')
 
   // Phones show one panel at a time. From `lg` the chat is always on the right and the
   // tab only switches the middle between the timeline and the assumptions.
@@ -81,6 +86,26 @@ export default function App() {
           >
             <Onboarding submit={submit} onDone={finishOnboarding} onSkip={skipOnboarding} />
           </motion.div>
+        ) : desktop ? (
+          <motion.div
+            key="plan"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, ease: EASE_OUT }}
+          >
+            <PlanScreen
+              messages={messages}
+              busy={busy}
+              scenario={scenario}
+              timeline={timeline}
+              changed={changed}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onSend={send}
+              onStop={stop}
+              onStartOver={startOver}
+            />
+          </motion.div>
         ) : (
           <motion.div
             key="app"
@@ -92,7 +117,7 @@ export default function App() {
             <Rail tab={tab} onChange={openTab} onReset={startOver} className="hidden lg:flex" />
 
             <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-2.5 lg:hidden">
-              <Logo className="size-9" />
+              <BrandMark size="sm" />
               <p className="min-w-0 flex-1 text-[13px] leading-tight font-black text-navy-900">
                 {APP_NAME}
               </p>
