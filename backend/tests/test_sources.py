@@ -161,6 +161,87 @@ def scenarios() -> list[dict[str, Any]]:
             | {"birth_date": birth, "losses": losses, "children_count": children}
             | {"leave_before_birth_weeks": weeks}
         )
+    return cases + father_scenarios()
+
+
+def father_scenarios() -> list[dict[str, Any]]:
+    """Section B: how the father works, paternity leave near its deadline, his parental leave
+    with an insured or uninsured mother, taking over, and every special situation."""
+    cases: list[dict[str, Any]] = []
+    fathers = [
+        {},
+        {"father_work": "employment"},
+        {"father_work": "contract"},
+        {"father_work": "business", "father_insured": True},
+        {"father_work": "contract", "father_insured": False},
+        {"father_work": "none"},
+    ]
+    mothers = [
+        {"role": "mother", "work": "employment"},
+        {"role": "mother", "work": "none"},
+        {"role": "mother", "work": "contract", "mother_insured": False},
+    ]
+    for child_born in (False, True):
+        base = {"due_date": "2027-03-15", "birth_date": "2026-11-10", "child_born": child_born}
+        cases += [
+            base | mother | father | {"children_count": children}
+            for mother in mothers
+            for father in fathers
+            for children in (1, 2)
+        ]
+        cases += [
+            base
+            | {"role": "mother", "work": "employment", "children_count": 1}
+            | {"father_takes_over": True}
+            | father
+            for father in ({}, {"father_work": "none"}, {"father_work": "contract"})
+        ]
+    born = {"child_born": True, "children_count": 1, "role": "mother", "work": "employment"}
+    # Paternity leave cut short, too short to show, and expired; parental leave cut short by
+    # its deadline and expired, with an uninsured mother.
+    cases += [born | {"birth_date": day} for day in ("2025-11-30", "2025-11-26", "2025-11-20")]
+    cases += [{**born, "work": "none", "birth_date": day} for day in ("2020-06-01", "2019-06-01")]
+    cases += [
+        born
+        | {"birth_date": "2026-11-10", "father_takes_over": True}
+        | {"mother_weeks_before_takeover": 16, "za_zyciem": True},
+        born
+        | {"birth_date": "2026-11-10", "father_takes_over": True, "children_count": 2}
+        | {"losses": [{"stillborn": True}]},
+    ]
+    # Special situations: each kind, the father insured or not, after the leave, the mother
+    # uninsured, no living child, and a premature child whose supplementary leave passes on.
+    special = born | {"birth_date": "2026-10-01", "leave_before_birth_weeks": 0}
+    events = [
+        {"kind": "incapacity", "start": "2026-12-01"},
+        {"kind": "incapacity", "start": "2027-01-10"},
+        {"kind": "hospital", "start": "2026-12-01", "end": "2026-12-20"},
+        {"kind": "hospital", "start": "2026-12-01"},
+        {"kind": "hospital", "start": "2026-12-01", "end": "2027-03-01"},
+        {"kind": "hospital", "start": "2027-03-01"},
+        {"kind": "death", "start": "2026-11-15"},
+        {"kind": "abandonment", "start": "2026-11-10"},
+    ]
+    cases += [
+        special | {"mother_event": e} | father
+        for e in events
+        for father in ({}, {"father_work": "none"}, {"father_work": "business"})
+    ]
+    cases += [special | {"mother_event": e, "work": "none"} for e in events[:1] + events[6:7]]
+    cases += [special | {"mother_event": e, "losses": [{"stillborn": True}]} for e in events[2:3]]
+    cases += [
+        special
+        | {"mother_event": e, "hospital_care": True, "birth_week": "28-37"}
+        | {"birth_weight_up_to_1000g": False}
+        | {"hospital_stays": [{"start": "2026-10-01", "end": "2026-10-20"}]}
+        for e in events[6:8]
+    ]
+    later = born | {"birth_date": "2026-01-05", "leave_before_birth_weeks": 0}
+    cases += [
+        later | {"mother_event": {"kind": kind, "start": "2026-08-01"}} | father
+        for kind in ("death", "abandonment")
+        for father in ({}, {"father_work": "none"})
+    ]
     return cases
 
 

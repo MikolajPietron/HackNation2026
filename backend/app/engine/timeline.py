@@ -23,6 +23,10 @@ Phase 3, stillbirth or death of the child (A.3; art. 180¹, see loss.py): matern
 death; with more children it follows the number who live. Without a living child there is no
 parental leave, and leave already under way is kept for 7 days from the death.
 
+Section B, the father (pages 7-8; see father.py), after the mother's rules: special situations
+or taking over maternity leave, paternity leave, the father's part of parental leave. It runs
+also when the mother has no benefit periods.
+
 Pure and deterministic: no I/O, no database, no LLM; `today` is an argument. Every number comes
 from `Params`, every element carries its sources. Later phases add rules after these.
 """
@@ -32,7 +36,8 @@ from collections.abc import Callable
 
 from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
-from app.engine.insurance import INSURED, NOT_INSURED, Coverage, coverage
+from app.engine.father import father_rules
+from app.engine.insurance import INSURED, NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
     Document,
@@ -44,7 +49,14 @@ from app.engine.models import (
     TimelineElement,
 )
 from app.engine.params import Params
-from app.engine.parental import for_children, parental_deadline, parental_table, parental_weeks
+from app.engine.parental import (
+    deadline_marker,
+    deadline_passed,
+    for_children,
+    parental_deadline,
+    parental_table,
+    parental_weeks,
+)
 from app.engine.supplementary import describe_case, supplementary_leave
 from app.engine.wording import children_phrase, fmt
 
@@ -92,6 +104,9 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
                 _parental(draft, scenario, params, birth, after, today)
             if loss is not None and loss.none_survived:
                 _keep_seven_days(draft, loss, params)
+    # Section B, after the mother's rules: it may shorten her maternity leave and adds the
+    # father's lane, also when the mother herself has no benefit periods.
+    father_rules(draft, scenario, params, birth, today, cover, loss)
     _for_non_employee(draft, scenario, params, cover)
     draft.markers.sort(key=lambda m: m.date)
 
@@ -111,7 +126,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         markers=draft.markers,
         documents=draft.documents,
         warnings=draft.warnings,
-        assumptions=_assumptions(scenario, born, cover, loss, draft),
+        assumptions=_assumptions(scenario, params, born, cover, loss, draft),
     )
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
@@ -119,7 +134,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
 
 def _for_non_employee(draft: Draft, scenario: Scenario, params: Params, cover: Coverage) -> None:
     """A mother on a contract or with her own business gets no leave, only the benefit for the
-    same periods (guide page 4); every period of leave on her timeline says so."""
+    same periods (guide page 4); every period of leave on her lane says so. The father's lane
+    has its own line (father.py)."""
     if scenario.mothers_work not in ("contract", "business") or cover in NOT_INSURED:
         return
     b = params.benefit
@@ -136,7 +152,7 @@ def _for_non_employee(draft: Draft, scenario: Scenario, params: Params, cover: C
                 ),
             }
         )
-        if segment.tone != "work"
+        if segment.lane == "mother" and segment.tone != "work"
         else segment
         for segment in draft.segments
     ]
@@ -673,10 +689,7 @@ def _parental(
     deadline = parental_deadline(birth, params)
     age = p.deadline_age.value
     if deadline < today:
-        draft.warnings.append(
-            f"Czas na urlop rodzicielski minął {fmt(deadline)}: to koniec roku kalendarzowego, "
-            f"w którym dziecko skończyło {age} lat."
-        )
+        draft.warnings.append(deadline_passed(deadline, params))
         return
 
     start = after + DAY
@@ -740,75 +753,64 @@ def _parental(
             sources=merge_sources(*sources),
         )
     )
-    estimate = [] if born else ["Liczymy od przewidywanej daty porodu."]
-    if not born and birth.month in (1, 12):
-        estimate.append(
-            "Gdyby dziecko urodziło się w innym roku kalendarzowym niż przewidywany, ten dzień "
-            "przesunie się o rok."
-        )
-    draft.markers.append(
-        Marker(
-            id="parental-deadline",
-            lane="child",
-            label="Rodzicielski najpóźniej do",
-            title="Koniec czasu na urlop rodzicielski",
-            date=deadline,
-            summary=(
-                "Urlop rodzicielski można wykorzystać najpóźniej do końca roku kalendarzowego, "
-                f"w którym dziecko kończy {age} lat."
-            ),
-            details=estimate,
-            sources=p.deadline_age.sources,
-        )
-    )
+    draft.markers.append(deadline_marker(birth, born, params))
 
 
 def _assumptions(
-    scenario: Scenario, born: bool, cover: Coverage, loss: Loss | None, draft: Draft
+    scenario: Scenario,
+    params: Params,
+    born: bool,
+    cover: Coverage,
+    loss: Loss | None,
+    draft: Draft,
 ) -> list[str]:
     assumptions = [
-        "Pokazujemy to, co wynika z punktów „Przygotowanie do porodu” i „Urodzenie dziecka” "
-        "Przewodnika ZUS. Kolejne części (uprawnienia taty, kwoty zasiłku, wnioski i terminy) "
-        "dodajemy krok po kroku."
+        "Pokazujemy to, co wynika z części A i B Przewodnika ZUS: zasiłek macierzyński mamy "
+        "i uprawnienia taty. Kolejne części (kwoty zasiłku, wnioski i terminy, łączenie urlopu "
+        "z pracą, adopcja) dodajemy krok po kroku."
     ]
-    if cover in NOT_INSURED:
-        assumptions.append(
-            "Uprawnienia taty opisuje dalsza część Przewodnika ZUS (sekcja B). Dodamy je "
-            "w kolejnym etapie."
-        )
-        return assumptions
-    if cover not in INSURED:
+    mother = cover not in NOT_INSURED
+    father = father_coverage(scenario)
+    fathers = [s for s in draft.segments if s.lane == "father"]
+    if cover not in INSURED and mother:
         assumptions.append(
             "Na razie zakładamy, że mama podlega ubezpieczeniu chorobowemu. Potwierdzi to "
             "pytanie w rozmowie."
         )
-    else:
+    elif mother:
         assumptions.append(
             "Zakładamy, że ubezpieczenie chorobowe mamy trwa w dniu porodu."
             if not born
             else "Zakładamy, że mama podlegała ubezpieczeniu chorobowemu w dniu porodu."
         )
-    if not born:
+    if not born and (mother or fathers):
         assumptions.append(
             "Liczymy od przewidywanej daty porodu. Po porodzie oś przeliczy się od faktycznej daty."
         )
     if scenario.children_count is None:
-        assumptions.append(
-            "Długość urlopów pokażemy, gdy będzie wiadomo, ile dzieci urodzi się przy jednym "
-            "porodzie."
-        )
-    elif any(segment.id == "parental" for segment in draft.segments):
+        if mother or father not in NOT_INSURED:
+            assumptions.append(
+                "Długość urlopów pokażemy, gdy będzie wiadomo, ile dzieci urodzi się przy jednym "
+                "porodzie."
+            )
+    elif (parental := draft.segment("parental")) is not None:
+        his = draft.segment("parental-father")
+        after_her = his is not None and his.start == parental.end + DAY
+        weeks = params.parental.exclusive_weeks.value
         assumptions.append(
             "Urlop rodzicielski pokazujemy tak, jakby mama wzięła całą swoją część od razu po "
-            "urlopie macierzyńskim. Podział na części i udział taty dojdą w kolejnym etapie."
+            "urlopie macierzyńskim"
+            + (f", a tata swoje {weeks} tygodni zaraz po niej" if after_her else "")
+            + ". Rodzice mogą też korzystać z niego jednocześnie albo naprzemiennie i dzielić go "
+            "na części."
         )
-    if scenario.hospital_care:
+    if mother and scenario.hospital_care:
         assumptions.append(
             "Przy uzupełniającym urlopie macierzyńskim dzień porodu liczymy jako pierwszy dzień "
             "po porodzie, jak przy urlopie macierzyńskim. Dzień przyjęcia i wypisu ze szpitala "
             "liczymy jako dni pobytu."
         )
-    if loss is not None:
+    if mother and loss is not None:
         assumptions.append(
             "7 dni od dnia śmierci dziecka liczymy od następnego dnia. 8 tygodni życia to 56 dni, "
             "licząc dzień urodzenia jako pierwszy. Te 7 dni nie wydłużają urlopu ponad to, ile "
@@ -820,4 +822,74 @@ def _assumptions(
                 "w Kodeksie pracy (art. 182¹ᵃ § 1). Czy zmienia się po śmierci jednego z nich, "
                 "materiały nie mówią."
             )
+    return assumptions + _father_assumptions(scenario, params, cover, loss, draft)
+
+
+def _father_assumptions(
+    scenario: Scenario, params: Params, cover: Coverage, loss: Loss | None, draft: Draft
+) -> list[str]:
+    """Section B: what we assume about the father and where the materials leave a gap."""
+    assumptions = []
+    mother = cover not in NOT_INSURED
+    father = father_coverage(scenario)
+    child_lives = loss is None or not loss.none_survived
+    shown = {s.id for s in draft.segments} | {m.id for m in draft.markers}
+    if any(s.lane == "father" for s in draft.segments) and father not in INSURED:
+        assumptions.append(
+            "Na razie zakładamy, że tata podlega ubezpieczeniu chorobowemu. Potwierdzi to "
+            "pytanie w rozmowie."
+        )
+    if "paternity-deadline" in shown:
+        assumptions.append(
+            "Urlop ojcowski można wykorzystać do ukończenia przez dziecko "
+            f"{params.father.paternity_months.value} miesięcy życia: przyjmujemy, że ostatnim "
+            "dniem jest dzień przed pierwszymi urodzinami."
+        )
+    if "parental-father" in shown and "parental" not in shown:
+        assumptions.append(
+            "Urlop rodzicielski taty pokazujemy bez "
+            f"{params.parental.exclusive_weeks.value} tygodni, których Kodeks pracy nie pozwala "
+            "przenieść na drugiego z rodziców (art. 182¹ᵃ § 4). Czy w tej sytuacji tata może "
+            "wykorzystać także je, materiały nie mówią."
+        )
+    event = scenario.mother_event
+    if event is None:
+        return assumptions
+    if not mother:
+        assumptions.append(
+            "Gdy mama nie była ubezpieczona, oś nie uwzględnia sytuacji szczególnych z części B "
+            "Przewodnika: dotyczą one przejęcia urlopu macierzyńskiego mamy, a przepisów o innych "
+            "przypadkach nie ma w naszych materiałach."
+        )
+        return assumptions
+    if not child_lives:
+        assumptions.append(
+            "Gdy żadne dziecko nie żyje, oś nie uwzględnia sytuacji szczególnych z części B "
+            "Przewodnika: dotyczą one opieki nad dzieckiem."
+        )
+        return assumptions
+    if "maternity-father" in shown and event.kind != "death":
+        assumptions.append(
+            f"{params.father.special_after_weeks.value} tygodni urlopu po porodzie liczymy jako "
+            f"{params.father.special_after_weeks.value * 7} dni, licząc dzień porodu jako "
+            "pierwszy."
+        )
+    if "maternity-father" in shown and event.kind == "hospital":
+        assumptions.append(
+            "Pobyt mamy w szpitalu liczymy od dnia przyjęcia do dnia wypisu: tata przejmuje urlop "
+            "od dnia przyjęcia, a mama wraca na urlop dzień po wypisie."
+        )
+    if scenario.children_count is not None and (
+        event.kind == "death" or (event.kind == "abandonment" and father not in NOT_INSURED)
+    ):
+        what = "śmierci mamy" if event.kind == "death" else "porzuceniu dziecka przez mamę"
+        assumptions.append(
+            f"Po {what} oś nie pokazuje dalszych urlopów mamy."
+            + (
+                " Uzupełniający urlop macierzyński, jeśli przysługuje, pokazujemy u taty. Jak "
+                "w tej sytuacji dzieli się urlop rodzicielski, materiały nie mówią wprost."
+                if father not in NOT_INSURED
+                else ""
+            )
+        )
     return assumptions
