@@ -1,6 +1,6 @@
-"""Reading a scanned case with Claude: the page images go in, `CaseFacts` come out (structured
-output). The model only transcribes what the documents say, with page numbers; it never computes
-dates or amounts (CLAUDE.md). Tests use a fake reader instead (no key, no network)."""
+"""Reading a scanned case with Claude or Gemini: the page images go in, `CaseFacts` come out
+(structured output). The model only transcribes what the documents say, with page numbers; it
+never computes dates or amounts (CLAUDE.md). Tests use a fake reader (no key, no network)."""
 
 from typing import Protocol
 
@@ -50,7 +50,7 @@ class CaseReader(Protocol):
     async def read(self, pages: list[Page]) -> CaseFacts: ...
 
 
-class ClaudeCaseReader:
+class ModelCaseReader:
     def __init__(self, model: Model) -> None:
         self._agent = Agent(
             model,

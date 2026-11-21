@@ -7,8 +7,10 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import ModelSettings
 
@@ -22,6 +24,7 @@ from app.services.sessions import SessionStore, open_session_store
 KEY_NAMES: dict[LlmProvider, str] = {
     "openrouter": "OPENROUTER_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GEMINI_API_KEY",
 }
 
 
@@ -67,6 +70,8 @@ def _chat_model(
     model_settings = ModelSettings(cache=True)
     if thinking is not None:
         model_settings["thinking"] = thinking
+    if provider == "google":
+        return GoogleModel(name, provider=GoogleProvider(api_key=api_key), settings=model_settings)
     if provider == "openrouter":
         return OpenRouterModel(
             name, provider=OpenRouterProvider(api_key=api_key), settings=model_settings

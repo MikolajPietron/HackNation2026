@@ -10,11 +10,15 @@ PUT  /api/cases/session/{session_id} load the case into the plan (a new conversa
 
 import datetime as dt
 from collections.abc import Callable
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic_ai.models import Model
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import KEY_NAMES, _chat_model, get_params, get_session_store, get_today
@@ -31,7 +35,7 @@ from app.cases.models import (
     CaseResult,
 )
 from app.cases.pages import page_count, render_pages
-from app.cases.reader import CaseReader, ClaudeCaseReader
+from app.cases.reader import CaseReader, ModelCaseReader
 from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -60,6 +64,15 @@ def get_reader_factory(settings: Annotated[Settings, Depends(get_settings)]) -> 
     no key and sends nothing anywhere. Tests replace this with a fake reader."""
 
     def make() -> CaseReader:
+        name = settings.cases_model_name
+        # Claude or Gemini, never the chat's model of another vendor: see Settings.cases_model.
+        if name.startswith("gemini"):
+            if not settings.gemini_api_key:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Odczyt spraw przez Gemini wymaga klucza GEMINI_API_KEY w backend/.env.",
+                )
+            return ModelCaseReader(_gemini_model(name, settings.gemini_api_key))
         if not settings.llm_api_key:
             raise HTTPException(
                 status_code=503,
@@ -68,13 +81,14 @@ def get_reader_factory(settings: Annotated[Settings, Depends(get_settings)]) -> 
                     f"{KEY_NAMES[settings.llm_provider]} w backend/.env."
                 ),
             )
-        # Claude, not the chat's model: see Settings.cases_model.
-        model = _chat_model(
-            settings.llm_provider, settings.cases_model_name, settings.llm_api_key, None
-        )
-        return ClaudeCaseReader(model)
+        return ModelCaseReader(_chat_model(settings.llm_provider, name, settings.llm_api_key, None))
 
     return make
+
+
+@lru_cache(maxsize=2)
+def _gemini_model(name: str, api_key: str) -> Model:
+    return GoogleModel(name, provider=GoogleProvider(api_key=api_key))
 
 
 Folder = Annotated[Path, Depends(get_cases_folder)]

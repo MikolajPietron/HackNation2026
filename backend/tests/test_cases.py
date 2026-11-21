@@ -120,6 +120,27 @@ def test_leave_before_the_birth_is_its_first_day() -> None:
     assert scenario.leave_start == dt.date(2026, 2, 20)
 
 
+def test_sick_leave_earlier_in_pregnancy_does_not_move_the_day_of_the_right() -> None:
+    leaves = [
+        LeavePeriod(person="mother", kind="sick", start=dt.date(2026, 1, 5), pages=[4]),
+        LeavePeriod(person="mother", kind="maternity", start=dt.date(2026, 3, 10), pages=[1]),
+    ]
+    assert check_insurance(facts(leaves=leaves)).on == dt.date(2026, 3, 10)
+
+
+def test_parental_leave_asked_for_becomes_the_plan() -> None:
+    parental = LeavePeriod(
+        person="mother",
+        kind="parental",
+        start=dt.date(2026, 7, 28),
+        end=dt.date(2027, 3, 8),
+        pages=[3],
+    )
+    case = facts(leaves=[*facts().leaves, parental, parental.model_copy(update={"pages": [9]})])
+    scenario, _ = to_scenario(case)
+    assert [(p.parent, p.weeks) for p in scenario.parental_parts] == [("mother", 32)]
+
+
 def test_insured_on_the_day_the_right_arises() -> None:
     check = check_insurance(facts())
     assert check.covered is True

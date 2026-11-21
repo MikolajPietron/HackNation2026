@@ -6,7 +6,7 @@ import datetime as dt
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.engine import Params, Scenario, ScenarioError, build_timeline
-from app.engine.models import BirthWeek, ChildLoss, HospitalStay, Role, Work
+from app.engine.models import BirthWeek, ChildLoss, HospitalStay, ParentalPart, Role, Work
 from app.engine.wording import long_date
 
 from .models import CaseFacts, CaseResult, Comparison, InsuranceCheck, InsurancePeriod
@@ -60,11 +60,11 @@ def anchor_day(facts: CaseFacts) -> dt.date | None:
 def right_day(facts: CaseFacts, person: Role) -> tuple[dt.date | None, str]:
     """The day the right arises for the applicant: the first day of the leave or benefit they
     asked for, else the birth (or taking in). With the words that say which day it is."""
-    leaves = sorted(
-        (leave for leave in facts.leaves if leave.person == person), key=lambda x: x.start
-    )
-    if leaves:
-        first = leaves[0]
+    leaves = [leave for leave in facts.leaves if leave.person == person]
+    # Sick leave earlier in pregnancy is not the benefit asked for, unless it is the only one.
+    asked = [leave for leave in leaves if leave.kind != "sick"] or leaves
+    if asked:
+        first = min(asked, key=lambda x: x.start)
         return first.start, f"pierwszy dzień {LEAVE_WORDS[first.kind]}"
     day = anchor_day(facts)
     what = "dzień przyjęcia dziecka" if facts.taken_in else "dzień porodu"
@@ -194,6 +194,8 @@ def to_scenario(facts: CaseFacts) -> tuple[Scenario, list[str]]:
         elif maternity:
             scenario.leave_before_birth_weeks = 0
 
+    scenario.parental_parts = parental_plan(facts)
+
     for parent in ("mother", "father"):
         amount, months = monthly_pay(facts, parent)
         if amount is None:
@@ -215,6 +217,23 @@ def to_scenario(facts: CaseFacts) -> tuple[Scenario, list[str]]:
     if not facts.pay:
         notes.append("W sprawie nie odczytano wynagrodzeń: kalkulator nie liczy kwoty.")
     return scenario, notes
+
+
+def parental_plan(facts: CaseFacts) -> list[ParentalPart]:
+    """The parental leave the case asks for, as parts of whole weeks in date order (a period
+    listed in two documents counts once). The engine checks the plan against the rules."""
+    seen: set[tuple[str, dt.date, dt.date]] = set()
+    parts: list[ParentalPart] = []
+    for leave in sorted(facts.leaves, key=lambda x: x.start):
+        if leave.kind != "parental" or leave.end is None:
+            continue
+        key = (leave.person, leave.start, leave.end)
+        days = (leave.end - leave.start).days + 1
+        if key in seen or days <= 0 or days % 7:
+            continue
+        seen.add(key)
+        parts.append(ParentalPart(parent=leave.person, weeks=days // 7, start=leave.start))
+    return parts
 
 
 def check_insurance(facts: CaseFacts) -> InsuranceCheck:
@@ -330,7 +349,16 @@ def assess(
         try:
             timeline = build_timeline(scenario, params, today)
         except ScenarioError as error:
-            problem = str(error)
+            if scenario.parental_parts:
+                # The plan in the case does not fit the rules: show parental leave as a choice.
+                notes.append(f"Plan urlopu rodzicielskiego ze sprawy pominięty: {error}")
+                scenario.parental_parts = []
+                try:
+                    timeline = build_timeline(scenario, params, today)
+                except ScenarioError as again:
+                    problem = str(again)
+            else:
+                problem = str(error)
     notes.extend(f"Niepewne: {item}" for item in facts.unreadable)
     return CaseResult(
         id=case_id,
