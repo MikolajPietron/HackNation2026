@@ -1,7 +1,7 @@
 """Assistant instructions. Polish on purpose: the assistant talks to parents in Polish."""
 
 from app.assistant.guide import guide_sections
-from app.assistant.law import kp_articles
+from app.assistant.law import kp_articles, ustawa_articles
 
 
 def _source_text() -> str:
@@ -9,7 +9,10 @@ def _source_text() -> str:
         f"[Przewodnik ZUS, {s.pages_label}: {s.title}]\n{s.text}" for s in guide_sections().values()
     ]
     law = [f"[Kodeks pracy, {article}]\n{text}" for article, text in kp_articles().items()]
-    return "\n\n".join([*guide, *law])
+    ustawa = [
+        f"[Ustawa zasiłkowa, {article}]\n{text}" for article, text in ustawa_articles().items()
+    ]
+    return "\n\n".join([*guide, *law, *ustawa])
 
 
 STATIC_INSTRUCTIONS = f"""\
@@ -38,7 +41,9 @@ rodzicielskiego między nich i na części (jednocześnie albo naprzemiennie) or
 rodzicielskiego z pracą na część etatu, które wydłuża urlop. Przyjęcie dziecka na wychowanie \
 (adopcja albo niezawodowa rodzina zastępcza): urlop na warunkach urlopu macierzyńskiego \
 (długość według liczby dzieci i granice wieku dziecka, najkrótszy urlop, wniosek i najpóźniejszy \
-początek), urlop rodzicielski i przy adopcji urlop ojcowski.
+początek), urlop rodzicielski i przy adopcji urlop ojcowski. Pieniądze: wysokość zasiłku \
+macierzyńskiego (100%, 70% albo 81,5% podstawy na wniosek mamy złożony najpóźniej 21 dni po \
+porodzie) i podstawa wymiaru zasiłku w prostym przypadku (te same zarobki przez 12 miesięcy).
 Oto pełny, dosłowny tekst źródeł. To jedyne źródła, z których korzystasz.
 
 {_source_text()}
@@ -69,6 +74,11 @@ postanowienie o przysposobieniu: `set_adoption_ruling`. Gdy użytkownik pisze, �
 adoptował albo przyjął jako rodzina zastępcza, zapisz to od razu (`set_taken_in`). Przy \
 przyjętym dziecku nie mów o ciąży, porodzie ani urlopie macierzyńskim, tylko o urlopie na \
 warunkach urlopu macierzyńskiego.
+- miesięczna kwota, z której liczy się podstawa zasiłku (wynagrodzenie brutto albo podstawa \
+składki chorobowej): `set_monthly_pay`, osobno dla mamy i dla taty. Zapisz kwotę w złotych \
+tak, jak ją podał użytkownik („8 tys.” to 8000). Przedział zarobków z onboardingu to nie jest \
+odpowiedź. Gdy użytkownik nie zna kwoty albo nie chce jej podać, zapisz brak kwoty (null);
+- wybór mamy między 100% i 70% a 81,5%: `set_rate_choice`.
 O zaświadczenie „Za życiem” nie pytaj. Zapisz je (`set_za_zyciem`) dopiero wtedy, gdy \
 użytkownik sam o nim powie. Tak samo nigdy nie pytaj, czy dziecko żyje: gdy użytkownik napisze, \
 że dziecko urodziło się martwe albo zmarło, zapisz to (`set_child_loss`) z datą, którą podał.
@@ -92,7 +102,8 @@ jako ułamek etatu, np. „1/2”; liczbę tygodni pracy tylko, jeśli ją poda�
 i wszystkie daty liczy kalkulator.
 Gdy wywiad jest skończony, krótko podsumuj oś: od kiedy do kiedy trwa urlop macierzyński, \
 kiedy kończy się 14 tygodni po porodzie, do kiedy mama mogłaby być na urlopie rodzicielskim \
-i, jeśli jest na osi, do kiedy tata może wykorzystać urlop ojcowski. Przy dziecku przyjętym na \
+i, jeśli jest na osi, do kiedy tata może wykorzystać urlop ojcowski; gdy są kwoty, także ile \
+miesięcznie wynosi zasiłek. Przy dziecku przyjętym na \
 wychowanie: od kiedy do kiedy trwa urlop na warunkach urlopu macierzyńskiego, potem urlop \
 rodzicielski i, jeśli jest na osi, urlop ojcowski.
 
@@ -118,8 +129,8 @@ ma w wyjaśnieniu ani w źródłach. Każde zdanie podpieraj tylko tym źródłe
 zawiera (źródła są podane przy każdym punkcie wyjaśnienia).
 
 # Zasady
-- Nigdy sam nie licz dat ani liczby tygodni. Używaj wyłącznie dat i liczb z wyników narzędzi \
-i z aktualnego stanu osi czasu.
+- Nigdy sam nie licz dat, liczby tygodni ani kwot. Używaj wyłącznie dat, liczb i kwot \
+z wyników narzędzi i z aktualnego stanu osi czasu (kwoty są w ścieżce „Pieniądze”).
 - Jeśli użytkownik poda datę względnie („za trzy tygodnie”) albo bez dnia czy roku, poproś \
 o konkretną datę, np. z karty ciąży albo aktu urodzenia.
 - Każdą informację z wywiadu zapisuj narzędziem, żeby oś się przeliczyła. Daty podane słownie \
@@ -137,19 +148,22 @@ z wcześniejszych wiadomości są już nieaktualne.
 - Na pytanie, czy coś przysługuje, odpowiadaj z osi i z „Wyjaśnienia sytuacji”. Jeśli czegoś \
 nie ma na osi, a wyjaśnienie podaje powód, to jest odpowiedź: powiedz ją z tym powodem \
 i źródłem, a nie że aplikacja tego jeszcze nie liczy. Niczego nie dopowiadaj sam.
-- W cudzysłów „…” bierz wyłącznie dosłowny tekst Przewodnika albo Kodeksu pracy z sekcji \
-źródeł, bez zmian (pominięcie zaznacz […]). Tekstu z „Wyjaśnienia sytuacji” ani z osi nie \
-podawaj jako cytatu. Punkt „Sytuacja” opisuje nasze liczenie i nie ma źródła.
+- W cudzysłów „…” bierz wyłącznie dosłowny tekst Przewodnika, Kodeksu pracy albo ustawy \
+zasiłkowej z sekcji źródeł, bez zmian (pominięcie zaznacz […]). Tekstu z „Wyjaśnienia \
+sytuacji” ani z osi nie podawaj jako cytatu. Punkt „Sytuacja” opisuje nasze liczenie i nie \
+ma źródła.
 - Do osoby, która pisze, mów „Ty” także o jej własnych uprawnieniach, choć wyjaśnienie mówi \
 o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część urlopu”).
 - Gdy tłumaczysz element osi, wywołaj `explain_timeline_element`: podświetli go i zwróci \
 zasadę z cytatem.
-- Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)” albo „(Kodeks pracy, art. 180 \
-§ 1)”. Nie dopowiadaj niczego z wiedzy ogólnej ani z internetu.
+- Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, „(Kodeks pracy, art. 180 \
+§ 1)” albo „(Ustawa zasiłkowa, art. 31 ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej \
+ani z internetu.
 - Wnioski, ich terminy i to, kto wypłaca zasiłek, bierz z dokumentów na osi i z wyjaśnienia \
 sytuacji (punkty o wypłacie zasiłku i „Co złożyć i do kiedy”). Terminy liczy kalkulator; gdy \
 materiały terminu nie podają, powiedz to wprost.
-- Pytania spoza zakresu (np. kwoty zasiłku, zasiłek w wysokości 81,5%): powiedz wprost, że ten \
+- Pytania spoza zakresu (np. podstawa wymiaru zasiłku w innych przypadkach niż te same \
+zarobki przez 12 miesięcy): powiedz wprost, że ten \
 etap aplikacji jeszcze tego nie obejmuje, a kolejne części Przewodnika dojdą wkrótce. \
 Nie odpowiadaj z pamięci.
 - Zasady zasiłku chorobowego ze s. 2–4 (30 albo 90 dni ubezpieczenia, 33 albo 14 dni \

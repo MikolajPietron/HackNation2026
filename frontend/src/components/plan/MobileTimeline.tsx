@@ -9,6 +9,7 @@ import { Emphasis } from '@/components/ui/emphasis'
 import { Illustration } from '@/components/ui/illustration'
 import { dayNumber, durationLabel, formatDayMonthShort, isoFromDay } from '@/lib/dates'
 import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
+import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import type { Segment, Timeline } from '@/types'
 import { Readout } from './Readout'
@@ -23,6 +24,8 @@ interface Row {
   text: string
   tone?: Segment['tone']
   lane?: Segment['lane']
+  /** Section G: what the period pays a month, when the engine computed it. */
+  money?: string
 }
 
 /** The coloured edge of a period: green for the mother, navy for the father. */
@@ -45,6 +48,7 @@ function rows(timeline: Timeline): Row[] {
       text: s.summary,
       tone: s.tone,
       lane: s.lane,
+      money: moneyLine(timeline, s.id),
     })),
     ...timeline.markers.map((m) => ({
       id: m.id,
@@ -147,6 +151,11 @@ export function MobileTimeline({
                   >
                     {row.title}
                   </span>
+                  {row.money && (
+                    <span className="mt-1 inline-block rounded-full bg-sun-100 px-2 py-0.5 text-xs font-bold text-sun-700">
+                      {row.money}
+                    </span>
+                  )}
                   {row.key && (
                     <span className="mt-1 line-clamp-2 block text-sm leading-relaxed text-navy-500">
                       <Emphasis text={row.text} className="text-navy-700" />
@@ -161,6 +170,11 @@ export function MobileTimeline({
       </ol>
     </div>
   )
+}
+
+function moneyLine(timeline: Timeline, segmentId: string): string | undefined {
+  const payment = paymentFor(timeline, segmentId)
+  return payment && `Zasiłek ${formatPln(payment.monthly)}/mies. · ${formatRate(payment.rate)}`
 }
 
 function TodayLine({ iso }: { iso: string }) {

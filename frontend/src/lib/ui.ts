@@ -1,5 +1,6 @@
 import type { Lane, SourceRef, Tone, Work } from '../types'
 import { formatDate } from './dates'
+import { formatPln } from './money'
 
 export const LANE_ORDER: Record<Lane, number> = { child: 0, mother: 1, father: 2, documents: 3 }
 
@@ -108,28 +109,41 @@ export function segmentLook({ lane, tone }: { lane: Lane; tone: Tone }): Segment
   return { ...PARENT[parent], kind: KIND[tone], ...STYLE[parent][tone] }
 }
 
+/** The two acts the app quotes besides the guide, as their labels start. */
+const LAW_NAME: Record<'kp' | 'ustawa', string> = {
+  kp: 'Kodeks pracy',
+  ustawa: 'Ustawa zasiłkowa',
+}
+
 export const sourceLabel = (source: SourceRef) =>
-  source.doc === 'kp'
-    ? `Kodeks pracy, ${source.article}`
-    : `Przewodnik ZUS, s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
+  source.doc === 'przewodnik'
+    ? `Przewodnik ZUS, s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
+    : `${LAW_NAME[source.doc]}, ${source.article}`
 
 /**
- * Where a set of quotes comes from, in one short line: the guide's pages and the Labour Code's
- * articles (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 · Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ".
+ * Where a set of quotes comes from, in one short line: the guide's pages and the articles of
+ * the Labour Code and the ustawa zasiłkowa (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 ·
+ * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31".
  */
 export function sourcesSummary(sources: SourceRef[]): string {
   const pages = new Set<number>()
-  const articles = new Set<string>()
+  const articles = { kp: new Set<string>(), ustawa: new Set<string>() }
   for (const source of sources) {
-    if (source.doc === 'kp') {
-      if (source.article) articles.add(source.article.replace(/^art\. /, '').replace(/ § .*$/, ''))
+    if (source.doc !== 'przewodnik') {
+      if (source.article) {
+        articles[source.doc].add(
+          source.article.replace(/^art\. /, '').replace(/ (§|ust\.|pkt) .*$/, ''),
+        )
+      }
     } else if (source.page !== null) {
       for (let page = source.page; page <= (source.page_to ?? source.page); page++) pages.add(page)
     }
   }
   const parts = []
   if (pages.size > 0) parts.push(`Przewodnik ZUS, s. ${pageRanges([...pages])}`)
-  if (articles.size > 0) parts.push(`Kodeks pracy, art. ${[...articles].join(', ')}`)
+  for (const doc of ['kp', 'ustawa'] as const) {
+    if (articles[doc].size > 0) parts.push(`${LAW_NAME[doc]}, art. ${[...articles[doc]].join(', ')}`)
+  }
   return parts.join(' · ')
 }
 
@@ -223,6 +237,15 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return args.final
         ? `Przysposobienie prawomocne: ${asDate(args.final_on)}`
         : 'Przysposobienie jeszcze nieprawomocne'
+    case 'set_monthly_pay': {
+      const whose = args.parent === 'father' ? 'taty' : 'mamy'
+      return typeof args.amount === 'number'
+        ? `Kwota ${whose}: ${formatPln(args.amount)} miesięcznie`
+        : `Kwota ${whose}: nie podano`
+    }
+    case 'set_rate_choice':
+      if (args.rate_815 === true) return 'Zasiłek 81,5% przez cały urlop'
+      return args.rate_815 === false ? 'Zasiłek 100% i 70%' : 'Wybór zasiłku: jeszcze nie'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
     case 'set_sick_leave':

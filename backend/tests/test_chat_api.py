@@ -544,6 +544,14 @@ SICK_LEAVE = (
     "Czy w tej ciąży jesteś albo byłaś na zwolnieniu lekarskim? Jeśli tak, od kiedy i do kiedy "
     "(albo że do porodu)?"
 )
+# Guide section G: the amounts come last.
+OWN_SALARY = (
+    "Ile wynosi Twoje miesięczne wynagrodzenie brutto? Jeśli w ostatnich 12 miesiącach się "
+    "zmieniało, podaj średnią z tych miesięcy."
+)
+FATHER_PAY_HIMSELF = OWN_SALARY
+MOTHER_PAY_TOOL = '`set_monthly_pay` (parent: "mother")'
+FATHER_PAY_TOOL = '`set_monthly_pay` (parent: "father")'
 
 
 def interview(returned: str) -> str:
@@ -653,8 +661,8 @@ def test_the_father_is_asked_about_even_when_the_mother_is_not_insured(
     model = scripted("set_father_insurance", {"registered": True}, "Zapisane.", returned)
     update = next(e for e in ask(client, model, "Tak") if e["type"] == "timeline")
     assert update["scenario"]["father_insured"] is True
-    assert interview(returned[0]) == next_question(
-        FATHER_PAYER_CONTRACT, '`set_payer_size` (parent: "father")'
+    assert interview(returned[0]).startswith(
+        next_question(FATHER_PAYER_CONTRACT, '`set_payer_size` (parent: "father")')
     )
 
 
@@ -787,8 +795,7 @@ def test_the_fathers_leave_is_in_scope() -> None:
     )
     for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego", "łączenie urlopu"):
         assert in_scope_now not in out_of_scope
-    for still_out in ("kwoty zasiłku", "81,5%"):
-        assert still_out in out_of_scope
+    assert "kwoty zasiłku" not in out_of_scope  # guide section G is in scope now
     # Section D (adoption, foster care) is in scope too.
     assert "przysposobieniu" not in out_of_scope
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
@@ -867,6 +874,10 @@ def test_who_pays_is_asked_last_and_recorded(client: TestClient, store: MemorySe
             "children_count": 1,
             "leave_before_birth_weeks": 0,
             "sick_leave": False,
+            # The amounts (asked after who pays) are left out here.
+            "mother_pay": "unknown",
+            "father_pay": "unknown",
+            "rate_815": False,
         },
     )
     assert next_question(MOTHER_PAYER_HERSELF, '`set_payer_size` (parent: "mother")') in (
@@ -1074,3 +1085,89 @@ def test_a_plan_against_the_rules_is_rejected_in_the_chat(
         "parental-father-1": ("2027-08-02", "2027-10-03"),
     }
     assert update["focus"] == "parental-mother-1"
+
+
+# Guide section G: the amounts.
+
+
+def test_the_amounts_are_asked_last_and_never_taken_from_the_range(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """The onboarding gave only a range: the interview asks for the exact amount, then for the
+    mother's choice of rate. The calculator computes every amount (8000 → base 6903,20 zł)."""
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "earnings": "8k-12k",
+            "child_born": True,
+            "birth_date": "2026-11-10",
+            "children_count": 1,
+            "leave_before_birth_weeks": 0,
+            "hospital_care": False,
+            "father_work": "none",
+            "mother_payer_size": "over-20",  # who pays is asked before the amounts
+        },
+    )
+    assert client.get(f"/api/session/{SESSION}").json()["question"]["key"] == "mother-pay"
+    state = instructions_now(client)
+    assert next_question(OWN_SALARY, MOTHER_PAY_TOOL) in state
+    assert "to tylko przedział. Nic z nich nie wyliczaj" in state
+
+    # A slip ("8" for 8 thousand) and the father, who does not work, are refused.
+    out = ask(client, scripted("set_monthly_pay", {"parent": "mother", "amount": 8}, "…"), "8")
+    assert rejected("set_monthly_pay") in out
+    out = ask(client, scripted("set_monthly_pay", {"parent": "father", "amount": 5000}, "…"), "…")
+    assert rejected("set_monthly_pay") in out
+
+    returned: list[str] = []
+    model = scripted("set_monthly_pay", {"parent": "mother", "amount": 8000}, "Zapisane.", returned)
+    update = next(e for e in ask(client, model, "8 tys. brutto") if e["type"] == "timeline")
+    assert update["scenario"]["mother_pay"] == 8000
+    assert update["focus"] == "pay-maternity"
+    assert {"pay-maternity", "pay-parental", "rate-815-deadline"} <= set(update["changed"])
+    assert update["changed_notes"] == ["rate-815", "money"]
+    maternity = update["timeline"]["payments"][0]
+    assert (maternity["segment_id"], maternity["monthly"], maternity["total"]) == (
+        "maternity",
+        6903.2,
+        32215.4,
+    )
+    assert "[pay-maternity] Zasiłek mamy: urlop macierzyński po porodzie" in returned[0]
+    assert interview(returned[0]) == next_question(
+        "Czy złożyłaś albo złożysz (najpóźniej 21 dni po porodzie) wniosek o zasiłek 81,5% za "
+        "cały urlop macierzyński i rodzicielski, czy wolisz 100% za macierzyński i 70% za "
+        "rodzicielski?",
+        "`set_rate_choice`",
+    )
+
+    returned.clear()
+    model = scripted("set_rate_choice", {"rate_815": True}, "Zapisane.", returned)
+    update = next(e for e in ask(client, model, "Chcę 81,5%") if e["type"] == "timeline")
+    assert update["scenario"]["rate_815"] is True
+    assert update["focus"] == "rate-815-deadline"
+    assert [p["rate"] for p in update["timeline"]["payments"]] == [81.5, 81.5]
+    assert interview(returned[0]) == "Wywiad: wszystko ustalone."
+
+    # The amount can also stay unknown: the interview does not ask again.
+    update = timeline_after(client, "set_monthly_pay", {"parent": "mother", "amount": None})
+    assert update["scenario"]["mother_pay"] == "unknown"
+    assert update["timeline"]["payments"] == []
+
+
+def test_the_rate_choice_needs_an_insured_mother(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    remember(store, {"role": "mother", "work": "none", "due_date": "2027-03-15"})
+    out = ask(client, scripted("set_rate_choice", {"rate_815": True}, "…"), "…")
+    assert rejected("set_rate_choice") in out
+
+
+def test_the_money_tools_and_the_ustawa_are_in_the_instructions() -> None:
+    assert "`set_monthly_pay`" in STATIC_INSTRUCTIONS
+    assert "`set_rate_choice`" in STATIC_INSTRUCTIONS
+    assert "[Ustawa zasiłkowa, art. 31 ust. 3]" in STATIC_INSTRUCTIONS
+    assert "[Przewodnik ZUS, s. 9: Wysokość zasiłku macierzyńskiego: 100% podstawy]" in (
+        STATIC_INSTRUCTIONS
+    )

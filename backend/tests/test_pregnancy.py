@@ -307,6 +307,9 @@ def keys(**answers: object) -> list[str]:
             # Who pays is asked after the pregnancy questions (test_applications covers it).
             "mother_payer_size": "over-20",
             "father_payer_size": "over-20",
+            "mother_pay": "unknown",
+            "father_pay": "unknown",
+            "rate_815": False,
             **answers,
         }
     )

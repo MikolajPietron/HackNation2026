@@ -44,12 +44,14 @@ from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
     Document,
     Marker,
+    Payment,
     Scenario,
     ScenarioError,
     Segment,
     Timeline,
     TimelineElement,
 )
+from app.engine.money import money_assumptions, money_rules
 from app.engine.params import Params
 from app.engine.parental import (
     deadline_marker,
@@ -122,6 +124,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     _for_non_employee(draft, scenario, params, cover)
     # Pregnancy (guide pages 2-4, section H): sick leave and the benefit after losing the job.
     pregnancy = pregnancy_rules(draft, scenario, params, birth)
+    # Section G, last: the amount for every period both parents' rules left on the timeline.
+    money_rules(draft, scenario, params, birth, cover, loss)
     draft.markers.sort(key=lambda m: m.date)
 
     if not born and birth < today:
@@ -143,7 +147,9 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         assumptions=_assumptions(scenario, params, born, cover, loss, draft)
         + pregnancy
         + plan_assumptions,
+        payments=draft.payments,
     )
+    timeline.assumptions += money_assumptions(scenario, timeline, params)
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
     timeline.notes = case_notes(scenario, timeline, params)
@@ -192,6 +198,8 @@ def _signature(e: TimelineElement) -> tuple[object, ...]:
             return ("marker", e.date, e.title)
         case Document():
             return ("document", e.needed_by, e.title, e.done)
+        case Payment():
+            return ("payment", e.start, e.end, e.rate, e.total)
 
 
 def _before_birth_plan(draft: Draft, scenario: Scenario, params: Params, due: dt.date) -> None:
@@ -788,9 +796,9 @@ def _assumptions(
     draft: Draft,
 ) -> list[str]:
     assumptions = [
-        "Pokazujemy to, co wynika z części A, B i E Przewodnika ZUS: zasiłek macierzyński mamy, "
-        "uprawnienia taty, łączenie urlopu rodzicielskiego z pracą, wnioski z terminami "
-        "i szczególna ochrona. Kolejne części (kwoty zasiłku, adopcja) dodajemy krok po kroku."
+        "Pokazujemy to, co wynika z Przewodnika ZUS: zasiłki w ciąży, zasiłek macierzyński mamy "
+        "i jego wysokość, uprawnienia taty, łączenie urlopu rodzicielskiego z pracą, wnioski "
+        "z terminami i szczególna ochrona."
     ]
     mother = cover not in NOT_INSURED
     father = father_coverage(scenario)

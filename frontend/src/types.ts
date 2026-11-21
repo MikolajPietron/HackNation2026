@@ -17,9 +17,12 @@ export type BirthWeek = 'before-28' | '28-37' | 'after-37'
  */
 export type TakenIn = 'adoption' | 'foster'
 
-/** A literal quote: from the guide (section and pages) or from the Labour Code (article). */
+/**
+ * A literal quote: from the guide (section and pages), from the Labour Code ('kp') or from the
+ * ustawa zasiłkowa ('ustawa'; both: article).
+ */
 export interface SourceRef {
-  doc: 'przewodnik' | 'kp'
+  doc: 'przewodnik' | 'kp' | 'ustawa'
   quote: string
   section: string | null
   page: number | null
@@ -150,6 +153,15 @@ export interface Scenario {
   /** Adoption: the adoption ruling is final, since `adoption_final_on`. */
   adoption_final: boolean | null
   adoption_final_on: string | null
+  // Amounts (guide section G).
+  /**
+   * The mother's monthly amount in PLN as given in the chat: gross salary (employee) or the base
+   * of the sickness contribution (contract, business). 'unknown' = not given.
+   */
+  mother_pay: number | 'unknown' | null
+  father_pay: number | 'unknown' | null
+  /** The mother files the request for 81,5% within 21 days after the birth (false = 100%/70%). */
+  rate_815: boolean | null
 }
 
 /**
@@ -216,6 +228,31 @@ export interface Document {
 }
 
 /**
+ * The maternity benefit for one period on the timeline (guide section G), the "Pieniądze" lane.
+ * Amounts in PLN, rounded to grosze; `segment_id` is the period it pays for.
+ */
+export interface Payment {
+  id: string
+  segment_id: string
+  lane: 'mother' | 'father'
+  title: string
+  start: string
+  end: string
+  days: number
+  /** Percent of the benefit base: 100, 70 or 81.5. */
+  rate: number
+  /** Monthly benefit base (podstawa wymiaru zasiłku). */
+  base: number
+  monthly: number
+  daily: number
+  total: number
+  summary: string
+  /** The calculation, step by step. */
+  details: string[]
+  sources: SourceRef[]
+}
+
+/**
  * One point of the case explanation: situation = which case this is, right = what the mother is
  * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
  * decide, relief = an easier or longer path the rules give them, computed = what we calculated.
@@ -243,6 +280,8 @@ export interface Timeline {
   assumptions: string[]
   /** Set for a child taken in for upbringing: then `birth_date` is the day of taking in. */
   taken_in: TakenIn | null
+  /** Section G: the benefit for each period, once the parent's monthly amount is known. */
+  payments: Payment[]
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */

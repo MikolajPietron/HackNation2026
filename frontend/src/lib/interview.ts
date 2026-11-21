@@ -91,6 +91,16 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
       return ask(['Tak, obowiązek szkolny odroczono', 'Nie, bez odroczenia'])
     case 'adoption-ruling':
       return ask(['Postanowienie jeszcze nie jest prawomocne', 'Tak, jest już prawomocne'])
+    // Guide section G: the amount is typed in the chat; a chip only says it is not known.
+    case 'mother-pay':
+    case 'father-pay':
+      return ask(['Nie znam dokładnej kwoty', 'Wolę jej nie podawać'])
+    case 'rate-815':
+      return ask(
+        mother
+          ? ['Chcę 81,5% przez cały urlop', 'Wolę 100% i 70%', 'Czym to się różni?']
+          : ['Mama chce 81,5% przez cały urlop', 'Mama woli 100% i 70%', 'Czym to się różni?'],
+      )
     default:
       return ask([])
   }

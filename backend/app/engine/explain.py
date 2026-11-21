@@ -15,6 +15,7 @@ from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
+from app.engine.money import add_money_notes
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
 from app.engine.parental_plan import parental_plan_notes
@@ -33,7 +34,9 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
     # Guide E and B.3: the parents' plan of parental leave, before "Co policzyliśmy".
     plan = parental_plan_notes(scenario, timeline, params)
     at = next((i for i, n in enumerate(notes) if n.id == "computed"), len(notes))
-    return notes[:at] + plan + notes[at:]
+    notes = notes[:at] + plan + notes[at:]
+    # Section G: the choice of rate joins the choices, the amounts come after the dates.
+    return add_money_notes(notes, scenario, timeline, params)
 
 
 def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:

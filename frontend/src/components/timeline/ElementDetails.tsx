@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Wallet } from 'lucide-react'
 import { Emphasis } from '@/components/ui/emphasis'
 import { formatDayMonthLong, formatDistance, formatShortDate } from '@/lib/dates'
 import { EASE_OUT } from '@/lib/ease'
+import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { SourceRef, Timeline } from '@/types'
@@ -40,6 +41,7 @@ function Body({ item, timeline, onSelect }: Props) {
     case 'segment': {
       const s = item.element
       const documents = timeline.documents.filter((d) => d.segment_id === s.id)
+      const payment = paymentFor(timeline, s.id)
       return (
         <>
           <Title>{s.title}</Title>
@@ -54,6 +56,24 @@ function Body({ item, timeline, onSelect }: Props) {
             <Emphasis text={s.summary} />
           </p>
           <Bullets items={s.details} />
+          {payment && (
+            <button
+              type="button"
+              onClick={() => onSelect(payment.id)}
+              className="group mt-5 flex w-full items-center gap-3 rounded-2xl border border-sun-300 bg-sun-100/50 px-4 py-3 text-left transition-[border-color,transform] duration-150 hover:border-sun-400 active:scale-[0.98]"
+            >
+              <Wallet className="size-4 shrink-0 text-sun-700" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-navy-900">
+                  Zasiłek: {formatPln(payment.monthly)} miesięcznie
+                </span>
+                <span className="block text-sm text-navy-500">
+                  {formatRate(payment.rate)} podstawy · za cały okres {formatPln(payment.total)}
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-navy-400 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          )}
           {documents.length > 0 && (
             <ul className="mt-5 space-y-2">
               {documents.map((d) => (
@@ -92,6 +112,36 @@ function Body({ item, timeline, onSelect }: Props) {
             <Emphasis text={m.summary} />
           </p>
           <Bullets items={m.details} />
+        </>
+      )
+    }
+    case 'payment': {
+      const p = item.element
+      const segment = timeline.segments.find((s) => s.id === p.segment_id)
+      return (
+        <>
+          <Title>{p.title}</Title>
+          <Facts
+            facts={[
+              { label: 'Miesięcznie', value: formatPln(p.monthly) },
+              { label: 'Stawka', value: formatRate(p.rate) },
+              { label: `Za ${p.days} dni`, value: formatPln(p.total) },
+            ]}
+          />
+          <p className="mt-5">
+            <Emphasis text={p.summary} />
+          </p>
+          <Bullets items={p.details} />
+          {segment && (
+            <button
+              type="button"
+              onClick={() => onSelect(segment.id)}
+              className="group mt-4 flex items-center gap-1 text-sm font-bold text-zus-700"
+            >
+              Dotyczy: {segment.title}
+              <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          )}
         </>
       )
     }
@@ -174,6 +224,7 @@ function elementText(item: TimelineItem): string {
   switch (item.kind) {
     case 'segment':
     case 'marker':
+    case 'payment':
       return item.element.summary
     case 'document':
       return item.element.rule
@@ -183,13 +234,13 @@ function elementText(item: TimelineItem): string {
 const numbersIn = (text: string) => new Set(text.match(/\d+(?:,\d+)?/g) ?? [])
 
 /**
- * Literal quotes: the guide first, the Labour Code behind a toggle so the details stay short.
- * The toggle starts open when a number the element states is only in the Labour Code (e.g. 31
- * weeks for twins: the guide quotes only the 20 weeks of one child).
+ * Literal quotes: the guide first, the law (Labour Code, ustawa zasiłkowa) behind a toggle so the
+ * details stay short. The toggle starts open when a number the element states is only in the law
+ * (e.g. 31 weeks for twins: the guide quotes only the 20 weeks of one child).
  */
 function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
   const guide = sources.filter((s) => s.doc === 'przewodnik')
-  const law = sources.filter((s) => s.doc === 'kp')
+  const law = sources.filter((s) => s.doc !== 'przewodnik')
   const inGuide = numbersIn(guide.map((s) => s.quote).join(' '))
   const inLaw = numbersIn(law.map((s) => s.quote).join(' '))
   const onlyInLaw = [...numbersIn(text)].some((n) => inLaw.has(n) && !inGuide.has(n))
@@ -211,7 +262,7 @@ function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
             aria-expanded={lawOpen}
             className="flex items-center gap-1.5 text-sm font-bold text-zus-700"
           >
-            {law.length === 1 ? 'Przepis z Kodeksu pracy' : `Przepisy z Kodeksu pracy (${law.length})`}
+            {lawToggle(law)}
             <ChevronDown
               className={cn('size-4 transition-transform duration-200', lawOpen && 'rotate-180')}
             />
@@ -237,6 +288,13 @@ function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
       )}
     </section>
   )
+}
+
+/** "Przepis z Kodeksu pracy", "Przepisy ustawy zasiłkowej (4)", "Przepisy (6)". */
+function lawToggle(law: SourceRef[]): string {
+  const docs = new Set(law.map((s) => s.doc))
+  const from = docs.size > 1 ? '' : docs.has('kp') ? ' z Kodeksu pracy' : ' ustawy zasiłkowej'
+  return law.length === 1 ? `Przepis${from}` : `Przepisy${from} (${law.length})`
 }
 
 function Quote({ source }: { source: SourceRef }) {
