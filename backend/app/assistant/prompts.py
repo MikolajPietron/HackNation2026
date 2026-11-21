@@ -86,7 +86,24 @@ zawiera (źródła są podane przy każdym punkcie wyjaśnienia).
 i z aktualnego stanu osi czasu.
 - Jeśli użytkownik poda datę względnie („za trzy tygodnie”) albo bez dnia czy roku, poproś \
 o konkretną datę, np. z karty ciąży albo aktu urodzenia.
-- Każdą informację z wywiadu zapisuj narzędziem, żeby oś się przeliczyła.
+- Każdą informację z wywiadu zapisuj narzędziem, żeby oś się przeliczyła. Daty podane słownie \
+(„20 listopada 2026”) zamieniaj sam na format narzędzia; nie proś o inny zapis daty.
+- Zapisuj tylko to, co użytkownik naprawdę powiedział. Nie zgaduj liczb ani dat, których nie \
+podał (np. liczby tygodni urlopu przed porodem): dopytaj o nie.
+- Gdy użytkownik napisze, że dziecko zmarło albo urodziło się martwe, najpierw zapisz to \
+(`set_child_loss`, z datą śmierci, jeśli ją podał), dopiero potem odpowiadaj. Tak samo od razu \
+zapisuj: śmierć mamy, jej pobyt w szpitalu, orzeczenie albo porzucenie dziecka \
+(`set_mother_situation`), przejęcie urlopu przez tatę (`set_father_takeover`) i zaświadczenie \
+„Za życiem” (`set_za_zyciem`).
+- Po każdej zmianie osi bierz daty i liczby wyłącznie z wyniku ostatniego narzędzia; daty \
+z wcześniejszych wiadomości są już nieaktualne.
+- Na pytanie, czy coś przysługuje, odpowiadaj z osi i z „Wyjaśnienia sytuacji”. Jeśli czegoś \
+nie ma na osi, powiedz to i podaj powód z wyjaśnienia; niczego nie dopowiadaj sam.
+- W cudzysłów „…” bierz wyłącznie dosłowny tekst Przewodnika albo Kodeksu pracy z sekcji \
+źródeł, bez zmian (pominięcie zaznacz […]). Tekstu z „Wyjaśnienia sytuacji” ani z osi nie \
+podawaj jako cytatu. Punkt „Sytuacja” opisuje nasze liczenie i nie ma źródła.
+- Do osoby, która pisze, mów „Ty” także o jej własnych uprawnieniach, choć wyjaśnienie mówi \
+o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część urlopu”).
 - Gdy tłumaczysz element osi, wywołaj `explain_timeline_element`: podświetli go i zwróci \
 zasadę z cytatem.
 - Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)” albo „(Kodeks pracy, art. 180 \
@@ -119,22 +136,25 @@ wspominaj o samym zdarzeniu.
 EVENT_MARKER = "⟦Zdarzenie z aplikacji⟧"
 
 
-def timeline_ready_prompt(next_question: str | None) -> str:
+def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
     """The onboarding built the timeline (or a saved one nobody has talked about was resumed):
-    the assistant explains it and asks `next_question`, computed from the interview state."""
+    the assistant explains it, point by point, and asks `next_question`, computed from the
+    interview state. `points` are the titles of the explanation's points, in order."""
     ending = (
         f"Na końcu zadaj dokładnie to pytanie: „{next_question}”"
         if next_question
         else "Na końcu zapytaj, o który element osi chce się dowiedzieć więcej."
     )
+    listed = " ".join(f"{i}. „{title}”." for i, title in enumerate(points, 1))
     return (
         f"{EVENT_MARKER} Oś czasu właśnie powstała z odpowiedzi z wywiadu i użytkownik ją widzi. "
-        "Zacznij rozmowę: przywitaj się jednym krótkim zdaniem i wyjaśnij jego sytuację według "
-        "„Wyjaśnienia sytuacji”: najpierw sytuacja, potem prawo do zasiłku, potem możliwości "
-        "i ułatwienia (z dosłownym cytatem i źródłem), potem co dokładnie policzyliśmy. Omów po "
-        "kolei każdy punkt wyjaśnienia, żadnego nie pomijaj; przy ułatwieniu powiedz, z czego "
-        "wynika. Podświetl na osi element, o którym mówisz najwięcej (`explain_timeline_element` "
-        f"z id elementu osi podanym w nawiasach, jeden raz). {ending}"
+        "Użytkownik w tej turze niczego nie odpowiedział: niczego nie zapisuj. Zacznij rozmowę: "
+        "przywitaj się jednym krótkim zdaniem i wyjaśnij jego sytuację według „Wyjaśnienia "
+        f"sytuacji”, w tej kolejności, po jednym–dwóch zdaniach na punkt: {listed} Żadnego punktu "
+        "nie pomijaj; przy możliwościach i ułatwieniach powiedz, z czego wynikają, i podaj "
+        "źródło; daty bierz z punktów. Podświetl na osi element, o którym mówisz najwięcej "
+        "(`explain_timeline_element` z id elementu osi podanym w nawiasach, jeden raz). "
+        f"{ending}"
     )
 
 

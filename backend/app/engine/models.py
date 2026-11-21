@@ -120,6 +120,10 @@ class Scenario(BaseModel):
     """Weeks of maternity leave before the birth; 0 = the mother works until the birth."""
     has_medical_certificate: bool | None = None
     """Medical certificate of the expected due date, needed for leave before the birth."""
+    leave_start: dt.date | None = None
+    """The first day of maternity leave before the birth, as a date. Set when an expected child
+    is born and the planned leave (weeks before the due date) had already started: the birth
+    rarely falls on the due date. For a born child it wins over `leave_before_birth_weeks`."""
 
     # Phase 2.
     mother_insured: bool | None = None
@@ -151,6 +155,12 @@ class Scenario(BaseModel):
     def anchor_date(self) -> dt.date | None:
         """The date the timeline counts from: the actual birth once born, else the due date."""
         return self.birth_date if self.child_born else self.due_date
+
+    def prenatal_days(self, birth: dt.date) -> int:
+        """Days of maternity leave before the actual birth (0 = none)."""
+        if self.child_born and self.leave_start is not None:
+            return max(0, (birth - self.leave_start).days)
+        return (self.leave_before_birth_weeks or 0) * 7
 
     @property
     def mothers_work(self) -> Work | None:

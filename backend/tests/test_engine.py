@@ -1179,14 +1179,16 @@ def test_hospital_stay_still_under_way_or_past_the_end_of_the_leave() -> None:
 
 def test_death_of_the_mother() -> None:
     """Died 15.11.2026 (day 46, no 8-week minimum): her leave ends that day (46 days), the
-    father has 16.11.2026-17.02.2027 (94 days). Her parental leave goes; his runs 41 - 9 = 32
-    weeks from 18.02.2027: + 223 days = 29.09.2027."""
+    father has 16.11.2026-17.02.2027 (94 days). He cannot be on paternity leave at the same
+    time: it follows, 18.02-3.03.2027 (14 days). Her parental leave goes; his runs 41 - 9 = 32
+    weeks from 4.03.2027: + 223 days = 13.10.2027."""
     t = event("death", "2026-11-15")
     assert span(t, "maternity") == (EVENT_BIRTH, dt.date(2026, 11, 15), 46)
     assert span(t, "maternity-father") == (dt.date(2026, 11, 16), WHOLE, 94)
     assert lane(t, "mother") == ["maternity"]
     assert lane(t, "father") == ["maternity-father", "paternity", "parental-father"]
-    assert span(t, "parental-father") == (dt.date(2027, 2, 18), dt.date(2027, 9, 29), 224)
+    assert span(t, "paternity") == (dt.date(2027, 2, 18), dt.date(2027, 3, 3), 14)
+    assert span(t, "parental-father") == (dt.date(2027, 3, 4), dt.date(2027, 10, 13), 224)
     assert "personal-weeks" not in ids(t)
     assert "parental-deadline" in ids(t)
     told = note(t, "mother-event")
@@ -1260,14 +1262,14 @@ def test_death_of_the_mother_after_her_maternity_leave() -> None:
 
 def test_abandonment_after_eight_weeks_at_the_earliest() -> None:
     """Abandoned on 10.11.2026, before 8 weeks were used: the mother until 25.11.2026 (56 days),
-    the father 26.11.2026-17.02.2027 (84 days). Her later leave goes; his parental leave runs
-    from 18.02.2027."""
+    the father 26.11.2026-17.02.2027 (84 days), then his paternity leave 18.02-3.03.2027. Her
+    later leave goes; his parental leave runs from 4.03.2027."""
     t = event("abandonment", "2026-11-10")
     assert span(t, "maternity") == (EVENT_BIRTH, dt.date(2026, 11, 25), 56)
     assert span(t, "maternity-father") == (dt.date(2026, 11, 26), WHOLE, 84)
     assert any("zaczyna się 26.11.2026" in d for d in segment(t, "maternity-father").details)
     assert lane(t, "mother") == ["maternity"]
-    assert span(t, "parental-father")[0] == dt.date(2027, 2, 18)
+    assert span(t, "parental-father")[0] == dt.date(2027, 3, 4)
     assert "art. 180 § 13" in note(t, "mother-event").text
 
 

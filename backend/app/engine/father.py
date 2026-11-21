@@ -507,6 +507,14 @@ def _paternity(
     days = f.paternity_days.value
     shortest = f.paternity_min_part_days.value
     start = max(birth, today) if born else birth
+    # He cannot be on paternity leave and on his part of maternity leave at once: shown right
+    # after that part (paternity leave can be used any time until the deadline).
+    after_his_part = False
+    for part in (s for s in draft.segments if s.id == "maternity-father"):
+        if part.start <= start + (days - 1) * DAY and part.end >= start:
+            start, after_his_part = part.end + DAY, True
+    if start > deadline:
+        return None
     end = min(start + (days - 1) * DAY, deadline)
     left = days_between(start, end)
     if left < shortest:
@@ -516,7 +524,9 @@ def _paternity(
             f"niż {shortest} dni."
         )
         return None
-    if not born:
+    if after_his_part:
+        when = "po jego części urlopu macierzyńskiego"
+    elif not born:
         when = "od przewidywanej daty porodu"
     elif start == birth:
         when = "od dnia porodu"

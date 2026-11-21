@@ -95,8 +95,10 @@ async def chat(
     if request.message is not None:
         prompt = request.message
     else:  # the only event: "timeline_ready"
+        deps.answers_allowed = False
         questions = interview_questions(deps.scenario)
-        prompt = timeline_ready_prompt(questions[0].text if questions else None)
+        points = [note.title for note in deps.timeline.notes] if deps.timeline else []
+        prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
     stream = _stream(prompt, load_history(session), deps, model, turn)
     return StreamingResponse(stream, media_type="application/x-ndjson")
 

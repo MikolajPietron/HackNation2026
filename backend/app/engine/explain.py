@@ -16,7 +16,7 @@ from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Ti
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
 from app.engine.supplementary import describe_case, supplementary_leave
-from app.engine.wording import children_phrase, long_date, multiples
+from app.engine.wording import children_phrase, long_date, multiples, weeks_or_days
 
 WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalności gospodarczej"}
 """After "przy": the two ways of working the guide names for voluntary sickness insurance."""
@@ -189,10 +189,11 @@ def _loss_computed(scenario: Scenario, timeline: Timeline, params: Params, loss:
             ),
             sources=_guide(params.maternity.weeks_by_children.sources),
         )
-    weeks = scenario.leave_before_birth_weeks or 0
+    prenatal_segment = _segment(timeline, "maternity-prenatal")
+    weeks = weeks_or_days(prenatal_segment.days) if prenatal_segment else ""
     whole = _maternity_end(timeline) or maternity.end
     before = (
-        f"Urlop zaczął się {weeks} tyg. przed porodem i trwa do {long_date(whole)}"
+        f"Urlop zaczął się {weeks} przed porodem i trwa do {long_date(whole)}"
         if weeks
         else f"Urlop macierzyński trwa od dnia porodu do {long_date(whole)}"
     )
@@ -288,18 +289,19 @@ def _situation(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
         )
     weeks = scenario.leave_before_birth_weeks
     prenatal = _segment(timeline, "maternity-prenatal")
-    if weeks and prenatal is not None:
+    if prenatal is not None:
         verb = "trwa" if born_today else "zaczął się"
+        before = weeks_or_days(prenatal.days)
         return CaseNote(
             id="situation",
             kind="situation",
             title=title,
             text=(
                 f"Liczymy od faktycznej daty urodzenia. Urlop macierzyński {verb} od "
-                f"{long_date(prenatal.start)}: mama zaczęła go {weeks} tyg. przed porodem."
+                f"{long_date(prenatal.start)}: mama zaczęła go {before} przed porodem."
                 if born_today
                 else f"Liczymy od faktycznej daty urodzenia. Urlop macierzyński zaczął się "
-                f"{long_date(prenatal.start)}, {weeks} tyg. przed porodem."
+                f"{long_date(prenatal.start)}, {before} przed porodem."
             ),
             sources=rules.rest_after_birth.sources,
         )
@@ -714,7 +716,12 @@ def _computed(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNot
         )
 
     weeks = scenario.leave_before_birth_weeks or 0
-    in_total = f", w tym {weeks} tyg. przed porodem" if weeks else ""
+    prenatal_segment = _segment(timeline, "maternity-prenatal")
+    in_total = (
+        f", w tym {weeks_or_days(prenatal_segment.days)} przed porodem"
+        if prenatal_segment is not None
+        else ""
+    )
     whole = _maternity_end(timeline) or maternity.end
     ended = timeline.child_born and whole < timeline.today
     rules = params.rules

@@ -12,6 +12,8 @@ from typing import Annotated, Any
 
 from pydantic import Field
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
+from pydantic_ai.capabilities import PrepareTools
+from pydantic_ai.tools import ToolDefinition
 
 from app.assistant.describe import (
     describe_element,
@@ -43,6 +45,8 @@ class AssistantDeps:
     params: Params
     today: dt.date
     timeline: Timeline | None = None
+    answers_allowed: bool = True
+    """False in a turn started by the app, not the user: nothing the parent said can be saved."""
 
 
 @dataclass(kw_only=True)
@@ -64,11 +68,25 @@ class ElementFocused(CustomEvent):
     element_id: str
 
 
+# In a turn the app started (the timeline appeared), the parent has answered nothing: the model
+# may only point at the timeline, never record an answer on the parent's behalf.
+EXPLAIN_ONLY = {"explain_timeline_element"}
+
+
+def _tools_for_turn(
+    ctx: RunContext[AssistantDeps], tool_defs: list[ToolDefinition]
+) -> list[ToolDefinition]:
+    if ctx.deps.answers_allowed:
+        return tool_defs
+    return [t for t in tool_defs if t.name in EXPLAIN_ONLY]
+
+
 assistant = Agent(
     deps_type=AssistantDeps,
     name="przewodnik",
     instructions=STATIC_INSTRUCTIONS,
     retries=2,
+    capabilities=[PrepareTools(_tools_for_turn)],
 )
 
 
@@ -150,6 +168,7 @@ async def set_due_date(ctx: RunContext[AssistantDeps], due_date: dt.date) -> str
         hospital_stays=[],
         losses=[],
         mother_event=None,
+        leave_start=None,
     )
     return await _apply(ctx, scenario, "due-date")
 
@@ -165,7 +184,22 @@ async def set_birth_date(ctx: RunContext[AssistantDeps], birth_date: dt.date) ->
     if problem:
         raise ModelRetry(f"Nie ustawiono: {problem}")
     # The certificate is needed only to start leave before an expected birth.
-    scenario = _with(ctx, child_born=True, birth_date=birth_date, has_medical_certificate=None)
+    changes: dict[str, Any] = {
+        "child_born": True,
+        "birth_date": birth_date,
+        "has_medical_certificate": None,
+    }
+    before = ctx.deps.scenario
+    if not before.child_born and before.due_date and before.leave_before_birth_weeks:
+        # The plan counted weeks before the due date; the birth rarely falls on it. The leave
+        # counts from its real first day (Labour Code art. 180 § 3); a birth before that day
+        # means no leave before the birth (art. 183¹ § 2).
+        planned = before.due_date - dt.timedelta(weeks=before.leave_before_birth_weeks)
+        if birth_date <= planned:
+            changes.update(leave_before_birth_weeks=0, leave_start=None)
+        else:
+            changes["leave_start"] = planned
+    scenario = _with(ctx, **changes)
     return await _apply(ctx, scenario, "birth")
 
 
@@ -193,7 +227,8 @@ async def set_leave_before_birth(
         weeks: Whole weeks of maternity leave before the birth. 0 = no leave before the birth
             (she works, or worked, until the birth).
     """
-    changes: dict[str, Any] = {"leave_before_birth_weeks": weeks}
+    # Weeks the user gives now count back from the birth (or the due date): no stored start.
+    changes: dict[str, Any] = {"leave_before_birth_weeks": weeks, "leave_start": None}
     if weeks == 0:
         changes["has_medical_certificate"] = None
     scenario = _with(ctx, **changes)

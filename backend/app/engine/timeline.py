@@ -58,7 +58,7 @@ from app.engine.parental import (
     parental_weeks,
 )
 from app.engine.supplementary import describe_case, supplementary_leave
-from app.engine.wording import children_phrase, fmt
+from app.engine.wording import children_phrase, fmt, weeks_or_days
 
 __all__ = ["DAY", "WEEK", "build_timeline", "changed_element_ids", "fmt"]
 
@@ -77,7 +77,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         )
     table = params.maternity.weeks_by_children.value
     count = scenario.children_count
-    if born and weeks and count and weeks >= table[min(count, len(table)) - 1]:
+    before_days = scenario.prenatal_days(birth)
+    if born and before_days and count and before_days >= table[min(count, len(table)) - 1] * 7:
         raise ScenarioError(
             "Tyle tygodni przed porodem to cały urlop macierzyński. Sprawdź liczbę tygodni."
         )
@@ -287,11 +288,23 @@ def _before_birth_plan(draft: Draft, scenario: Scenario, params: Params, due: dt
 
 def _before_birth_past(draft: Draft, scenario: Scenario, params: Params, birth: dt.date) -> None:
     """Phase 1 once the child is born: leave the mother already took before the birth."""
-    weeks = scenario.leave_before_birth_weeks
-    if not weeks:
+    days = scenario.prenatal_days(birth)
+    if not days:
         return
     limit = params.maternity.max_weeks_before_birth.value
-    start = birth - weeks * WEEK
+    start = birth - days * DAY
+    details = ["To część urlopu macierzyńskiego, a nie dodatkowe tygodnie."]
+    if scenario.leave_start is not None:
+        details.append(
+            f"Urlop zaczął się {fmt(start)}, jak był zaplanowany przed przewidywaną datą porodu; "
+            "dziecko urodziło się innego dnia, więc przed porodem trwał "
+            f"{weeks_or_days(days)}."
+        )
+    if days > limit * 7:
+        details.append(
+            f"Limit {limit} tyg. dotyczy czasu przed przewidywaną datą porodu, więc gdy dziecko "
+            "urodziło się później, tygodni przed porodem może być więcej."
+        )
     draft.segments.append(
         Segment(
             id="maternity-prenatal",
@@ -300,17 +313,10 @@ def _before_birth_past(draft: Draft, scenario: Scenario, params: Params, birth: 
             title="Urlop macierzyński przed porodem",
             start=start,
             end=birth - DAY,
-            days=weeks * 7,
-            summary=f"Mama była na urlopie macierzyńskim {weeks} tyg. przed porodem.",
-            details=["To część urlopu macierzyńskiego, a nie dodatkowe tygodnie."]
-            + (
-                [
-                    f"Limit {limit} tyg. dotyczy czasu przed przewidywaną datą porodu, więc gdy "
-                    "dziecko urodziło się później, tygodni przed porodem może być więcej."
-                ]
-                if weeks > limit
-                else []
-            ),
+            days=days,
+            summary=f"Mama była na urlopie macierzyńskim od {fmt(start)}, "
+            f"{weeks_or_days(days)} przed porodem.",
+            details=details,
             sources=[
                 *params.maternity.max_weeks_before_birth.sources,
                 *params.rules.rest_after_birth.sources,
@@ -388,8 +394,8 @@ def _maternity_after_birth(
     assert count is not None
     table = m.weeks_by_children.value
     weeks = scenario.leave_before_birth_weeks
-    before = weeks or 0
-    start = birth - before * WEEK
+    before_days = scenario.prenatal_days(birth) if born else (weeks or 0) * 7
+    start = birth - before_days * DAY
 
     def weeks_for(children: int) -> int:
         return table[min(children, len(table)) - 1]
@@ -404,10 +410,10 @@ def _maternity_after_birth(
 
     details = ["Tydzień urlopu to 7 dni kalendarzowych."]
     sources = [*m.weeks_by_children.sources, *rules.week_is_7_days.sources]
-    if before:
+    if before_days:
         details.append(
-            f"{before} tyg. wykorzystane przed porodem wliczają się do {total} tyg.; "
-            "reszta przysługuje po porodzie."
+            f"{weeks_or_days(before_days)} wykorzystane przed porodem wliczają się do "
+            f"{total} tyg.; reszta przysługuje po porodzie."
         )
         sources += rules.rest_after_birth.sources
     elif weeks is None and not born:
@@ -444,7 +450,7 @@ def _maternity_after_birth(
             "Liczymy od przewidywanej daty porodu. Po porodzie oś przeliczy się od faktycznej daty."
         )
 
-    in_total = f", w tym {before} tyg. przed porodem" if before else ""
+    in_total = f", w tym {weeks_or_days(before_days)} przed porodem" if before_days else ""
     summary = (
         f"Urlop macierzyński przy urodzeniu {children_phrase(count)} trwa "
         f"{total} tyg.{in_total}; po porodzie do {fmt(end)}."

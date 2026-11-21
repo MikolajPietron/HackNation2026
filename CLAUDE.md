@@ -141,7 +141,9 @@ Fazy 1–3 w szczegółach:
 - Urlop uzupełniający liczymy z dat pobytów w szpitalu (KP art. 180² § 1–3): okno 15 tygodni (przed ukończeniem 28. tygodnia ciąży albo masa do 1000 g), 8 tygodni (po 28. i przed ukończeniem 37. tygodnia, masa ponad 1000 g) albo od 5. dnia do końca 8. tygodnia (po 37. tygodniu, pod warunkiem 2 kolejnych dni, z których pierwszy przypada między 5. a 28. dniem). Dni w oknie sumujemy, niepełny tydzień w górę. Pobyt bez daty końca liczymy do dziś; mówimy, o ile wymiar może jeszcze wzrosnąć, tylko gdy naprawdę może. Jedna konwencja w całej aplikacji: dzień porodu jest pierwszym dniem „po porodzie” (jak pierwszy dzień urlopu macierzyńskiego, KP art. 183¹ § 2), więc n-ty dzień po porodzie = data porodu + (n − 1) dni (patrz „Otwarte pytania”).
 - Mama na zleceniu albo z JDG nie dostaje urlopu, tylko zasiłek za okres odpowiadający urlopowi (s. 4): każdy odcinek urlopu na jej osi mówi to w szczegółach.
 - Martwe urodzenie i zgon dziecka (faza 3): asystent nigdy o to nie pyta; zapisuje (`set_child_loss`), gdy rodzic sam powie. Wtedy karta „Twoja sytuacja” zaczyna się od słów współczucia i mówi tylko o tym, co przysługuje mamie. Bez żyjącego dziecka: brak urlopu rodzicielskiego (KP art. 182¹ᵃ § 1: „w celu sprawowania opieki nad dzieckiem”), brak pytań o szpital, znacznik „Poród” zamiast „Narodziny dziecka” przy martwym urodzeniu. 8 tygodni życia = 56 dni (Poradnik), 7 dni od zgonu liczymy od następnego dnia i nie wydłużają urlopu ponad zwykły wymiar.
-- Poza zakresem: urlop taty i urlop ojcowski, podział rodzicielskiego między rodziców i na części, łączenie z pracą, kwoty i stawki, wnioski i ich terminy (także 21 dni na wniosek o urlop uzupełniający i rodzicielski), zasiłek po ustaniu ubezpieczenia.
+- Sekcja B (tata, `engine/father.py`): urlop ojcowski 14 dni do dnia przed 1. urodzinami (po części urlopu macierzyńskiego taty, jeśli ją ma — nie da się być na obu naraz); jego 9 tygodni rodzicielskiego po części mamy; gdy mama nie jest ubezpieczona albo zmarła, urlop rodzicielski taty = pula − 9 tygodni; przejęcie urlopu macierzyńskiego po co najmniej 14 tygodniach mamy; sytuacje szczególne mamy (niezdolność, szpital — po 8 tygodniach; śmierć — bez minimum; porzucenie — nie wcześniej niż po 8 tygodniach). Asystent nie pyta o przejęcie ani o sytuacje szczególne; zapisuje je, gdy rodzic sam powie.
+- Urlop przed porodem po urodzeniu dziecka: plan liczony w tygodniach przed przewidywaną datą porodu przechodzi na prawdziwą datę startu (`Scenario.leave_start`), bo poród rzadko wypada w terminie; poród przed planowanym startem = bez urlopu przed porodem (KP art. 183¹ § 2). Wymiar liczy się od faktycznego startu (art. 180 § 3).
+- Poza zakresem: podział rodzicielskiego między rodziców i na części, łączenie z pracą, kwoty i stawki, wnioski i ich terminy (także 21 dni na wniosek o urlop uzupełniający i rodzicielski), zasiłek po ustaniu ubezpieczenia, adopcja i rodzina zastępcza (sekcja D).
 
 ## Wyjaśnianie przypadku — zasada dla każdej fazy
 
@@ -296,6 +298,7 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 
 - Jednostkowe dla każdej reguły i interakcji: przykłady z Przewodnika i liczby z Załącznika. Oczekiwane daty liczymy ręcznie i wpisujemy na sztywno, nie kopiujemy logiki silnika.
 - Czat testujemy bez klucza i bez sieci: `FunctionModel` (Pydantic AI) odgrywa wywołania narzędzi, a model podmienia `app.dependency_overrides[get_chat_model]`.
+- Prawdziwy model sprawdza `tools/eval/` (README tam): scenariusze z datami policzonymi ręcznie z Przewodnika i KP, zależności (np. bliźnięta → 31 tyg.), cytaty co do znaku, determinizm. Kosztuje wywołania LLM, poza CI; puszczaj po zmianie promptów, narzędzi, modelu albo silnika. Przegląd 21.11.2026 (88 tur, `openai/gpt-5.4-mini`): silnik i oś bez zarzutu i deterministyczne; błędy modelu poprawione w kodzie — w turze zdarzenia (`timeline_ready`) model ma tylko `explain_timeline_element` (nie może zapisać odpowiedzi, której nikt nie dał), daty słowne zamienia sam, zapisuje każdą odpowiedź z wiadomości, nie zgaduje liczb, cytuje tylko źródła. Mniejszy model nadal czasem omija punkty wyjaśnienia; mocniejszy model (domyślny Claude) powinien robić to lepiej.
 - Regresja na sprawach: `katalog_spraw.json` to klucz rozstrzygnięć (przyznano/odmowa, wykryte z OCR w 60/86 — resztę zweryfikować wzrokowo). W sprawach nie ma kwot: kwoty liczymy z tabeli Z-3 i pokazujemy wyliczenie krok po kroku.
 - Cel na prezentację: „zgodność z decyzjami ZUS: X/86”.
 
@@ -308,6 +311,8 @@ Każda interakcja = osobna reguła ze źródłem i testem. W nawiasach: sprawy t
 - Ocena: związek z wyzwaniem 25%, kompletność + UX 25%, pomysł 20%, oryginalność 15%, potencjał wdrożeniowy 15%.
 
 ## Otwarte pytania do mentorów ZUS
+
+- Sekcja B, nasze odczytania (materiały ich nie rozstrzygają): gdy mama nie jest ubezpieczona albo zmarła, tata może wykorzystać całą pulę urlopu rodzicielskiego poza 9 tygodniami mamy; po śmierci albo porzuceniu przez mamę jej dalsze urlopy znikają, a urlop uzupełniający przechodzi na tatę; pobyt mamy w szpitalu liczymy od dnia przyjęcia do dnia wypisu, mama wraca do urlopu dzień po wypisie; urlop ojcowski „do ukończenia 12 miesięcy” kończy się dzień przed 1. urodzinami.
 
 - Minimalna podstawa wymiaru 2026: w Załączniku brak tabeli. Nasze wyliczenie: 4 806 × (1 − 13,71%) ≈ 4 147,10 zł.
 - Minimum 1 000 zł: jak liczyć zaliczkę PIT przy porównaniu netto?

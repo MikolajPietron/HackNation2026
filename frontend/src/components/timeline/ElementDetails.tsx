@@ -28,7 +28,7 @@ export function ElementDetails({ item, timeline, onSelect }: Props) {
   return (
     <div className="text-[15px] leading-relaxed text-navy-700">
       <Body item={item} timeline={timeline} onSelect={onSelect} />
-      <Sources sources={item.element.sources} />
+      <Sources sources={item.element.sources} text={elementText(item)} />
     </div>
   )
 }
@@ -169,10 +169,31 @@ function Bullets({ items }: { items: string[] }) {
 }
 
 /** Literal quotes: the guide first, the Labour Code behind a toggle so the details stay short. */
-function Sources({ sources }: { sources: SourceRef[] }) {
+/** The element's own sentence, to see which numbers in it its quotes must back. */
+function elementText(item: TimelineItem): string {
+  switch (item.kind) {
+    case 'segment':
+    case 'marker':
+      return item.element.summary
+    case 'document':
+      return item.element.rule
+  }
+}
+
+const numbersIn = (text: string) => new Set(text.match(/\d+(?:,\d+)?/g) ?? [])
+
+/**
+ * Literal quotes: the guide first, the Labour Code behind a toggle so the details stay short.
+ * The toggle starts open when a number the element states is only in the Labour Code (e.g. 31
+ * weeks for twins: the guide quotes only the 20 weeks of one child).
+ */
+function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
   const guide = sources.filter((s) => s.doc === 'przewodnik')
   const law = sources.filter((s) => s.doc === 'kp')
-  const [lawOpen, setLawOpen] = useState(guide.length === 0)
+  const inGuide = numbersIn(guide.map((s) => s.quote).join(' '))
+  const inLaw = numbersIn(law.map((s) => s.quote).join(' '))
+  const onlyInLaw = [...numbersIn(text)].some((n) => inLaw.has(n) && !inGuide.has(n))
+  const [lawOpen, setLawOpen] = useState(guide.length === 0 || onlyInLaw)
   if (sources.length === 0) return null
   return (
     <section className="mt-6 border-t border-line pt-5">

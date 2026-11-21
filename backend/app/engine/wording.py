@@ -32,6 +32,13 @@ def long_date(d: dt.date) -> str:
     return f"{d.day} {_MONTHS[d.month - 1]} {d.year}"
 
 
+def weeks_or_days(days: int) -> str:
+    """ "6 tyg." for whole weeks, else "34 dni" / "1 dzień"."""
+    if days % 7 == 0:
+        return f"{days // 7} tyg."
+    return "1 dzień" if days == 1 else f"{days} dni"
+
+
 def children_phrase(count: int) -> str:
     """After "przy urodzeniu": "jednego dziecka", "dwojga dzieci", "6 dzieci"."""
     return _CHILDREN.get(count, f"{count} dzieci")

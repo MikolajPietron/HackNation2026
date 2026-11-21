@@ -294,10 +294,16 @@ def describe_interview(scenario: Scenario) -> str:
     if not questions:
         return "Wywiad: wszystko ustalone."
     first, *rest = questions
-    later = f" Potem: {' '.join(q.text for q in rest)}" if rest else ""
+    later = "".join(f" Potem: „{q.text}” (narzędzie {q.tool})." for q in rest)
+    several = (
+        " Jeśli wiadomość odpowiada na kilka z tych pytań naraz, zapisz każdą odpowiedź jej "
+        "narzędziem."
+        if rest
+        else ""
+    )
     return (
         f"Następne pytanie wywiadu (zadaj je dokładnie tak): „{first.text}” Gdy użytkownik "
-        f"odpowie, najpierw zapisz odpowiedź narzędziem {first.tool}, potem pisz.{later}"
+        f"odpowie, najpierw zapisz odpowiedź narzędziem {first.tool}, potem pisz.{later}{several}"
     )
 
 
@@ -323,11 +329,7 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
         lines += ["", "Wyjaśnienie sytuacji (z kalkulatora, z tego mów):"]
         for n in timeline.notes:
             labels = list(dict.fromkeys(source_label(s) for s in n.sources))
-            backed = (
-                f" (źródła: {'; '.join(labels)})"
-                if labels
-                else " (bez źródła: to opis naszego liczenia, nie dopisuj do niego źródła)"
-            )
+            backed = f" (źródła: {'; '.join(labels)})" if labels else ""
             lines.append(f"- {NOTE_KINDS[n.kind]} — {n.title}. {n.text}{backed}")
     if timeline.warnings:
         lines += ["", "Ostrzeżenia:", *(f"- {w}" for w in timeline.warnings)]
