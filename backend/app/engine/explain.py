@@ -14,7 +14,13 @@ from app.engine.base import add_base_notes
 from app.engine.debt import add_debt_notes
 from app.engine.draft import DAY, days_between
 from app.engine.explain_adoption import taken_in_notes
-from app.engine.father import MATERNITY_PARTS
+from app.engine.father import (
+    INTERRUPTED_WORK,
+    MATERNITY_PARTS,
+    UNINSURED_AFTER,
+    interrupted_work_rule,
+    uninsured_maternity_end,
+)
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
@@ -780,13 +786,12 @@ def _computed(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNot
     rules = params.rules
     split, split_sources = _split(scenario, timeline, params)
     event = scenario.mother_event
-    if (
-        event is not None
-        and event.kind == "death"
-        and maternity.end == event.start
-        and _segment(timeline, "maternity-father") is None
+    if _segment(timeline, "maternity-father") is None and (
+        (event is not None and event.kind == "death" and maternity.end == event.start)
+        or _abandoned(maternity)
     ):
-        # The mother died and nobody takes the rest of her leave: just its last day.
+        # The mother died or abandoned the child and nobody takes the rest of her leave: just
+        # its last day.
         text = split.strip()
         sources = [*split_sources, rules.week_is_7_days.sources]
     else:
@@ -907,6 +912,15 @@ def _split(
         if father is not None:
             text += f"; tata ma urlop od {long_date(father.start)} do {long_date(father.end)}"
         return f"{text}.", [rule]
+    if father is None and _abandoned(maternity):
+        verb = "trwał" if maternity.end < timeline.today else "trwa"
+        weeks = params.father.special_after_weeks.value
+        return (
+            f" Urlop macierzyński mamy {verb} po porodzie do {long_date(maternity.end)}: część "
+            "przypadająca po dniu porzucenia dziecka jej nie przysługuje, ale urlop po porodzie "
+            f"nie może wynosić mniej niż {weeks} tygodni.",
+            [params.father.abandonment_mother_loses.sources],
+        )
     if father is None:
         return "", []
     text = (
@@ -950,6 +964,12 @@ def _father_dates(
 def _father_computed(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     """The mother has no benefit periods: what we computed is the father's alone."""
     text, sources = _father_dates(scenario, timeline, params)
+    his = _segment(timeline, "maternity-father")
+    if his is not None:  # after the death, abandonment or incapacity of an uninsured mother
+        text = (
+            f" Urlop macierzyński taty: od {long_date(his.start)} do {long_date(his.end)}." + text
+        )
+        sources = [params.father.special_uninsured.sources, *sources]
     if not text:
         return []
     return [
@@ -967,19 +987,50 @@ def _father_computed(scenario: Scenario, timeline: Timeline, params: Params) -> 
     ]
 
 
+def _abandoned(maternity: Segment) -> bool:
+    """The mother's maternity leave was cut after she abandoned the child (father.py cites
+    art. 182 on it)."""
+    return any(s.article == "art. 182" for s in maternity.sources)
+
+
+def _mother_left(scenario: Scenario) -> bool:
+    """The mother died or abandoned the child: her lane ended (father.py)."""
+    event = scenario.mother_event
+    return event is not None and event.kind in ("death", "abandonment")
+
+
+def _not_employee(scenario: Scenario) -> bool:
+    return scenario.fathers_work in ("contract", "business")
+
+
+def _interrupted_work(
+    scenario: Scenario, params: Params, cover: Coverage
+) -> tuple[str, list[list[SourceRef]]]:
+    """A father who is not an employee: his benefit for the mother's maternity leave needs him
+    to interrupt his work (ustawa art. 29 ust. 3, 5-7, 9)."""
+    if not _not_employee(scenario):
+        return "", []
+    return f" {INTERRUPTED_WORK}", [interrupted_work_rule(scenario, params, cover).sources]
+
+
 def _mother_event(
     scenario: Scenario, timeline: Timeline, params: Params, cover: Coverage
 ) -> CaseNote | None:
     """Guide B.2: the mother's special situation and what the father takes over."""
     event = scenario.mother_event
+    if event is None or not timeline.child_born:
+        return None
+    if cover in NOT_INSURED:
+        return _uninsured_mother_event(scenario, timeline, params, cover)
     maternity = _segment(timeline, "maternity")
-    if event is None or maternity is None or cover in NOT_INSURED or not timeline.child_born:
+    if maternity is None:
         return None
     f = params.father
     after = f.special_after_weeks.value
     rule = _event_rule(scenario, params).sources
     article = ARTICLE[event.kind]
     father = _segment(timeline, "maternity-father")
+    interrupted, interrupted_sources = _interrupted_work(scenario, params, cover)
     if father is not None:
         span = f"od {long_date(father.start)} do {long_date(father.end)}"
         title = f"Tata przejmuje urlop macierzyński od {long_date(father.start)}"
@@ -1027,18 +1078,37 @@ def _mother_event(
         if event.kind != "death":
             text += " Łączny wymiar urlopu macierzyńskiego się nie zmienia."
         return CaseNote(
-            id="mother-event", kind="right", title=title, text=text, sources=_merge(*sources)
+            id="mother-event",
+            kind="right",
+            title=title,
+            text=text + interrupted,
+            sources=_merge(*sources, *interrupted_sources),
         )
 
+    sorry = "Bardzo nam przykro. " if event.kind == "death" else ""
+    earliest = timeline.birth_date + after * 7 * DAY
+    if event.kind == "hospital" and event.end is not None and event.end < earliest:
+        return CaseNote(
+            id="mother-event",
+            kind="right",
+            title="Pobyt w szpitalu przed upływem 8 tygodni",
+            text=(
+                "Mama może przerwać urlop macierzyński na okres pobytu w szpitalu, a tata "
+                "wykorzystać tę część urlopu, gdy mama wykorzysta po porodzie co najmniej "
+                f"{after} tygodni urlopu macierzyńskiego, czyli od {long_date(earliest)}. Pobyt "
+                f"skończył się wcześniej, {long_date(event.end)}, dlatego urlop mamy się nie "
+                "zmienia."
+            ),
+            sources=_merge(_guide(f.special.sources), rule),
+        )
     # Nothing passed to the father: the leave had ended, or he is not insured.
     covered = father_coverage(scenario) not in NOT_INSURED
     if event.kind == "death":
         ended = maternity.end < event.start or covered
     elif event.kind == "abandonment":
-        ended = event.start >= maternity.end
+        ended = not _abandoned(maternity)
     else:
         ended = event.start > maternity.end
-    sorry = "Bardzo nam przykro. " if event.kind == "death" else ""
     if ended:
         verb = "kończy się" if maternity.end >= timeline.today else "skończył się"
         return CaseNote(
@@ -1054,6 +1124,15 @@ def _mother_event(
             sources=_merge(_guide(f.special.sources), rule),
         )
     b = params.benefit
+    family = (
+        "tata albo inny członek najbliższej rodziny, który jest pracownikiem. Zasiłek "
+        "macierzyński za ten okres przysługuje też ubezpieczonemu ojcu albo innemu ubezpieczonemu "
+        "członkowi rodziny, który przerwał działalność zarobkową w celu sprawowania osobistej "
+        "opieki nad dzieckiem."
+    )
+    no_insurance = (
+        "Tata nie podlega jednak ubezpieczeniu chorobowemu, a bez niego zasiłek nie przysługuje"
+    )
     if event.kind == "death":
         return CaseNote(
             id="mother-event",
@@ -1061,27 +1140,124 @@ def _mother_event(
             title="Urlop macierzyński mamy",
             text=(
                 f"Bardzo nam przykro. Urlop macierzyński mamy trwał do "
-                f"{long_date(maternity.end)}. Pozostałą część może przejąć tata albo inny członek "
-                "najbliższej rodziny, jeśli jest pracownikiem. Tata nie podlega ubezpieczeniu "
-                "chorobowemu, a bez niego zasiłek nie przysługuje."
+                f"{long_date(maternity.end)}. Pozostałą część urlopu może wykorzystać {family} "
+                f"{no_insurance}."
             ),
-            sources=_merge(rule, b.without_insurance.sources),
+            sources=_merge(rule, f.interrupted_work_death.sources, b.without_insurance.sources),
         )
-    situation = {
-        "incapacity": "Mama ma orzeczenie o niezdolności do samodzielnej egzystencji.",
-        "hospital": "Mama przebywa w szpitalu.",
-        "abandonment": "Mama porzuciła dziecko.",
+    if event.kind == "abandonment":
+        return CaseNote(
+            id="mother-event",
+            kind="right",
+            title="Mamie nie przysługuje dalsza część urlopu",
+            text=(
+                f"Mama porzuciła dziecko {long_date(event.start)}. Część urlopu macierzyńskiego "
+                "przypadająca po dniu porzucenia dziecka jej nie przysługuje, ale urlop po "
+                f"porodzie nie może wynosić mniej niż {after} tygodni, więc trwa do "
+                f"{long_date(maternity.end)}. Dalszą część mógłby wykorzystać tata, ale nie "
+                "podlega ubezpieczeniu chorobowemu, a bez niego zasiłek nie przysługuje."
+            ),
+            sources=_merge(
+                f.abandonment_mother_loses.sources,
+                _guide(f.special.sources),
+                rule,
+                b.without_insurance.sources,
+            ),
+        )
+    situation, part, benefit = {
+        "incapacity": (
+            "Mama ma orzeczenie o niezdolności do samodzielnej egzystencji.",
+            "Pozostałą część urlopu macierzyńskiego",
+            f.interrupted_work_incapacity,
+        ),
+        "hospital": (
+            "Mama przebywa w szpitalu.",
+            "Część urlopu macierzyńskiego odpowiadającą okresowi pobytu mamy w szpitalu",
+            f.interrupted_work_hospital,
+        ),
     }[event.kind]
     return CaseNote(
         id="mother-event",
         kind="right",
         title="Przejęcie urlopu wymaga ubezpieczenia chorobowego taty",
         text=(
-            f"{situation} Dalszą część urlopu macierzyńskiego mógłby wtedy wykorzystać tata albo "
-            "inny członek najbliższej rodziny. Tata nie podlega jednak ubezpieczeniu "
-            "chorobowemu, a bez niego zasiłek nie przysługuje, dlatego urlop mamy się nie zmienia."
+            f"{situation} {part} mógłby wtedy wykorzystać tata albo inny członek najbliższej "
+            "rodziny. Tata nie podlega jednak ubezpieczeniu chorobowemu, a bez niego zasiłek nie "
+            "przysługuje, dlatego urlop mamy się nie zmienia."
         ),
         sources=_merge(_guide(f.special.sources), rule, b.without_insurance.sources),
+    )
+
+
+UNINSURED_SITUATION = {
+    "death": "Mama nie podlegała ubezpieczeniu chorobowemu, ale",
+    "abandonment": "Mama porzuciła dziecko. Nie podlegała ubezpieczeniu chorobowemu, ale",
+    "incapacity": (
+        "Mama ma orzeczenie o niezdolności do samodzielnej egzystencji i nie może sprawować "
+        "osobistej opieki nad dzieckiem. Nie podlega ubezpieczeniu chorobowemu, ale"
+    ),
+}
+
+
+def _uninsured_mother_event(
+    scenario: Scenario, timeline: Timeline, params: Params, cover: Coverage
+) -> CaseNote | None:
+    """Art. 180 § 15, ustawa art. 29 ust. 9: the mother had no sickness insurance and died,
+    abandoned the child, or cannot look after it with a ruling of incapacity."""
+    event = scenario.mother_event
+    assert event is not None
+    if event.kind == "hospital":
+        return None  # not among the cases of art. 180 § 15 (see the assumptions)
+    f = params.father
+    b = params.benefit
+    sorry = "Bardzo nam przykro. " if event.kind == "death" else ""
+    situation = UNINSURED_SITUATION[event.kind]
+    after = UNINSURED_AFTER[event.kind]
+    rule = f.special_uninsured.sources
+    father = _segment(timeline, "maternity-father")
+    if father is not None:
+        interrupted, interrupted_sources = _interrupted_work(scenario, params, cover)
+        return CaseNote(
+            id="mother-event",
+            kind="right",
+            title=f"Urlop macierzyński taty od {long_date(father.start)}",
+            text=(
+                f"{sorry}{situation} tacie przysługuje część urlopu macierzyńskiego przypadająca "
+                f"{after}: od {long_date(father.start)} do {long_date(father.end)} (Kodeks pracy, "
+                f"art. 180 § 15).{interrupted}"
+            ),
+            sources=_merge(_guide(f.benefit.sources), rule, *interrupted_sources),
+        )
+    if father_coverage(scenario) in NOT_INSURED:
+        return CaseNote(
+            id="mother-event",
+            kind="right",
+            title="Urlop macierzyński taty wymaga ubezpieczenia chorobowego",
+            text=(
+                f"{sorry}{situation} część urlopu macierzyńskiego przypadająca {after} "
+                "przysługuje tacie albo innemu członkowi najbliższej rodziny, który jest "
+                "pracownikiem; zasiłek za ten okres — także ubezpieczonemu, który przerwał "
+                "działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem. Tata nie "
+                "podlega jednak ubezpieczeniu chorobowemu, a bez niego zasiłek nie przysługuje."
+            ),
+            sources=_merge(rule, f.special_uninsured_benefit.sources, b.without_insurance.sources),
+        )
+    loss = child_loss(scenario, params, timeline.birth_date, timeline.today)
+    end = uninsured_maternity_end(scenario, params, timeline.birth_date, loss)
+    if end is None:
+        return None
+    verb = "kończy się" if end >= timeline.today else "skończył się"
+    return CaseNote(
+        id="mother-event",
+        kind="right",
+        title="Urlop macierzyński już się skończył"
+        if end < timeline.today
+        else "Urlop macierzyński kończy się wcześniej",
+        text=(
+            f"{sorry}Urlop macierzyński, liczony od dnia porodu, {verb} {long_date(end)}, więc "
+            f"nie zostaje jego część przypadająca {after}, którą mógłby wykorzystać tata."
+        ),
+        sources=_merge(rule, params.maternity.weeks_by_children.sources),
     )
 
 
@@ -1097,6 +1273,7 @@ def _takeover(
     weeks = f.takeover_after_weeks.value
     sources = [f.takeover_after_weeks.sources, f.takeover_starts_after.sources]
     father = _segment(timeline, "maternity-father")
+    interrupted, interrupted_sources = _interrupted_work(scenario, params, cover)
     if father is not None:
         return CaseNote(
             id="takeover",
@@ -1107,8 +1284,9 @@ def _takeover(
                 f"{long_date(maternity.end)}. Dalszą część, od {long_date(father.start)} do "
                 f"{long_date(father.end)}, przejmuje tata: jego urlop zaczyna się bezpośrednio "
                 "po zakończeniu urlopu mamy. Łączny wymiar urlopu macierzyńskiego się nie zmienia."
+                + interrupted
             ),
-            sources=_merge(*sources, f.total_cap.sources),
+            sources=_merge(*sources, f.total_cap.sources, *interrupted_sources),
         )
     personal = _marker(timeline, "personal-weeks")
     if personal is None or maternity.end <= personal.date:
@@ -1136,9 +1314,9 @@ def _takeover(
             f"Po wykorzystaniu przez mamę co najmniej {weeks} tygodni urlopu macierzyńskiego po "
             "porodzie tata może przejąć jego dalszą część, czyli najwcześniej od "
             f"{long_date(personal.date + DAY)}. Urlop taty zaczyna się bezpośrednio po "
-            "zakończeniu urlopu mamy, a łączny wymiar urlopu się nie zmienia."
+            "zakończeniu urlopu mamy, a łączny wymiar urlopu się nie zmienia." + interrupted
         ),
-        sources=_merge(*sources, f.total_cap.sources),
+        sources=_merge(*sources, f.total_cap.sources, *interrupted_sources),
     )
 
 
@@ -1194,6 +1372,10 @@ def _father(scenario: Scenario, timeline: Timeline, params: Params, cover: Cover
                 "okres urlopu rodzicielskiego przysługuje tacie."
             )
             sources.append(f.parental_uninsured_mother.sources)
+        elif _mother_left(scenario):
+            # Her lane ended (father.py): what is left of the pool is his to use, not shared.
+            parts.append("Urlop rodzicielski może wykorzystać tata.")
+            sources.append(f.parental_together.sources)
         elif _mothers_parental(timeline):
             parts.append(
                 f"Z urlopu rodzicielskiego {exclusive} tyg. należy wyłącznie do taty: nie można "

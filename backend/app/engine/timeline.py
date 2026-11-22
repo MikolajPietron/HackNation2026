@@ -913,12 +913,27 @@ def _father_assumptions(
     event = scenario.mother_event
     if event is None:
         return assumptions
+    weeks = params.father.special_after_weeks.value
     if not mother:
-        assumptions.append(
-            "Gdy mama nie była ubezpieczona, oś nie uwzględnia sytuacji szczególnych z części B "
-            "Przewodnika: dotyczą one przejęcia urlopu macierzyńskiego mamy, a przepisów o innych "
-            "przypadkach nie ma w naszych materiałach."
-        )
+        if event.kind == "hospital":
+            assumptions.append(
+                "Gdy mama nie była ubezpieczona, jej pobyt w szpitalu nie zmienia osi: Kodeks "
+                "pracy daje wtedy tacie część urlopu macierzyńskiego po śmierci mamy, po "
+                "porzuceniu przez nią dziecka albo przy jej orzeczeniu o niezdolności do "
+                "samodzielnej egzystencji (art. 180 § 15), a nie przy pobycie w szpitalu."
+            )
+        elif "maternity-father" in shown:
+            assumptions.append(
+                "Mama nie była ubezpieczona, więc nie miała urlopu macierzyńskiego: część "
+                "przypadającą tacie liczymy z wymiaru urlopu macierzyńskiego od dnia porodu, bez "
+                f"czekania {weeks} tygodni (art. 180 § 15 nie stawia takiego warunku)."
+                + (
+                    " Przy orzeczeniu o niezdolności do samodzielnej egzystencji podana data to "
+                    "dzień powstania niezdolności: urlop taty zaczyna się następnego dnia."
+                    if event.kind == "incapacity"
+                    else ""
+                )
+            )
         return assumptions
     if not child_lives:
         assumptions.append(
@@ -926,26 +941,31 @@ def _father_assumptions(
             "Przewodnika: dotyczą one opieki nad dzieckiem."
         )
         return assumptions
-    if "maternity-father" in shown and event.kind != "death":
+    cut = any(
+        s.id == "maternity" and any(src.article == "art. 182" for src in s.sources)
+        for s in draft.segments
+    )
+    if event.kind != "death" and ("maternity-father" in shown or cut):
         assumptions.append(
-            f"{params.father.special_after_weeks.value} tygodni urlopu po porodzie liczymy jako "
-            f"{params.father.special_after_weeks.value * 7} dni, licząc dzień porodu jako "
-            "pierwszy."
+            f"{weeks} tygodni urlopu po porodzie liczymy jako {weeks * 7} dni, licząc dzień "
+            "porodu jako pierwszy."
         )
     if "maternity-father" in shown and event.kind == "hospital":
         assumptions.append(
             "Pobyt mamy w szpitalu liczymy od dnia przyjęcia do dnia wypisu: tata przejmuje urlop "
-            "od dnia przyjęcia, a mama wraca na urlop dzień po wypisie."
+            f"od dnia przyjęcia (nie wcześniej niż po {weeks} tygodniach urlopu mamy po porodzie), "
+            "a mama wraca na urlop dzień po wypisie."
         )
-    if scenario.children_count is not None and (
-        event.kind == "death" or (event.kind == "abandonment" and father not in NOT_INSURED)
-    ):
+    if scenario.children_count is not None and event.kind in ("death", "abandonment"):
         what = "śmierci mamy" if event.kind == "death" else "porzuceniu dziecka przez mamę"
         assumptions.append(
             f"Po {what} oś nie pokazuje dalszych urlopów mamy."
             + (
-                " Uzupełniający urlop macierzyński, jeśli przysługuje, pokazujemy u taty. Jak "
-                "w tej sytuacji dzieli się urlop rodzicielski, materiały nie mówią wprost."
+                " Uzupełniający urlop macierzyński, jeśli przysługuje, pokazujemy u taty. Urlop "
+                "rodzicielski taty to reszta łącznego wymiaru po odjęciu dni, które wykorzystała "
+                f"mama, ale co najmniej jej {params.parental.exclusive_weeks.value} tygodni, "
+                "których nie można przenieść na drugiego z rodziców (art. 182¹ᵃ § 4). Materiały "
+                "nie mówią tego wprost."
                 if father not in NOT_INSURED
                 else ""
             )

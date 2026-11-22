@@ -548,9 +548,12 @@ def _employee_mother(
         )
     documents += _plan_part_requests(scenario, timeline, params, today, "mother")
     his = _segment(timeline, "maternity-father")
+    event = scenario.mother_event
+    # Art. 180 § 8: the mother resigns from the rest when the father takes over after 14 weeks
+    # (§ 4) or with her ruling of incapacity (§ 6).
+    incapacity = event is not None and event.kind == "incapacity"
     if (
-        scenario.father_takes_over
-        and scenario.mother_event is None
+        ((scenario.father_takes_over and event is None) or incapacity)
         and his is not None
         and maternity is not None
         and maternity.end + DAY >= today
@@ -558,11 +561,10 @@ def _employee_mother(
         back = maternity.end + DAY
         r = a.resignation_days_before.value
         deadline = back - r * DAY
-        needed_by, when = _by(
-            deadline, r, f"przed powrotem do pracy ({fmt(back)})", today, movable=False
-        )
+        before = "przystąpieniem do pracy" if incapacity else "powrotem do pracy"
+        needed_by, when = _by(deadline, r, f"przed {before} ({fmt(back)})", today, movable=False)
         rule = [f"Mama składa go pracodawcy, gdy dalszą część urlopu przejmuje tata. {when}"]
-        if (scenario.mother_weeks_before_takeover or 14) == 14:
+        if not incapacity and (scenario.mother_weeks_before_takeover or 14) == 14:
             rule.append("Może też od razu wnioskować tylko o 14 tygodni urlopu.")
         documents.append(
             Document(
@@ -575,7 +577,9 @@ def _employee_mother(
                 segment_id="maternity",
                 sources=merge_sources(
                     a.resignation_days_before.sources,
-                    params.father.takeover_starts_after.sources,
+                    params.father.special_incapacity.sources
+                    if incapacity
+                    else params.father.takeover_starts_after.sources,
                 ),
                 deadline=deadline,
             )
@@ -733,7 +737,8 @@ def _employee_father(
     if his is not None and his.end >= today:
         event = scenario.mother_event
         deadline: dt.date | None = None
-        if event is None or event.kind == "incapacity":
+        uninsured = coverage(scenario) in NOT_INSURED  # art. 180 § 15: on request, § 16
+        if not uninsured and (event is None or event.kind == "incapacity"):
             # Art. 180 § 9: taking over after 14 weeks (§ 4-5) or the mother's incapacity (§ 6-7).
             days = a.father_maternity_days_before.value
             deadline = his.start - days * DAY
@@ -746,7 +751,8 @@ def _employee_father(
             )
             sources = a.father_maternity_days_before.sources
         else:
-            # Art. 180 § 16: the mother in hospital, dead or gone; no deadline.
+            # Art. 180 § 16: the mother in hospital, dead or gone, or (§ 15) a mother without
+            # sickness insurance; no deadline.
             needed_by = his.start
             when = (
                 f"Jego część urlopu zaczyna się {fmt(his.start)}; Kodeks pracy nie podaje w tej "
@@ -1046,7 +1052,9 @@ def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> M
         return None
     chain = [leave[0]]
     for segment in leave[1:]:
-        if segment.start == chain[-1].end + DAY:
+        # The rest of maternity leave after the mother's stay in hospital is maternity leave too
+        # (art. 177 § 1), even with the father's part in between.
+        if segment.start == chain[-1].end + DAY or segment.id == "maternity-resumed":
             chain.append(segment)
     end = chain[-1].end
     if end < timeline.today:

@@ -1168,10 +1168,37 @@ def test_incapacity_after_fourteen_weeks_keeps_their_marker() -> None:
     assert span(t, "maternity-father") == (dt.date(2027, 1, 10), WHOLE, 39)
 
 
-def test_special_situations_need_eight_weeks_first() -> None:
-    for kind in ("incapacity", "hospital"):
-        with pytest.raises(ScenarioError, match="najwcześniej 26.11.2026"):
-            event(kind, "2026-11-25")
+def test_special_situations_before_eight_weeks_start_after_them() -> None:
+    """Art. 180 § 6, § 10: only after 8 weeks of leave after the birth. In hospital
+    10.11-10.12.2026: the mother until 25.11.2026 (56 days), the father 26.11-10.12.2026 (5 + 10
+    = 15 days), the mother back 11.12.2026-17.02.2027 (21 + 31 + 17 = 69 days). A ruling from
+    10.11.2026: the father 26.11.2026-17.02.2027 (5 + 31 + 31 + 17 = 84 days)."""
+    hospital = event("hospital", "2026-11-10", "2026-12-10")
+    assert span(hospital, "maternity") == (EVENT_BIRTH, dt.date(2026, 11, 25), 56)
+    assert span(hospital, "maternity-father") == (
+        dt.date(2026, 11, 26),
+        dt.date(2026, 12, 10),
+        15,
+    )
+    assert span(hospital, "maternity-resumed") == (dt.date(2026, 12, 11), WHOLE, 69)
+    waits = "dlatego urlop taty zaczyna się 26.11.2026"
+    assert any(waits in d for d in segment(hospital, "maternity-father").details)
+    assert any("nie wcześniej niż po 8 tygodniach" in a for a in hospital.assumptions)
+    incapacity = event("incapacity", "2026-11-10")
+    assert span(incapacity, "maternity")[1] == dt.date(2026, 11, 25)
+    assert span(incapacity, "maternity-father") == (dt.date(2026, 11, 26), WHOLE, 84)
+    assert any(waits in d for d in segment(incapacity, "maternity-father").details)
+
+
+def test_a_hospital_stay_over_before_eight_weeks_changes_nothing() -> None:
+    """In hospital 10.10-20.11.2026: over before 26.11.2026, the first day after 8 weeks."""
+    t = event("hospital", "2026-10-10", "2026-11-20")
+    assert "maternity-father" not in ids(t)
+    assert span(t, "maternity")[1] == WHOLE
+    told = note(t, "mother-event")
+    assert told.title == "Pobyt w szpitalu przed upływem 8 tygodni"
+    assert "czyli od 26 listopada 2026" in told.text
+    assert "skończył się wcześniej, 20 listopada 2026" in told.text
 
 
 def test_hospital_the_father_takes_the_stay_and_the_mother_comes_back() -> None:
@@ -1260,8 +1287,10 @@ def test_death_of_the_mother_when_the_father_is_not_insured() -> None:
 
 def test_death_of_the_mother_after_her_maternity_leave() -> None:
     """Born 5.01.2026: maternity leave ended on 24.05.2026. Died 1.08.2026, during her parental
-    leave: it ends that day (25.05-1.08, 69 days); the father's 9 weeks from 2.08 end on
-    3.10.2026."""
+    leave: it ends that day (25.05-1.08, 7 + 30 + 31 + 1 = 69 days). The father has the rest of
+    the 41 weeks: 287 - 69 = 218 days, from today (21.11.2026) after his paternity leave
+    21.11-4.12.2026 (the deadline is 4.01.2027): 5.12.2026 + 217 days = 10.07.2027 (27 days of
+    December, then 31 + 28 + 31 + 30 + 31 + 30 + 10)."""
     t = build_timeline(
         Scenario.model_validate(
             {
@@ -1279,7 +1308,15 @@ def test_death_of_the_mother_after_her_maternity_leave() -> None:
     assert span(t, "maternity")[1] == dt.date(2026, 5, 24)
     assert "maternity-father" not in ids(t)
     assert span(t, "parental") == (dt.date(2026, 5, 25), dt.date(2026, 8, 1), 69)
-    assert span(t, "parental-father") == (dt.date(2026, 8, 2), dt.date(2026, 10, 3), 63)
+    assert span(t, "paternity") == (TODAY, dt.date(2026, 12, 4), 14)
+    assert span(t, "parental-father") == (dt.date(2026, 12, 5), dt.date(2027, 7, 10), 218)
+    parental = segment(t, "parental-father")
+    assert parental.summary.startswith("Urlop rodzicielski może wykorzystać tata. Pokazujemy 218")
+    assert "jednocześnie albo naprzemiennie" not in parental.summary
+    assert any("Mama wykorzystała 69 dni urlopu rodzicielskiego" in d for d in parental.details)
+    assert "jednocześnie albo naprzemiennie" not in note(t, "father").text
+    assert "Urlop rodzicielski może wykorzystać tata." in note(t, "father").text
+    assert any("co najmniej jej 9 tygodni" in a for a in t.assumptions)
     told = note(t, "mother-event")
     assert told.title == "Urlop macierzyński już się skończył"
     assert "skończył się 24 maja 2026" in told.text
@@ -1357,14 +1394,7 @@ def test_a_special_situation_overrides_taking_over() -> None:
     assert "takeover" not in notes(t)
 
 
-def test_special_situations_of_an_uninsured_mother_or_without_a_living_child_are_out_of_scope() -> (
-    None
-):
-    uninsured = event("death", "2026-11-15", work="none")
-    assert lane(uninsured, "mother") == []
-    assert lane(uninsured, "father") == ["paternity", "parental-father"]
-    assert "mother-event" not in notes(uninsured)
-    assert any("oś nie uwzględnia sytuacji szczególnych" in a for a in uninsured.assumptions)
+def test_special_situations_without_a_living_child_are_out_of_scope() -> None:
     stillborn = event("hospital", "2026-12-01", losses=[STILLBORN])
     assert ids(stillborn) == ["maternity", "birth", "protection-end", "maternity-request"]
     assert span(stillborn, "maternity")[1] == dt.date(2026, 11, 25)  # 8 weeks, untouched
@@ -1383,3 +1413,253 @@ def test_the_fathers_dates_are_explained() -> None:
         in (explained["computed"])
     )
     assert not any("Uprawnienia taty" in a for a in expecting(children_count=1).assumptions)
+
+
+# Section B after the independent check against the Labour Code (22.11.2026).
+
+
+def test_abandonment_cuts_the_mothers_leave_when_the_father_is_not_insured() -> None:
+    """Art. 182: abandoned on 10.11.2026, before 8 weeks were used: the mother keeps the leave
+    until 25.11.2026 (56 days), not to 17.02.2027, whether or not the father can take the rest.
+    Her later leave goes too."""
+    t = event("abandonment", "2026-11-10", father_work="none")
+    assert span(t, "maternity") == (EVENT_BIRTH, dt.date(2026, 11, 25), 56)
+    assert lane(t, "mother") == ["maternity"]
+    assert lane(t, "father") == []
+    assert "personal-weeks" not in ids(t)
+    assert t.element("protection-end").date == dt.date(2026, 11, 25)  # type: ignore[union-attr]
+    assert any(s.article == "art. 182" for s in segment(t, "maternity").sources)
+    told = note(t, "mother-event")
+    assert told.title == "Mamie nie przysługuje dalsza część urlopu"
+    assert "nie może wynosić mniej niż 8 tygodni, więc trwa do 25 listopada 2026" in told.text
+    assert "nie podlega ubezpieczeniu chorobowemu" in told.text
+    assert any(s.article == "art. 182" for s in told.sources)
+    assert note(t, "computed").text.startswith(
+        "Urlop macierzyński mamy trwa po porodzie do 25 listopada 2026"
+    )
+    assert any("Po porzuceniu dziecka przez mamę oś nie pokazuje" in a for a in t.assumptions)
+    # Abandoned on 20.11.2026, still within the 8 weeks: the leave lasts to 25.11.2026.
+    later = event("abandonment", "2026-11-20", father_work="none")
+    assert span(later, "maternity")[1] == dt.date(2026, 11, 25)
+    # After the 8 weeks the leave ends on the day of abandonment.
+    after_eight = build_timeline(
+        Scenario.model_validate(
+            {
+                **EMPLOYED,
+                "father_work": "none",
+                "child_born": True,
+                "birth_date": "2026-09-01",
+                "children_count": 1,
+                "leave_before_birth_weeks": 0,
+                "mother_event": {"kind": "abandonment", "start": "2026-11-15"},
+            }
+        ),
+        PARAMS,
+        TODAY,
+    )
+    # Born 1.09.2026: 30 + 31 + 15 = 76 days to 15.11.2026.
+    assert span(after_eight, "maternity") == (dt.date(2026, 9, 1), dt.date(2026, 11, 15), 76)
+
+
+def uninsured(kind: str, start: str, **answers: object) -> Timeline:
+    """Born 1.10.2026 to a mother who does not work; the father is an employee."""
+    return build_timeline(
+        Scenario.model_validate(
+            {
+                "role": "father",
+                "work": "employment",
+                "mother_work": "none",
+                "child_born": True,
+                "birth_date": EVENT_BIRTH,
+                "children_count": 1,
+                "mother_event": {"kind": kind, "start": start},
+                **answers,
+            }
+        ),
+        PARAMS,
+        TODAY,
+    )
+
+
+def test_death_of_an_uninsured_mother_gives_the_father_maternity_leave() -> None:
+    """Art. 180 § 15: died 15.10.2026, 20 weeks from the birth end on 17.02.2027, so the father
+    has 16.10.2026-17.02.2027 (16 + 30 + 31 + 31 + 17 = 125 days), with no 8-week minimum. Then
+    his paternity leave 18.02-3.03.2027 and 32 weeks of parental leave from 4.03.2027 (+223 days
+    = 13.10.2027)."""
+    t = uninsured("death", "2026-10-15")
+    assert lane(t, "mother") == []
+    assert lane(t, "father") == ["maternity-father", "paternity", "parental-father"]
+    assert span(t, "maternity-father") == (dt.date(2026, 10, 16), WHOLE, 125)
+    assert span(t, "paternity") == (dt.date(2027, 2, 18), dt.date(2027, 3, 3), 14)
+    assert span(t, "parental-father") == (dt.date(2027, 3, 4), dt.date(2027, 10, 13), 224)
+    his = segment(t, "maternity-father")
+    assert his.summary == (
+        "Mama nie podlegała ubezpieczeniu chorobowemu. Tacie przysługuje część urlopu "
+        "macierzyńskiego przypadająca po dniu śmierci mamy: od 16.10.2026 do 17.02.2027."
+    )
+    assert {s.article for s in his.sources} >= {"art. 180 § 15", "art. 180 § 1"}
+    assert "art. 180 § 14" not in {s.article for s in his.sources}
+    told = note(t, "mother-event")
+    assert told.title == "Urlop macierzyński taty od 16 października 2026"
+    assert told.text.startswith("Bardzo nam przykro. Mama nie podlegała ubezpieczeniu")
+    assert "od 16 października 2026 do 17 lutego 2027 (Kodeks pracy, art. 180 § 15)" in told.text
+    assert note(t, "computed").text.startswith(
+        "Urlop macierzyński taty: od 16 października 2026 do 17 lutego 2027."
+    )
+    assert any("bez czekania 8 tygodni" in a for a in t.assumptions)
+    assert not any("przepisów o innych przypadkach" in a for a in t.assumptions)
+    # His request: art. 180 § 16, no deadline.
+    request = t.element("maternity-father-request")
+    assert request is not None and request.deadline is None  # type: ignore[union-attr]
+
+
+def test_abandonment_or_incapacity_of_an_uninsured_mother() -> None:
+    """The same part after the day she abandoned the child, or after the day her incapacity
+    arose: 16.10.2026-17.02.2027."""
+    gone = uninsured("abandonment", "2026-10-15")
+    assert span(gone, "maternity-father") == (dt.date(2026, 10, 16), WHOLE, 125)
+    assert "po dniu porzucenia przez nią dziecka" in segment(gone, "maternity-father").summary
+    assert not note(gone, "mother-event").text.startswith("Bardzo nam przykro")
+    ill = uninsured("incapacity", "2026-10-15")
+    assert span(ill, "maternity-father") == (dt.date(2026, 10, 16), WHOLE, 125)
+    assert "po dniu powstania jej niezdolności" in segment(ill, "maternity-father").summary
+    assert any("dzień powstania niezdolności" in a for a in ill.assumptions)
+    # Twins: 31 weeks = 217 days from 1.10.2026: 31 + 30 + 31 + 31 + 28 + 31 + 30 + 5, so
+    # they end on 5.05.2027.
+    twins = uninsured("death", "2026-10-15", children_count=2)
+    assert span(twins, "maternity-father")[1] == dt.date(2027, 5, 5)
+
+
+def test_a_stay_in_hospital_of_an_uninsured_mother_is_not_among_the_cases() -> None:
+    t = uninsured("hospital", "2026-10-15")
+    assert lane(t, "father") == ["paternity", "parental-father"]
+    assert "mother-event" not in notes(t)
+    assert any("a nie przy pobycie w szpitalu" in a for a in t.assumptions)
+
+
+def test_nothing_left_after_an_uninsured_mother_dies_late() -> None:
+    """Born 1.03.2026: 20 weeks end on 1.03.2026 + 139 days = 18.07.2026; died 1.09.2026."""
+    t = uninsured("death", "2026-09-01", birth_date="2026-03-01")
+    assert "maternity-father" not in ids(t)
+    told = note(t, "mother-event")
+    assert told.title == "Urlop macierzyński już się skończył"
+    assert "liczony od dnia porodu, skończył się 18 lipca 2026" in told.text
+
+
+def test_an_uninsured_father_after_an_uninsured_mother_died() -> None:
+    t = uninsured("death", "2026-10-15", work="none")
+    assert lane(t, "father") == []
+    told = note(t, "mother-event")
+    assert told.title == "Urlop macierzyński taty wymaga ubezpieczenia chorobowego"
+    assert "przerwał działalność zarobkową" in told.text
+    assert any(s.article == "art. 29 ust. 9" for s in told.sources)
+
+
+@pytest.mark.parametrize(
+    ("answers", "article"),
+    [
+        ({"father_takes_over": True}, "art. 29 ust. 3"),
+        ({"mother_event": {"kind": "incapacity", "start": "2026-12-01"}}, "art. 29 ust. 5"),
+        (
+            {"mother_event": {"kind": "hospital", "start": "2026-12-01", "end": "2026-12-20"}},
+            "art. 29 ust. 6",
+        ),
+        ({"mother_event": {"kind": "death", "start": "2026-11-15"}}, "art. 29 ust. 7"),
+        ({"mother_event": {"kind": "abandonment", "start": "2026-11-10"}}, "art. 29 ust. 7"),
+    ],
+)
+def test_a_father_who_is_not_an_employee_interrupts_his_work(
+    answers: dict[str, object], article: str
+) -> None:
+    """Ustawa art. 29 ust. 3, 5-7: the benefit for the mother's maternity leave goes to the
+    father who interrupted his work to look after the child."""
+    t = build_timeline(
+        Scenario.model_validate(
+            {
+                **EMPLOYED,
+                "father_work": "contract",
+                "father_insured": True,
+                "child_born": True,
+                "birth_date": EVENT_BIRTH,
+                "children_count": 1,
+                "leave_before_birth_weeks": 0,
+                **answers,
+            }
+        ),
+        PARAMS,
+        TODAY,
+    )
+    his = segment(t, "maternity-father")
+    assert any("przerwał działalność zarobkową" in d for d in his.details)
+    assert article in {s.article for s in his.sources}
+    # Only his part of maternity leave: not paternity leave.
+    assert not any("przerwał działalność" in d for d in segment(t, "paternity").details)
+    told = note(t, "takeover" if "father_takes_over" in answers else "mother-event")
+    assert "przerwał działalność zarobkową w celu sprawowania osobistej opieki" in told.text
+    assert article in {s.article for s in told.sources}
+
+
+def test_an_uninsured_mother_and_a_father_who_is_not_an_employee() -> None:
+    t = uninsured("death", "2026-10-15", work="contract", father_insured=True)
+    his = segment(t, "maternity-father")
+    assert any("przerwał działalność zarobkową" in d for d in his.details)
+    assert "art. 29 ust. 9" in {s.article for s in his.sources}
+    assert "przerwał działalność zarobkową" in note(t, "mother-event").text
+
+
+def test_the_offer_to_take_over_says_what_a_father_on_a_contract_needs() -> None:
+    offered = note(
+        born(**EMPLOYED | {"father_work": "contract"}, father_insured=True, children_count=1),
+        "takeover",
+    )
+    assert offered.title == "Tata może przejąć część urlopu macierzyńskiego"
+    assert "przerwał działalność zarobkową" in offered.text
+    assert "przerwał działalność" not in note(born(**EMPLOYED, children_count=1), "takeover").text
+
+
+def test_the_wording_without_the_fathers_insurance() -> None:
+    """Ustawa art. 29 ust. 7: the benefit also for an insured member of the family who
+    interrupted the work; KP art. 180 § 11: the part for the time of the stay in hospital."""
+    died = note(event("death", "2026-11-15", father_work="none"), "mother-event")
+    assert "który jest pracownikiem" in died.text
+    assert "przerwał działalność zarobkową" in died.text
+    assert any(s.article == "art. 29 ust. 7" for s in died.sources)
+    hospital = note(
+        event("hospital", "2026-12-01", "2026-12-20", father_work="contract", father_insured=False),
+        "mother-event",
+    )
+    assert hospital.text.startswith(
+        "Mama przebywa w szpitalu. Część urlopu macierzyńskiego odpowiadającą okresowi pobytu "
+        "mamy w szpitalu mógłby wtedy wykorzystać tata"
+    )
+
+
+def test_the_fathers_parental_option_starts_today_at_the_earliest() -> None:
+    """Born 1.03.2025: maternity leave to 18.07.2025, the mother's parental leave 19.07.2025-
+    27.02.2026. The father's 9 weeks from today, 21.11.2026 + 62 days = 22.01.2027."""
+    t = born(**EMPLOYED, birth_date=dt.date(2025, 3, 1), children_count=1)
+    assert span(t, "parental")[1] == dt.date(2026, 2, 27)
+    assert span(t, "parental-father") == (TODAY, dt.date(2027, 1, 22), 63)
+    # Before the birth: right after the mother's share, as before.
+    assert span(expecting(children_count=1), "parental-father")[0] == dt.date(2028, 3, 13)
+
+
+def test_abandonment_during_parental_leave() -> None:
+    """Born 5.01.2026, abandoned 1.08.2026: as after the death, the father has 287 - 69 = 218
+    days of parental leave, 5.12.2026-10.07.2027."""
+    t = build_timeline(
+        Scenario.model_validate(
+            {
+                **EMPLOYED,
+                "child_born": True,
+                "birth_date": "2026-01-05",
+                "children_count": 1,
+                "leave_before_birth_weeks": 0,
+                "mother_event": {"kind": "abandonment", "start": "2026-08-01"},
+            }
+        ),
+        PARAMS,
+        TODAY,
+    )
+    assert span(t, "parental") == (dt.date(2026, 5, 25), dt.date(2026, 8, 1), 69)
+    assert span(t, "parental-father") == (dt.date(2026, 12, 5), dt.date(2027, 7, 10), 218)

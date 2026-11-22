@@ -1,9 +1,10 @@
 """Request forms (ZADANIA B.3, engine/forms.py): each request on the timeline as a form, its
 fields as the regulations name them, filled in from the scenario and the timeline.
 
-Sources: the regulation of 11 March 2025 on the leave requests (rozp_wnioski: § 2, § 3, § 5,
-§ 7, § 14, § 15, § 16, § 17, § 22), the regulation of 27 September 2026 on the benefit documents
-(rozp_zasilki: § 2, § 12, § 13, § 32, § 33, annexes 1 and 6), the guide (A.4, page 12).
+Sources: the regulation of 11 March 2025 on the leave requests (rozp_wnioski: § 2, § 3, § 4,
+§ 5, § 7, § 10-§ 12, § 14, § 15, § 16, § 17, § 22), the regulation of 27 September 2026 on the
+benefit documents (rozp_zasilki: § 2, § 12, § 13, § 20, § 22, § 32, § 33, annexes 1 and 6), the
+guide (A.4, page 12).
 
 Expected dates were computed by hand, today being 21.11.2026:
 - due 15.03.2027, leave 2 weeks before: from 01.03.2027; maternity leave until 18.07.2027; the
@@ -16,6 +17,11 @@ Expected dates were computed by hand, today being 21.11.2026:
   18.02-10.03.2027 (3 weeks);
 - born 01.10.2026, the mother (on a contract) in hospital 01.12-20.12.2026, after 8 weeks
   (26.11.2026): the father's part of maternity leave from 01.12.2026;
+- born 01.10.2026, the mother's ruling of incapacity, the father from 01.12.2026: her
+  resignation at least 7 days before she goes back, by 24.11.2026;
+- born 01.10.2026 to a mother without sickness insurance who died (abandoned the child, has a
+  ruling) on 15.10.2026: the father's part from the day after, 16.10.2026, to the end of 20
+  weeks from the birth, 17.02.2027 (+139 days);
 - a business insured from 01.10.2026, sick from 01.11.2026: the right after 90 days, from
   30.12.2026; the benefit until the day before the due date, 14.03.2027 (2 + 31 + 28 + 14 = 75
   days);
@@ -315,6 +321,112 @@ def test_zam_of_the_father_whose_partner_does_not_work() -> None:
         "§ 32 ust. 1",
         "§ 33 ust. 1",
     }
+
+
+def test_the_mother_with_a_ruling_of_incapacity_resigns() -> None:
+    """§ 4 (art. 180 § 6, § 8): her return to work, the copy of the father's request and a copy
+    of her ruling. Born 01.10.2026, the father from 01.12.2026."""
+    t = timeline(
+        **PARENTS,
+        child_born=True,
+        birth_date="2026-10-01",
+        leave_before_birth_weeks=0,
+        children_count=1,
+        mother_event={"kind": "incapacity", "start": "2026-12-01"},
+    )
+    resignation = form(t, "maternity-resignation")
+    assert articles(resignation) == ["§ 4 ust. 1"]
+    assert values(resignation) == {"employee-name": None, "return-date": "01.12.2026"}
+    assert attachments(resignation) == [
+        ("father-request-copy", True),
+        ("incapacity-ruling-copy", True),
+    ]
+    assert {s.article for a in resignation.attachments for s in a.sources} == {"§ 4 ust. 2"}
+    assert document(t, "maternity-resignation").deadline == dt.date(2026, 11, 24)
+
+
+UNINSURED_MOTHER = {
+    "role": "father",
+    "mother_work": "none",
+    "child_born": True,
+    "birth_date": "2026-10-01",
+    "children_count": 1,
+}
+
+
+def test_the_father_after_the_death_of_an_uninsured_mother() -> None:
+    """§ 10 (art. 180 § 15-16): the day of her death and the first day of his part (the day
+    after, 16.10.2026); the birth certificate. No deadline."""
+    t = timeline(
+        **UNINSURED_MOTHER, work="employment", mother_event={"kind": "death", "start": "2026-10-15"}
+    )
+    assert document(t, "maternity-father-request").deadline is None
+    his = form(t, "maternity-father-request")
+    assert articles(his) == ["§ 10 ust. 1"]
+    assert values(his) == {
+        "father-name": None,
+        "event-date": "15.10.2026",
+        "leave-from": "16.10.2026",
+    }
+    assert attachments(his) == [("birth-certificate", True)]
+    assert (his.start, his.end) == (dt.date(2026, 10, 16), dt.date(2027, 2, 17))
+
+
+def test_the_father_after_an_uninsured_mother_abandoned_the_child_or_has_a_ruling() -> None:
+    """§ 11 (abandonment): the day she abandoned the child; § 12 (incapacity): only the first
+    day of his part, with a copy of the ruling."""
+    gone = form(
+        timeline(
+            **UNINSURED_MOTHER,
+            work="employment",
+            mother_event={"kind": "abandonment", "start": "2026-10-15"},
+        ),
+        "maternity-father-request",
+    )
+    assert articles(gone) == ["§ 11 ust. 1"]
+    assert values(gone)["event-date"] == "15.10.2026"
+    ill = form(
+        timeline(
+            **UNINSURED_MOTHER,
+            work="employment",
+            mother_event={"kind": "incapacity", "start": "2026-10-15"},
+        ),
+        "maternity-father-request",
+    )
+    assert articles(ill) == ["§ 12 ust. 1"]
+    assert values(ill) == {"father-name": None, "leave-from": "16.10.2026"}
+    assert attachments(ill) == [("birth-certificate", True), ("incapacity-ruling-copy", True)]
+
+
+def test_zam_of_the_father_after_an_uninsured_mother() -> None:
+    """Rozp_zasilki § 20 ust. 4 (death, abandonment): his statement on the day she died; § 22
+    ust. 2 (incapacity): the ruling. Not the certificate of her benefit: she had none."""
+    died = form(
+        timeline(
+            **UNINSURED_MOTHER,
+            work="contract",
+            father_insured=True,
+            mother_event={"kind": "death", "start": "2026-10-15"},
+        ),
+        "father-benefit-request",
+    )
+    ids = [a for a, _ in attachments(died)]
+    assert "mother-uninsured-event-statement" in ids
+    assert "mother-benefit-certificate" not in ids
+    statement = next(a for a in died.attachments if a.id == "mother-uninsured-event-statement")
+    assert {s.article for s in statement.sources} == {"§ 20 ust. 4"}
+    ill = form(
+        timeline(
+            **UNINSURED_MOTHER,
+            work="business",
+            father_insured=True,
+            mother_event={"kind": "incapacity", "start": "2026-10-15"},
+        ),
+        "father-benefit-request",
+    )
+    ruling = next(a for a in ill.attachments if a.id == "incapacity-ruling-uninsured")
+    assert {s.article for s in ruling.sources} == {"§ 22 ust. 2"}
+    assert "mother-benefit-certificate" not in [a for a, _ in attachments(ill)]
 
 
 def test_zas53_with_her_own_business() -> None:

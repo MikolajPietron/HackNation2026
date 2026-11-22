@@ -2,9 +2,9 @@
 as the letter an employee writes, with an e-mail to HR; ZUS forms (ZAM, ZAS-53) say where the
 guide puts them.
 
-Sources: the regulation of 11 March 2025 on the leave requests (rozp_wnioski: § 2, § 3, § 5-§ 9,
-§ 14-§ 17), the Labour Code provisions the letters cite (art. 180, 180¹, 180², 182¹ᵃ, 182¹ᵉ,
-182¹ᶠ, 182³, 183¹), the guide (A.4; page 12: the ZUS forms on www.zus.pl).
+Sources: the regulation of 11 March 2025 on the leave requests (rozp_wnioski: § 2, § 3, § 4,
+§ 5-§ 12, § 14-§ 17), the Labour Code provisions the letters cite (art. 180, 180¹, 180², 182¹ᵃ,
+182¹ᵉ, 182¹ᶠ, 182³, 183¹), the guide (A.4; page 12: the ZUS forms on www.zus.pl).
 
 Expected dates were computed by hand, today being 21.11.2026:
 - due 15.03.2027, leave 2 weeks before: from 15.03.2027 - 14 days = 01.03.2027; paternity leave
@@ -367,6 +367,72 @@ def test_the_father_after_the_mother_abandoned_the_child() -> None:
         statements(found)[0]
         == "Oświadczam, że matka dziecka porzuciła dziecko w dniu 15.11.2026 r."
     )
+
+
+def test_the_mothers_resignation_with_a_ruling_of_incapacity() -> None:
+    """§ 4: the same as § 3, under art. 180 § 6, with a copy of her ruling. Born 01.10.2026, the
+    father from 01.12.2026 after 61 days of her leave (8 weeks and 5 days)."""
+    t = timeline(
+        **PARENTS,
+        child_born=True,
+        birth_date="2026-10-01",
+        leave_before_birth_weeks=0,
+        children_count=1,
+        mother_event={"kind": "incapacity", "start": "2026-12-01"},
+    )
+    found = letter(t, "maternity-resignation")
+    assert operative(found) == (
+        "Na podstawie art. 180 § 6 Kodeksu pracy, legitymując się orzeczeniem o niezdolności "
+        "do samodzielnej egzystencji, rezygnuję z pozostałej części urlopu macierzyńskiego po "
+        "wykorzystaniu po porodzie 8 tygodni i 5 dni tego urlopu i wnoszę o umożliwienie mi "
+        "powrotu do pracy od dnia 01.12.2026 r."
+    )
+    assert found.attachments == [
+        "Kopia wniosku ojca dziecka o udzielenie pozostałej części urlopu macierzyńskiego",
+        "Kopia prawomocnego orzeczenia o mojej niezdolności do samodzielnej egzystencji",
+    ]
+    assert found.legal_basis == (
+        f"Podstawa prawna: art. 180 § 6, art. 180 § 8 Kodeksu pracy; § 4 {REGULATION}"
+    )
+
+
+def test_the_father_after_an_uninsured_mother() -> None:
+    """§ 10-§ 12 (art. 180 § 15): born 01.10.2026, the mother without sickness insurance died
+    on 15.10.2026: his part 16.10.2026-17.02.2027 = 16 + 30 + 31 + 31 + 17 = 125 days = 17
+    weeks and 6 days."""
+    uninsured = {
+        "role": "father",
+        "work": "employment",
+        "mother_work": "none",
+        "child_born": True,
+        "birth_date": "2026-10-01",
+        "children_count": 1,
+    }
+    died = letter(
+        timeline(**uninsured, mother_event={"kind": "death", "start": "2026-10-15"}),
+        "maternity-father-request",
+    )
+    assert operative(died) == (
+        "Na podstawie art. 180 § 15 Kodeksu pracy wnoszę o udzielenie mi części urlopu "
+        "macierzyńskiego w wymiarze 17 tygodni i 6 dni, w okresie od 16.10.2026 r. do "
+        "17.02.2027 r., w związku ze zgonem matki dziecka nieobjętej ubezpieczeniem społecznym "
+        "w razie choroby i macierzyństwa. Wniosek dotyczy dziecka {{child-name}}, urodzonego "
+        "w dniu 01.10.2026 r."
+    )
+    assert statements(died) == ["Oświadczam, że matka dziecka zmarła w dniu 15.10.2026 r."]
+    assert died.legal_basis == (
+        f"Podstawa prawna: art. 180 § 15, art. 180 § 16 Kodeksu pracy; § 10 {REGULATION}"
+    )
+    ill = letter(
+        timeline(**uninsured, mother_event={"kind": "incapacity", "start": "2026-10-15"}),
+        "maternity-father-request",
+    )
+    assert "przez matkę dziecka nieobjętą ubezpieczeniem społecznym" in operative(ill)
+    assert statements(ill) == []
+    assert ill.attachments == [
+        "Odpis skrócony aktu urodzenia dziecka",
+        "Kopia prawomocnego orzeczenia o niezdolności matki dziecka do samodzielnej egzystencji",
+    ]
 
 
 def test_supplementary_leave() -> None:

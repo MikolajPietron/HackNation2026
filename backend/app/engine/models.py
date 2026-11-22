@@ -58,7 +58,8 @@ class MotherEvent(BaseModel):
 
     kind: MotherEventKind
     start: dt.date
-    """Incapacity: the day the father takes over; hospital: the first day in hospital; death,
+    """Incapacity: the day the father takes over (when the mother had no sickness insurance:
+    the day her incapacity arose, art. 180 § 15); hospital: the first day in hospital; death,
     abandonment: the day it happened."""
     end: dt.date | None = None
     """Hospital only: the last day in hospital; None = still there."""
