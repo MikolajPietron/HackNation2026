@@ -8,9 +8,12 @@ import type {
   OnboardingAnswers,
   ParamPreview,
   ParamValues,
+  PlanGoal,
+  PlansResult,
   Scenario,
   SessionStart,
   SessionView,
+  StressReport,
 } from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
@@ -170,4 +173,24 @@ export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
   requestJson<SessionStart>(`/api/cases/session/${sessionId}`, {
     method: 'PUT',
     body: JSON.stringify({ scenario }),
+  })
+
+// ---------------------------------------------------------------------------------------------
+// F8 plans for a goal and F11 the stress test (no AI). A chosen plan's `patch` goes to
+// PATCH /api/session/{id}/scenario.
+
+/** 2-3 plans for the goal, ranked and compared by the engine. */
+export const proposePlans = (scenario: Scenario, goal: PlanGoal, signal?: AbortSignal) =>
+  requestJson<PlansResult>('/api/plans', {
+    method: 'POST',
+    body: JSON.stringify({ scenario, goal }),
+    signal,
+  })
+
+/** What every event that can still happen would change; `timelines` adds both timelines. */
+export const stressTest = (scenario: Scenario, timelines = false, signal?: AbortSignal) =>
+  requestJson<StressReport>('/api/stress', {
+    method: 'POST',
+    body: JSON.stringify({ scenario, timelines }),
+    signal,
   })

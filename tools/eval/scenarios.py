@@ -34,6 +34,8 @@ Step fields:
   require / forbid   regexes the reply must / must not match
   not_repeat         dates of unchanged elements the reply should not repeat (soft)
   question           key of the next interview question after the step (None = finished)
+  extra_dates        dates off the timeline the reply may state, computed by hand: what the
+                     read-only tools return (plans for a goal, the stress test)
   sensitive          no "!", words of sympathy, no congratulations
   out_of_scope       the reply says the app does not cover it yet
 """
@@ -978,6 +980,88 @@ SCENARIOS = [
                 "no_tools": ["set_due_date", "set_birth_date", "set_hospital_care"],
                 "question": "leave-before-birth",
                 "forbid": [r"[Kk]iedy (jest|będzie) przewidywany poród", r"[Kk]iedy urodziło się"],
+            },
+        ],
+    },
+    {
+        # ZADANIA B.8, F8: plans for a goal come from the engine; the model shows the options and
+        # leaves the choice to the parents. Hand-computed (tests/test_plans.py): bases 8000 ×
+        # 0,8629 = 6903,20 and 6000 × 0,8629 = 5177,40; the whole pool, the mother 32 weeks
+        # 30.03-08.11.2027, the father 9 weeks 09.11.2027-10.01.2028. 100% and 70%: 140 × 230,11
+        # + 224 × 161,07 + 14 × 172,58 + 63 × 120,81 = 78 322,23 zł; 81,5% (request by
+        # 10.11.2026 + 21 days = 01.12.2026): 364 × 187,54 + 10 027,15 = 78 291,71 zł.
+        "id": "plans-most-money",
+        "about": "the most money: two plans from the engine (100% and 70% or 81,5%), nothing "
+        "saved until the parents choose (FUNKCJE F8)",
+        "runs": 2,
+        "onboarding": {
+            "role": "mother",
+            "child_born": True,
+            "date": "2026-11-10",
+            "children_count": 1,
+            "work": "employment",
+            "payer_size": "over-20",
+            "pay": 8000,
+            "partner": {"work": "employment", "payer_size": "over-20", "pay": 6000},
+            "hospital_care": False,
+            "leave_before_birth_weeks": 0,
+        },
+        "steps": [
+            {"event": "timeline_ready"},
+            {
+                "say": "Jak podzielić urlop rodzicielski, żebyśmy dostali najwięcej pieniędzy?",
+                "tools": [{"name": "propose_plans", "args": {"goal": "most-money"}}],
+                "no_tools": ["set_parental_plan", "set_rate_choice", "set_father_takeover"],
+                "require": [r"78\s?322,23", r"81,5"],
+                "forbid": [r"polecam|radzę|najlepiej wybierz|powinniście wybrać"],
+                "extra_dates": [
+                    "2026-12-01",
+                    "2027-03-30",
+                    "2027-11-08",
+                    "2027-11-09",
+                    "2028-01-10",
+                ],
+            },
+        ],
+    },
+    {
+        # ZADANIA B.8, F11: the stress test of an expected child (tests/test_stress.py). A birth
+        # 6 weeks early (01.02.2027), 28 days in hospital: 4 weeks of supplementary leave
+        # 21.06-18.07.2027 (KP art. 180² § 1 pkt 2, § 3). The work ending on 18.01.2027 for a
+        # reason the guide does not name: no insurance on the day of the birth, no maternity
+        # benefit (guide p. 3-4, section H).
+        "id": "stress-test-expected",
+        "about": "what if the child comes early or the job ends: the engine's stress test, no "
+        "change saved (FUNKCJE F11)",
+        "runs": 2,
+        "onboarding": {
+            **MOTHER_EXPECTED,
+            "payer_size": "over-20",
+            "pay": 8000,
+            "partner": {"work": "employment", "payer_size": "over-20", "pay": 6000},
+        },
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Co się stanie z naszym planem, jeśli coś pójdzie nie tak, np. dziecko "
+                "urodzi się wcześniej albo stracę pracę?",
+                "tools": [{"name": "stress_test"}],
+                "no_tools": ["set_birth_date", "set_hospital_care", "set_job_loss"],
+                "require": [r"uzupełniając", r"ubezpiecz"],
+                "forbid": [r"!"],
+                "question": "leave-before-birth",
+                "extra_dates": [
+                    "2027-01-18",
+                    "2027-01-19",
+                    "2027-02-01",
+                    "2027-02-28",
+                    "2027-03-14",
+                    "2027-05-10",
+                    "2027-06-20",
+                    "2027-06-21",
+                    "2027-07-18",
+                    "2027-07-19",
+                ],
             },
         ],
     },

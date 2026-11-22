@@ -681,3 +681,193 @@ export interface CaseResult {
   notes: string[]
   problem: string | null
 }
+
+// ---------------------------------------------------------------------------------------------
+// F8 plans for a goal and F11 the stress test (backend/app/engine/plans.py, stress.py,
+// compare.py; POST /api/plans and POST /api/stress). Deterministic, no AI.
+
+export type PlanGoal = 'most-money' | 'longest-home' | 'equal-split' | 'quick-return'
+
+/** The Scenario fields a plan sets; send them as they are to PATCH /api/session/{id}/scenario. */
+export type PlanPatch = Pick<
+  Scenario,
+  'parental_parts' | 'rate_815' | 'father_takes_over' | 'mother_weeks_before_takeover'
+>
+
+/**
+ * One parent's leave in a plan: maternity, supplementary and paternity leave as drawn, parental
+ * leave only where the plan decides it (a share still "do wyboru" is left out).
+ */
+export interface PlanParentFigures {
+  leave_days: number
+  /** Days of parental leave combined with part-time work. */
+  work_days: number
+  first_day: string | null
+  last_day: string | null
+  /** The first day back at work, also part-time; null = no leave. */
+  back_to_work: string | null
+  /** PLN for the leave counted; null = no amount known for this parent. */
+  total: number | null
+}
+
+export interface PlanFigures {
+  mother: PlanParentFigures
+  father: PlanParentFigures
+  /** Both parents' money; null when no amount is known. */
+  total: number | null
+  amounts_known: boolean
+  /** The child is at home with a parent on leave, without a break from the birth, until then. */
+  home_until: string | null
+  /** Weeks of the parental pool the plan takes, of `pool_total`. */
+  pool_used: number
+  pool_total: number
+  rate_815: boolean | null
+}
+
+export interface Plan {
+  id: string
+  goal: PlanGoal
+  /** 1 = the best for the goal. */
+  rank: number
+  title: string
+  summary: string
+  patch: PlanPatch
+  figures: PlanFigures
+  /** What the family gives up or leaves for later with this plan. */
+  given_up: string[]
+  /** Elements that differ from the current timeline. */
+  changed: string[]
+  /** The family already has this plan. */
+  current: boolean
+  sources: SourceRef[]
+}
+
+export interface PlansResult {
+  goal: PlanGoal
+  plans: Plan[]
+  /** The same figures for the timeline as it is now. */
+  current: PlanFigures | null
+  /** What the comparison assumes and cannot compare. */
+  notes: string[]
+  /** After a child's death or the mother's death: no plans. */
+  sensitive: boolean
+  /** Why there are no plans. */
+  reason: string | null
+}
+
+export type StressEventId =
+  | 'premature'
+  | 'twins'
+  | 'job-loss-bankruptcy'
+  | 'job-loss-liquidation'
+  | 'job-loss-employer-death'
+  | 'job-loss-unlawful'
+  | 'job-loss-other'
+  | 'mother-incapacity'
+  | 'mother-hospital'
+  | 'mother-death'
+  | 'father-takeover'
+  | 'za-zyciem'
+
+/**
+ * loss = an entitlement lost or shortened, or the plan stops fitting; risk = a new risk; kept =
+ * the entitlements stay (possibly moved, longer or new).
+ */
+export type StressVerdict = 'loss' | 'risk' | 'kept'
+
+export type RightKind =
+  | 'maternity'
+  | 'supplementary'
+  | 'paternity'
+  | 'parental'
+  | 'job-loss'
+  | 'sick'
+
+/** An entitlement gained (days_before 0), lost (days_after 0), longer or shorter: both lanes. */
+export interface RightChange {
+  kind: RightKind
+  label: string
+  days_before: number
+  days_after: number
+}
+
+export interface PeriodChange {
+  id: string
+  element: 'segment' | 'marker'
+  lane: Lane
+  title: string
+  change: 'added' | 'removed' | 'moved'
+  start_before: string | null
+  /** null for a marker (its day is `start_before`). */
+  end_before: string | null
+  start_after: string | null
+  end_after: string | null
+}
+
+export interface PaymentChange {
+  id: string
+  title: string
+  lane: 'mother' | 'father'
+  monthly_before: number | null
+  monthly_after: number | null
+  total_before: number | null
+  total_after: number | null
+}
+
+/** All the money on the timeline before and after, PLN. */
+export interface MoneyChange {
+  total_before: number
+  total_after: number
+  diff: number
+  mother_before: number
+  mother_after: number
+  father_before: number
+  father_after: number
+  payments: PaymentChange[]
+}
+
+export interface StressEvent {
+  id: StressEventId
+  title: string
+  /** The synthetic facts of the what-if (dates, weeks, weight). */
+  assumed: string[]
+  /** The Scenario fields the event changes (for a preview only, never to save). */
+  patch: Partial<Scenario>
+  /** "Today" of the event's timeline; the reference is computed for the real today. */
+  as_of: string
+  verdict: StressVerdict
+  /** The mother's illness, stay in hospital or death: show gently (e.g. collapsed). */
+  sensitive: boolean
+  /** The parents' plan of parental leave no longer fits: the engine's reason. */
+  plan_breaks: string | null
+  rights: RightChange[]
+  periods: PeriodChange[]
+  /** null when amounts are not known. */
+  money: MoneyChange | null
+  /** New or reworded points of the explanation of kind "risk". */
+  risks: CaseNote[]
+  warnings: string[]
+  changed: string[]
+  changed_notes: string[]
+  /** The changes in plain Polish, one per line. */
+  lines: string[]
+  sources: SourceRef[]
+  /** Both timelines, only with `timelines: true` in the request. */
+  reference: Timeline | null
+  timeline: Timeline | null
+}
+
+export interface SkippedStressEvent {
+  id: StressEventId
+  title: string
+  reason: string
+}
+
+export interface StressReport {
+  events: StressEvent[]
+  skipped: SkippedStressEvent[]
+  /** After a child's death or the mother's death: no what-ifs. */
+  sensitive: boolean
+  /** Why there are no events. */
+  reason: string | null
+}
