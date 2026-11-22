@@ -36,6 +36,7 @@ from app.cases.models import (
 )
 from app.cases.pages import page_count, render_pages
 from app.cases.reader import CaseReader, ModelCaseReader
+from app.cases.report import Report, build_report
 from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -154,6 +155,17 @@ async def _read(
         params=params,
         today=today,
     )
+
+
+@router.get("/report")
+async def report(
+    folder: Folder,
+    cache: Cache,
+    params: Annotated[Params, Depends(get_params)],
+    today: Annotated[dt.date, Depends(get_today)],
+) -> Report:
+    """FUNKCJE F37: the calculator against the decisions of ZUS, for the cases already read."""
+    return await run_in_threadpool(build_report, folder, cache, params, today)
 
 
 @router.post("/{case_id}/read")

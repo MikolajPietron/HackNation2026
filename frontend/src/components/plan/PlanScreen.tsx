@@ -526,9 +526,14 @@ function Footer() {
           </li>
         ))}
       </ul>
-      <a href="/admin" className="font-bold text-navy-500 hover:text-navy-900 lg:ml-auto">
-        Panel administracyjny (demo)
-      </a>
+      <span className="flex gap-4 lg:ml-auto">
+        <a href="/raport" className="font-bold text-navy-500 hover:text-navy-900">
+          Raport zgodności
+        </a>
+        <a href="/admin" className="font-bold text-navy-500 hover:text-navy-900">
+          Panel administracyjny (demo)
+        </a>
+      </span>
     </motion.footer>
   )
 }

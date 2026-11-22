@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
 import { AdminScreen } from '@/components/admin/AdminScreen'
+import { ReportScreen } from '@/components/report/ReportScreen'
 import { Onboarding } from '@/components/onboarding/Onboarding'
 import { PlanScreen } from '@/components/plan/PlanScreen'
 import { useAssistant } from '@/hooks/useAssistant'
@@ -9,11 +10,17 @@ import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
 import { childrenLabel } from '@/lib/ui'
 import type { SessionStart } from '@/types'
 
-/** `/admin` is the parameters panel; everything else is the parents' app. */
+/** `/admin` is the parameters panel, `/raport` the agreement report; the rest is the parents' app. */
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
-      {window.location.pathname.startsWith('/admin') ? <AdminScreen /> : <ParentsApp />}
+      {window.location.pathname.startsWith('/admin') ? (
+        <AdminScreen />
+      ) : window.location.pathname.startsWith('/raport') ? (
+        <ReportScreen />
+      ) : (
+        <ParentsApp />
+      )}
     </MotionConfig>
   )
 }

@@ -10,7 +10,6 @@ prints how often the calculator agrees with the decisions of ZUS (the goal in CL
 
 import argparse
 import asyncio
-import json
 import time
 from collections import Counter
 from pathlib import Path
@@ -18,10 +17,10 @@ from pathlib import Path
 from pydantic_ai.exceptions import ModelRateLimitError
 
 from app.api.cases import get_case_cache, get_cases_folder, get_reader_factory
-from app.cases.assess import assess
 from app.cases.cache import CachedRead, file_digest
 from app.cases.catalog import CaseFile, list_case_files
 from app.cases.pages import render_pages
+from app.cases.report import build_report
 from app.clock import today_in_warsaw
 from app.config import get_settings
 from app.services.params import load_params
@@ -82,55 +81,21 @@ async def main() -> None:
     if not args.only_cached:
         await asyncio.gather(*(read(case) for case in cases))
 
-    params, today = load_params(), today_in_warsaw()
-    rows = []
-    for case in cases:
-        stored = cache.get(file_digest(case.path))
-        if stored is None:
-            rows.append({"id": case.id, "category": case.category, "read": False})
-            continue
-        result = assess(
-            stored.facts,
-            case_id=case.id,
-            pages=stored.pages,
-            pages_read=stored.pages_read,
-            cached=True,
-            params=params,
-            today=today,
-        )
-        rows.append(
-            {
-                "id": case.id,
-                "category": case.category,
-                "read": True,
-                "title": stored.facts.title,
-                "zus": result.comparison.zus,
-                "ours": result.comparison.ours,
-                "match": result.comparison.match,
-                "covered": result.insurance.covered,
-                "timeline": result.timeline is not None,
-                "payments": len(result.timeline.payments) if result.timeline else 0,
-                "problem": result.problem,
-            }
-        )
-
-    read = [row for row in rows if row["read"]]
-    decided = [row for row in read if row["match"] is not None]
-    agree = sum(1 for row in decided if row["match"])
+    report = build_report(get_cases_folder(settings), cache, load_params(), today_in_warsaw())
+    read = [row for row in report.rows if row.read]
     print()
-    print(f"Przeczytane: {len(read)}/{len(rows)}")
-    print(f"Decyzja ZUS w aktach: {Counter(row['zus'] for row in read)}")
-    print(f"Zgodność z decyzjami ZUS: {agree}/{len(decided)} (gdzie obie strony są znane)")
-    with_amounts = sum(1 for row in read if row["payments"])
-    print(f"Z osią: {sum(row['timeline'] for row in read)} · z kwotami: {with_amounts}")
-    for row in decided:
-        if not row["match"]:
+    print(f"Przeczytane: {report.read}/{len(report.rows)}")
+    print(f"Decyzja ZUS w aktach: {Counter(row.zus for row in read)}")
+    print(f"Zgodność z decyzjami ZUS: {report.agree}/{report.decided} (gdzie obie strony są znane)")
+    with_amounts = sum(1 for row in read if row.payments)
+    print(f"Z osią: {sum(row.timeline for row in read)} · z kwotami: {with_amounts}")
+    for row in read:
+        if row.match is False:
             print(
-                f"  różnica {row['id']} ({row['category']}): ZUS {row['zus']}, "
-                f"my {row['ours']} — {row['title']}"
+                f"  różnica {row.id} ({row.category}): ZUS {row.zus}, my {row.ours} — {row.title}"
             )
     if args.summary:
-        args.summary.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+        args.summary.write_text(report.model_dump_json(indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import type {
   AdminView,
   CaseFacts,
   CaseList,
+  CaseReport,
   CaseResult,
   ChatEvent,
   ChatRequest,
@@ -176,3 +177,6 @@ export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
 /** The deterministic calculator without AI and without a session: a variant of the plan. */
 export const calculateTimeline = (scenario: Scenario, signal?: AbortSignal) =>
   requestJson<Timeline>('/api/timeline', { method: 'POST', body: JSON.stringify(scenario), signal })
+
+/** The agreement report: the calculator against ZUS for the cases already read. */
+export const fetchCaseReport = () => requestJson<CaseReport>('/api/cases/report')

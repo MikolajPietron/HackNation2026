@@ -309,3 +309,15 @@ def test_a_case_loads_into_the_plan(client: TestClient) -> None:
     assert start["scenario"]["birth_date"] == "2026-03-10"
     restored = client.get(f"/api/session/{session}").json()
     assert restored["scenario"]["mother_pay"] == 6000
+
+
+def test_the_report_sets_read_cases_against_zus(client: TestClient) -> None:
+    empty = client.get("/api/cases/report").json()
+    assert (empty["read"], empty["decided"], empty["agree"]) == (0, 0, 0)
+    assert empty["rows"][0] == {**empty["rows"][0], "id": "S01", "read": False}
+    client.post("/api/cases/S01/read")
+    report = client.get("/api/cases/report").json()
+    assert (report["read"], report["decided"], report["agree"]) == (1, 1, 1)
+    row = report["rows"][0]
+    assert (row["zus"], row["ours"], row["match"]) == ("granted", "granted", True)
+    assert row["insurance"].startswith("Mama podlega")

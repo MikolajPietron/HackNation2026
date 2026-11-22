@@ -681,3 +681,27 @@ export interface CaseResult {
   notes: string[]
   problem: string | null
 }
+
+/** FUNKCJE F37: the calculator against the decisions of ZUS (backend/app/cases/report.py). */
+export interface CaseReportRow {
+  id: string
+  category: string
+  read: boolean
+  title: string
+  zus: CaseOutcome
+  ours: CaseOutcome
+  match: boolean | null
+  covered: boolean | null
+  timeline: boolean
+  payments: number
+  insurance: string
+  comparison: string
+  problem: string | null
+}
+
+export interface CaseReport {
+  rows: CaseReportRow[]
+  read: number
+  decided: number
+  agree: number
+}
