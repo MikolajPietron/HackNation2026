@@ -42,7 +42,8 @@ ACTS = {
         # The leave requests on the timeline (engine/forms.py): the part of maternity leave
         # before the birth, the mother's resignation, the father's part of maternity leave
         # (taking over, the mother's incapacity, hospital, death, abandonment), supplementary,
-        # parental and paternity leave; attachments kept in the personal files.
+        # parental leave, combining parental leave with work, paternity leave; attachments kept
+        # in the personal files.
         "provisions": [
             "§ 2 ust. 1",
             "§ 2 ust. 2",
@@ -62,6 +63,7 @@ ACTS = {
             "§ 14 ust. 2",
             "§ 15 ust. 1",
             "§ 15 ust. 2",
+            "§ 16",
             "§ 17 ust. 1",
             "§ 17 ust. 2",
             "§ 22",
@@ -116,6 +118,7 @@ FLAT = {
     "art. 1802 § 5": "art. 180² § 5",
     "art. 1821a § 2": "art. 182¹ᵃ § 2",
     "art. 1821d § 1": "art. 182¹ᵈ § 1",
+    "art. 1821e § 2": "art. 182¹ᵉ § 2",
     "art. 1821f § 3–7": "art. 182¹ᶠ § 3–7",
     "art. 1823 § 2": "art. 182³ § 2",
     "art. 183 § 31": "art. 183 § 3¹",

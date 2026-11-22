@@ -7,8 +7,8 @@ name, each with its quote) and filled in from the scenario and the timeline:
   (rozp_wnioski): § 2 the part of maternity leave before the birth, § 3 the mother's
   resignation, § 5-§ 9 the father's part of maternity leave (taking over or the mother's
   incapacity, her stay in hospital, death, abandonment), § 14 supplementary, § 15 parental
-  (also each part of the parents' plan), § 17 paternity leave; § 22: nothing the employer keeps
-  in the personal files is attached;
+  (also each part of the parents' plan), § 16 combining a part of the plan with work, § 17
+  paternity leave; § 22: nothing the employer keeps in the personal files is attached;
 - ZAM (a parent who is not an employee, or a mother whose employment ended in pregnancy) follows
   annex 6 of the regulation of 27 September 2026 on the benefit documents (rozp_zasilki, § 12):
   the data of the request for the maternity benefit; its attachments: § 13 (the birth), § 20,
@@ -30,15 +30,18 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
   leave of either parent on the timeline before this period (the limit of 5 parts counts both
   parents together, parental_plan.py);
 - "termin zakończenia urlopu macierzyńskiego" (§ 14 ust. 1 pkt 2): the day before supplementary
-  leave starts, since it starts right after maternity leave.
+  leave starts, since it starts right after maternity leave;
+- the request to combine parental leave with work (§ 16): the period of work is the first weeks
+  of the part (parental_plan.py), and the statement on the extension says "no": on the timeline
+  the extension is added at the end of the part, without work.
 """
 
 import datetime as dt
 from dataclasses import dataclass
 
 from app.engine.after_insurance import after_job_loss
-from app.engine.applications import MOTHER_LEAVE, PLAN_REQUESTS, who_pays
-from app.engine.draft import DAY, days_between
+from app.engine.applications import MOTHER_LEAVE, PLAN_REQUESTS, WORK_REQUESTS, who_pays
+from app.engine.draft import DAY, days_between, merge_sources
 from app.engine.insurance import coverage
 from app.engine.models import (
     Addressee,
@@ -54,6 +57,7 @@ from app.engine.models import (
     Timeline,
 )
 from app.engine.params import Params
+from app.engine.parental_plan import formula, fraction, planned_parts, work_end, work_weeks
 from app.engine.pregnancy import SEGMENT_IDS
 from app.engine.wording import fmt, weeks_or_days
 
@@ -67,10 +71,12 @@ KINDS: dict[str, FormFieldKind] = {
     "leave-period": "period",
     "benefit-period": "period",
     "sick-period": "period",
+    "work-period": "period",
     "prenatal-leave": "statement",
     "discharge-commitment": "statement",
     "used-so-far": "statement",
     "za-zyciem": "statement",
+    "extension-work": "statement",
 }
 """Field kinds by id; any other field is text."""
 
@@ -140,6 +146,9 @@ def request_form(
         case "parental-request" | "parental-father-request" if document.segment_id:
             parent: Role = "mother" if document.id == "parental-request" else "father"
             return build.parental(parent, document.segment_id)
+        case work if work.startswith(WORK_REQUESTS) and document.segment_id:
+            parent = "father" if work.startswith(WORK_REQUESTS[1]) else "mother"
+            return build.parental_work(parent, document.segment_id)
         case part if part.startswith(PLAN_REQUESTS) and document.segment_id:
             parent = "father" if part.startswith(PLAN_REQUESTS[1]) else "mother"
             return build.parental(parent, document.segment_id)
@@ -671,6 +680,80 @@ class Forms:
             notes=[self.personal_files()],
             start=leave.start,
             end=leave.end,
+        )
+
+    def parental_work(self, parent: Role, segment_id: str) -> RequestForm:
+        """§ 16: the part of full time, the period of work and the statement on working during
+        the extension, from the plan. Nothing to attach: § 16 names no attachments."""
+        leave = self.segment(segment_id)
+        part = planned_parts(self.scenario).get(segment_id)
+        assert leave is not None and part is not None and part.work_fraction is not None
+        pp = self.params.parental_plan
+        share = fraction(part.work_fraction)
+        until = work_end(part, leave.start)
+        fills: dict[str, Fill] = {
+            "work-fraction": Fill(f"{share} etatu", hint="Z planu na osi czasu."),
+            "work-period": Fill(
+                _days(leave.start, until),
+                leave.start,
+                until,
+                f"Z planu na osi: pierwsze {work_weeks(part)} tyg. tej części urlopu "
+                "rodzicielskiego, która razem z wydłużeniem trwa "
+                f"{_days(leave.start, leave.end)}. Możesz wskazać inne tygodnie.",
+            ),
+        }
+        skip: set[str] = set()
+        notes: list[FormNote] = []
+        extension = leave.days - part.weeks * 7
+        if extension > 0:
+            first = leave.end - (extension - 1) * DAY
+            fills["extension-work"] = Fill(
+                "Brak takiego zamiaru: w planie wydłużenie tej części urlopu "
+                f"{_days(first, leave.end)} jest bez pracy.",
+                hint=(
+                    "Z planu na osi. Jeśli chcesz pracować także w czasie wydłużenia, wpisz to "
+                    "z wymiarem pracy; oś tego nie liczy."
+                ),
+            )
+            notes.append(
+                FormNote(
+                    text=(
+                        "Urlop wydłuża się o tygodnie pracy razy wymiar pracy "
+                        f"({formula(part)}). Za okres wydłużonego urlopu rodzicielskiego też "
+                        "przysługuje zasiłek macierzyński."
+                    ),
+                    sources=merge_sources(
+                        pp.extension.sources,
+                        pp.extension_in_days.sources if extension % 7 else [],
+                        pp.extension_paid.sources,
+                    ),
+                )
+            )
+        else:
+            skip.add("extension-work")  # the incomplete day is dropped: no extension
+        notes.append(
+            FormNote(
+                text=(
+                    "Wniosek składa się w postaci papierowej albo elektronicznej. Pracodawca "
+                    "uwzględnia go, chyba że nie pozwala na to organizacja pracy albo rodzaj "
+                    "Twojej pracy; o przyczynie odmowy informuje w ciągu "
+                    f"{pp.employer_answer_days.value} dni od otrzymania wniosku."
+                ),
+                sources=merge_sources(
+                    pp.work_request_days.sources, pp.employer_answer_days.sources
+                ),
+            )
+        )
+        return self.build(
+            "parental-work",
+            applicant=parent,
+            addressee=self.employer(parent),
+            fills=fills,
+            attachments=[],
+            skip=skip,
+            notes=notes,
+            start=leave.start,
+            end=until,
         )
 
     def resignation(self) -> RequestForm:

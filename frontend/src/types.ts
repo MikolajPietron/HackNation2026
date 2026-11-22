@@ -1271,6 +1271,9 @@ export type RequestKind =
   | 'supplementary-request'
   | 'parental-request'
   | 'parental-father-request'
+  /** ZADANIA B.13: combining parental leave with work (documents `parental-work-request-<k>`,
+   *  `parental-father-work-request-<k>`); its deadline is 21 days before the work starts. */
+  | 'parental-work-request'
   | 'paternity-request'
   | 'zam'
   | 'rate-815'
