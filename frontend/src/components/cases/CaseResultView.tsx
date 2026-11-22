@@ -2,7 +2,7 @@
 // insured on the day the right arises, and does the calculator agree with the decision of ZUS),
 // the amounts and periods the engine computed, and the facts to correct by hand. Each answer is
 // a picture, a word and one sentence; the detail is a click away.
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ChevronDown } from 'lucide-react'
@@ -47,14 +47,11 @@ export function CaseResultView({
   onShowPlan: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const factsRef = useRef<HTMLElement>(null)
-  // No date of birth (or of taking the child in) in the documents: there is no timeline to show
-  // yet, so the main button leads to the one field that is missing instead of being dead.
-  const openFacts = () => {
-    setEditing(true)
-    requestAnimationFrame(() => factsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-  }
+  // No date of birth in the documents: there is no timeline yet. The one missing date is asked
+  // right here, next to the reason, instead of deep in the form.
+  const [date, setDate] = useState('')
   const { facts, insurance, comparison, timeline } = result
+  const expecting = facts.child_born === false
   const covered: Tone = insurance.covered ? 'good' : insurance.covered === false ? 'bad' : 'unknown'
   const verdict: { tone: Tone; word: string } =
     comparison.match === true
@@ -114,8 +111,37 @@ export function CaseResultView({
         />
       </div>
 
-      {result.problem && (
-        <p className="mt-3 rounded-2xl bg-sun-100 px-4 py-3 text-sm leading-relaxed text-sun-700">{result.problem}</p>
+      {result.problem && !timeline ? (
+        <div className="mt-3 rounded-2xl bg-sun-100 px-4 py-4">
+          <p className="text-sm leading-relaxed text-sun-700">{result.problem}</p>
+          <label htmlFor="case-date" className="mt-3 block font-bold text-navy-900">
+            {expecting ? 'Przewidywana data porodu' : 'Data porodu'}
+          </label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              id="case-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="h-12 rounded-xl border border-line bg-white px-3 text-base text-navy-900 outline-none focus:border-zus-400 focus:ring-4 focus:ring-zus-600/10"
+            />
+            <PrimaryButton
+              onClick={() =>
+                onRecalculate(
+                  expecting ? { ...facts, due_date: date } : { ...facts, birth_date: date, child_born: true },
+                )
+              }
+              disabled={!date || busy}
+              className="h-12 px-6 text-base"
+            >
+              Przelicz i pokaż oś
+            </PrimaryButton>
+          </div>
+        </div>
+      ) : (
+        result.problem && (
+          <p className="mt-3 rounded-2xl bg-sun-100 px-4 py-3 text-sm leading-relaxed text-sun-700">{result.problem}</p>
+        )
       )}
 
       {payments.length > 0 && (
@@ -160,7 +186,7 @@ export function CaseResultView({
         </Section>
       )}
 
-      <section ref={factsRef} className="mt-5 rounded-3xl border border-line">
+      <section className="mt-5 rounded-3xl border border-line">
         <button
           type="button"
           onClick={() => setEditing(!editing)}
@@ -214,13 +240,9 @@ export function CaseResultView({
         >
           Inna sprawa
         </button>
-        {timeline ? (
+        {timeline && (
           <PrimaryButton onClick={onShowPlan} disabled={busy} className="h-12 px-6 text-base">
             Pokaż na osi
-          </PrimaryButton>
-        ) : (
-          <PrimaryButton onClick={openFacts} disabled={busy} className="h-12 px-6 text-base">
-            Wpisz datę porodu, żeby zobaczyć oś
           </PrimaryButton>
         )}
       </div>
