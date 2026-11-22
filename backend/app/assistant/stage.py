@@ -111,9 +111,12 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "2a": ("debt",),
     "64": ("debt",),
     "3": ("money",),
+    "4": ("sick",),  # the insurance the sickness benefit needs
+    "6": ("sick",),
     "7": ("sick",),
     "8": ("sick",),
     "11": ("sick",),
+    "12": ("sick",),  # the employer's days count in the benefit period
     "13": ("sick",),
     "18": ("sick",),
     "19": ("sick",),

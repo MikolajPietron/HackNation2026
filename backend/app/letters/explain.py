@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from app.documents.dates import dates_in, mentions
 from app.documents.forms import abolished_text, find_forms
 from app.engine import Params, Timeline
-from app.engine.applications import COURT_JUDGMENT
+from app.engine.applications import COURT_JUDGMENT, JOB_LOSS_REQUEST, SICK_AFTER_REQUEST
 from app.engine.pregnancy import JOB_LOSS_SEGMENT, REHAB_SEGMENT, SEGMENT_IDS
 from app.engine.wording import fmt
 
@@ -44,9 +44,14 @@ BENEFIT_ELEMENTS: dict[Benefit, tuple[str, ...]] = {
     ),
     "paternity": ("paternity", "paternity-request", "paternity-deadline"),
     "supplementary": ("supplementary", "supplementary-request"),
-    "sickness": (*SEGMENT_IDS.values(), "sick-leave-notice", "sick-benefit-request"),
+    "sickness": (
+        *SEGMENT_IDS.values(),
+        "sick-leave-notice",
+        "sick-benefit-request",
+        SICK_AFTER_REQUEST,
+    ),
     "rehabilitation": (REHAB_SEGMENT,),
-    "job_loss": (JOB_LOSS_SEGMENT, COURT_JUDGMENT),
+    "job_loss": (JOB_LOSS_SEGMENT, COURT_JUDGMENT, JOB_LOSS_REQUEST),
     "rate_815": ("rate-815-deadline",),
     "other": (),
 }

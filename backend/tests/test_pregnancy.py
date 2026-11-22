@@ -131,7 +131,15 @@ def test_not_an_employee_benefit_from_the_first_day_after_90_days_of_insurance()
     assert right is not None and right.date == d("2026-12-30")  # type: ignore[union-attr]
     text = note(t, "sick-leave").text
     assert "od pierwszego dnia niezdolności do pracy" in text
-    assert "po 90 dniach ubezpieczenia, czyli od 30 grudnia 2026" in text
+    # Ustawa art. 4 ust. 1 pkt 2: 90 days of uninterrupted voluntary insurance.
+    assert "po 90 dniach nieprzerwanego ubezpieczenia, czyli od 30 grudnia 2026" in text
+    right_marker = t.element("sick-benefit-right")
+    assert right_marker is not None
+    assert "po 90 dniach nieprzerwanego ubezpieczenia" in right_marker.summary  # type: ignore[union-attr]
+    assert any(
+        s.article == "art. 4 ust. 1" and "90 dni nieprzerwanego" in s.quote
+        for s in right_marker.sources
+    )
     assert "Od 1 marca 2027 mama jest na urlopie macierzyńskim" in text
 
 
@@ -481,3 +489,244 @@ def test_the_chat_records_the_rehabilitation_benefit_only_after_270_days(api: Te
     rehab = next(s for s in update["timeline"]["segments"] if s["id"] == "rehab-benefit")
     assert (rehab["start"], rehab["end"], rehab["tone"]) == ("2027-02-26", "2027-03-14", "option")
     assert "rehab-benefit" in update["changed_notes"]
+
+
+# After the independent check against the ZUS documents (22.11.2026): the end of work, the
+# exceptions to the 30 (90) days, an incapacity from before the insurance, who pays after it.
+
+ENDED_OTHER = {"job_loss": {"ended_on": "2026-11-30", "reason": "other"}, "sick_leave": True}
+
+
+def sources_of(element: Any, doc: str) -> set[str | None]:
+    return {s.article for s in element.sources if s.doc == doc}
+
+
+def test_the_rehabilitation_benefit_goes_on_after_the_work_ended() -> None:
+    """Sick leave from 01.06.2026, the work ends 15.12.2026 (another reason), due 15.03.2027.
+    The employer pays 01.06-03.07.2026 (33 days), the benefit 04.07-15.12.2026 (28 + 31 + 30 +
+    31 + 30 + 15 = 165 days), the benefit after the insurance ended 16.12.2026-25.02.2027 (16 +
+    31 + 25 = 72 days): 270 in all. The rehabilitation benefit 26.02-14.03.2027 (3 + 14 = 17
+    days), not ending on the day the work ended (15.12.2026), before its own start."""
+    ended = {"job_loss": {"ended_on": "2026-12-15", "reason": "other"}}
+    t = expecting(sick_leave=True, sick_leave_start="2026-06-01", rehab_benefit="granted", **ended)
+    assert spans(t, "sick") == [
+        ("sick-pay", d("2026-06-01"), d("2026-07-03"), 33),
+        ("sick-benefit", d("2026-07-04"), d("2026-12-15"), 165),
+        ("sick-after-insurance", d("2026-12-16"), d("2027-02-25"), 72),
+    ]
+    rehab = t.element("rehab-benefit")
+    assert isinstance(rehab, Segment)
+    assert (rehab.start, rehab.end, rehab.days) == (d("2027-02-26"), d("2027-03-14"), 17)
+    details = " ".join(rehab.details)
+    assert "przysługuje także po ustaniu ubezpieczenia" in details
+    assert "dodatkowo oświadczenie do zasiłku za okres" in details
+    assert "ten etap aplikacji" not in details
+    assert "art. 22" in sources_of(rehab, "ustawa")
+    assert "§ 11 ust. 3" in sources_of(rehab, "rozp_zasilki")
+    assert any("art. 22 z art. 13 ust. 1" in a for a in t.assumptions)
+    # Not told yet: the note says what to file, the statement after the insurance too.
+    told = note(expecting(sick_leave=True, sick_leave_start="2026-06-01", **ended), "rehab-benefit")
+    assert "zaświadczenie o stanie zdrowia" in told.text
+    assert "wywiad zawodowy z miejsca pracy" in told.text  # the incapacity began while insured
+    assert "dodatkowo oświadczenie do zasiłku za okres" in told.text
+    assert {"§ 11 ust. 1", "§ 11 ust. 3"} <= sources_of(told, "rozp_zasilki")
+
+
+def test_the_rehabilitation_benefit_stops_where_the_benefit_until_the_birth_starts() -> None:
+    """Sick leave from 01.05.2026: 270 days end on 25.01.2027 (31 + 30 + 31 + 31 + 30 + 31 +
+    30 + 31 = 245, and 25 days of January). The employer is liquidated, the work ends
+    10.02.2027: the rehabilitation benefit 26.01-10.02.2027 (6 + 10 = 16 days), then the
+    benefit equal to the maternity benefit 11.02-14.03.2027."""
+    t = expecting(
+        sick_leave=True,
+        sick_leave_start="2026-05-01",
+        job_loss={"ended_on": "2027-02-10", "reason": "liquidation"},
+        rehab_benefit="granted",
+    )
+    assert t.element("sick-benefit-limit").date == d("2027-01-25")  # type: ignore[union-attr]
+    rehab = t.element("rehab-benefit")
+    assert isinstance(rehab, Segment)
+    assert (rehab.start, rehab.end, rehab.days) == (d("2027-01-26"), d("2027-02-10"), 16)
+    assert any("od następnego dnia oś pokazuje zasiłek w wysokości" in x for x in rehab.details)
+    assert span_of(t, "job-loss-benefit") == (d("2027-02-11"), d("2027-03-14"))
+
+
+def test_sick_leave_after_the_work_ended_is_not_paid_by_the_employer() -> None:
+    """The work ends 30.11.2026, the sick leave starts 05.12.2026, within 14 days, and lasts
+    until the day before the due date: 27 + 31 + 28 + 14 = 100 days, at least 30. The sickness
+    benefit after the insurance ended, paid by ZUS; no employer's days."""
+    t = expecting(**ENDED_OTHER, sick_leave_start="2026-12-05")
+    assert spans(t, "sick") == [
+        ("sick-after-insurance", d("2026-12-05"), d("2027-03-14"), 100),
+    ]
+    sick = note(t, "sick-leave")
+    assert (sick.kind, sick.title) == (
+        "right",
+        "Zwolnienie lekarskie po ustaniu pracy: zasiłek chorobowy",
+    )
+    assert "pracodawca wypłaca" not in sick.text
+    assert "wynagrodzenie chorobowe" not in sick.text
+    assert "nie później niż w ciągu 14 dni od jego ustania" in sick.text
+    assert "od 5 grudnia 2026 do 14 marca 2027 (100 dni)" in sick.text
+    assert "Wypłaca go ZUS" in sick.text
+    assert {"art. 7", "art. 8 ust. 2", "art. 61 ust. 1"} <= sources_of(sick, "ustawa")
+    assert not sources_of(sick, "kp")
+    # Who pays: ZUS, for a period after the insurance ended (art. 61 ust. 1 pkt 2 lit. d).
+    payer = note(t, "payer")
+    assert "Zasiłek chorobowy po ustaniu ubezpieczenia wypłaca mamie ZUS" in payer.text
+    assert "art. 61 ust. 1" in sources_of(payer, "ustawa")
+    # The documents: the statement of annex 4 (regulation of 27.09.2026, § 4), with ZUS, shown
+    # on the first day of the benefit; no deadline in the materials.
+    request = next(x for x in t.documents if x.id == "sick-after-insurance-request")
+    assert (request.needed_by, request.deadline, request.segment_id) == (
+        d("2026-12-05"),
+        None,
+        "sick-after-insurance",
+    )
+    assert "§ 4" in sources_of(request, "rozp_zasilki")
+    form = request.form
+    assert form is not None and (form.addressee, form.official_form) == ("zus", None)
+    assert [a.id for a in form.attachments] == ["after-insurance-statement"]
+    period = next(f for f in form.fields if f.id == "insurance-period")
+    assert period.value == "po ustaniu tytułu ubezpieczenia; ustał 30.11.2026"
+    assert "sick-leave-notice" not in {x.id for x in t.documents}
+    assert "— do ZUS" in note(t, "applications").text
+
+
+def test_sick_leave_that_goes_on_after_the_work_ended_has_both_payers() -> None:
+    """Sick leave from 01.10.2026, the work ends 30.11.2026: the employer 01.10-02.11.2026 (31 +
+    2 = 33 days), the benefit 03-30.11.2026 (28 days), after the insurance ended
+    01.12.2026-14.03.2027 (31 + 31 + 28 + 14 = 104 days)."""
+    t = expecting(**ENDED_OTHER, sick_leave_start="2026-10-01")
+    assert spans(t, "sick") == [
+        ("sick-pay", d("2026-10-01"), d("2026-11-02"), 33),
+        ("sick-benefit", d("2026-11-03"), d("2026-11-30"), 28),
+        ("sick-after-insurance", d("2026-12-01"), d("2027-03-14"), 104),
+    ]
+    payer = note(t, "payer").text
+    assert "wynagrodzenie chorobowe za pierwsze 33 dni" in payer
+    assert "Zasiłek chorobowy po ustaniu ubezpieczenia wypłaca mamie ZUS" in payer
+    request = next(x for x in t.documents if x.id == "sick-after-insurance-request")
+    assert request.needed_by == d("2026-12-01")
+
+
+def test_sick_leave_after_the_work_ended_too_late_or_without_the_right() -> None:
+    # 20 days after the end (30.11 -> 20.12.2026): more than 14, no benefit.
+    late = note(expecting(**ENDED_OTHER, sick_leave_start="2026-12-20"), "sick-leave")
+    assert late.kind == "risk"
+    assert "tu tak nie jest" in late.text and "pracodawca" not in late.text
+    # Insured since 10.11.2026: the right would arise on 10.12.2026, after the end (30.11).
+    t = expecting(**ENDED_OTHER, sick_leave_start="2026-12-05", insured_since="2026-11-10")
+    assert spans(t, "sick") == []
+    refused = note(t, "sick-leave")
+    assert "nie nabyła do niego prawa w czasie ubezpieczenia" in refused.text
+    assert "Wyjątki:" in refused.text
+    assert {"art. 4 ust. 2", "art. 4 ust. 3", "art. 13 ust. 1"} <= sources_of(refused, "ustawa")
+    # The employer went bankrupt: the benefit equal to the maternity benefit, not sick pay.
+    bankrupt = expecting(
+        sick_leave=True,
+        sick_leave_start="2026-12-05",
+        job_loss={"ended_on": "2026-11-30", "reason": "bankruptcy"},
+    )
+    told = note(bankrupt, "sick-leave")
+    assert told.kind == "computed" and "pracodawca wypłaca" not in told.text
+    assert "zasiłek w wysokości zasiłku macierzyńskiego" in told.text
+
+
+def test_the_exceptions_to_the_30_and_90_days_are_told() -> None:
+    """Ustawa art. 4 ust. 2-3: earlier insurance after a break of up to 30 days counts; the
+    right from the first day for graduates and after 10 years of obligatory insurance. Insured
+    since 25.10.2026: the right from 24.11.2026 (25.10 + 30 days)."""
+    t = expecting(sick_leave=True, sick_leave_start="2026-11-01", insured_since="2026-10-25")
+    right = t.element("sick-benefit-right")
+    assert right is not None and right.date == d("2026-11-24")  # type: ignore[union-attr]
+    assert any("przerwa nie przekroczyła 30 dni" in x for x in right.details)  # type: ignore[union-attr]
+    assert {"art. 4 ust. 1", "art. 4 ust. 2", "art. 4 ust. 3"} <= sources_of(right, "ustawa")
+    sick = note(t, "sick-leave")
+    assert "co najmniej 10-letni okres obowiązkowego ubezpieczenia" in sick.text
+    assert "po 30 dniach nieprzerwanego ubezpieczenia" in sick.text
+    assert any("art. 4 ust. 2 ustawy zasiłkowej" in a for a in t.assumptions)
+    # The interview: a break of up to 30 days between the periods does not count.
+    scenario = Scenario.model_validate(
+        {
+            "child_born": False,
+            "due_date": DUE,
+            **EMPLOYED,
+            "leave_before_birth_weeks": 0,
+            "sick_leave": True,
+            "sick_leave_start": "2026-11-02",
+        }
+    )
+    question = next(q for q in interview_questions(scenario) if q.key == "insured-since")
+    assert "Przerwa do 30 dni" in question.text and "początek pierwszego" in question.text
+
+
+def test_sick_leave_that_began_before_the_insurance_is_not_paid() -> None:
+    """Sick leave from 01.10.2026, insured from 20.10.2026: the incapacity began before the
+    insurance (ustawa art. 6 ust. 1). No pay from 19.11.2026 (20.10 + 30 days) any more."""
+    t = expecting(
+        leave_before_birth_weeks=0,
+        sick_leave=True,
+        sick_leave_start="2026-10-01",
+        insured_since="2026-10-20",
+    )
+    assert spans(t, "sick") == []
+    assert t.element("sick-benefit-right") is None
+    assert not [p for p in t.payments if p.segment_id.startswith("sick")]
+    sick = note(t, "sick-leave")
+    assert (sick.kind, sick.title) == ("risk", "Zwolnienie lekarskie sprzed ubezpieczenia")
+    assert "w czasie trwania ubezpieczenia chorobowego" in sick.text
+    assert "zaczęło się 1 października 2026" in sick.text
+    assert "od 20 października 2026" in sick.text
+    assert sources_of(sick, "ustawa") == {"art. 6 ust. 1"}
+    assert sources_of(sick, "kp") == {"art. 92 § 3"}
+    # Maternity leave is not affected.
+    assert span_of(t, "maternity") == (DUE, d("2027-08-01"))
+
+
+def test_the_employers_days_count_in_the_270() -> None:
+    """Ustawa art. 12 ust. 1: "Okresy te wlicza się do okresu zasiłkowego" (no longer only our
+    reading). With the 270 days as in test_the_benefit_period_ends_after_270_days."""
+    t = expecting(**LONG_SICK_LEAVE)
+    sick = note(t, "sick-leave")
+    assert "Do okresu zasiłkowego wlicza się też dni, za które pracodawca wypłaca" in sick.text
+    assert "art. 12 ust. 1" in sources_of(sick, "ustawa")
+    limit = t.element("sick-benefit-limit")
+    assert limit is not None and "art. 12 ust. 1" in sources_of(limit, "ustawa")
+    assert not any("wliczamy też dni wynagrodzenia" in a for a in t.assumptions)
+    # 50 years: the answer is for the year the leave began (2026); 2027 may differ.
+    assert any("w następnym roku pracodawca płaci za najwyżej 14 dni" in a for a in t.assumptions)
+    # A woman who is not an employee has no employer's days: nothing to count.
+    business = expecting(work="business", mother_insured=True, **LONG_SICK_LEAVE)
+    assert "pracodawca wypłaca wynagrodzenie" not in note(business, "sick-leave").text
+
+
+def test_a_job_that_ended_points_to_the_fixed_term_contract_extended_to_the_birth() -> None:
+    """Guide I, KP art. 177 § 3 and § 3¹, ustawa art. 30 ust. 4: the insurance point and the
+    job-loss point do not say that the benefit after the insurance ended has no other case."""
+    t = expecting(job_loss={"ended_on": "2026-11-30", "reason": "other"})
+    insurance = note(t, "insurance")
+    assert "umowy o pracę na czas określony, którą przedłużono do dnia porodu" in insurance.text
+    assert "art. 30 ust. 4" in sources_of(insurance, "ustawa")
+    loss = note(t, "job-loss")
+    assert "przedłuża się jednak do dnia porodu" in loss.text
+    assert "w celu zastępstwa pracownika" in loss.text
+    assert "napisz o tym asystentowi" in loss.text
+    assert {"art. 177 § 3", "art. 177 § 3¹"} <= sources_of(loss, "kp")
+    assert "art. 30 ust. 4" in sources_of(note(t, "insurance-way"), "ustawa")
+    # A contract of mandate is not extended.
+    mandate = expecting(
+        work="contract",
+        mother_insured=True,
+        job_loss={"ended_on": "2026-11-30", "reason": "other"},
+    )
+    assert "przedłuża się" not in note(mandate, "job-loss").text
+
+
+def test_the_chat_asks_whether_an_ended_contract_was_fixed_term() -> None:
+    from app.assistant.agent import set_job_loss
+    from app.assistant.prompts import BASE_INSTRUCTIONS
+
+    doc = set_job_loss.__doc__ or ""
+    assert "fixed-term contract" in doc and "art. 177 § 3" in doc
+    assert "na czas określony albo na okres próbny dłuższy niż miesiąc" in BASE_INSTRUCTIONS

@@ -77,9 +77,40 @@ def test_after_the_employer_went_bankrupt_the_maternity_benefit_follows_the_birt
     assert "art. 30 ust. 3" in articles(job.sources)  # type: ignore[union-attr]
     # No request to an employer, no protection: ZAM to ZUS.
     # ZAM for the parental period: before that benefit starts, 02.08.2027 (rozporządzenie § 29).
-    assert [d.id for d in t.documents] == ["maternity-request", "zam-parental"]
+    # The benefit until the birth: the documents of § 17 of the regulation of 27.09.2026, filed
+    # with ZUS on the day it starts (01.12.2026); no deadline in the materials.
+    assert [d.id for d in t.documents] == ["maternity-request", "zam-parental", "job-loss-request"]
     assert t.documents[0].title == "Wniosek o zasiłek macierzyński (ZAM)"
     assert "bezpośrednio do ZUS" in t.documents[0].rule
+    # ZAM after the bankruptcy: the documents of § 15 ust. 1.
+    assert "stwierdzające ciążę w okresie zatrudnienia" in t.documents[0].rule
+    assert "z powodu upadłości pracodawcy" in t.documents[0].rule
+    zam = t.documents[0].form
+    assert zam is not None
+    assert {"pregnancy-certificate", "employment-end-document"} <= {a.id for a in zam.attachments}
+    assert "court-ruling" not in {a.id for a in zam.attachments}
+    request = t.documents[2]
+    assert (request.needed_by, request.deadline, request.done) == (
+        dt.date(2026, 12, 1),
+        None,
+        False,
+    )
+    assert "ustala go i wypłaca ZUS" in request.rule
+    assert "nie zapewniono jej innego zatrudnienia" in request.rule
+    assert {s.article for s in request.sources if s.doc == "rozp_zasilki"} == {"§ 17"}
+    assert "art. 61 ust. 1" in articles(request.sources)
+    form = request.form
+    assert form is not None and (form.addressee, form.fields) == ("zus", [])
+    assert [a.id for a in form.attachments] == [
+        "pregnancy-certificate",
+        "employment-end-document",
+        "no-other-job-statement",
+    ]
+    assert (form.start, form.end) == (dt.date(2026, 12, 1), dt.date(2027, 3, 14))
+    assert "Dokumenty do zasiłku w wysokości zasiłku macierzyńskiego — do ZUS" in note(
+        t, "applications"
+    )
+    assert not any("Przewodnik nie podaje, więc oś tego nie pokazuje" in a for a in t.assumptions)
     assert not {"protection-end", "earliest-start"} & {m.id for m in t.markers}
     notes = [n.id for n in t.notes]
     assert "before-birth" not in notes and "protection" not in notes

@@ -343,7 +343,8 @@ def test_a_job_that_ended_before_the_birth_and_a_fixed_term_contract() -> None:
     t = expecting(job_loss={"ended_on": "2026-11-30", "reason": "other"})
     way = note(t, "insurance-way")
     assert note_ids(t)[note_ids(t).index("job-loss") + 1] == "insurance-way"
-    assert "na czas określony albo na okres próbny dłuższy niż miesiąc" in way.text
+    assert "na czas określony albo na okres próbny przekraczający miesiąc" in way.text
+    assert "w celu zastępstwa pracownika" in way.text  # KP art. 177 § 3¹
     articles = {s.article for s in way.sources}
     assert {"art. 177 § 3", "art. 30 ust. 4"} <= articles
 

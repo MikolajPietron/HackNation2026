@@ -396,14 +396,22 @@ def test_the_employed_mother_is_protected_until_her_leave_ends() -> None:
     assert any(
         "zakaz zaczyna obowiązywać 21 dni przed tym urlopem" in d for d in protection.details
     )
-    # A fixed-term contract is extended until the birth (art. 177 § 3).
+    # A fixed-term contract is extended until the birth (art. 177 § 3), not a contract to
+    # replace an absent employee (§ 3¹); the benefit after it only for a fixed-term contract
+    # (ustawa art. 30 ust. 4), not for a probation.
     due = marker(t, "due-date")
-    assert any("umowa przedłuża się do dnia porodu" in d for d in due.details)
-    assert "art. 177 § 3" in articles(due)
+    extended = next(d for d in due.details if "przedłuża się do dnia porodu" in d)
+    assert "nie dotyczy to umowy na czas określony zawartej w celu zastępstwa" in extended
+    assert "Gdy do dnia porodu przedłużono umowę na czas określony, po porodzie" in extended
+    assert {"art. 177 § 3", "art. 177 § 3¹"} <= articles(due)
+    assert any(s.article == "art. 30 ust. 4" for s in due.sources)
     told = note(t, "protection")
     assert (told.kind, told.title) == ("right", "Ochrona przed zwolnieniem")
     assert "ochrona trwa do 27 lutego 2028" in told.text
     assert "przedłuża się do dnia porodu" in told.text
+    assert "przysługuje wtedy" not in told.text  # "wtedy" covered the probation too
+    assert "w celu zastępstwa pracownika" in told.text
+    assert any(s.article == "art. 177 § 3¹" for s in told.sources)
 
 
 def test_the_rest_of_maternity_leave_after_the_mothers_stay_in_hospital_is_protected() -> None:
@@ -659,8 +667,32 @@ def test_bankruptcy_of_the_employer_needs_no_judgment() -> None:
         **MOTHER, children_count=1, job_loss={"ended_on": "2026-11-30", "reason": "bankruptcy"}
     )
     assert "court-judgment" not in {d.id for d in t.documents}
-    # The guide does not say what to file for this benefit or who pays it.
-    assert any("Przewodnik nie podaje, więc oś tego nie pokazuje" in a for a in t.assumptions)
+    # The regulation of 27.09.2026 (§ 17) names the documents; ZUS pays (ustawa art. 61 ust. 1
+    # pkt 2 lit. d). Shown on the day the benefit starts, 01.12.2026.
+    request = document(t, "job-loss-request")
+    assert (request.needed_by, request.segment_id) == (dt.date(2026, 12, 1), "job-loss-benefit")
+    assert "świadectwo pracy albo inny dokument" in request.rule
+    assert any("dokumentów do zasiłku za okres po ustaniu" in a.lower() for a in t.assumptions)
+
+
+def test_unlawful_termination_lists_no_documents_for_the_benefit_until_the_birth() -> None:
+    """§ 17 covers the employer's bankruptcy, liquidation and death; after an unlawful
+    termination the timeline shows the court judgment, and ZAM after the birth lists the
+    documents of § 15 ust. 2."""
+    t = expecting(
+        **MOTHER,
+        children_count=1,
+        job_loss={"ended_on": "2026-11-30", "reason": "unlawful", "court_confirmed": True},
+    )
+    assert "job-loss-request" not in {d.id for d in t.documents}
+    assert any("rozporządzenie nie wymienia" in a for a in t.assumptions)
+    zam = document(t, "maternity-request")
+    assert "prawomocne orzeczenie sądu o rozwiązaniu stosunku pracy" in zam.rule
+    assert {s.article for s in zam.sources if s.doc == "rozp_zasilki"} == {"§ 15 ust. 2"}
+    assert zam.form is not None
+    attached = {a.id for a in zam.form.attachments}
+    assert {"pregnancy-certificate-unlawful", "court-ruling"} <= attached
+    assert "employment-end-document" not in attached
 
 
 def test_zam_deadlines_of_a_father_with_a_business() -> None:

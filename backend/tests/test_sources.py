@@ -83,6 +83,7 @@ def test_labour_code_provisions() -> None:
         "art. 177 § 1",
         "art. 177 § 1¹",
         "art. 177 § 3",
+        "art. 177 § 3¹",
         "art. 92 § 1",
         "art. 92 § 2",
         "art. 92 § 3",
@@ -192,6 +193,12 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert set(ustawa_articles()) == {
         "art. 3 pkt 3",
         "art. 3 pkt 4",
+        # The sickness benefit: the insurance it needs, the employer's days in the period.
+        "art. 4 ust. 1",
+        "art. 4 ust. 2",
+        "art. 4 ust. 3",
+        "art. 6 ust. 1",
+        "art. 12 ust. 1",
         "art. 7",
         "art. 8 ust. 2",
         "art. 11 ust. 2",
@@ -260,6 +267,11 @@ def test_ustawa_zasilkowa_provisions() -> None:
     }
     texts = ustawa_articles()
     assert texts["art. 30a ust. 1"].startswith("Ubezpieczona - matka dziecka, nie później niż 21")
+    assert (
+        "90 dni nieprzerwanego ubezpieczenia chorobowego - jeżeli jest ubezpieczony"
+        in (texts["art. 4 ust. 1"])
+    )
+    assert texts["art. 12 ust. 1"].endswith("Okresy te wlicza się do okresu zasiłkowego.")
     assert "art. 182¹ᵃ § 4 Kodeksu pracy" in texts["art. 31 ust. 3f"]
     assert texts["art. 3 pkt 3"].startswith("wynagrodzenie - przychód pracownika")
     assert "13,71%" in texts["art. 3 pkt 4"]
@@ -298,6 +310,13 @@ def test_the_two_regulations_on_requests() -> None:
     }
     assert set(zasilki) == {
         "§ 2",
+        "§ 4",
+        "§ 11 ust. 1",
+        "§ 11 ust. 3",
+        "§ 15 ust. 1",
+        "§ 15 ust. 2",
+        "§ 17",
+        "zał. 4",
         "§ 12",
         "§ 13 ust. 1",
         "§ 13 ust. 2",
@@ -334,6 +353,12 @@ def test_the_two_regulations_on_requests() -> None:
     assert zasilki["zał. 6"].startswith("1) NIP i REGON płatnika składek")
     assert zasilki["zał. 6"].endswith("19) pouczenie dotyczące zasiłku macierzyńskiego.")
     assert zasilki["zał. 1"].endswith("10) pouczenie dotyczące zasiłku chorobowego.")
+    # Annex 4: its title runs over two lines and is not part of its text.
+    assert zasilki["zał. 4"].startswith("1) dane ubezpieczonego")
+    assert zasilki["zał. 4"].endswith("9) pouczenie dotyczące oświadczenia.")
+    # § 11 runs over a page break: the page header after its number is left out.
+    assert zasilki["§ 11 ust. 1"].startswith("Dokumentami niezbędnymi do przyznania i wypłaty")
+    assert zasilki["§ 17"].endswith("że nie zapewniono jej innego zatrudnienia.")
     assert "art. 180² § 5 Kodeksu pracy" in zasilki["§ 26"]
 
 
@@ -845,6 +870,24 @@ def pregnancy_scenarios() -> list[dict[str, Any]]:
         | {"sick_leave": True, "sick_leave_start": "2026-11-02"}
         | {"rehab_benefit": "applied"},
     ]
+    # After the check against the documents: the rehabilitation benefit after the work ended,
+    # sick leave that began before the insurance, the right not acquired before the end.
+    ended = {"job_loss": {"ended_on": "2026-12-15", "reason": "other"}}
+    cases += [employed | long_sick | ended | {"rehab_benefit": s} for s in (None, "granted")]
+    cases += [
+        expecting
+        | who
+        | {"sick_leave": True, "sick_leave_start": "2026-10-01", "insured_since": "2026-10-20"}
+        for who in (
+            {"role": "mother", "work": "employment"},
+            {"role": "mother", "work": "contract", "mother_insured": True},
+        )
+    ]
+    cases.append(
+        employed
+        | {"job_loss": {"ended_on": "2026-11-30", "reason": "other"}}
+        | {"sick_leave": True, "sick_leave_start": "2026-12-05", "insured_since": "2026-11-10"}
+    )
     return cases
 
 

@@ -17,7 +17,11 @@ name, each with its quote) and filled in from the scenario and the timeline:
   § 22, § 23 (the father after the mother; § 20 ust. 4 and § 22 ust. 2 when she had no sickness
   insurance), § 26 (supplementary leave), § 32 (a mother without insurance), § 33 (paternity
   leave). The ZAM form itself is on www.zus.pl (guide page 12);
-- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2).
+- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2); after the
+  work ended, filed with ZUS with the statement of annex 4 (§ 4);
+- after the employment ended in pregnancy (ustawa art. 30): ZAM with the documents of § 15, and
+  for the benefit equal to the maternity benefit until the birth the documents of § 17 (a form
+  without fields: the regulation lists only documents).
 
 The attachments for the maternity benefit (§ 13, guide A.4) go with the employee mother's
 request for maternity leave too: her employer determines the benefit on its basis (guide A.4).
@@ -170,6 +174,10 @@ def request_form(
             return build.paternity()
         case "sick-benefit-request":
             return build.sick()
+        case "sick-after-insurance-request":
+            return build.sick_after()
+        case "job-loss-request":
+            return build.job_loss()
         case _:
             return None
 
@@ -531,6 +539,12 @@ class Forms:
             attachments.append(Attach("supplementary-other-parent"))
         if parent == "father":
             attachments += self.father_attachments()
+        if loss is not None:
+            # After the employment ended in pregnancy (rozp_zasilki § 15 ust. 1-2).
+            if loss.reason == "unlawful":
+                attachments += [Attach("pregnancy-certificate-unlawful"), Attach("court-ruling")]
+            else:
+                attachments += [Attach("pregnancy-certificate"), Attach("employment-end-document")]
         return self.build(
             "zam",
             applicant=parent,
@@ -942,4 +956,67 @@ class Forms:
             start=start,
             end=end,
             official_form="ZAS-53" if business else None,
+        )
+
+    def sick_after(self) -> RequestForm:
+        """The sickness benefit after the work ended: annex 1 (§ 2) for the periods after it,
+        filed with ZUS, which pays benefits for a period after the insurance ended (ustawa
+        art. 61 ust. 1 pkt 2 lit. d), with the statement of annex 4 (§ 4)."""
+        today = self.timeline.today
+        after = [
+            x
+            for x in self.timeline.segments
+            if x.lane == "mother" and x.id.startswith(SEGMENT_IDS["after"]) and x.end >= today
+        ]
+        start = min(x.start for x in after)
+        end = max(x.end for x in after)
+        loss = self.scenario.job_loss
+        assert loss is not None
+        return self.build(
+            "sick",
+            applicant="mother",
+            addressee=("zus", "ZUS"),
+            fills={
+                "sick-period": Fill(
+                    "; ".join(_days(x.start, x.end) for x in after),
+                    start,
+                    end,
+                    "Zasiłek chorobowy po ustaniu ubezpieczenia na osi czasu.",
+                ),
+                "insurance-period": Fill(
+                    f"po ustaniu tytułu ubezpieczenia; ustał {fmt(loss.ended_on)}",
+                    hint="Na osi: praca ustała tego dnia.",
+                ),
+            },
+            attachments=[Attach("after-insurance-statement")],
+            notes=[
+                FormNote(
+                    text=(
+                        "Zamiast tego dokumentu ZUS przyjmuje też wydruk zaświadczenia lekarskiego "
+                        "albo zaświadczenie płatnika składek."
+                    ),
+                    sources=self.params.forms.sick_alternatives.sources,
+                )
+            ],
+            start=start,
+            end=end,
+        )
+
+    def job_loss(self) -> RequestForm:
+        """The benefit equal to the maternity benefit until the birth after the employer's
+        bankruptcy, liquidation or death: the documents of § 17, filed with ZUS."""
+        segment = self.segment("job-loss-benefit")
+        assert segment is not None
+        return self.build(
+            "job-loss",
+            applicant="mother",
+            addressee=("zus", "ZUS"),
+            fills={},
+            attachments=[
+                Attach("pregnancy-certificate"),
+                Attach("employment-end-document"),
+                Attach("no-other-job-statement"),
+            ],
+            start=segment.start,
+            end=segment.end,
         )
