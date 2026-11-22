@@ -1,7 +1,8 @@
-// The top bar across the whole app: our mark, then the services a ZUS customer expects —
-// contact, language, accessibility, search, PUE/eZUS. Most of them are mocks for now (FUNKCJE:
-// simulations are clearly marked), reported through `onMock`. "Większy tekst" already works;
-// "Czytaj na głos" is the place for the ElevenLabs voice (F40).
+// The top bar across the whole app: our mark, then only what works — the letter from ZUS, the
+// example cases, the parameters panel, accessibility (larger text, contrast, reading aloud with
+// the device's own Polish voice) and the simulated PUE/eZUS login through mObywatel (the brief
+// asks for the simulation). Mocks with nothing behind them (contact, languages, sign language,
+// search, registration) were removed on 22.11.2026.
 //
 // Menus follow Emil Kowalski's rules: they grow from their trigger (origin-aware), from scale 0.96
 // with opacity, ease-out in ~160 ms, and close faster than they open.
@@ -14,12 +15,11 @@ import {
   ChevronDown,
   ChevronRight,
   Contrast,
-  Ear,
   FolderOpen,
   LogOut,
   Mail,
-  Search,
   Settings2,
+  Square,
   UserRound,
   Type,
   Volume2,
@@ -27,12 +27,12 @@ import {
 import { useHighContrast } from '@/hooks/useHighContrast'
 import { useLargeText } from '@/hooks/useLargeText'
 import { EASE_OUT } from '@/lib/ease'
+import { canReadAloud, readAloud, stopReading, useReading } from '@/lib/speech'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import { Brand } from './Brand'
 
 interface TopBarProps {
-  onMock: (message: string) => void
   /** Simulated login (mObywatel) and what it unlocks. */
   persona: Persona | null
   onLogin: () => void
@@ -45,7 +45,7 @@ interface TopBarProps {
   className?: string
 }
 
-export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases, onLetter, className }: TopBarProps) {
+export function TopBar({ persona, onLogin, onLogout, onZusData, onCases, onLetter, className }: TopBarProps) {
   return (
     <header
       className={cn(
@@ -68,49 +68,21 @@ export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases,
         >
           <Settings2 className="size-4" /> <Label short="Admin">Panel admina</Label>
         </a>
-        <TextButton
-          className="hidden 2xl:flex"
-          onClick={() => onMock('Kontakt i pomoc pojawią się w wersji demo.')}
-        >
-          Kontakt
-        </TextButton>
-        <LanguageMenu onMock={onMock} />
         <Divider />
-        <IconButton
-          label="Tłumacz języka migowego"
-          onClick={() => onMock('Wideotłumacz polskiego języka migowego jest w przygotowaniu.')}
-        >
-          <Ear className="size-5" />
-        </IconButton>
-        <AccessibilityMenu onMock={onMock} />
-        <Divider />
-        <IconButton label="Szukaj" onClick={() => onMock('Wyszukiwanie w Przewodniku ZUS — wkrótce.')}>
-          <Search className="size-5" />
-        </IconButton>
+        <AccessibilityMenu />
         {persona ? (
           <AccountMenu persona={persona} onZusData={onZusData} onLogout={onLogout} />
         ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => onMock('Rejestracja w PUE/eZUS to atrapa integracji.')}
-              className="ml-2 flex h-10 items-center rounded-full border border-navy-200 px-4 text-sm font-bold whitespace-nowrap text-navy-900 transition-[border-color,background-color,transform] duration-150 hover:border-navy-400 hover:bg-navy-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
-            >
-              <span>
-                Zarejestruj<span className="hidden 2xl:inline"> w PUE/eZUS</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={onLogin}
-              className="group flex h-10 items-center gap-1 rounded-full bg-sun-400 pr-3 pl-4 text-sm font-bold whitespace-nowrap text-navy-900 transition-[background-color,transform] duration-150 hover:bg-sun-300 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              <span>
-                Zaloguj<span className="hidden xl:inline"> do PUE/eZUS</span>
-              </span>
-              <ChevronRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={onLogin}
+            className="group ml-2 flex h-10 items-center gap-1 rounded-full bg-sun-400 pr-3 pl-4 text-sm font-bold whitespace-nowrap text-navy-900 transition-[background-color,transform] duration-150 hover:bg-sun-300 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <span>
+              Zaloguj<span className="hidden xl:inline"> do PUE/eZUS</span>
+            </span>
+            <ChevronRight className="size-4 transition-transform duration-150 group-hover:translate-x-0.5" />
+          </button>
         )}
       </nav>
     </header>
@@ -166,66 +138,27 @@ function AccountMenu({
   )
 }
 
-function LanguageMenu({ onMock }: { onMock: (message: string) => void }) {
-  return (
-    <Menu
-      label="Język"
-      trigger={
-        <span className="flex items-center gap-1 px-1 text-sm font-bold">
-          PL
-          <ChevronDown className="size-4 text-navy-400" />
-        </span>
-      }
-    >
-      {(close) => (
-        <>
-          <MenuItem icon={<span className="text-xs font-black">PL</span>} checked onClick={close}>
-            Polski
-          </MenuItem>
-          <MenuItem
-            icon={<span className="text-xs font-black">EN</span>}
-            soon
-            onClick={() => {
-              close()
-              onMock('Wersja angielska — wkrótce.')
-            }}
-          >
-            English
-          </MenuItem>
-          <MenuItem
-            icon={<span className="text-xs font-black">UA</span>}
-            soon
-            onClick={() => {
-              close()
-              onMock('Wersja ukraińska — wkrótce.')
-            }}
-          >
-            Українська
-          </MenuItem>
-        </>
-      )}
-    </Menu>
-  )
-}
-
-function AccessibilityMenu({ onMock }: { onMock: (message: string) => void }) {
+function AccessibilityMenu() {
   const [largeText, setLargeText] = useLargeText()
   const [contrast, setContrast] = useHighContrast()
+  const reading = useReading()
 
   return (
     <Menu label="Dostępność" trigger={<Accessibility className="size-5" />} icon>
       {(close) => (
         <>
-          <MenuItem
-            icon={<Volume2 className="size-4" />}
-            soon
-            onClick={() => {
-              close()
-              onMock('Czytanie na głos przygotowujemy z ElevenLabs.')
-            }}
-          >
-            Czytaj na głos
-          </MenuItem>
+          {(reading || canReadAloud()) && (
+            <MenuItem
+              icon={reading ? <Square className="size-4" /> : <Volume2 className="size-4" />}
+              onClick={() => {
+                close()
+                if (reading) stopReading()
+                else readAloud()
+              }}
+            >
+              {reading ? 'Zatrzymaj czytanie' : 'Czytaj na głos'}
+            </MenuItem>
+          )}
           <MenuItem
             icon={<Type className="size-4" />}
             checked={largeText}
@@ -313,13 +246,11 @@ function Menu({
 function MenuItem({
   icon,
   checked = false,
-  soon = false,
   onClick,
   children,
 }: {
   icon: ReactNode
   checked?: boolean
-  soon?: boolean
   onClick: () => void
   children: ReactNode
 }) {
@@ -332,24 +263,7 @@ function MenuItem({
     >
       <span className="grid size-6 place-items-center text-navy-500">{icon}</span>
       <span className="flex-1">{children}</span>
-      {soon && (
-        <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-bold text-navy-500">wkrótce</span>
-      )}
       {checked && <Check className="size-4 text-zus-600" strokeWidth={3} />}
-    </button>
-  )
-}
-
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="grid size-10 place-items-center rounded-full text-navy-700 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.95] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
-    >
-      {children}
     </button>
   )
 }

@@ -340,7 +340,6 @@ export function PlanScreen({
     <div className="flex h-dvh flex-col bg-white">
       {wide ? (
         <TopBar
-          onMock={showMock}
           persona={persona}
           onLogin={() => setLoginOpen(true)}
           onLogout={() => setPersona(null)}
@@ -359,7 +358,6 @@ export function PlanScreen({
           onAbout={() => openWhy()}
           onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
-          onMock={showMock}
           onShare={timeline ? () => setShareOpen(true) : undefined}
         />
       )}

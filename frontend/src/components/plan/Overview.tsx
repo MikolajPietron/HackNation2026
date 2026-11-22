@@ -82,10 +82,10 @@ export function Overview({
             <p className="text-sm font-bold text-navy-500">Twoja sytuacja</p>
             {situation && (
               <>
-                <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-navy-900 lg:text-[32px]">
+                <h1 data-read-aloud className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-navy-900 lg:text-[32px]">
                   {situation.title}
                 </h1>
-                <p className="mt-2 max-w-3xl text-[17px] leading-relaxed text-pretty text-navy-700">
+                <p data-read-aloud className="mt-2 max-w-3xl text-[17px] leading-relaxed text-pretty text-navy-700">
                   {situation.text}
                 </p>
               </>
@@ -136,13 +136,15 @@ export function Overview({
       <motion.header variants={ITEM} className="flex items-start gap-6">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-zus-700">Twoja sytuacja</p>
-          <h1 className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-balance text-navy-900 lg:text-[34px]">
+          <h1 data-read-aloud className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-balance text-navy-900 lg:text-[34px]">
             <TextStates text={title} />
           </h1>
           <p className="mt-2 max-w-4xl text-[17px] leading-relaxed text-pretty text-navy-500">
             {text && (
               <>
-                <Emphasis text={text} className="text-navy-900" />{' '}
+                <span data-read-aloud>
+                  <Emphasis text={text} className="text-navy-900" />
+                </span>{' '}
               </>
             )}
             <button

@@ -1,24 +1,22 @@
 // The top bar on phones: our mark, sign-in and one menu. The menu is a sheet from the bottom
 // (Vaul, via components/ui/sheet) with everything the wide top bar has: example cases, language,
-// accessibility, the ZUS services, how we count, start over and the admin panel.
+// accessibility, the ZUS services, how we count, start over and the admin panel. Only what works
+// (mocks with nothing behind them were removed on 22.11.2026, as in the wide top bar).
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   Calculator,
   Check,
-  ChevronRight,
   Contrast,
-  Ear,
   FolderOpen,
   HeartHandshake,
-  Languages,
   LogOut,
   Mail,
   Menu,
   RotateCcw,
-  Search,
   Settings2,
   Share2,
+  Square,
   Type,
   UserRound,
   Volume2,
@@ -26,6 +24,7 @@ import {
 import { Sheet } from '@/components/ui/sheet'
 import { useHighContrast } from '@/hooks/useHighContrast'
 import { useLargeText } from '@/hooks/useLargeText'
+import { canReadAloud, readAloud, stopReading, useReading } from '@/lib/speech'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import { BrandMark } from './Brand'
@@ -40,7 +39,6 @@ interface Props {
   onAbout: () => void
   onSupport: () => void
   onStartOver: () => void
-  onMock: (message: string) => void
   /** "Udostępnij plan": a read-only link for the partner. */
   onShare?: () => void
 }
@@ -98,12 +96,12 @@ function MenuContent({
   onAbout,
   onSupport,
   onStartOver,
-  onMock,
   onShare,
   close,
 }: Props & { close: () => void }) {
   const [largeText, setLargeText] = useLargeText()
   const [contrast, setContrast] = useHighContrast()
+  const reading = useReading()
   const then = (action: () => void) => () => {
     close()
     action()
@@ -144,14 +142,9 @@ function MenuContent({
             </Item>
           </>
         ) : (
-          <>
-            <Item icon={<UserRound />} onClick={then(onLogin)} meta="mObywatel · symulacja">
-              Zaloguj do PUE/eZUS
-            </Item>
-            <Item icon={<ChevronRight />} onClick={then(() => onMock('Rejestracja w PUE/eZUS to atrapa integracji.'))}>
-              Zarejestruj w PUE/eZUS
-            </Item>
-          </>
+          <Item icon={<UserRound />} onClick={then(onLogin)} meta="mObywatel · symulacja">
+            Zaloguj do PUE/eZUS
+          </Item>
         )}
       </Group>
 
@@ -159,28 +152,21 @@ function MenuContent({
         <Item icon={<Type />} onClick={() => setLargeText(!largeText)} checked={largeText}>
           Większy tekst
         </Item>
-        <Item icon={<Volume2 />} soon onClick={then(() => onMock('Czytanie na głos przygotowujemy z ElevenLabs.'))}>
-          Czytaj na głos
-        </Item>
+        {(reading || canReadAloud()) && (
+          <Item
+            icon={reading ? <Square /> : <Volume2 />}
+            meta="Zaznaczony tekst albo Twoja sytuacja"
+            onClick={then(reading ? stopReading : readAloud)}
+          >
+            {reading ? 'Zatrzymaj czytanie' : 'Czytaj na głos'}
+          </Item>
+        )}
         <Item icon={<Contrast />} onClick={() => setContrast(!contrast)} checked={contrast}>
           Wysoki kontrast
-        </Item>
-        <Item
-          icon={<Ear />}
-          soon
-          onClick={then(() => onMock('Wideotłumacz polskiego języka migowego jest w przygotowaniu.'))}
-        >
-          Tłumacz języka migowego
         </Item>
       </Group>
 
       <Group title="Więcej">
-        <Item icon={<Languages />} meta="PL · EN i UA wkrótce" onClick={then(() => onMock('Wersje EN i UA — wkrótce.'))}>
-          Język
-        </Item>
-        <Item icon={<Search />} soon onClick={then(() => onMock('Wyszukiwanie w Przewodniku ZUS — wkrótce.'))}>
-          Szukaj
-        </Item>
         <Item icon={<Settings2 />} href="/admin" meta="demo">
           Panel administracyjny
         </Item>
@@ -201,7 +187,6 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
 function Item({
   icon,
   meta,
-  soon,
   checked,
   href,
   onClick,
@@ -209,7 +194,6 @@ function Item({
 }: {
   icon: ReactNode
   meta?: string
-  soon?: boolean
   checked?: boolean
   href?: string
   onClick?: () => void
@@ -222,9 +206,6 @@ function Item({
         <span className="block font-bold text-navy-900">{children}</span>
         {meta && <span className="block text-sm text-navy-500">{meta}</span>}
       </span>
-      {soon && (
-        <span className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-bold text-navy-500">wkrótce</span>
-      )}
       {checked !== undefined && (
         <span
           className={cn(
