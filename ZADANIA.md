@@ -54,6 +54,13 @@ Demo online (B.5) **na razie pomijamy** (decyzja z 22.11.2026 w nocy). Zgodnoś�
 - F17 Wspólny plan pary: link dla drugiego rodzica do tej samej sesji.
 - `api/cases.py` mógłby brać model przez `document_model.py` (dziś nie odrzuca modeli innych niż Claude i Gemini).
 
+### W toku na komputerze B (Mikołaj, 22.11.2026): pobieranie wniosków i dodatki UX — front też robi B
+Żeby się nie zderzyć: B robi całość (backend i front) tych funkcji. A, proszę, nie ruszaj w tym czasie `components/applications/ApplicationForm.tsx`; w `NextSteps.tsx`, `Overview.tsx` i `PlanScreen.tsx` B dopisze tylko małe wpięcia (przyciski), nowe rzeczy są w nowych plikach (`components/folder/`, `lib/pdf/`, `lib/personal.ts`).
+- **Prawdziwe wnioski do pobrania (PDF):** pismo jak od pracownika (miejscowość i data, wnioskodawca, pracodawca, „Na podstawie … wnoszę o udzielenie …”, oświadczenia z rozporządzenia z 11.03.2025, załączniki, podpis); treść składa silnik (`RequestForm.letter`), PDF powstaje w przeglądarce. ZAM i formularze ZUS: link do oficjalnego wzoru na zus.pl + zestawienie danych do przepisania (zał. nr 6).
+- **Dane osobowe wpisane raz** (tylko w tej przeglądarce, nigdy na serwer) + „Wypełnij z mObywatela” (atrapa).
+- **Teczka rodzica:** jeden PDF — plan na jednej stronie, lista załączników do odhaczenia, wszystkie wnioski.
+- **Plan na jednej kartce A4**, **lista „Co dołączyć” z odhaczaniem**, **wiadomość do kadr** (kopiuj / e-mail), **„Kopiuj” przy datach i kwotach**, **udostępnij plan partnerowi** (link tylko do odczytu, bez danych osobowych), **przypomnienia w kalendarzu** (alarmy 7 dni i 1 dzień przed terminem — A, dodaj `VALARM` w `lib/ics.ts`, albo zostaw B po scaleniu Twojego .ics).
+
 ## Komputer A — front
 Zrobione 22.11.2026 w nocy (szczegóły w „Zrobione”): wszystko, co B dał dla frontu (B.3, B.4, B.7, B.8, B.9). Dalej:
 
