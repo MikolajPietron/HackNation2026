@@ -13,14 +13,7 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 
 ## Komputer B — logika
 
-Kolejność: **0** (błąd czatu) → **7** (endpoint, odblokowuje front) → **1** i **11** (podstawa wymiaru w sprawach, doczytanie spraw) → **2** (zgodność) → **3** i **10** (dane wniosków i organizacji dla frontu) → **4** → **5** i **6** (wymogi formalne) → **8**, **9** (funkcje wyróżniające).
-
-### 0. PILNE: czat zadaje złe pytanie wywiadu (błąd zgłoszony 22.11.2026)
-- Objaw: dziecko w drodze, termin porodu zapisany (23.01.2027). Rodzic klika chip „Wcześniak”, który wysyła „Co się zmieni, jeśli dziecko urodzi się przedwcześnie?”. Asystent kończy odpowiedź pytaniem „Kiedy jest przewidywany poród albo kiedy urodziło się dziecko? Podaj dzień, miesiąc i rok.”, czyli pyta o datę, którą już zna.
-- Przyczyna: stan jest dobry. `next_question` zwraca `leave-before-birth`, a front pokazuje do niego poprawne szybkie odpowiedzi. Ostatnie zdanie odpowiedzi pisze jednak model: `prompts.py` (linie ~60, ~144, ~170) i `describe.py` (`Następne pytanie wywiadu (zadaj je dokładnie tak)`) tylko go o to proszą. Gemini Flash (`LLM_MODEL=gemini-flash-latest` na komputerze A) czasem uznaje, że do wcześniaka potrzebna jest data urodzenia, i sam układa pytanie. W 4 powtórzeniach na czystej sesji się nie pojawiło, czyli błąd jest losowy, ale prawdziwy.
-- Poprawka (deterministyczna): pytanie wywiadu dokleja serwer, nie model. Prompt zabrania modelowi zadawania pytań wywiadu („aplikacja doda je sama pod Twoją odpowiedzią”), a `chat.py` po zakończeniu odpowiedzi wysyła `question.text` jako ostatnią porcję tekstu (albo osobne zdarzenie `question`, które front pokaże jako dymek). Doklejone pytanie musi też trafić do historii modelu, żeby kolejna tura wiedziała, o co zapytano.
-- Gotowe, gdy: test na skryptowanym modelu, który „pisze własne pytanie”, pokazuje w odpowiedzi tylko pytanie z kodu; przypadek „wcześniak przy znanym terminie” jest w `tools/eval`.
-- Doraźnie na komputerze A można zmienić model czatu na `gemini-pro-latest` (lepiej trzyma się instrukcji, ale jest wolniejszy).
+Kolejność: **7** (endpoint, odblokowuje front) → **1** i **11** (podstawa wymiaru w sprawach, doczytanie spraw) → **2** (zgodność) → **3** i **10** (dane wniosków i organizacji dla frontu) → **4** → **5** i **6** (wymogi formalne) → **8**, **9** (funkcje wyróżniające).
 
 ### 1. Pełna podstawa wymiaru → podpiąć pod przykładowe sprawy
 `engine/base.py` jest gotowy (Mikołaj, 22.11.2026: `Scenario.mother_pay_history` / `father_pay_history`, `PayHistory`, `Timeline.bases`). Zostało podpięcie odczytu spraw:
@@ -104,5 +97,6 @@ Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko czę
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- B.0 (22.11.2026): pytanie wywiadu dokleja serwer (`chat.py`), nie model; trafia też do historii modelu i do rozmowy po odświeżeniu. Front bez zmian: tekst odpowiedzi kończy się pytaniem, a szybkie odpowiedzi nadal idą po `question.key`. Test `test_the_interview_question_comes_from_the_code_not_the_model`, przypadek `premature-question-known-due-date` w `tools/eval`.
 - Pełna podstawa wymiaru `engine/base.py` (B). Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).
 - Przykładowe sprawy: wybór, wgranie, odczyt przez AI, ubezpieczenie, porównanie z ZUS, „Pokaż na osi” (A).

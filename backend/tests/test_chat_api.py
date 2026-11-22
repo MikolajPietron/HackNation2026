@@ -14,11 +14,11 @@ from pydantic_ai import ModelMessage, ModelRequest, ToolReturnPart
 from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 
 from app.api.deps import get_chat_model, get_param_store, get_session_store, get_today
-from app.assistant.describe import opening_notes
+from app.assistant.describe import interview_questions, opening_notes
 from app.assistant.law import zalacznik_available
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.config import Settings, get_settings
-from app.engine.models import CaseNote
+from app.engine.models import CaseNote, Scenario
 from app.main import app
 from app.services.param_versions import MemoryParamStore
 from app.services.sessions import MemorySessionStore, Session
@@ -104,7 +104,10 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
         "2027-03-14",
     )
     assert {"type": "tool-result", "id": "call-1", "name": "set_due_date", "ok": True} in out
-    assert "".join(e["delta"] for e in out if e["type"] == "text") == "Mam datę."
+    # The model's words, then the interview question the server adds (the model never writes it).
+    assert "".join(e["delta"] for e in out if e["type"] == "text") == (
+        "Mam datę.\n\nIle dzieci urodzi się przy jednym porodzie?"
+    )
     assert out[-1] == {"type": "done"}
 
     # Next answers: the server remembers the session; the client sends only the message.
@@ -156,7 +159,8 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
             "args": {"due_date": "2027-03-15"},
             "status": "done",
         },
-        {"kind": "text", "text": "Mam datę."},
+        # The question the server added is in the history too, so the next turn knows it.
+        {"kind": "text", "text": "Mam datę.\n\nIle dzieci urodzi się przy jednym porodzie?"},
     ]
     assert restored["scenario"]["has_medical_certificate"] is True
     assert restored["timeline"]["documents"][0]["done"] is True
@@ -272,7 +276,7 @@ def test_onboarding_answers_are_saved_and_used(client: TestClient) -> None:
     assert "Rozmawiasz z tatą" in seen[0]
     assert "tata pracuje na etacie" in seen[0]
     # His own work says nothing about the mother's insurance: that is asked first.
-    assert "Następne pytanie wywiadu (zadaj je dokładnie tak): „Jak pracuje mama:" in seen[0]
+    assert ASKED + "Jak pracuje mama:" in seen[0]
     assert "Potem: „Czy mama chce zacząć urlop macierzyński przed porodem" in seen[0]
     assert "Uprawnienie — Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe." in seen[0]
     assert "Ułatwienie — Bliźnięta: dłuższy urlop." in seen[0]
@@ -320,10 +324,15 @@ def test_timeline_ready_event_starts_the_conversation(client: TestClient) -> Non
     assert "Ochrona przed zwolnieniem" not in prompts[0]
     assert "bez powitania" in prompts[0]
     # The father filled in the interview: the closing question is about the mother.
-    assert prompts[0].endswith(
-        "Na końcu zadaj dokładnie to pytanie: „Jak pracuje mama: na etacie (umowa o pracę), na "
-        "umowie zlecenia, prowadzi własną firmę czy nie pracuje?”"
+    mother_work = (
+        "Jak pracuje mama: na etacie (umowa o pracę), na umowie zlecenia, prowadzi własną firmę "
+        "czy nie pracuje?"
     )
+    assert prompts[0].endswith(
+        f"Nie zadawaj pytania wywiadu: aplikacja dopisze pod Twoją odpowiedzią „{mother_work}”."
+    )
+    # ...and the server adds it under the answer.
+    assert "".join(e["delta"] for e in out if e["type"] == "text").endswith(mother_work)
     assert out[-1] == {"type": "done"}
     # The parent answered nothing in this turn: the model can only point at the timeline.
     assert tools == [["explain_timeline_element"]]
@@ -592,9 +601,16 @@ def interview(returned: str) -> str:
     return returned.split("\n\n")[-1]
 
 
+ASKED = (
+    "Następne pytanie wywiadu (aplikacja dopisze je sama pod Twoją odpowiedzią; nie zadawaj go "
+    "ani innego pytania wywiadu): „"
+)
+"""How the interview state names the next question: the server adds it, not the model."""
+
+
 def next_question(question: str, tool: str) -> str:
     return (
-        f"Następne pytanie wywiadu (zadaj je dokładnie tak): „{question}” Gdy użytkownik odpowie, "
+        f"{ASKED}{question}” Gdy użytkownik odpowie, "
         f"najpierw zapisz odpowiedź narzędziem {tool}, potem pisz."
     )
 
@@ -622,9 +638,7 @@ def test_the_fathers_questions_follow_the_mothers(client: TestClient) -> None:
     client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
     returned: list[str] = []
     ask(client, scripted("set_children_count", {"count": 2}, "Bliźnięta.", returned), "Dwoje")
-    assert interview(returned[0]).startswith(
-        "Następne pytanie wywiadu (zadaj je dokładnie tak): „Chcesz zacząć urlop macierzyński"
-    )
+    assert interview(returned[0]).startswith(ASKED + "Chcesz zacząć urlop macierzyński")
     assert f"Potem: „{FATHER_WORK}” (narzędzie `set_father_work`)." in interview(returned[0])
 
     returned.clear()
@@ -1256,3 +1270,50 @@ def test_the_pay_history_is_recorded_month_by_month(
         assert "[Załącznik ZUS, Okres uwzględniany w podstawie wymiaru zasiłku]" in (
             STATIC_INSTRUCTIONS
         )
+
+
+def test_the_interview_question_comes_from_the_code_not_the_model(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """ZADANIA B.0: the child is on the way and the due date is known; the parent asks about a
+    premature child and the model, against its instructions, ends with its own question about
+    the date. The server still adds the question the interview state gives (here: leave before
+    the birth), word for word, as the last piece of text; it never asks for the date again."""
+    answers = {
+        "role": "mother",
+        "work": "employment",
+        "child_born": False,
+        "due_date": "2027-01-23",
+        "children_count": 1,
+    }
+    remember(store, answers)
+    expected = interview_questions(Scenario.model_validate(answers))[0]
+    assert expected.key == "leave-before-birth"
+    model = FunctionModel(
+        stream_function=lambda messages, info: _words(
+            "Przy wcześniaku może dojść urlop uzupełniający. Kiedy jest przewidywany poród?"
+        )
+    )
+    app.dependency_overrides[get_chat_model] = lambda: model
+    out = events(
+        client.post(
+            "/api/chat",
+            json={
+                "session_id": SESSION,
+                "message": "Co się zmieni, jeśli dziecko urodzi się przedwcześnie?",
+            },
+        )
+    )
+    text = "".join(e["delta"] for e in out if e["type"] == "text")
+    assert text.endswith("\n\n" + expected.text)
+    assert out[-1] == {"type": "done"}
+    # An answer that already ends with the question gets nothing added.
+    model = FunctionModel(stream_function=lambda messages, info: _words("Dobrze. " + expected.text))
+    app.dependency_overrides[get_chat_model] = lambda: model
+    out = events(client.post("/api/chat", json={"session_id": SESSION, "message": "Ok"}))
+    text = "".join(e["delta"] for e in out if e["type"] == "text")
+    assert text == "Dobrze. " + expected.text
+
+
+async def _words(text: str) -> AsyncIterator[str]:
+    yield text

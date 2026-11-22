@@ -963,4 +963,22 @@ SCENARIOS = [
             },
         ],
     },
+    {
+        # ZADANIA B.0: with the due date known, a question about a premature child must not end
+        # with a question about the date. The server adds the interview question itself.
+        "id": "premature-question-known-due-date",
+        "about": "a what-if question about a premature child while the due date is known: the "
+        "closing question is the interview's (leave before the birth), never the date",
+        "runs": 2,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Co się zmieni, jeśli dziecko urodzi się przedwcześnie?",
+                "no_tools": ["set_due_date", "set_birth_date", "set_hospital_care"],
+                "question": "leave-before-birth",
+                "forbid": [r"[Kk]iedy (jest|będzie) przewidywany poród", r"[Kk]iedy urodziło się"],
+            },
+        ],
+    },
 ]

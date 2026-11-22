@@ -472,7 +472,10 @@ def test_onboarding_starts_the_adoption_path(api: TestClient) -> None:
     seen = instructions_now(api)
     assert "przyjęte na wychowanie (adopcja)" in seen
     assert "Dzień przyjęcia dziecka na wychowanie: 02.11.2026." in seen
-    assert "Następne pytanie wywiadu (zadaj je dokładnie tak): „Jak pracuje tata:" in seen
+    assert (
+        "Następne pytanie wywiadu (aplikacja dopisze je sama pod Twoją odpowiedzią; nie zadawaj go "
+        "ani innego pytania wywiadu): „Jak pracuje tata:" in seen
+    )
     assert "Potem: „Czy postanowienie sądu o przysposobieniu" in seen
     assert "urlop macierzyński przed porodem" not in seen.split("# Wywiad")[-1].split("\n\n")[-1]
 

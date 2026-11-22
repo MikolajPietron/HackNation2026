@@ -4,13 +4,17 @@ Events: `text` (delta), `tool-call`, `tool-result`, `timeline` (scenario + recal
 timeline), `focus` (element the assistant explains), `done`, `error`.
 The conversation (scenario and message history) is stored per session id; the client only
 sends its session id and the new message.
+
+The next interview question is never written by the model: when the turn ends, the server adds
+`interview_questions`' first question as the last piece of text, word for word, and to the
+model's history (so the next turn knows what was asked). The model is told not to ask it.
 """
 
 import datetime as dt
 import json
 import logging
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -26,6 +30,7 @@ from pydantic_ai import (
     ModelMessagesTypeAdapter,
     ModelOverloadedError,
     ModelRateLimitError,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -135,7 +140,14 @@ async def _stream(
                 if isinstance(event, TimelineUpdated):
                     await turn.save(event.scenario)
                 elif isinstance(event, AgentRunResultEvent):
-                    await turn.save(deps.scenario, event.result.all_messages())
+                    messages = event.result.all_messages()
+                    question = _closing_question(deps, messages)
+                    if question is not None:
+                        separator = "\n\n" if to_payload.wrote_text else ""
+                        to_payload.wrote_text = True
+                        yield _line({"type": "text", "delta": separator + question})
+                        messages = _with_text(messages, question)
+                    await turn.save(deps.scenario, messages)
                 payload = to_payload(event)
                 if payload is not None:
                     yield _line(payload)
@@ -211,6 +223,30 @@ def _error_message(exc: Exception) -> str:
             return "Asystent potrzebował zbyt wielu kroków. Spróbuj zapytać prościej."
         case _:
             return "Coś poszło nie tak po stronie asystenta. Spróbuj jeszcze raz."
+
+
+def _closing_question(deps: AssistantDeps, messages: list[ModelMessage]) -> str | None:
+    """The interview question the server adds under the model's answer: the first one the
+    interview state gives, unless the answer already ends with it word for word."""
+    questions = interview_questions(deps.scenario)
+    if not questions:
+        return None
+    text = questions[0].text
+    last = messages[-1] if messages else None
+    written = (
+        "".join(p.content for p in last.parts if isinstance(p, TextPart))
+        if isinstance(last, ModelResponse)
+        else ""
+    )
+    return None if written.rstrip().endswith(text) else text
+
+
+def _with_text(messages: list[ModelMessage], text: str) -> list[ModelMessage]:
+    """The history with `text` added to the model's last answer, as if it had written it."""
+    last = messages[-1] if messages else None
+    if not isinstance(last, ModelResponse):
+        return [*messages, ModelResponse(parts=[TextPart(content=text)])]
+    return [*messages[:-1], replace(last, parts=[*last.parts, TextPart(content=text)])]
 
 
 def _question(scenario: Scenario) -> dict[str, str] | None:
