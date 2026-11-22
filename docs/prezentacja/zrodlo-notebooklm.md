@@ -209,6 +209,8 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 
 ## 19. Technologia
 
+- Demo online: https://app-production-2f4e6c1c.up.railway.app (jeden kontener, backend serwuje też stronę).
+
 - Frontend: React, TypeScript, Vite, Tailwind, Motion.
 - Backend: Python, FastAPI. Silnik reguł to czysty, deterministyczny moduł bez bazy i bez AI.
 - Asystent: Pydantic AI, model Claude. Dokumenty czyta Claude albo Gemini.
@@ -217,7 +219,6 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 
 ## 20. Co dalej
 
-- Wdrożenie wersji online.
 - Pełny przebieg raportu zgodności na wszystkich 86 sprawach.
 - Wersje językowe: angielska i ukraińska.
 - Głos: czytanie wyniku na głos i pytania głosem.

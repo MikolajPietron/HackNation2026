@@ -43,6 +43,18 @@ from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
 
+
+def _reading_failed(error: Exception) -> str:
+    """What the parent sees when the model could not read the file: no provider's raw answer."""
+    text = str(error).lower()
+    if any(word in text for word in ("spend cap", "spending cap", "quota", "credits", "limit")):
+        return (
+            "Odczyt dokumentów przez AI jest chwilowo niedostępny: wyczerpał się limit konta "
+            "albo klucza modelu. Przykładowe rodziny i kalkulator działają bez AI."
+        )
+    return "Nie udało się odczytać sprawy. Spróbuj ponownie za chwilę."
+
+
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -159,7 +171,7 @@ async def _read(
         except HTTPException:
             raise
         except Exception as error:  # noqa: BLE001 — the model or the network failed
-            raise HTTPException(502, f"Nie udało się odczytać sprawy: {error}") from error
+            raise HTTPException(502, _reading_failed(error)) from error
         stored = CachedRead(facts=facts, pages=len(pages), pages_read=len(to_read))
         cache.put(key, stored)
     return assess(

@@ -4,6 +4,12 @@ Projekt na HackNation 2026, wyzwanie ZUS. Aplikacja buduje rodzicom osobistą **
 
 Każda reguła ma dosłowny cytat ze źródła: Przewodnika ZUS (opis wyzwania), Kodeksu pracy, ustawy zasiłkowej albo Załącznika ZUS. Produkt, domena i zasady pracy: [CLAUDE.md](CLAUDE.md). Plan funkcji: [FUNKCJE.md](FUNKCJE.md). Podział bieżącej pracy: [ZADANIA.md](ZADANIA.md).
 
+## Demo online
+
+https://app-production-2f4e6c1c.up.railway.app (Railway, jeden kontener: FastAPI serwuje też zbudowany front; `Dockerfile`, `railway.json`). Panel parametrów: `/admin`, raport zgodności: `/raport`. Rozmowy są w pamięci serwera. Skanów spraw ZUS na serwerze nie ma: sprawę wgrywa się samemu albo wybiera przykładową rodzinę.
+
+Wdrożenie nowej wersji: `npx @railway/cli up --service app` z katalogu głównego (po `railway login`).
+
 ## Co potrafi
 
 | Wymaganie z wyzwania | W aplikacji |
