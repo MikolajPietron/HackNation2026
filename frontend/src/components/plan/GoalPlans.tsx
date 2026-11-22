@@ -220,7 +220,7 @@ function PlanCard({
         </dl>
       )}
 
-      <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-navy-500">{plan.summary}</p>
+      <p className="mt-3 text-sm leading-relaxed text-navy-500">{plan.summary}</p>
 
       {plan.given_up.length > 0 && (
         <ul className="mt-3 space-y-1 text-sm">

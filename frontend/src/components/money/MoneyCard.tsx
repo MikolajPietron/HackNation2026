@@ -2,7 +2,7 @@
 // what comes in each calendar month and who pays it (MonthChart, from Timeline.monthly), the
 // total, the periods with their amounts, and the choice between 100% + 70% and 81,5%. Every
 // number is the engine's.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { calculateTimeline } from '@/api'
@@ -335,22 +335,35 @@ function RateChoice({
   )
 }
 
-/** A long text of the engine, two lines until opened. */
+/** A long text of the engine, two lines until opened; "Więcej" only when something is cut. */
 function Folded({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
+  const [cut, setCut] = useState(false)
+  const ref = useRef<HTMLParagraphElement>(null)
+  useLayoutEffect(() => {
+    const p = ref.current
+    if (!p || open) return
+    const check = () => setCut(p.scrollHeight > p.clientHeight + 1)
+    check()
+    const observer = new ResizeObserver(check)
+    observer.observe(p)
+    return () => observer.disconnect()
+  }, [text, open])
   return (
     <div className="mt-3 text-sm leading-relaxed text-navy-500">
-      <p className={cn(!open && 'line-clamp-2')}>
+      <p ref={ref} className={cn(!open && 'line-clamp-2')}>
         <Emphasis text={text} className="text-navy-900" />
       </p>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="mt-1 font-bold text-zus-700 underline-offset-4 hover:underline"
-      >
-        {open ? 'Mniej' : 'Więcej'}
-      </button>
+      {(cut || open) && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="mt-1 font-bold text-zus-700 underline-offset-4 hover:underline"
+        >
+          {open ? 'Mniej' : 'Więcej'}
+        </button>
+      )}
     </div>
   )
 }

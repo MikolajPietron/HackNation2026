@@ -166,7 +166,7 @@ export function MobileTimeline({
                     </span>
                   )}
                   {row.key && (
-                    <span className="mt-1 line-clamp-2 block text-sm leading-relaxed text-navy-500">
+                    <span className="mt-1 block text-sm leading-relaxed text-navy-500">
                       <Emphasis text={row.text} className="text-navy-700" />
                     </span>
                   )}

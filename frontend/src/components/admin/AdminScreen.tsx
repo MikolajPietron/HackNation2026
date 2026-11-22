@@ -139,12 +139,12 @@ export function AdminScreen() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-line bg-white/90 px-4 backdrop-blur lg:px-6">
+      <header className="sticky top-0 z-30 flex min-h-[72px] items-center gap-4 py-2 border-b border-line bg-white/90 px-4 backdrop-blur lg:px-6">
         <Brand className="hidden sm:flex" />
         <span className="hidden h-8 w-px bg-line sm:block" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold text-navy-900">Panel parametrów</p>
-          <p className="truncate text-xs text-navy-500">Liczby, z których liczy silnik reguł</p>
+          <p className="text-lg leading-tight font-bold text-navy-900">Panel parametrów</p>
+          <p className="text-xs text-navy-500">Liczby, z których liczy silnik reguł</p>
         </div>
         <span className="hidden md:inline-flex">
           <SimBadge>demo · bez logowania</SimBadge>

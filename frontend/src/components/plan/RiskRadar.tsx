@@ -165,7 +165,7 @@ function Row({ line, onCheckZus, onWhy }: { line: Line; onCheckZus: () => void; 
           <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-bold', level.className)}>{level.label}</span>
           <span className="font-bold text-navy-900">{line.title}</span>
         </p>
-        <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-navy-500">{line.text}</p>
+        <p className="mt-1 text-sm leading-relaxed text-navy-500">{line.text}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold">
           {line.note ? (
             <button type="button" onClick={() => onWhy(line.note!)} className="flex items-center gap-0.5 text-zus-700 hover:text-zus-900">

@@ -65,12 +65,12 @@ export function ReportScreen() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <header className="sticky top-0 z-30 flex h-[72px] items-center gap-4 border-b border-line bg-white/90 px-4 backdrop-blur lg:px-6">
+      <header className="sticky top-0 z-30 flex min-h-[72px] items-center gap-4 py-2 border-b border-line bg-white/90 px-4 backdrop-blur lg:px-6">
         <Brand className="hidden sm:flex" />
         <span className="hidden h-8 w-px bg-line sm:block" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold text-navy-900">Raport zgodności</p>
-          <p className="truncate text-xs text-navy-500">Kalkulator a decyzje ZUS w przykładowych sprawach</p>
+          <p className="text-lg leading-tight font-bold text-navy-900">Raport zgodności</p>
+          <p className="text-xs text-navy-500">Kalkulator a decyzje ZUS w przykładowych sprawach</p>
         </div>
         <a
           href="/"
@@ -213,10 +213,10 @@ function Row({ row }: { row: CaseAgreementRow }) {
         </span>
         <span className="w-10 shrink-0 text-sm font-black text-navy-400">{row.id}</span>
         <span className="min-w-0 flex-1">
-          <span className={cn('block truncate font-bold', row.read ? 'text-navy-900' : 'text-navy-400')}>
+          <span className={cn('block font-bold', row.read ? 'text-navy-900' : 'text-navy-400')}>
             {row.title || row.category}
           </span>
-          <span className="block truncate text-sm text-navy-500">
+          <span className="block text-sm text-navy-500">
             {row.read ? (row.title ? row.category : status.label) : status.label}
           </span>
         </span>

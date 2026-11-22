@@ -737,14 +737,19 @@ function LargeMonth({
                     key={`${piece.segment.id}-${weekStart}`}
                     aria-hidden
                     className={cn(
-                      'pointer-events-none z-10 mx-0.5 truncate px-2 text-[11px] leading-[20px] font-bold',
+                      'pointer-events-none z-10 mx-0.5 flex flex-wrap overflow-hidden px-2 text-[11px] leading-[20px] font-bold',
                       BAR[fill],
                       piece.roundStart ? 'rounded-l-full' : 'rounded-l-sm -ml-px',
                       piece.roundEnd ? 'rounded-r-full' : 'rounded-r-sm -mr-px',
                     )}
                     style={{ gridColumn: `${piece.from + 1} / ${piece.to + 2}`, gridRow: r + 2, height: 20 }}
                   >
-                    {span >= 2 || piece.roundStart ? clipName(piece.segment) : ''}
+                    {/* A name that does not fit whole wraps past the zero-width spacer to a second,
+                        hidden line: never cut with "…". The day's hover and card still name it. */}
+                    <span className="h-5 w-0" />
+                    <span className="whitespace-nowrap">
+                      {span >= 2 || piece.roundStart ? clipName(piece.segment) : ''}
+                    </span>
                   </span>
                 )
               }),

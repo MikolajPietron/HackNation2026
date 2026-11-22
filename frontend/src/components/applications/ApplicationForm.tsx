@@ -403,7 +403,7 @@ export function ApplicationForm({
                 {form.fields
                   .filter((f) => !f.personal && written(f, values))
                   .map((f) => (
-                    <li key={f.id} className="line-clamp-1">
+                    <li key={f.id}>
                       {f.label}: <span className="text-navy-900">{written(f, values)}</span>
                     </li>
                   ))}
