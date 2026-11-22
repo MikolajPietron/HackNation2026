@@ -46,5 +46,6 @@ async def health(
     store: Annotated[SessionStore, Depends(get_session_store)],
     params: Annotated[ParamStore, Depends(get_param_store)],
 ) -> dict[str, str]:
-    """Where conversations and parameter versions are stored: "supabase" or "memory"."""
+    """Where conversations are stored ("supabase" or "file") and parameter versions ("supabase" or
+    "memory")."""
     return {"status": "ok", "sessions": store.name, "params": params.name}

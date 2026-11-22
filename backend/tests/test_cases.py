@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from app.api.cases import get_case_cache, get_cases_folder, get_reader_factory
-from app.api.deps import get_today
+from app.api.deps import get_session_store, get_today
 from app.cases.assess import assess, check_insurance, compare, to_scenario
 from app.cases.cache import CaseCache
 from app.cases.catalog import list_case_files
@@ -32,6 +32,7 @@ from app.cases.models import (
 from app.cases.pages import render_pages
 from app.main import app
 from app.services.params import load_params
+from app.services.sessions import MemorySessionStore
 
 TODAY = dt.date(2026, 11, 22)
 
@@ -664,6 +665,8 @@ def client(tmp_path: Path):
     app.dependency_overrides[get_case_cache] = lambda: CaseCache(tmp_path / "cache")
     app.dependency_overrides[get_reader_factory] = lambda: lambda: reader
     app.dependency_overrides[get_today] = lambda: TODAY
+    sessions = MemorySessionStore()
+    app.dependency_overrides[get_session_store] = lambda: sessions
     with TestClient(app) as test_client:
         test_client.reader = reader  # type: ignore[attr-defined]
         yield test_client

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Supabase: the secret key stays in the backend, never in the frontend.
     supabase_url: str = ""
     supabase_secret_key: str = ""
+    sessions_dir: str = ".sessions"
+    """Without Supabase (or before its migration) conversations are kept here, one JSON file per
+    session, outside git, so they survive a restart of the backend. Relative = to backend/."""
 
     # LLM for the chat assistant (Pydantic AI): OpenRouter by default, or Anthropic, or Google
     # (Gemini, with GEMINI_API_KEY).

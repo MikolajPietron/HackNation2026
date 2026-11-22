@@ -30,3 +30,5 @@ dist/
 .claude/worktrees/
 # Facts read from the confidential ZUS cases (backend/app/cases/cache.py)
 backend/.cases_cache/
+# Conversations kept locally when Supabase is not configured (app/services/sessions.py)
+backend/.sessions/

@@ -2,6 +2,7 @@
 
 import datetime as dt
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -48,8 +49,16 @@ async def get_params(
     return active_params(load_params(), await store.list(), today)
 
 
+BACKEND = Path(__file__).resolve().parents[2]
+
+
 async def get_session_store(settings: Annotated[Settings, Depends(get_settings)]) -> SessionStore:
-    return await open_session_store(settings.supabase_url, settings.supabase_secret_key)
+    folder = Path(settings.sessions_dir)
+    return await open_session_store(
+        settings.supabase_url,
+        settings.supabase_secret_key,
+        folder if folder.is_absolute() else BACKEND / folder,
+    )
 
 
 def get_chat_model(settings: Annotated[Settings, Depends(get_settings)]) -> Model:
