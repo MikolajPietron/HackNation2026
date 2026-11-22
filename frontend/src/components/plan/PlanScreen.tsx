@@ -17,6 +17,7 @@ import { MobileBar } from '@/components/layout/MobileBar'
 import { TopBar } from '@/components/layout/TopBar'
 import { CasesDialog } from '@/components/cases/CasesDialog'
 import { LetterDialog } from '@/components/letters/LetterDialog'
+import { BirthCertificate } from '@/components/mocks/BirthCertificate'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
@@ -143,6 +144,7 @@ export function PlanScreen({
   const [zusOpen, setZusOpen] = useState(false)
   const [casesOpen, setCasesOpen] = useState(false)
   const [letterOpen, setLetterOpen] = useState(false)
+  const [certOpen, setCertOpen] = useState(false)
   const plan = usePlanChange(scenario, onUpdate)
   /** Changes from the interface wait while the assistant is writing (it may be changing the
    *  same plan). */
@@ -379,12 +381,12 @@ export function PlanScreen({
             <AnimatePresence>
               {selected && timeline && (
                 <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
-                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} />
+                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} onCertificate={() => setCertOpen(true)} />
                 </Dialog>
               )}
               {fillDocument && timeline && (
                 <Dialog key="fill" label={fillDocument.title} onClose={() => setFill(null)}>
-                  <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
+                  <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} onCertificate={() => setCertOpen(true)} />
                 </Dialog>
               )}
               {supportOpen && (
@@ -467,7 +469,7 @@ export function PlanScreen({
             title={selected?.title ?? 'Szczegóły'}
           >
             {selected && timeline && (
-              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} />
+              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} onCertificate={() => setCertOpen(true)} />
             )}
           </Sheet>
           <Sheet
@@ -476,7 +478,7 @@ export function PlanScreen({
             title={fillDocument?.title ?? 'Wniosek'}
           >
             {fillDocument && timeline && (
-              <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
+              <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} onCertificate={() => setCertOpen(true)} />
             )}
           </Sheet>
           <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
@@ -514,6 +516,7 @@ export function PlanScreen({
       />
       <ZusDataDialog persona={persona} open={zusOpen} onClose={() => setZusOpen(false)} onMock={showMock} />
       <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
+      <BirthCertificate open={certOpen} onClose={() => setCertOpen(false)} />
       <LetterDialog open={letterOpen} onClose={() => setLetterOpen(false)} timeline={timeline} onSelect={onSelect} />
 
       <UndoPill change={plan.change} onUndo={() => void plan.undo()} onDismiss={plan.dismiss} />

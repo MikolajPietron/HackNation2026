@@ -89,11 +89,14 @@ export function ApplicationForm({
   timeline,
   document,
   onSelect,
+  onCertificate,
 }: {
   timeline: Timeline
   document: Document
   /** Show the element a finding is about on the timeline. */
   onSelect?: (id: string) => void
+  /** Order the birth certificate (a simulation, F35). */
+  onCertificate?: () => void
 }) {
   const form = document.form
   const [values, setValues] = useState<Values>(() => (form ? initialValues(form) : {}))
@@ -225,6 +228,15 @@ export function ApplicationForm({
                             {attachment.hint && <span className="mt-0.5 block text-navy-500">{attachment.hint}</span>}
                           </span>
                         </label>
+                        {onCertificate && !on && /aktu urodzenia/i.test(attachment.label) && (
+                          <button
+                            type="button"
+                            onClick={onCertificate}
+                            className="mt-1 ml-11 text-sm font-bold text-zus-700 hover:text-zus-900"
+                          >
+                            Nie masz? Zamów odpis (symulacja)
+                          </button>
+                        )}
                       </li>
                     )
                   })}

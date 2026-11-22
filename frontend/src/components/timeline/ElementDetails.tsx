@@ -7,6 +7,8 @@ import { EASE_OUT } from '@/lib/ease'
 import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { daysLeftLabel } from '@/lib/plan'
 import { sourceLabel } from '@/lib/ui'
+import { Illustration } from '@/components/ui/illustration'
+import { ICONS } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { SourceRef, Timeline } from '@/types'
 import type { TimelineItem } from './items'
@@ -17,6 +19,8 @@ interface Props {
   onSelect: (id: string) => void
   /** Open the filled-in request for a document (a leave request). */
   onFill?: (documentId: string) => void
+  /** Order the birth certificate (a simulation, F35). */
+  onCertificate?: () => void
 }
 
 interface Fact {
@@ -28,10 +32,10 @@ interface Fact {
  * What the parent needs about one element. The facts come first and big (from, to, how long;
  * or when and how far away), the explanation with its numbers in bold, the sources last.
  */
-export function ElementDetails({ item, timeline, onSelect, onFill }: Props) {
+export function ElementDetails({ item, timeline, onSelect, onFill, onCertificate }: Props) {
   return (
     <div className="text-[15px] leading-relaxed text-navy-700">
-      <Body item={item} timeline={timeline} onSelect={onSelect} onFill={onFill} />
+      <Body item={item} timeline={timeline} onSelect={onSelect} onFill={onFill} onCertificate={onCertificate} />
       <Sources sources={item.element.sources} text={elementText(item)} />
     </div>
   )
@@ -39,7 +43,7 @@ export function ElementDetails({ item, timeline, onSelect, onFill }: Props) {
 
 const weeksOrDays = (days: number) => (days % 7 === 0 ? `${days / 7} tyg.` : `${days} dni`)
 
-function Body({ item, timeline, onSelect, onFill }: Props) {
+function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
   switch (item.kind) {
     case 'segment': {
       const s = item.element
@@ -130,6 +134,17 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
             <Emphasis text={m.summary} />
           </p>
           <Bullets items={m.details} />
+          {m.id === 'birth' && onCertificate && (
+            <button
+              type="button"
+              onClick={onCertificate}
+              className="mt-5 flex h-11 items-center gap-2 rounded-full border border-line pr-5 pl-2 text-sm font-bold text-navy-900 transition-colors hover:bg-navy-50"
+            >
+              <Illustration src={ICONS.aktUrodzenia} size="hint" />
+              Zamów odpis aktu urodzenia
+              <span className="rounded-full bg-sun-100 px-2 py-0.5 text-[11px] text-sun-700">symulacja</span>
+            </button>
+          )}
         </>
       )
     }
