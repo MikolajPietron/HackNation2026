@@ -21,7 +21,8 @@
   --color-navy-100: #dfe5ef;
   --color-navy-200: #c2cce0;
   --color-navy-300: #a6b1ca;
-  --color-navy-400: #8a97b3;
+  /* Captions in navy-400 meet WCAG AA on white and on the canvas (5.0:1 and 4.7:1). */
+  --color-navy-400: #636f8a;
   --color-navy-500: #5d6c8c;
   --color-navy-700: #283754;
   --color-navy-900: #1a2438;
@@ -98,6 +99,35 @@
   }
   to {
     stroke-dashoffset: var(--undo-length);
+  }
+}
+
+/* "Wysoki kontrast" (hooks/useHighContrast): the same tokens, darker. Grey text reaches at least
+   7:1 on white, lines and borders are visible, and the focus ring is thicker. */
+html.contrast {
+  --color-navy-300: #5d6c8c;
+  --color-navy-400: #3f4c69;
+  --color-navy-500: #2b3956;
+  --color-navy-700: #1a2438;
+  --color-navy-900: #0d1422;
+  --color-zus-700: #014a21;
+  --color-zus-600: #00652b;
+  --color-sun-700: #5e3d00;
+  --color-alert-600: #a80000;
+  --color-line: #8a97b3;
+  --color-canvas: #ffffff;
+}
+
+html.contrast :focus-visible {
+  outline: 3px solid var(--color-navy-900) !important;
+  outline-offset: 2px;
+}
+
+/* Keyboard focus is always visible, also where a component sets no ring of its own. */
+@layer base {
+  :where(a, button, input, textarea, select, summary, [role='button'], [role='radio'], [tabindex]):focus-visible {
+    outline: 2px solid var(--color-zus-600);
+    outline-offset: 2px;
   }
 }
 

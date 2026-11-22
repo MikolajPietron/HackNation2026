@@ -23,6 +23,7 @@ import {
   Type,
   Volume2,
 } from 'lucide-react'
+import { useHighContrast } from '@/hooks/useHighContrast'
 import { useLargeText } from '@/hooks/useLargeText'
 import { EASE_OUT } from '@/lib/ease'
 import type { Persona } from '@/lib/mockData'
@@ -201,6 +202,7 @@ function LanguageMenu({ onMock }: { onMock: (message: string) => void }) {
 
 function AccessibilityMenu({ onMock }: { onMock: (message: string) => void }) {
   const [largeText, setLargeText] = useLargeText()
+  const [contrast, setContrast] = useHighContrast()
 
   return (
     <Menu label="Dostępność" trigger={<Accessibility className="size-5" />} icon>
@@ -223,14 +225,7 @@ function AccessibilityMenu({ onMock }: { onMock: (message: string) => void }) {
           >
             Większy tekst
           </MenuItem>
-          <MenuItem
-            icon={<Contrast className="size-4" />}
-            soon
-            onClick={() => {
-              close()
-              onMock('Tryb wysokiego kontrastu — wkrótce.')
-            }}
-          >
+          <MenuItem icon={<Contrast className="size-4" />} checked={contrast} onClick={() => setContrast(!contrast)}>
             Wysoki kontrast
           </MenuItem>
         </>

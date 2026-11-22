@@ -23,6 +23,7 @@ import {
   Volume2,
 } from 'lucide-react'
 import { Sheet } from '@/components/ui/sheet'
+import { useHighContrast } from '@/hooks/useHighContrast'
 import { useLargeText } from '@/hooks/useLargeText'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
@@ -98,6 +99,7 @@ function MenuContent({
   close,
 }: Props & { close: () => void }) {
   const [largeText, setLargeText] = useLargeText()
+  const [contrast, setContrast] = useHighContrast()
   const then = (action: () => void) => () => {
     close()
     action()
@@ -151,7 +153,7 @@ function MenuContent({
         <Item icon={<Volume2 />} soon onClick={then(() => onMock('Czytanie na głos przygotowujemy z ElevenLabs.'))}>
           Czytaj na głos
         </Item>
-        <Item icon={<Contrast />} soon onClick={then(() => onMock('Tryb wysokiego kontrastu — wkrótce.'))}>
+        <Item icon={<Contrast />} onClick={() => setContrast(!contrast)} checked={contrast}>
           Wysoki kontrast
         </Item>
         <Item

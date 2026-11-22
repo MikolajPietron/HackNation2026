@@ -1,31 +1,45 @@
-import { useCallback, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, MotionConfig } from 'motion/react'
-import { AdminScreen } from '@/components/admin/AdminScreen'
-import { ReportScreen } from '@/components/report/ReportScreen'
 import { Onboarding } from '@/components/onboarding/Onboarding'
-import { PlanScreen } from '@/components/plan/PlanScreen'
 import { useAssistant } from '@/hooks/useAssistant'
 import { formatLongDate } from '@/lib/dates'
 import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
 import { childrenLabel } from '@/lib/ui'
 import type { SessionStart } from '@/types'
 
+// Loaded on demand, so the start screen comes up fast on a phone: the plan (with the chat, the
+// timeline and the windows), the parameters panel and the report are separate files.
+const loadPlan = () => import('@/components/plan/PlanScreen')
+const PlanScreen = lazy(() => loadPlan().then((m) => ({ default: m.PlanScreen })))
+const AdminScreen = lazy(() => import('@/components/admin/AdminScreen').then((m) => ({ default: m.AdminScreen })))
+const ReportScreen = lazy(() => import('@/components/report/ReportScreen').then((m) => ({ default: m.ReportScreen })))
+
+/** While a part of the app loads: a quiet page, marked busy for screen readers. */
+const Loading = () => <div className="h-dvh bg-white" aria-busy="true" aria-label="Wczytywanie" />
+
 /** `/admin` is the parameters panel, `/raport` the agreement report; the rest is the parents' app. */
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
-      {window.location.pathname.startsWith('/admin') ? (
-        <AdminScreen />
-      ) : window.location.pathname.startsWith('/raport') ? (
-        <ReportScreen />
-      ) : (
-        <ParentsApp />
-      )}
+      <Suspense fallback={<Loading />}>
+        {window.location.pathname.startsWith('/admin') ? (
+          <AdminScreen />
+        ) : window.location.pathname.startsWith('/raport') ? (
+          <ReportScreen />
+        ) : (
+          <ParentsApp />
+        )}
+      </Suspense>
     </MotionConfig>
   )
 }
 
 function ParentsApp() {
+  // The plan is fetched in the background while the parent is on the start screen.
+  useEffect(() => {
+    const id = window.setTimeout(() => void loadPlan(), 300)
+    return () => window.clearTimeout(id)
+  }, [])
   // Every visit starts on the interview's start screen; this turns true once the parent goes on
   // (finished interview, resumed plan or chat without the interview).
   const [entered, setEntered] = useState(false)
