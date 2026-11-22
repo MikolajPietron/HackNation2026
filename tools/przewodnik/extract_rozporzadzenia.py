@@ -92,6 +92,9 @@ ACTS = {
             "§ 22 ust. 1",
             "§ 23 ust. 1",
             "§ 26",
+            # ZAM of a non-employee for parental leave: filed before the benefit starts.
+            "§ 29",
+            "§ 30 ust. 1",
             "§ 32 ust. 1",
             "§ 33 ust. 1",
             "zał. 1",

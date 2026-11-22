@@ -25,7 +25,6 @@ Zostało (stan 22.11.2026, wieczór):
 
 ### Drobne, gdy będzie czas
 - Wniosek o łączenie rodzicielskiego z pracą (rozporządzenie § 16, KP art. 182¹ᵉ § 2) jako dokument z formularzem.
-- Terminy ZAM dla osoby niebędącej pracownikiem „przed rozpoczęciem korzystania z zasiłku” (rozporządzenie z 27.09.2026) — do decyzji, czy pokazywać jako termin (CLAUDE.md, „Otwarte pytania”).
 - `api/cases.py` mógłby brać model przez `document_model.py` (dziś nie odrzuca modeli innych niż Claude i Gemini).
 
 ## Komputer A — front
@@ -48,6 +47,7 @@ Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko czę
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- Terminy ZAM osoby bez etatu (22.11.2026): nowe dokumenty osi `zam-supplementary`, `zam-parental`, `zam-parental-mother-<k>`, `zam-paternity`, `zam-parental-father`, `zam-parental-father-<k>` z `deadline` z rozporządzenia z 27.09.2026 (dzień przed startem zasiłku za ten okres; za uzupełniający dzień przed końcem zasiłku za urlop macierzyński). Źródło `rozp_zasilki` (§ 26, § 29, § 30 ust. 1, § 32 ust. 1, § 33 ust. 1). Główny ZAM (macierzyński) nadal bez terminu.
 - **Dla frontu (A), 22.11.2026 wieczór — wszystko w `main`, typy w `frontend/src/types.ts`, wywołania w `api.ts`:**
   - **B.3 Wnioski do wypełnienia:** każdy dokument osi ma `form: RequestForm | null` — `title`, `applicant`, `addressee` (`employer` / `payer` / `zus` / `payer-or-zus`) z `addressee_label`, `official_form` (`ZAM`, `ZAS-53` albo null), `legal_basis`, `start`/`end`, `fields[]` (`id`, `label`, `kind`: text / date / period / statement, `value`, `personal`, `required`, `hint`, `sources`), `attachments[]`, `notes[]`. Pola `personal` (imiona, PESEL, adres, konto, podpis) są puste: wpisuje je użytkownik. Każda część planu rodzicielskiego ma własny wniosek (`parental-request-<k>`, `parental-father-request-<k>`). Źródła `rozp_wnioski` / `rozp_zasilki` — `ElementDetails` `Sources` musi je pokazywać (dziś pokazuje tylko Przewodnik/Załącznik i KP/ustawę).
   - **B.4 Terminy:** `Document.deadline` tylko tam, gdzie termin liczy Kodeks pracy; inaczej data na osi to dzień startu, nie termin.

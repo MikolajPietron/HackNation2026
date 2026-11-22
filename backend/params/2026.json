@@ -1740,6 +1740,51 @@
           "quote": "Kobiety, które pracują, ale nie są pracownikami (np. prowadzące pozarolniczą działalność gospodarczą) powinny powstrzymać się od pracy zawodowej, a w celu otrzymania zasiłku powinny złożyć odpowiednie dokumenty do ZUS (wniosek o zasiłek chorobowy ZAS-53)"
         }
       ]
+    },
+    "zam_supplementary_before": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 26",
+          "quote": "wniosek ubezpieczonego złożony płatnikowi zasiłku macierzyńskiego przed zakończeniem okresu pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu macierzyńskiego albo urlopu na warunkach urlopu macierzyńskiego zawierający termin zakończenia pobierania zasiłku macierzyńskiego za okres urlopu macierzyńskiego albo urlopu na warunkach urlopu macierzyńskiego – w przypadku ubezpieczonego niebędącego pracownikiem"
+        }
+      ]
+    },
+    "zam_parental_before": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 29",
+          "quote": "wniosek ubezpieczonego złożony płatnikowi zasiłku macierzyńskiego przed terminem rozpoczęcia korzystania z tego zasiłku za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego – w przypadku ubezpieczonego, który nie jest pracownikiem"
+        }
+      ]
+    },
+    "zam_parental_before_other": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 30 ust. 1",
+          "quote": "wniosek ubezpieczonego złożony płatnikowi zasiłku macierzyńskiego przed terminem rozpoczęcia korzystania z tego zasiłku za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego – w przypadku ubezpieczonego niebędącego pracownikiem"
+        }
+      ]
+    },
+    "zam_parental_before_father": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 32 ust. 1",
+          "quote": "wniosek ubezpieczonego złożony płatnikowi zasiłku macierzyńskiego przed terminem rozpoczęcia korzystania z tego zasiłku za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego – w przypadku ubezpieczonego, który nie jest pracownikiem"
+        }
+      ]
+    },
+    "zam_paternity_before": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 33 ust. 1",
+          "quote": "złożony przed terminem rozpoczęcia korzystania z zasiłku macierzyńskiego, zawierający datę, od której ubezpieczony zamierza korzystać z zasiłku macierzyńskiego – w przypadku ubezpieczonego, który nie jest pracownikiem"
+        }
+      ]
     }
   },
   "parental_plan": {
