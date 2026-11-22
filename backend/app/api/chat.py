@@ -158,7 +158,10 @@ async def _stream(
                     messages = event.result.all_messages()
                     question = _closing_question(deps, messages)
                     if question is not None:
-                        separator = "\n\n" if to_payload.wrote_text else ""
+                        # From the answer itself: some providers send text the stream events
+                        # don't mark as text (found in the Gemini eval, 22.11.2026).
+                        wrote = to_payload.wrote_text or bool(_answer_text(messages).strip())
+                        separator = "\n\n" if wrote else ""
                         to_payload.wrote_text = True
                         yield _line({"type": "text", "delta": separator + question})
                         messages = _with_text(messages, question)
@@ -307,13 +310,15 @@ def _closing_question(deps: AssistantDeps, messages: list[ModelMessage]) -> str 
     if not questions:
         return None
     text = questions[0].text
+    return None if _answer_text(messages).rstrip().endswith(text) else text
+
+
+def _answer_text(messages: list[ModelMessage]) -> str:
+    """The text of the model's last answer in the history."""
     last = messages[-1] if messages else None
-    written = (
-        "".join(p.content for p in last.parts if isinstance(p, TextPart))
-        if isinstance(last, ModelResponse)
-        else ""
-    )
-    return None if written.rstrip().endswith(text) else text
+    if not isinstance(last, ModelResponse):
+        return ""
+    return "".join(p.content for p in last.parts if isinstance(p, TextPart))
 
 
 def _with_text(messages: list[ModelMessage], text: str) -> list[ModelMessage]:

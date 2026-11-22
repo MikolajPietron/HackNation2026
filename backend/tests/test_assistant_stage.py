@@ -265,8 +265,9 @@ def test_the_welcome_thinks_little_and_answers_briefly(
         deps = SimpleNamespace(answers_allowed=answers_allowed)
         return _turn_settings(SimpleNamespace(deps=deps, model_settings=model))  # type: ignore[arg-type]
 
-    assert settings(False, {})["thinking"] == "minimal"
-    assert settings(False, {"thinking": "high"})["thinking"] == "minimal"
+    # Not "minimal": Gemini Flash refuses it (400 INVALID_ARGUMENT).
+    assert settings(False, {})["thinking"] == "low"
+    assert settings(False, {"thinking": "high"})["thinking"] == "low"
     assert settings(True, {})["thinking"] == "low"
     # LLM_THINKING (the model's own setting) still decides the answers.
     assert settings(True, {"thinking": "high"})["thinking"] == "high"

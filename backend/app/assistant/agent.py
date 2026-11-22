@@ -129,9 +129,10 @@ EVENT_MAX_TOKENS = 2048
 
 def _turn_settings(ctx: RunContext[AssistantDeps]) -> ModelSettings:
     """No long thinking (ZADANIA B.17): the engine computes, the model only records and explains.
-    `LLM_THINKING` still sets it for answers; the welcome turn thinks minimally."""
+    `LLM_THINKING` still sets it for answers; the welcome turn thinks "low" — not "minimal",
+    which Gemini Flash refuses with 400 (found by the real-model eval, 22.11.2026)."""
     if not ctx.deps.answers_allowed:
-        return ModelSettings(thinking="minimal", max_tokens=EVENT_MAX_TOKENS)
+        return ModelSettings(thinking="low", max_tokens=EVENT_MAX_TOKENS)
     thinking = (ctx.model_settings or {}).get("thinking") or "low"
     return ModelSettings(thinking=thinking, max_tokens=MAX_TOKENS)
 

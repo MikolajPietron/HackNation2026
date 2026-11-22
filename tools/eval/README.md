@@ -11,11 +11,12 @@ changing prompts, tools, the model or the engine.
 
 ## Running
 
-Start a backend with Supabase switched off, so no test session reaches the hosted database:
+Start a backend with Supabase switched off, so no test session reaches the hosted database, and with
+`APP_TODAY` fixed to the day the scenarios are computed for:
 
 ```bash
 cd backend
-SUPABASE_URL= SUPABASE_SECRET_KEY= uv run uvicorn app.main:app --port 8010
+SUPABASE_URL= SUPABASE_SECRET_KEY= APP_TODAY=2026-11-21 uv run uvicorn app.main:app --port 8010
 ```
 
 Then, in another terminal:

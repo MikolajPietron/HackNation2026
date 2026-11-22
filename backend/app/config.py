@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     """Empty = the default model of the provider (Claude Opus 5.5)."""
     llm_thinking: ThinkingLevel | None = None
     """Thinking effort of the chat's answers; unset = "low" (agent.py). The welcome turn after the
-    onboarding always thinks minimally."""
+    onboarding always thinks "low"."""
     llm_fallback_model: str = ""
     """A model of the same provider (same key) the chat falls back to when the main one is rate
     limited, overloaded or unreachable even after one more attempt. Empty = no fallback."""
