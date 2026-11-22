@@ -13,10 +13,12 @@ import { ITEM } from '@/components/onboarding/motion'
 import { Illustration } from '@/components/ui/illustration'
 import { EASE_OUT, SPRING_PRESS } from '@/lib/ease'
 import { ICONS } from '@/lib/icons'
-import { STRESS_ICON, VERDICT } from '@/lib/stress'
-import { formatPln } from '@/lib/money'
+import { REASON, STRESS_ICON, VERDICT } from '@/lib/stress'
+import { formatShortDate } from '@/lib/dates'
+import { formatPlnShort } from '@/lib/money'
+import { length } from '@/lib/plan'
 import { cn } from '@/lib/utils'
-import type { StressEvent, StressEventId, StressReport } from '@/types'
+import type { RightChange, StressEvent, StressEventId, StressReport } from '@/types'
 
 
 export function StressTest({
@@ -54,7 +56,7 @@ export function StressTest({
           </h2>
           <p className="mt-0.5 text-sm text-navy-500">
             {report && plain.length > 0
-              ? 'Kliknij zdarzenie, a pokażemy je na Waszej osi. Kwota to zmiana wszystkich zasiłków na osi.'
+              ? 'Kliknij zdarzenie, a pokażemy je na Waszej osi. Kwota to zmiana wszystkich zasiłków w planie.'
               : 'Sprawdzamy Wasz plan na zdarzeniach, które jeszcze mogą się zdarzyć.'}
           </p>
         </div>
@@ -148,7 +150,40 @@ function groups(events: StressEvent[]): StressEvent[][] {
   return result
 }
 
-const signed = (amount: number) => `${amount > 0 ? '+' : '−'}${formatPln(Math.abs(amount))}`
+/** "+7 047 zł", "−62 807 zł": whole złoty on a tile, the exact amount is in the preview. */
+const signed = (amount: number) => `${amount > 0 ? '+' : '−'}${formatPlnShort(Math.abs(amount))}`
+
+/** The engine's change of an entitlement in a few words: "Urlop macierzyński: 20 → 31 tyg.",
+ *  "Uzupełniający urlop macierzyński: +4 tyg.", "Urlop macierzyński przepada". */
+function rightLine(change: RightChange): string {
+  const label = change.label.charAt(0).toUpperCase() + change.label.slice(1)
+  // A number never parts from its unit or the arrow.
+  const len = (days: number) => length(days).replace(' ', '\u00a0')
+  if (change.days_before === 0) return `${label}: +${len(change.days_after)}`
+  if (change.days_after === 0) return `${label} przepada`
+  return `${label}: ${len(change.days_before)}\u00a0→\u00a0${len(change.days_after)}`
+}
+
+/** What a gentle event changes first: a right, else the period that is added (the father's
+ *  leave), else the engine's first line. */
+function firstChange(event: StressEvent): string | null {
+  if (event.rights[0]) return rightLine(event.rights[0])
+  const added = event.periods.find((p) => p.change === 'added' && p.start_after)
+  if (added) return `${added.title} od ${formatShortDate(added.start_after!)}`
+  return event.lines[0] ?? null
+}
+
+/** The job loss by reason: reasons with the same verdict and money read as one line. */
+function byReason(events: StressEvent[]): { reasons: string[]; event: StressEvent }[] {
+  const lines: { reasons: string[]; event: StressEvent }[] = []
+  for (const event of events) {
+    const same = lines.find((l) => l.event.verdict === event.verdict && l.event.money?.diff === event.money?.diff)
+    const reason = REASON[event.id] ?? event.title
+    if (same) same.reasons.push(reason)
+    else lines.push({ reasons: [reason], event })
+  }
+  return lines
+}
 
 function Tile({
   events,
@@ -171,9 +206,8 @@ function Tile({
   const event = events[0]
   const many = events.length > 1
   const verdict = VERDICT[event.verdict]
-  const diffs = events.map((e) => e.money?.diff ?? null).filter((d): d is number => d !== null && d !== 0)
-  const low = diffs.length > 0 ? Math.min(...diffs) : null
-  const high = diffs.length > 0 ? Math.max(...diffs) : null
+  const diff = event.money?.diff ?? null
+  const change = gentle ? firstChange(event) : event.rights[0] ? rightLine(event.rights[0]) : null
   return (
     <motion.li
       initial={{ opacity: 0, y: 8 }}
@@ -187,51 +221,79 @@ function Tile({
         aria-pressed={active}
         whileTap={{ scale: 0.98, transition: SPRING_PRESS }}
         className={cn(
-          'flex h-full w-full items-start gap-3 rounded-3xl border bg-white p-4 text-left',
+          'flex h-full w-full flex-col rounded-3xl border bg-white p-4 text-left sm:p-5',
           'transition-[border-color,box-shadow,background-color] duration-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
           active
             ? 'border-navy-900 bg-navy-50/60 shadow-[0_0_0_1px_var(--color-navy-900)]'
             : 'border-line hover:border-navy-200 hover:shadow-[0_16px_40px_-28px_rgb(26_36_56/0.45)]',
         )}
       >
-        <Illustration src={STRESS_ICON[event.id]} size="event" className="bg-navy-50/60" />
-        <span className="min-w-0 flex-1">
-          <span className="block leading-tight font-bold text-navy-900">
+        {/* The event. */}
+        <span className="flex items-center gap-3">
+          <Illustration src={STRESS_ICON[event.id]} size="event" className="bg-navy-50/60" />
+          <span className="min-w-0 flex-1 text-[17px] leading-snug font-bold text-navy-900">
             {many ? 'Utrata pracy w ciąży' : event.title}
           </span>
-          {!gentle && (
-            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              {many ? (
-                <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs font-bold text-navy-700">
-                  zależy od powodu
-                </span>
-              ) : (
-                <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', verdict.chip)}>{verdict.label}</span>
-              )}
-              {low !== null && high !== null && (
-                <span className="font-bold text-navy-700 tabular-nums">
-                  {low === high ? signed(low) : `od ${signed(low)} do ${signed(high)}`}
-                </span>
-              )}
-            </span>
-          )}
-          {(gentle || low === null) && event.lines[0] && (
-            <span className="mt-1 block text-sm text-pretty text-navy-500">{event.lines[0]}</span>
-          )}
-          {(loading || active) && (
-            <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-navy-900">
-              {loading ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin" /> Liczę…
-                </>
-              ) : (
-                <>
-                  <Eye className="size-4" /> Na osi teraz
-                </>
-              )}
-            </span>
-          )}
         </span>
+
+        {many ? (
+          // What each reason means, money first.
+          <span className="mt-4 block space-y-2">
+            {byReason(events).map(({ reasons, event: e }) => {
+              const d = e.money?.diff ?? null
+              return (
+                <span key={e.id} className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 text-sm text-navy-700">
+                    <span className="font-bold text-navy-900">{reasons.join(', ')}</span>
+                    {e.verdict !== 'kept' && <span className="text-navy-500"> · {VERDICT[e.verdict].label}</span>}
+                  </span>
+                  {d !== null && d !== 0 && (
+                    <span className={cn('shrink-0 text-lg font-bold tabular-nums', d > 0 ? 'text-zus-700' : 'text-sun-700')}>
+                      {signed(d)}
+                    </span>
+                  )}
+                </span>
+              )
+            })}
+          </span>
+        ) : (
+          <>
+            {/* What changes in the leave, then the money. */}
+            {change && (
+              <span className={cn('mt-4 block text-[15px] leading-snug', gentle ? 'text-navy-700' : 'font-bold text-navy-900')}>
+                {change}
+              </span>
+            )}
+            {!gentle && diff !== null && diff !== 0 && (
+              <span className="mt-2 flex items-baseline gap-2">
+                <span className={cn('text-[26px] leading-none font-bold tracking-tight tabular-nums', diff > 0 ? 'text-zus-700' : 'text-sun-700')}>
+                  {signed(diff)}
+                </span>
+                <span className="text-sm text-navy-500">zasiłków razem</span>
+              </span>
+            )}
+          </>
+        )}
+
+        {/* The verdict, at the foot so the tiles of a row line up; and whether it is on the axis. */}
+        {((!gentle && !many) || loading || active) && (
+          <span className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-4 text-sm font-bold">
+            {!gentle && !many && (
+              <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-bold', verdict.chip)}>{verdict.label}</span>
+            )}
+            {loading ? (
+              <span className="flex items-center gap-1.5 text-navy-900">
+                <LoaderCircle className="size-4 animate-spin" /> Liczę…
+              </span>
+            ) : (
+              active && (
+                <span className="flex items-center gap-1.5 text-navy-900">
+                  <Eye className="size-4" /> Na osi teraz
+                </span>
+              )
+            )}
+          </span>
+        )}
       </motion.button>
     </motion.li>
   )
