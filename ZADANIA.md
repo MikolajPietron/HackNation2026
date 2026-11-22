@@ -59,13 +59,20 @@ README jest nieaktualny („zrobiona jest faza 1”, „Claude przez OpenRouter�
 - Bez AI: silnik dat i kwot, sprawdzenie ubezpieczenia, porównanie z ZUS.
 
 ## Komputer A — front
+Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko część. Kolejność według priorytetów z FUNKCJE.md:
 
-1. Organizacje wsparcia (punkt i zadania): fundacje i stowarzyszenia przy śmierci dziecka, wcześniaku, poronieniu, ciężko chorym dziecku. Lista ze sprawdzonymi adresami i źródłem, w trybie łagodnym i w szczegółach takich sytuacji.
-2. Symulacja wypełnienia i wysłania wniosków (widok na danych z punktu B.3).
-3. Symulacja wniosku o odpis aktu urodzenia (gov.pl, rejestr stanu cywilnego).
-4. „Co jeśli: Utrata pracy w ciąży” — dziś atrapa; podpiąć pod silnik przez czat jak pozostałe chipy.
-5. Przykładowe sprawy: dopracować widok po wynikach wsadu (tytuły, statusy, różnice).
-6. „Plany dla Was” czekają na drzewo decyzyjne.
+1. **Pieniądze na ekranie planu (F4, F5; P0).** Dziś kwota jest tylko w szczegółach okresu. Do zrobienia: kafelek „Ile dostaniecie?” w „Twojej sytuacji”, ścieżka Pieniądze na osi z prawdziwego `Timeline.payments` (kto płaci, ile w którym miesiącu) i „Dlaczego tyle?” z `Timeline.bases` oraz `Payment.details` (krok po kroku, ze źródłem).
+2. **Raport zgodności (F37; P0).** Strona z listą spraw: zgodne, różne, bez decyzji, z powodem różnicy. Dane z pamięci odczytów (endpoint w `app/cases`, jak `batch --only-cached`).
+3. **Porównanie 100/70 a 81,5% (F12; P1).** Dwa przeliczenia przez `POST /api/timeline` (`rate_815` true/false), różnica w złotówkach i czasie.
+4. **Organizacje wsparcia (F28, wymóg i zadania).** Lista ze sprawdzonymi adresami, w trybie łagodnym i przy wcześniaku.
+5. **Wnioski: wypełnienie i atrapa wysyłki (F22, wymóg zadania).** Na danych z B.3; do tego czasu z `timeline.documents`.
+6. **Odpis aktu urodzenia (F35, wymóg zadania).** Atrapa przebiegu gov.pl.
+7. **Plan rodzicielskiego w interfejsie (F6 suwak 0–50% etatu, F13 kafelki tygodni, F3 walidacja na żywo; P0/P1).** Wymaga endpointu z B (niżej). Do tego czasu przez czat, jak chipy „Co jeśli…”.
+8. **„Co jeśli: Utrata pracy w ciąży” (F7).** Podpiąć przez czat.
+9. „Zostawiacie na stole” (F9), punkty bez powrotu (F10), „Plany dla Was” (F8, drzewo decyzyjne).
+
+### Potrzebne od B dla frontu
+- `PATCH /api/session/{id}/scenario`: zmiana wybranych pól scenariusza (np. `parental_parts`, `rate_815`) bez czatu, z walidacją silnika. Zwraca oś i następne pytanie jak `SessionStart`. FUNKCJE: „Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny”.
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
