@@ -125,6 +125,23 @@ class FatherParams(BaseModel):
     special_death: Rule
     special_abandonment: Rule
     total_cap: Rule
+    abandonment_mother_loses: Rule
+    """Art. 182: after abandoning the child the mother loses the rest of maternity leave, but
+    not below 8 weeks after the birth, whoever takes it."""
+    special_uninsured: Rule
+    """Art. 180 § 15: the mother had no sickness insurance and died, abandoned the child, or
+    has a ruling of incapacity: the father has the part after that day."""
+    special_uninsured_benefit: Rule
+    """Ustawa art. 29 ust. 9: the father's benefit for that part."""
+    interrupted_work_takeover: Rule
+    """A father who is not an employee: the benefit after he interrupted his work to look after
+    the child (ustawa art. 29 ust. 3; KP art. 180 § 4 pkt 2) ..."""
+    interrupted_work_incapacity: Rule
+    """... the mother's incapacity (ustawa art. 29 ust. 5) ..."""
+    interrupted_work_hospital: Rule
+    """... her stay in hospital (ustawa art. 29 ust. 6) ..."""
+    interrupted_work_death: Rule
+    """... her death or abandoning the child (ustawa art. 29 ust. 7)."""
 
 
 class PregnancyParams(BaseModel):
@@ -456,10 +473,11 @@ class FormTemplate(BaseModel):
 
 class FormParams(BaseModel):
     templates: dict[str, FormTemplate]
-    """By kind of request: "prenatal", "maternity", "resignation", "father-takeover",
-    "father-hospital-employee", "father-hospital-insured", "father-death",
-    "father-abandonment", "supplementary", "parental", "parental-work", "paternity", "zam",
-    "sick"."""
+    """By kind of request: "prenatal", "maternity", "resignation", "resignation-incapacity",
+    "father-takeover", "father-hospital-employee", "father-hospital-insured", "father-death",
+    "father-abandonment", "father-uninsured-death", "father-uninsured-abandonment",
+    "father-uninsured-incapacity", "supplementary", "parental", "parental-work", "paternity",
+    "zam", "sick"."""
     personal_files: Rule
     """An employee attaches nothing the employer keeps in the personal files."""
     zus_forms: Rule

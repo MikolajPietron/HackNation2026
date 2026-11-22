@@ -474,7 +474,8 @@ async def set_mother_situation(
     Args:
         situation: {"kind": "incapacity", "start": the day the father takes over} = the mother
             has a certificate of inability to live independently (orzeczenie o niezdolności do
-            samodzielnej egzystencji); {"kind": "hospital", "start": first day, "end": last
+            samodzielnej egzystencji); when the mother has no sickness insurance, "start" is the
+            day her incapacity arose; {"kind": "hospital", "start": first day, "end": last
             day} = she is in hospital and cannot look after the child (no `end` = still
             there); {"kind": "death", "start": the day she died}; {"kind": "abandonment",
             "start": the day she abandoned the child}. Null corrects an earlier answer.

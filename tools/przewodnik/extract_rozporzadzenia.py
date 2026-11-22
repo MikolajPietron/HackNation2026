@@ -49,6 +49,9 @@ ACTS = {
             "§ 2 ust. 2",
             "§ 3 ust. 1",
             "§ 3 ust. 2",
+            # The resignation of a mother with a ruling of incapacity (art. 180 § 6, § 8).
+            "§ 4 ust. 1",
+            "§ 4 ust. 2",
             "§ 5 ust. 1",
             "§ 5 ust. 2",
             "§ 6 ust. 1",
@@ -59,6 +62,14 @@ ACTS = {
             "§ 8 ust. 2",
             "§ 9 ust. 1",
             "§ 9 ust. 2",
+            # The father's part after the death, abandonment or incapacity of an uninsured
+            # mother (art. 180 § 15-16).
+            "§ 10 ust. 1",
+            "§ 10 ust. 2",
+            "§ 11 ust. 1",
+            "§ 11 ust. 2",
+            "§ 12 ust. 1",
+            "§ 12 ust. 2",
             "§ 14 ust. 1",
             "§ 14 ust. 2",
             "§ 15 ust. 1",
@@ -91,7 +102,9 @@ ACTS = {
             "§ 13 ust. 3",
             "§ 20 ust. 1",
             "§ 20 ust. 3",
+            "§ 20 ust. 4",
             "§ 22 ust. 1",
+            "§ 22 ust. 2",
             "§ 23 ust. 1",
             "§ 26",
             # ZAM of a non-employee for parental leave: filed before the benefit starts.

@@ -335,6 +335,44 @@ def test_the_mother_in_hospital_the_father_asks_without_a_deadline() -> None:
     assert "maternity-resignation" not in {d.id for d in t.documents}
 
 
+def test_the_mother_with_a_ruling_resigns_and_the_father_asks_14_days_before() -> None:
+    """Art. 180 § 8 (§ 4 and § 6): with her ruling of incapacity the mother resigns too, at least
+    7 days before she goes back: born 1.10.2026, the father from 1.12.2026, so her request by
+    24.11.2026; his (art. 180 § 9) by 17.11.2026, already past."""
+    t = born(
+        dt.date(2026, 10, 1),
+        **PARENTS,
+        children_count=1,
+        mother_event={"kind": "incapacity", "start": "2026-12-01"},
+    )
+    resignation = document(t, "maternity-resignation")
+    assert (resignation.needed_by, resignation.deadline) == (
+        dt.date(2026, 11, 24),
+        dt.date(2026, 11, 24),
+    )
+    assert "co najmniej 7 dni przed przystąpieniem do pracy (01.12.2026)" in resignation.rule
+    assert "14 tygodni" not in resignation.rule
+    assert articles(resignation) == {"art. 180 § 8", "art. 180 § 6"}
+    his = document(t, "maternity-father-request")
+    assert his.deadline == dt.date(2026, 11, 17)
+
+
+def test_an_uninsured_mother_the_father_asks_without_a_deadline() -> None:
+    """Art. 180 § 15-16: after an uninsured mother's death, on request, with no deadline."""
+    t = born(
+        dt.date(2026, 10, 1),
+        role="father",
+        work="employment",
+        mother_work="none",
+        children_count=1,
+        mother_event={"kind": "incapacity", "start": "2026-10-15"},
+    )
+    his = document(t, "maternity-father-request")
+    assert (his.needed_by, his.deadline) == (dt.date(2026, 10, 16), None)
+    assert articles(his) == {"art. 180 § 16"}
+    assert "maternity-resignation" not in {d.id for d in t.documents}
+
+
 def test_a_father_with_a_business_files_zam_with_zus() -> None:
     t = expecting(**MOTHER, father_work="business", father_insured=True, children_count=1)
     request = document(t, "father-benefit-request")
@@ -366,6 +404,21 @@ def test_the_employed_mother_is_protected_until_her_leave_ends() -> None:
     assert (told.kind, told.title) == ("right", "Ochrona przed zwolnieniem")
     assert "ochrona trwa do 27 lutego 2028" in told.text
     assert "przedłuża się do dnia porodu" in told.text
+
+
+def test_the_rest_of_maternity_leave_after_the_mothers_stay_in_hospital_is_protected() -> None:
+    """Art. 177 § 1: the rest of maternity leave after her stay in hospital is maternity leave
+    too. Born 1.10.2026, in hospital 1-20.12.2026: back on leave 21.12.2026-17.02.2027, then
+    parental leave 18.02.2027 + 223 days = 29.09.2027: the protection lasts to its end."""
+    t = born(
+        dt.date(2026, 10, 1),
+        **PARENTS,
+        children_count=1,
+        mother_event={"kind": "hospital", "start": "2026-12-01", "end": "2026-12-20"},
+    )
+    protection = marker(t, "protection-end")
+    assert protection.date == dt.date(2027, 9, 29)
+    assert not any("ochrona wraca" in d for d in protection.details)
 
 
 def test_once_the_child_is_born_no_word_about_the_fixed_term_contract() -> None:

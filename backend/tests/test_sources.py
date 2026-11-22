@@ -101,6 +101,7 @@ def test_labour_code_provisions() -> None:
         "art. 180 § 12",
         "art. 180 § 13",
         "art. 180 § 14",
+        "art. 180 § 15",
         "art. 180 § 16",
         "art. 180¹ § 1",
         "art. 180¹ § 2",
@@ -110,6 +111,7 @@ def test_labour_code_provisions() -> None:
         "art. 180² § 4",
         "art. 180² § 5",
         "art. 180² § 7",
+        "art. 182",
         "art. 182¹ᵃ § 1",
         "art. 182¹ᵃ § 2",
         "art. 182¹ᵃ § 3",
@@ -203,6 +205,12 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 19 ust. 1",
         "art. 22",
         "art. 13 ust. 1",
+        # The father's benefit in the mother's special situations (engine/father.py).
+        "art. 29 ust. 3",
+        "art. 29 ust. 5",
+        "art. 29 ust. 6",
+        "art. 29 ust. 7",
+        "art. 29 ust. 9",
         "art. 29a ust. 1",
         "art. 30 ust. 1",
         "art. 30 ust. 3",
@@ -280,7 +288,11 @@ def test_the_two_regulations_on_requests() -> None:
     wnioski = rozporzadzenie_provisions("rozp_wnioski")
     zasilki = rozporzadzenie_provisions("rozp_zasilki")
     assert set(wnioski) == {
-        *(f"§ {n} ust. {u}" for n in (2, 3, 5, 6, 7, 8, 9, 14, 15, 17) for u in (1, 2)),
+        *(
+            f"§ {n} ust. {u}"
+            for n in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 17)
+            for u in (1, 2)
+        ),
         "§ 16",
         "§ 22",
     }
@@ -292,7 +304,9 @@ def test_the_two_regulations_on_requests() -> None:
         "§ 13 ust. 3",
         "§ 20 ust. 1",
         "§ 20 ust. 3",
+        "§ 20 ust. 4",
         "§ 22 ust. 1",
+        "§ 22 ust. 2",
         "§ 23 ust. 1",
         "§ 26",
         "§ 29",
@@ -672,6 +686,32 @@ def father_scenarios() -> list[dict[str, Any]]:
         later | {"mother_event": {"kind": kind, "start": "2026-08-01"}} | father
         for kind in ("death", "abandonment")
         for father in ({}, {"father_work": "none"})
+    ]
+    # A mother without sickness insurance (art. 180 § 15-16, ustawa art. 29 ust. 9): each kind,
+    # the father an employee, on a contract, not working; too late for any part of the leave.
+    uninsured = special | {"work": "none"}
+    cases += [
+        uninsured | {"mother_event": {"kind": kind, "start": "2026-10-15"}} | father
+        for kind in ("incapacity", "hospital", "death", "abandonment")
+        for father in (
+            {"father_work": "employment"},
+            {"father_work": "contract", "father_insured": True},
+            {"father_work": "none"},
+        )
+    ]
+    cases.append(
+        uninsured
+        | {"birth_date": "2026-03-01", "mother_event": {"kind": "death", "start": "2026-09-01"}}
+    )
+    # Before 8 weeks (art. 180 § 6, § 10): the father from the 57th day; a stay over by then.
+    cases += [
+        special | {"mother_event": e} | father
+        for e in (
+            {"kind": "incapacity", "start": "2026-11-10"},
+            {"kind": "hospital", "start": "2026-11-10", "end": "2026-12-10"},
+            {"kind": "hospital", "start": "2026-10-10", "end": "2026-11-20"},
+        )
+        for father in ({}, {"father_work": "contract", "father_insured": True})
     ]
     return cases
 

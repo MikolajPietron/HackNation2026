@@ -274,6 +274,14 @@ def test_father_taking_over_has_no_deadline_when_the_mother_is_in_hospital() -> 
     hospital = born(mother_event=MotherEvent(kind="hospital", start=dt.date(2026, 12, 1)))
     in_hospital = run(title, ("Od", "01.12.2026"), scenario=hospital, timeline=False)
     assert not problems(in_hospital, "deadline-passed")
+    # A ruling of incapacity of an insured mother: art. 180 § 9, 14 days; of a mother without
+    # sickness insurance: art. 180 § 15-16, on request, no deadline.
+    ruling = MotherEvent(kind="incapacity", start=dt.date(2026, 12, 1))
+    insured = run(title, ("Od", "01.12.2026"), scenario=born(mother_event=ruling), timeline=False)
+    assert "Termin minął 17.11.2026" in problems(insured, "deadline-passed")[0].message
+    uninsured = born(mother_event=ruling, work="none")
+    without = run(title, ("Od", "01.12.2026"), scenario=uninsured, timeline=False)
+    assert not problems(without, "deadline-passed")
 
 
 def test_without_a_date_the_timeline_document_gives_the_deadline() -> None:

@@ -50,6 +50,12 @@ PROVISIONS = {
     "art. 19 ust. 1": ("Art. 19 [", "ust", "1"),
     "art. 22": ("Art. 22 [", None, None),
     "art. 13 ust. 1": ("Art. 13 [", "ust", "1"),
+    # The father's maternity benefit in the special situations of section B (father.py).
+    "art. 29 ust. 3": ("Art. 29 [", "ust", "3"),
+    "art. 29 ust. 5": ("Art. 29 [", "ust", "5"),
+    "art. 29 ust. 6": ("Art. 29 [", "ust", "6"),
+    "art. 29 ust. 7": ("Art. 29 [", "ust", "7"),
+    "art. 29 ust. 9": ("Art. 29 [", "ust", "9"),
     "art. 29a ust. 1": ("Art. 29a [", "ust", "1"),
     "art. 30 ust. 1": ("Art. 30 [", "ust", "1"),
     "art. 30 ust. 3": ("Art. 30 [", "ust", "3"),

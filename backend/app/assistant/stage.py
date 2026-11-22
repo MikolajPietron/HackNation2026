@@ -81,6 +81,7 @@ KP_TOPICS: dict[str, tuple[Topic, ...]] = {
     "art. 180": ("birth",),  # § 1-3, the length of the leave; the rest: KP_EXCEPTIONS
     "art. 180¹": ("loss",),
     "art. 180²": ("born", "taken-in"),  # before the birth the guide's section C says enough
+    "art. 182": ("mother-event",),  # the mother abandoned the child: she loses the rest
     "art. 182¹ᵃ": ("core",),
     "art. 182¹ᶜ": ("core",),
     "art. 182¹ᵈ": ("core",),
@@ -97,8 +98,8 @@ KP_EXCEPTIONS: dict[str, tuple[Topic, ...]] = {
     **{f"art. 180 § {p}": ("birth", "taken-in") for p in (4, 5, 14)},
     # Art. 180 § 8-9: the requests to hand over the rest of the leave, once that is planned.
     **{f"art. 180 § {p}": ("takeover", "mother-event") for p in (8, 9)},
-    # Art. 180 § 6, 10-13 and 16: the mother's special situations (guide B.2 sums them up).
-    **{f"art. 180 § {p}": ("mother-event",) for p in (6, 10, 11, 12, 13, 16)},
+    # Art. 180 § 6, 10-13 and 15-16: the mother's special situations (guide B.2 sums them up).
+    **{f"art. 180 § {p}": ("mother-event",) for p in (6, 10, 11, 12, 13, 15, 16)},
     # Sick pay is computed like the benefit base: the base points cite it.
     "art. 92 § 2": ("sick", "money"),
 }
@@ -117,6 +118,7 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "18": ("sick",),
     "19": ("sick",),
     "22": ("sick",),
+    "29": ("mother-event",),  # the father's benefit in the mother's special situations
     "29a": ("core",),
     "30": ("job-loss",),  # ust. 1 and 4: USTAWA_EXCEPTIONS below
     "30a": ("money",),
@@ -141,6 +143,8 @@ USTAWA_EXCEPTIONS: dict[str, tuple[Topic, ...]] = {
     # (ust. 1), the protection point cites a fixed-term contract extended to the birth (ust. 4).
     "art. 30 ust. 1": ("birth",),
     "art. 30 ust. 4": ("birth",),
+    # A father who is not an employee takes over after 14 weeks once he interrupted his work.
+    "art. 29 ust. 3": ("birth",),
     # Paid for every day: art. 31 ust. 5 applies it to the maternity benefit.
     "art. 11 ust. 4": ("sick", "money"),
     # Only the base computed month by month needs these provisions of the money articles.

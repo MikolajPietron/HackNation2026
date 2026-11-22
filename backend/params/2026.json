@@ -760,6 +760,85 @@
           "quote": "Łączny wymiar urlopu macierzyńskiego oraz urlopu macierzyńskiego i okresu pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi tego urlopu w okolicznościach, o których mowa w § 4-7 i § 10-13, nie może przekroczyć wymiaru urlopu macierzyńskiego, o którym mowa w § 1."
         }
       ]
+    },
+    "abandonment_mother_loses": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182",
+          "quote": "W przypadku porzucenia dziecka przez pracownicę"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182",
+          "quote": "pracownicy nie przysługuje część urlopu macierzyńskiego przypadająca po dniu porzucenia dziecka"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 182",
+          "quote": "Jednakże urlop macierzyński po porodzie nie może wynosić mniej niż 8 tygodni."
+        }
+      ]
+    },
+    "special_uninsured": {
+      "note": "Mama, która nie podlega ubezpieczeniu chorobowemu: zgon, porzucenie dziecka albo orzeczenie o niezdolności do samodzielnej egzystencji.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 180 § 15",
+          "quote": "W przypadku: 1) zgonu matki dziecka nieobjętej ubezpieczeniem społecznym w razie choroby i macierzyństwa, określonym w ustawie z dnia 13 października 1998 r. o systemie ubezpieczeń społecznych, albo nieposiadającej tytułu do objęcia takim ubezpieczeniem, 2) porzucenia dziecka przez matkę nieobjętą ubezpieczeniem, o którym mowa w pkt 1, albo nieposiadającą tytułu do objęcia takim ubezpieczeniem, 3) niemożności sprawowania osobistej opieki nad dzieckiem przez matkę nieobjętą ubezpieczeniem, o którym mowa w pkt 1, albo nieposiadającą tytułu do objęcia takim ubezpieczeniem, legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji - pracownikowi - ojcu wychowującemu dziecko albo pracownikowi - innemu członkowi najbliższej rodziny przysługuje prawo do części urlopu macierzyńskiego przypadającej po dniu zgonu matki dziecka, porzucenia przez nią dziecka albo powstania niezdolności do samodzielnej egzystencji."
+        }
+      ]
+    },
+    "special_uninsured_benefit": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29 ust. 9",
+          "quote": "W przypadku: 1) zgonu matki dziecka nieobjętej ubezpieczeniem społecznym w razie choroby i macierzyństwa, określonym w ustawie z dnia 13 października 1998 r. o systemie ubezpieczeń społecznych, albo nieposiadającej tytułu do objęcia takim ubezpieczeniem, 2) porzucenia dziecka przez matkę nieobjętą ubezpieczeniem, o którym mowa w pkt 1, albo nieposiadającą tytułu do objęcia takim ubezpieczeniem, 3) niemożności sprawowania osobistej opieki nad dzieckiem przez matkę nieobjętą ubezpieczeniem, o którym mowa w pkt 1, albo nieposiadającą tytułu do objęcia takim ubezpieczeniem, legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji - zasiłek macierzyński przysługuje ubezpieczonemu - ojcu dziecka albo innemu ubezpieczonemu członkowi najbliższej rodziny, który uzyskał prawo do urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego albo urlopu rodzicielskiego lub przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem, za okres przypadający po dniu zaistnienia tych okoliczności."
+        }
+      ]
+    },
+    "interrupted_work_takeover": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29 ust. 3",
+          "quote": "W przypadku rezygnacji przez ubezpieczoną - matkę dziecka z pobierania zasiłku macierzyńskiego, po wykorzystaniu przez nią tego zasiłku za okres co najmniej 14 tygodni po porodzie, zasiłek macierzyński przysługuje ubezpieczonemu - ojcu dziecka, który uzyskał prawo do urlopu macierzyńskiego lub przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 180 § 4",
+          "quote": "2) przez okres odpowiadający okresowi, który pozostał do końca urlopu macierzyńskiego, osobistą opiekę nad dzieckiem będzie sprawował ubezpieczony - ojciec dziecka, który w celu sprawowania tej opieki przerwał działalność zarobkową."
+        }
+      ]
+    },
+    "interrupted_work_incapacity": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29 ust. 5",
+          "quote": "W przypadku rezygnacji przez ubezpieczoną - matkę dziecka, legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji, z pobierania zasiłku macierzyńskiego, po wykorzystaniu przez nią tego zasiłku za okres co najmniej 8 tygodni po porodzie, zasiłek macierzyński przysługuje ubezpieczonemu - ojcu dziecka albo ubezpieczonemu - innemu członkowi najbliższej rodziny, który uzyskał prawo do urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego albo urlopu rodzicielskiego lub przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem."
+        }
+      ]
+    },
+    "interrupted_work_hospital": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29 ust. 6",
+          "quote": "Po wykorzystaniu przez ubezpieczoną - matkę dziecka zasiłku macierzyńskiego za okres co najmniej 8 tygodni po porodzie, ubezpieczonemu - ojcu dziecka albo innemu ubezpieczonemu członkowi najbliższej rodziny, który uzyskał prawo do urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego albo urlopu rodzicielskiego lub przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem, przysługuje prawo do zasiłku macierzyńskiego za okres, w którym ubezpieczona - matka dziecka przebywa w szpitalu"
+        }
+      ]
+    },
+    "interrupted_work_death": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 29 ust. 7",
+          "quote": "W przypadku zgonu ubezpieczonej - matki dziecka albo porzucenia przez nią dziecka, zasiłek macierzyński przysługuje ubezpieczonemu - ojcu dziecka albo innemu ubezpieczonemu członkowi najbliższej rodziny, który uzyskał prawo do urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego albo urlopu rodzicielskiego lub przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem. W przypadku porzucenia dziecka przez ubezpieczoną - matkę dziecka, zasiłek macierzyński przysługuje ubezpieczonemu - ojcu dziecka albo innemu ubezpieczonemu członkowi najbliższej rodziny, za okres przypadający po dniu porzucenia dziecka przez ubezpieczoną - matkę dziecka, nie wcześniej jednak niż po wykorzystaniu przez nią 8 tygodni zasiłku macierzyńskiego po porodzie."
+        }
+      ]
     }
   },
   "pregnancy": {
@@ -3077,6 +3156,60 @@
           }
         }
       },
+      "resignation-incapacity": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 4 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 8 Kodeksu pracy, w sprawie rezygnacji przez pracownicę legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji z pozostałej części urlopu macierzyńskiego po wykorzystaniu po porodzie co najmniej 8 tygodni tego urlopu zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko pracownicy",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 4 ust. 1",
+                "quote": "imię i nazwisko pracownicy"
+              }
+            ]
+          },
+          "return-date": {
+            "label": "Termin powrotu do pracy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 4 ust. 1",
+                "quote": "wskazanie terminu powrotu do pracy"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "father-request-copy": {
+            "label": "Kopia wniosku taty o pozostałą część urlopu macierzyńskiego albo kopia jego oświadczenia o przerwaniu działalności zarobkowej",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 4 ust. 2",
+                "quote": "kopię wniosku pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny o udzielenie pozostałej części urlopu macierzyńskiego albo kopię oświadczenia ubezpieczonego – ojca dziecka albo ubezpieczonego – innego członka najbliższej rodziny o przerwaniu działalności zarobkowej w celu sprawowania opieki nad dzieckiem przez okres odpowiadający okresowi, który pozostał do końca urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "incapacity-ruling-copy": {
+            "label": "Kopia prawomocnego orzeczenia o niezdolności mamy do samodzielnej egzystencji",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 4 ust. 2",
+                "quote": "kopię prawomocnego orzeczenia o niezdolności pracownicy do samodzielnej egzystencji"
+              }
+            ]
+          }
+        }
+      },
       "father-takeover": {
         "basis": [
           {
@@ -3453,6 +3586,168 @@
                 "doc": "rozp_wnioski",
                 "article": "§ 9 ust. 2",
                 "quote": "Do wniosku dołącza się odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów."
+              }
+            ]
+          }
+        }
+      },
+      "father-uninsured-death": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 10 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku zgonu matki dziecka nieobjętej ubezpieczeniem społecznym w razie choroby i macierzyństwa"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 10 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "event-date": {
+            "label": "Dzień śmierci mamy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 10 ust. 1",
+                "quote": "oświadczenie pracownika o dniu zgonu matki dziecka"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 10 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, przypadającej po dniu zgonu matki dziecka"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 10 ust. 2",
+                "quote": "Do wniosku dołącza się odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów."
+              }
+            ]
+          }
+        }
+      },
+      "father-uninsured-abandonment": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 11 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku porzucenia dziecka przez matkę nieobjętą ubezpieczeniem społecznym w razie choroby i macierzyństwa"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 11 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "event-date": {
+            "label": "Dzień porzucenia dziecka przez mamę",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 11 ust. 1",
+                "quote": "oświadczenie pracownika o dniu porzucenia dziecka przez matkę"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 11 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, przypadającej po dniu porzucenia dziecka przez matkę"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 11 ust. 2",
+                "quote": "Do wniosku dołącza się odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów."
+              }
+            ]
+          }
+        }
+      },
+      "father-uninsured-incapacity": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 12 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku niemożności sprawowania osobistej opieki nad dzieckiem przez matkę nieobjętą ubezpieczeniem społecznym w razie choroby i macierzyństwa"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 12 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 12 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 12 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          },
+          "incapacity-ruling-copy": {
+            "label": "Kopia prawomocnego orzeczenia o niezdolności mamy do samodzielnej egzystencji",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 12 ust. 2",
+                "quote": "kopię prawomocnego orzeczenia o niezdolności matki dziecka do samodzielnej egzystencji"
               }
             ]
           }
@@ -4086,6 +4381,26 @@
               {
                 "doc": "rozp_zasilki",
                 "article": "§ 22 ust. 1",
+                "quote": "orzeczenie stwierdzające niezdolność matki do samodzielnej egzystencji"
+              }
+            ]
+          },
+          "mother-uninsured-event-statement": {
+            "label": "Oświadczenie o dniu śmierci mamy albo o porzuceniu przez nią dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 20 ust. 4",
+                "quote": "oświadczenie ubezpieczonego odpowiednio o dniu zgonu matki dziecka albo o porzuceniu przez nią dziecka"
+              }
+            ]
+          },
+          "incapacity-ruling-uninsured": {
+            "label": "Orzeczenie o niezdolności mamy do samodzielnej egzystencji",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 22 ust. 2",
                 "quote": "orzeczenie stwierdzające niezdolność matki do samodzielnej egzystencji"
               }
             ]
