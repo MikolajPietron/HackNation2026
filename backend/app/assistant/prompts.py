@@ -340,10 +340,9 @@ o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część ur
 zasadę z cytatem.
 - Cytaty krótkie: najwyżej kilkanaście słów, tylko to, co potwierdza zdanie; zwykle wystarczy \
 samo źródło w nawiasie. Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, \
-„(Kodeks pracy, art. 180 § 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, Okres \
-uwzględniany w podstawie wymiaru zasiłku)” albo „(Rozporządzenie w sprawie wniosków urlopowych, § 15 \
-ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej \
-ani z internetu.
+„(Kodeks pracy, art. 180 § 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, \
+Okres uwzględniany w podstawie wymiaru zasiłku)” albo „(Rozporządzenie w sprawie wniosków \
+urlopowych, § 15 ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej ani z internetu.
 - Wnioski i to, kto wypłaca zasiłek, bierz z dokumentów na osi i z wyjaśnienia sytuacji \
 (punkty o wypłacie zasiłku i „Co złożyć i do kiedy”). Co wniosek zawiera i co do niego dołączyć, \
 mówi `explain_timeline_element` dla tego wniosku.
