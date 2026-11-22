@@ -4,7 +4,7 @@
 // the engine already computed (CLAUDE.md: the engine counts, the UI shows).
 import { dayNumber, formatDistance, formatLongDate, formatShortDate } from './dates'
 import { documentIcon, markerIcon, segmentIcon } from './icons'
-import type { CaseNote, Marker, Segment, Timeline } from '../types'
+import type { CaseNote, Marker, Scenario, Segment, Timeline, Work } from '../types'
 
 /** Periods that are a part of another one, not extra leave (the weeks before the birth come
  *  out of the 20 weeks of maternity leave). */
@@ -76,7 +76,25 @@ const ON_LEAVE: Record<string, string> = {
   paternity: 'urlopie ojcowskim',
 }
 
+/** The same periods after "za okres …", for a parent who gets the benefit without leave. */
+const PERIOD_OF: Record<string, string> = {
+  'urlopie macierzyńskim': 'urlopu macierzyńskiego',
+  'urlopie rodzicielskim': 'urlopu rodzicielskiego',
+  'urlopie ojcowskim': 'urlopu ojcowskiego',
+}
+
 const WHO: Record<string, string> = { mother: 'Mama', father: 'Tata' }
+
+/** How a parent works, as the scenario says: their own answer or what was said of them. */
+export function workOf(scenario: Scenario | null | undefined, parent: 'mother' | 'father'): Work | null {
+  if (!scenario) return null
+  if (scenario.role === parent) return scenario.work
+  return parent === 'mother' ? scenario.mother_work : scenario.father_work
+}
+
+/** On a contract of mandate or with one's own firm there is no leave, only the maternity
+ *  benefit for the period corresponding to it (guide page 4). */
+const notEmployee = (work: Work | null) => work === 'contract' || work === 'business'
 
 const listJoin = (items: string[]) =>
   items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} i ${items.at(-1)}`
@@ -85,9 +103,14 @@ const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1)
 
 /**
  * The plan in one line, and a second line with what is still to decide. Today's leave comes
- * first ("Mama jest na urlopie macierzyńskim do 23 marca 2027"); before the birth, the due date.
+ * first ("Mama jest na urlopie macierzyńskim do 23 marca 2027"; on a contract or with her own
+ * firm "Mama pobiera zasiłek macierzyński (za okres urlopu macierzyńskiego) do …"); before the
+ * birth, the due date.
  */
-export function headline(timeline: Timeline): { title: string; text: string } {
+export function headline(
+  timeline: Timeline,
+  scenario?: Scenario | null,
+): { title: string; text: string } {
   const today = dayNumber(timeline.today)
   const sorted = [...timeline.segments].sort((a, b) => a.start.localeCompare(b.start))
   const active = sorted.filter(
@@ -102,9 +125,12 @@ export function headline(timeline: Timeline): { title: string; text: string } {
       if (next.lane === s.lane && next.tone === 'leave' && ON_LEAVE[next.id] === words &&
         dayNumber(next.start) === dayNumber(end) + 1) end = next.end
     }
-    return words
-      ? `${WHO[s.lane] ?? ''} jest na ${words} do ${formatLongDate(end)}`.trim()
-      : `${periodName(s)} trwa do ${formatLongDate(end)}`
+    if (!words) return `${periodName(s)} trwa do ${formatLongDate(end)}`
+    const who = WHO[s.lane] ?? ''
+    const parent = s.lane === 'mother' || s.lane === 'father' ? s.lane : null
+    return parent && notEmployee(workOf(scenario, parent))
+      ? `${who} pobiera zasiłek macierzyński (za okres ${PERIOD_OF[words]}) do ${formatLongDate(end)}`
+      : `${who} jest na ${words} do ${formatLongDate(end)}`.trim()
   })
   const title =
     titles.length > 0
@@ -275,18 +301,26 @@ export function nextSteps(timeline: Timeline): Record<StepGroup, Step[]> {
   for (const d of timeline.documents) {
     if (d.done) continue
     const day = dayNumber(d.needed_by)
-    const overdue = day < today
+    const past = day < today
+    // Only a deadline can be missed. Without one, `needed_by` is just the day the leave or the
+    // benefit starts (the engine: never a deadline); for a leave still to choose whose deadline
+    // passed, the engine moves `needed_by` to today.
+    const overdue = d.deadline !== null && dayNumber(d.deadline) < today && past
     steps.push({
       key: `document-${d.id}`,
       id: d.id,
-      day: overdue ? today : day,
+      day: past ? today : day,
       date: d.needed_by,
       title: `Przygotuj: ${lower(d.title)}`,
-      detail: overdue ? `termin minął ${formatShortDate(d.needed_by)}` : `potrzebne ${formatDistance(timeline.today, d.needed_by)}`,
+      detail: overdue
+        ? `termin minął ${formatShortDate(d.deadline!)}`
+        : d.deadline === null
+          ? `na dzień startu: ${formatShortDate(d.needed_by)} · bez terminu w materiałach`
+          : `potrzebne ${formatDistance(timeline.today, d.needed_by)}`,
       icon: documentIcon(d),
       decide: false,
       overdue,
-      group: overdue ? 'now' : undefined,
+      group: past ? 'now' : undefined,
     })
   }
 

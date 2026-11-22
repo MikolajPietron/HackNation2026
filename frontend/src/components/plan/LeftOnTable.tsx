@@ -248,7 +248,7 @@ function Card({
               onClick={() =>
                 void onApply(
                   { rate_815: !chose815 },
-                  chose815 ? 'Zostajecie przy 100% i 70%' : 'Wybrano 81,5% przez cały urlop',
+                  chose815 ? 'Zostajecie przy 100% i 70%' : 'Wybrano 81,5% za urlop macierzyński i rodzicielski',
                   chose815 ? undefined : `Wniosek o 81,5% złóż najpóźniej ${formatShortDate(item.last_day)}.`,
                 )
               }

@@ -249,7 +249,7 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
         : 'Tata przejmuje urlop macierzyński'
     case 'set_payer_size': {
       const whose = args.parent === 'father' ? 'taty' : 'mamy'
-      if (args.size === 'over-20') return `Zasiłek ${whose} wypłaca pracodawca`
+      if (args.size === 'over-20') return `Zasiłek ${whose} wypłaca płatnik składek (pracodawca albo zleceniodawca)`
       if (args.size === 'up-to-20') return `Zasiłek ${whose} wypłaca ZUS`
       return `Kto wypłaca zasiłek ${whose}: do sprawdzenia`
     }
@@ -292,7 +292,7 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return months > 0 ? `Zarobki ${whose}: ${months} mies.` : `Dane do podstawy zasiłku ${whose}`
     }
     case 'set_rate_choice':
-      if (args.rate_815 === true) return 'Zasiłek 81,5% przez cały urlop'
+      if (args.rate_815 === true) return 'Zasiłek 81,5% za urlop macierzyński i rodzicielski'
       return args.rate_815 === false ? 'Zasiłek 100% i 70%' : 'Wybór zasiłku: jeszcze nie'
     case 'explain_timeline_element':
       return 'Pokazuję na osi czasu'
