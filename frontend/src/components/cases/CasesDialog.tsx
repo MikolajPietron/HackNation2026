@@ -212,8 +212,9 @@ function Picker({
       {error && <p className="mt-4 rounded-2xl bg-alert-50 px-4 py-3 text-sm text-alert-600">{error}</p>}
 
       {list && !list.configured && (
-        <p className="mt-4 rounded-2xl bg-sun-100 px-4 py-3 text-sm text-sun-700">
-          Na serwerze nie ma folderu ze sprawami (CASES_DIR). Wgraj PDF sprawy powyżej.
+        <p className="mt-3 text-sm leading-relaxed text-navy-500">
+          Skanów spraw ZUS nie publikujemy w demo, bo to dokumenty poufne. Wgraj PDF albo zdjęcie sprawy
+          z zestawu, a aplikacja ją przeczyta, sprawdzi ubezpieczenie i porówna wynik z decyzją ZUS.
         </p>
       )}
 
