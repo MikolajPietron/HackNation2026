@@ -174,6 +174,8 @@ export interface Step {
   key: string
   /** The element whose details a click opens. */
   id: string
+  /** The day it counts for (today for what is open now or overdue), as a day number. */
+  day: number
   date: string
   title: string
   detail: string
@@ -194,7 +196,7 @@ const SOON_DAYS = 92
  */
 export function nextSteps(timeline: Timeline): Record<StepGroup, Step[]> {
   const today = dayNumber(timeline.today)
-  const steps: (Step & { day: number; group?: StepGroup })[] = []
+  const steps: (Step & { group?: StepGroup })[] = []
   const sorted = [...timeline.segments].sort((a, b) => a.start.localeCompare(b.start))
   const joined = (a: Segment, b: Segment) =>
     a.lane === b.lane && a.tone === 'leave' && b.tone === 'leave' &&

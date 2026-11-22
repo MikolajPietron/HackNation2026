@@ -1,11 +1,13 @@
 // The timeline with what lies ahead underneath, in one card. The switch at the top shows the
-// same plan as a wall calendar. "Rozwiń" opens the axis over the whole plan column, zoomed in,
-// for a closer look; Escape or "Zwiń" brings it back.
+// same plan as a wall calendar. "Rozwiń" opens the axis (zoomed in) or the calendar (large, with
+// the periods named and a panel for the chosen day) over the whole plan column for a closer
+// look; Escape or "Zwiń" brings it back.
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { usePlanView } from '@/hooks/usePlanView'
 import { EASE_OUT } from '@/lib/ease'
+import { cn } from '@/lib/utils'
 import type { Timeline } from '@/types'
 import { NextSteps } from './NextSteps'
 import { PlanTimeline } from './PlanTimeline'
@@ -63,14 +65,26 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
         >
           <motion.div
             role="dialog"
-            aria-label="Oś czasu"
+            aria-label={view === 'axis' ? 'Oś czasu' : 'Kalendarz'}
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.15 } }}
             transition={{ duration: 0.25, ease: EASE_OUT }}
-            className="min-h-full rounded-4xl border border-line bg-white px-6 pt-4 pb-3 shadow-[0_24px_60px_-30px_rgb(26_36_56/0.28)]"
+            className={cn(
+              'min-h-full rounded-4xl border border-line bg-white px-6 shadow-[0_24px_60px_-30px_rgb(26_36_56/0.28)]',
+              view === 'axis' ? 'pt-4 pb-3' : 'pt-4 pb-10',
+            )}
           >
-            {axis(2.25, true)}
+            {view === 'axis' ? (
+              axis(2.25, true)
+            ) : (
+              <YearCalendar
+                timeline={props.timeline}
+                onSelect={props.onSelect}
+                size="large"
+                onCollapse={() => setExpanded(false)}
+              />
+            )}
           </motion.div>
         </motion.div>
       )}
@@ -83,10 +97,12 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
         {view === 'axis' ? (
           axis(1, false)
         ) : (
-          <>
-            <ViewSwitch view={view} onChange={setView} className="mb-4 w-fit" />
-            <YearCalendar timeline={props.timeline} onSelect={props.onSelect} />
-          </>
+          <YearCalendar
+            timeline={props.timeline}
+            onSelect={props.onSelect}
+            headerStart={<ViewSwitch view={view} onChange={setView} className="w-fit" />}
+            onExpand={() => setExpanded(true)}
+          />
         )}
         <NextSteps
           timeline={props.timeline}

@@ -399,7 +399,7 @@ function RateChoice({
   ]
 
   return (
-    <section className="mt-5 border-t border-line pt-5">
+    <section id="rate-choice" className="mt-5 scroll-mt-6 border-t border-line pt-5">
       <h3 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-bold text-navy-900">
         Jak wolisz dostawać zasiłek?
         {deadline && (
