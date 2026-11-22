@@ -47,6 +47,7 @@ import { GoalPlans } from './GoalPlans'
 import { LeftOnTable } from './LeftOnTable'
 import { MobileTimeline } from './MobileTimeline'
 import { NextSteps } from './NextSteps'
+import { ParentalEditor } from './ParentalEditor'
 import { Overview } from './Overview'
 import { RiskRadar } from './RiskRadar'
 import { StressTest } from './StressTest'
@@ -314,6 +315,12 @@ export function PlanScreen({
                       </>
                     )}
                   </motion.section>
+
+                  {scenario && !timeline.taken_in && (
+                    <div className="mt-5">
+                      <ParentalEditor scenario={scenario} onApply={apply} />
+                    </div>
+                  )}
 
                   {timeline.left_on_table.length > 0 && (
                     <motion.div variants={ITEM} className="mt-5">
