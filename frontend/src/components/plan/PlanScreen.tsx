@@ -33,7 +33,7 @@ import { nextQuestion } from '@/lib/interview'
 import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
-import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
+import type { InterviewQuestion, Scenario, SessionStart, StressEventId, Timeline } from '@/types'
 import { ApplicationForm } from '@/components/applications/ApplicationForm'
 import { MoneyCard } from '@/components/money/MoneyCard'
 import { SupportList, SupportWindow } from '@/components/support/SupportList'
@@ -48,6 +48,7 @@ import { MobileTimeline } from './MobileTimeline'
 import { NextSteps } from './NextSteps'
 import { Overview } from './Overview'
 import { RiskRadar } from './RiskRadar'
+import { StressTest } from './StressTest'
 import { TimelineCard } from './TimelineCard'
 import { ViewSwitch } from './ViewSwitch'
 import { WhatIf } from './WhatIf'
@@ -129,6 +130,8 @@ export function PlanScreen({
     setFill(null)
     onSelect(id)
   }
+  /** Events of the stress test to open (from the "Co jeśli…" chips). */
+  const [stressFocus, setStressFocus] = useState<{ ids: StressEventId[]; n: number } | null>(null)
   const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -258,7 +261,13 @@ export function PlanScreen({
                   </AnimatePresence>
 
                   <motion.div variants={ITEM} className="mt-5">
-                    <WhatIf scenario={scenario} busy={busy} onSend={choose} onMock={showMock} />
+                    <WhatIf
+                      scenario={scenario}
+                      busy={busy}
+                      onSend={choose}
+                      onMock={showMock}
+                      onPreview={(ids) => setStressFocus((f) => ({ ids, n: (f?.n ?? 0) + 1 }))}
+                    />
                   </motion.div>
 
                   <motion.section variants={ITEM} aria-label="Oś czasu" className="mt-4">
@@ -330,7 +339,8 @@ export function PlanScreen({
                     </motion.section>
                   )}
 
-                  <GoalPlans onMock={showMock} />
+                  <GoalPlans scenario={scenario} onApply={apply} />
+                  <StressTest scenario={scenario} focus={stressFocus} />
                   <RiskRadar scenario={scenario} onCheckZus={checkZus} />
                   <Footer onSupport={() => setSupportOpen(true)} />
                 </>

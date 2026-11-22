@@ -94,37 +94,3 @@ export const PERSONAS: Persona[] = [
     },
   },
 ]
-
-/** Plans from the goal (F8) as they will come from the decision tree. Shapes only, no numbers. */
-export interface GoalPlan {
-  id: string
-  title: string
-  summary: string
-  /** Bars of the preview, as shares of the first year: [start, end] in 0–1. */
-  mother: [number, number][]
-  father: [number, number][]
-}
-
-export const GOAL_PLANS: GoalPlan[] = [
-  {
-    id: 'money',
-    title: 'Najwięcej pieniędzy',
-    summary: 'Mama bierze macierzyński i większość rodzicielskiego, tata swoje tygodnie na końcu.',
-    mother: [[0.02, 0.86]],
-    father: [[0.04, 0.08], [0.86, 1]],
-  },
-  {
-    id: 'home',
-    title: 'Najdłużej w domu',
-    summary: 'Rodzice dzielą rodzicielski na części i łączą go z pracą na część etatu.',
-    mother: [[0.02, 0.5], [0.62, 0.8]],
-    father: [[0.04, 0.08], [0.5, 0.62], [0.8, 1]],
-  },
-  {
-    id: 'equal',
-    title: 'Równy podział',
-    summary: 'Po macierzyńskim mama i tata biorą po połowie rodzicielskiego, jedno po drugim.',
-    mother: [[0.02, 0.62]],
-    father: [[0.04, 0.08], [0.62, 1]],
-  },
-]

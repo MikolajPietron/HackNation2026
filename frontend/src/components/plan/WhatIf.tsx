@@ -8,7 +8,7 @@ import { useDragScroll } from '@/hooks/useDragScroll'
 import { SPRING_PRESS } from '@/lib/ease'
 import { ICONS } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import type { Scenario } from '@/types'
+import type { Scenario, StressEventId } from '@/types'
 
 interface Event {
   id: string
@@ -21,6 +21,10 @@ interface Event {
   undo?: string
   /** Not computed yet: the chip only says so. */
   later?: string
+  /** A preview in the stress test instead of a change of the plan (it is not a fact yet). */
+  preview?: StressEventId[]
+  /** Shown only when it can still happen. */
+  show?: (scenario: Scenario | null) => boolean
 }
 
 const born = (scenario: Scenario | null) => scenario?.child_born === true
@@ -66,7 +70,13 @@ const EVENTS: Event[] = [
         : 'Co się zmieni, jeśli dziecko będzie po porodzie w szpitalu?',
     undo: 'Dziecko urodziło się o czasie i nie było w szpitalu',
   },
-  { id: 'job', label: 'Utrata pracy w ciąży', icon: ICONS.karton, later: 'Utrata pracy w ciąży' },
+  {
+    id: 'job',
+    label: 'Utrata pracy w ciąży',
+    icon: ICONS.karton,
+    preview: ['job-loss-bankruptcy', 'job-loss-other'],
+    show: (s) => s !== null && !born(s),
+  },
   {
     id: 'father',
     label: 'Tata przejmuje urlop',
@@ -90,11 +100,14 @@ export function WhatIf({
   busy,
   onSend,
   onMock,
+  onPreview,
 }: {
   scenario: Scenario | null
   busy: boolean
   onSend: (text: string) => void
   onMock: (message: string) => void
+  /** Show these events of the stress test. */
+  onPreview: (ids: StressEventId[]) => void
 }) {
   const row = useDragScroll<HTMLDivElement>()
   return (
@@ -103,7 +116,7 @@ export function WhatIf({
       className="scrollbar-none -mx-1 flex cursor-grab items-center gap-2 overflow-x-auto px-1 py-1 pr-12 select-none data-[dragging]:cursor-grabbing [mask-image:linear-gradient(to_right,#000_calc(100%-56px),transparent)]"
     >
       <span className="mr-1 shrink-0 text-sm font-bold text-navy-500">Co jeśli…</span>
-      {EVENTS.map((event) => {
+      {EVENTS.filter((event) => !event.show || event.show(scenario)).map((event) => {
         const active = scenario !== null && event.on !== undefined && event.on(scenario)
         return (
           <motion.button
@@ -112,7 +125,8 @@ export function WhatIf({
             aria-pressed={active}
             disabled={busy && event.prompt !== undefined}
             onClick={() => {
-              if (event.later) onMock(`${event.later} — policzy to kolejna faza silnika.`)
+              if (event.preview) onPreview(event.preview)
+              else if (event.later) onMock(`${event.later} — policzy to kolejna faza silnika.`)
               else if (active && event.undo) onSend(event.undo)
               else if (event.prompt) onSend(event.prompt(scenario))
             }}
