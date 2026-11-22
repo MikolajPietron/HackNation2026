@@ -5,11 +5,19 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
+import type { Variants } from 'motion/react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Illustration } from '@/components/ui/illustration'
 import { useDragScroll } from '@/hooks/useDragScroll'
 import { EASE_OUT, SPRING_PRESS } from '@/lib/ease'
 import { cn } from '@/lib/utils'
+
+/** The chosen tool's panel: a short fade in, a quicker one out. */
+const PANEL: Variants = {
+  enter: { opacity: 0, y: 6 },
+  center: { opacity: 1, y: 0, transition: { duration: 0.22, ease: EASE_OUT } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+}
 
 export interface SectionTab {
   id: string
@@ -70,13 +78,10 @@ export function SectionTabs({ title, subtitle, tabs }: { title: string; subtitle
         className="mt-4 [&>*>*]:mt-0!"
       >
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={current.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0.1 } }}
-            transition={{ duration: 0.22, ease: EASE_OUT }}
-          >
+          {/* The panel names its own states ("enter" → "center"): a tool's card comes in with the
+              page's ITEM variants, which only move when a parent passes the label down. With a
+              plain object here, a tool opened by a tab stayed at "enter" (invisible). */}
+          <motion.div key={current.id} variants={PANEL} initial="enter" animate="center" exit="exit">
             {current.content}
           </motion.div>
         </AnimatePresence>
