@@ -31,6 +31,8 @@ import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
+import { MoneyCard } from '@/components/money/MoneyCard'
+import { MoneyExplanation } from '@/components/money/MoneyExplanation'
 import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
@@ -100,6 +102,8 @@ export function PlanScreen({
   /** The explanation window, opened at one point of it or at the top. */
   const [why, setWhy] = useState<{ focus?: string } | null>(null)
   const [view, setView] = usePlanView()
+  const [moneyOpen, setMoneyOpen] = useState(false)
+  const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
   const mockTimer = useRef(0)
@@ -190,6 +194,8 @@ export function PlanScreen({
                     onWhy={(focus) => setWhy({ focus })}
                     onSelect={onSelect}
                     onStartOver={onStartOver}
+                    onMoney={() => setMoneyOpen(true)}
+                    onAsk={choose}
                   />
 
                   {timeline.warnings.map((warning) => (
@@ -261,6 +267,18 @@ export function PlanScreen({
                     )}
                   </motion.section>
 
+                  <motion.div variants={ITEM} className="mt-5">
+                    <MoneyCard
+                      timeline={timeline}
+                      scenario={scenario}
+                      hoveredId={moneyHover}
+                      onHover={setMoneyHover}
+                      onSelect={onSelect}
+                      onWhy={() => setMoneyOpen(true)}
+                      onAsk={choose}
+                    />
+                  </motion.div>
+
                   <GoalPlans onMock={showMock} />
                   <RiskRadar scenario={scenario} onCheckZus={checkZus} />
                   <Footer />
@@ -278,6 +296,17 @@ export function PlanScreen({
               {selected && timeline && (
                 <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
                   <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+                </Dialog>
+              )}
+              {moneyOpen && timeline && (
+                <Dialog key="money" label="Dlaczego tyle?" onClose={() => setMoneyOpen(false)}>
+                  <MoneyExplanation
+                    timeline={timeline}
+                    onSelect={(id) => {
+                      setMoneyOpen(false)
+                      onSelect(id)
+                    }}
+                  />
                 </Dialog>
               )}
               {why && timeline && (
@@ -345,6 +374,17 @@ export function PlanScreen({
           >
             {selected && timeline && (
               <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+            )}
+          </Sheet>
+          <Sheet open={moneyOpen && timeline !== null} onOpenChange={setMoneyOpen} title="Dlaczego tyle?">
+            {timeline && (
+              <MoneyExplanation
+                timeline={timeline}
+                onSelect={(id) => {
+                  setMoneyOpen(false)
+                  onSelect(id)
+                }}
+              />
             )}
           </Sheet>
           <Sheet

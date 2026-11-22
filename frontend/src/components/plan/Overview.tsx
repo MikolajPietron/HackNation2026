@@ -16,6 +16,7 @@ import { Illustration } from '@/components/ui/illustration'
 import { TextStates } from '@/components/ui/text-states'
 import type { ChangeSet } from '@/hooks/useAssistant'
 import { SPRING_LAYOUT, SPRING_PRESS } from '@/lib/ease'
+import { formatPlnShort, formatRate, headlinePayment } from '@/lib/money'
 import { entitlement, headline, leaveBudget, length, nextSteps, periodName } from '@/lib/plan'
 import { cn } from '@/lib/utils'
 import type { CaseNote, Segment, Timeline } from '@/types'
@@ -33,6 +34,8 @@ export function Overview({
   onWhy,
   onSelect,
   onStartOver,
+  onMoney,
+  onAsk,
 }: {
   timeline: Timeline
   changed: ChangeSet
@@ -42,6 +45,10 @@ export function Overview({
   onWhy: (noteId?: string) => void
   onSelect: (id: string) => void
   onStartOver: () => void
+  /** Open "Dlaczego tyle?". */
+  onMoney: () => void
+  /** Say something to the assistant (e.g. give the pay). */
+  onAsk: (prompt: string) => void
 }) {
   const { title, text } = headline(timeline)
   const right = entitlement(timeline.notes)
@@ -82,19 +89,18 @@ export function Overview({
     )
   }
 
+  const money = headlinePayment(timeline)
+  // Amounts need the pay: without it the tile asks for it (after a loss there are no tiles).
+  const askPay = !money && budget.totalDays > 0
   const tiles = [
     right ? 'right' : null,
     budget.totalDays > 0 ? 'budget' : null,
+    money || askPay ? 'money' : null,
     step && !decisionPending ? 'step' : null,
   ].filter(Boolean)
-  const columns =
-    tiles.length === 3
-      ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]'
-      : tiles.length === 2
-        ? tiles.includes('budget')
-          ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]'
-          : 'lg:grid-cols-2'
-        : ''
+  // The tiles sit in a row when the plan column is wide enough, else two by two.
+  const columns = tiles.length >= 4 ? '@[52rem]:grid-cols-4' : tiles.length === 3 ? '@[44rem]:grid-cols-3' : ''
+  const moneySegment = money ? timeline.segments.find((s) => s.id === money.now.segment_id) : undefined
 
   return (
     <>
@@ -123,7 +129,8 @@ export function Overview({
       </motion.header>
 
       {tiles.length > 0 && (
-        <motion.div variants={ITEM} className={cn('mt-5 grid gap-3 sm:grid-cols-2', columns)}>
+        <motion.div variants={ITEM} className="@container mt-5">
+          <div className={cn('grid grid-cols-2 gap-2 @lg:gap-3 [&>*:last-child:nth-child(odd)]:col-span-2', columns, tiles.length >= 3 && '@[44rem]:[&>*:last-child:nth-child(odd)]:col-span-1')}>
           {right && (
             <Tile
               question="Czy nam się należy?"
@@ -152,7 +159,7 @@ export function Overview({
               question="Ile wolnego razem?"
               onClick={() => onWhy('computed')}
               pulse={[...budget.mother, ...budget.father].some((s) => changedIds.has(s.id)) ? changed.version : null}
-              className="sm:col-span-2 lg:col-span-1"
+
             >
               <span className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-navy-900">
@@ -161,6 +168,41 @@ export function Overview({
                 <span className="text-sm text-navy-500">urlopu razem</span>
               </span>
               <Budget mother={budget.mother} father={budget.father} />
+            </Tile>
+          )}
+
+          {(money || askPay) && (
+            <Tile
+              question="Ile dostaniecie?"
+              onClick={money ? onMoney : () => onAsk('Chcę podać moje miesięczne zarobki brutto')}
+              pulse={money && changedIds.has(money.now.id) ? changed.version : null}
+            >
+              {money ? (
+                <>
+                  <span className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-bold text-navy-900 tabular-nums">
+                      <TextStates text={formatPlnShort(money.now.monthly)} />
+                    </span>
+                    <span className="text-sm text-navy-500">/ mies.</span>
+                  </span>
+                  <span className="mt-1 block text-sm leading-snug text-navy-500">
+                    {money.now.lane === 'father' ? 'Tata' : 'Mama'}
+                    {moneySegment ? `: ${periodName(moneySegment).toLowerCase()}` : ''} · {formatRate(money.now.rate)}
+                  </span>
+                  {money.then && (
+                    <span className="block text-sm leading-snug text-navy-500">
+                      potem <b className="text-navy-900 tabular-nums">{formatPlnShort(money.then.monthly)}</b> / mies.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="text-lg leading-snug font-bold text-navy-900">Podajcie zarobki</span>
+                  <span className="mt-1 block text-sm leading-snug text-navy-500">
+                    Policzymy zasiłek na każdy okres, krok po kroku.
+                  </span>
+                </>
+              )}
             </Tile>
           )}
 
@@ -179,6 +221,7 @@ export function Overview({
               <span className="mt-1.5 block text-sm leading-snug text-navy-500">{step.detail}</span>
             </Tile>
           )}
+          </div>
         </motion.div>
       )}
 
@@ -288,14 +331,14 @@ function Tile({
       onClick={onClick}
       whileTap={{ scale: 0.98, transition: SPRING_PRESS }}
       className={cn(
-        'group relative flex flex-col items-stretch rounded-3xl border border-line bg-white p-4 text-left lg:p-5',
+        'group relative flex flex-col items-stretch rounded-3xl border border-line bg-white p-3.5 text-left @lg:p-5',
         'transition-[border-color,box-shadow] duration-200 hover:border-navy-200 hover:shadow-[0_12px_30px_-20px_rgb(26_36_56/0.35)]',
         'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
         className,
       )}
     >
       {pulse !== null && <Pulse key={pulse} className="rounded-3xl" />}
-      <span className="mb-2 flex items-center justify-between text-sm font-bold text-navy-500">
+      <span className="mb-2 flex items-center justify-between gap-1 text-[13px] leading-tight font-bold text-navy-500 @lg:text-sm">
         {question}
         <ChevronRight className="size-4 text-navy-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-navy-500" />
       </span>
@@ -340,7 +383,7 @@ function Budget({ mother, father }: { mother: Segment[]; father: Segment[] }) {
           </span>
         )}
         {parts.some((s) => s.tone === 'option') && (
-          <span className="flex items-center gap-1.5 text-navy-500">
+          <span className="hidden items-center gap-1.5 text-navy-500 @lg:flex">
             <span className="size-2.5 rounded-full bg-zus-200" />
             jaśniej: do wyboru
           </span>

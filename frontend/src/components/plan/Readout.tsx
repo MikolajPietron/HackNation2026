@@ -4,6 +4,8 @@
 import { Illustration } from '@/components/ui/illustration'
 import { dayNumber, formatDayMonthShort, formatDistance, formatShortDate, isoFromDay } from '@/lib/dates'
 import { documentIcon, markerIcon, segmentIcon } from '@/lib/icons'
+import { ICONS } from '@/lib/icons'
+import { formatPln, formatRate } from '@/lib/money'
 import { deadlineOf, length, optionWindow, periodName } from '@/lib/plan'
 import type { Segment, Timeline } from '@/types'
 
@@ -80,6 +82,20 @@ export function Readout({
       icon: segmentIcon(s),
       title: s.title,
       rest: `${progress} · do ${formatDayMonthShort(s.end)}`,
+    })
+  }
+  // What comes in on that day: the benefit of each period going on, as the engine computed it.
+  for (const p of timeline.payments) {
+    if (dayNumber(p.start) > day || day > dayNumber(p.end)) continue
+    // A period still to decide pays only if it is taken: say so, as for the period itself.
+    const option = timeline.segments.find((s) => s.id === p.segment_id)?.tone === 'option'
+    lines.push({
+      key: `p-${p.id}`,
+      id: p.id,
+      icon: ICONS.pieniadze,
+      lead: option ? 'Do wyboru' : 'Wpływa',
+      title: `${formatPln(p.monthly)} miesięcznie`,
+      rest: `${p.lane === 'father' ? 'zasiłek taty' : 'zasiłek mamy'} · ${formatRate(p.rate)}`,
     })
   }
   if (active.length === 0 && upcoming) {

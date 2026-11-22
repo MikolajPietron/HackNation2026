@@ -11,6 +11,7 @@ import type {
   Scenario,
   SessionStart,
   SessionView,
+  Timeline,
 } from './types'
 
 /** Empty in dev: Vite forwards /api to the backend. Set VITE_API_URL for a separate API host. */
@@ -171,3 +172,7 @@ export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
     method: 'PUT',
     body: JSON.stringify({ scenario }),
   })
+
+/** The deterministic calculator without AI and without a session: a variant of the plan. */
+export const calculateTimeline = (scenario: Scenario, signal?: AbortSignal) =>
+  requestJson<Timeline>('/api/timeline', { method: 'POST', body: JSON.stringify(scenario), signal })

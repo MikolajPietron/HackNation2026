@@ -19,6 +19,7 @@ import type { AnimationPlaybackControls } from 'motion/react'
 import { Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
 import dziecko from '@/assets/onboarding/dziecko.webp'
 import mama from '@/assets/onboarding/mama.webp'
+import pieniadze from '@/assets/onboarding/pieniadze.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zaswiadczenie from '@/assets/onboarding/zaswiadczenie.webp'
 import {
@@ -31,10 +32,11 @@ import {
 import { SPRING_LAYOUT } from '@/lib/ease'
 import { Illustration } from '@/components/ui/illustration'
 import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
+import { formatPlnShort, formatRate } from '@/lib/money'
 import { clipName, length, optionWindow } from '@/lib/plan'
 import { LANE_ORDER } from '@/lib/ui'
 import { cn } from '@/lib/utils'
-import type { Lane, Segment, Timeline } from '@/types'
+import type { Lane, Payment, Segment, Timeline } from '@/types'
 import { Readout } from './Readout'
 
 /** Days of margin before the first and after the last element. */
@@ -63,6 +65,8 @@ const FLAG_SPACE = 8
 const FLAG_HANG = 6
 const CLIP_HEIGHT = 46
 const CLIP_TOP = (ROW_HEIGHT - CLIP_HEIGHT) / 2
+/** A payment on the money track: two rows (mother, father) fit in one track. */
+const MONEY_CLIP = 30
 /** Heights in the tracks follow the text size ("Większy tekst" scales rem), like the chips. */
 const rem = (px: number) => `${px / 16}rem`
 const MIN_ZOOM = 1
@@ -522,7 +526,10 @@ export function PlanTimeline({
   const lanes = (Object.keys(LANES) as Lane[])
     .filter((lane) => flags[lane].length > 0 || laneSegments(lane).length > 0)
     .sort((a, b) => LANE_ORDER[a] - LANE_ORDER[b])
-  const rowsBelowRuler = Math.max(1, lanes.length)
+  // The money track: what is paid for each period, the mother's above the father's.
+  const payments = timeline.payments
+  const moneyLanes = (['mother', 'father'] as const).filter((lane) => payments.some((p) => p.lane === lane))
+  const rowsBelowRuler = Math.max(1, lanes.length + (payments.length > 0 ? 1 : 0))
 
   const sortedIn = (lane: Lane) =>
     laneSegments(lane).sort((a, b) => a.start.localeCompare(b.start))
@@ -869,6 +876,47 @@ export function PlanTimeline({
               </Fragment>
             )
           })}
+
+          {payments.length > 0 && (
+            <>
+              <div
+                className="sticky left-0 z-30 flex items-center gap-2 border-b border-line bg-white pr-3"
+                style={{ gridColumn: 1, gridRow: lanes.length + 2 }}
+              >
+                <Illustration src={pieniadze} size="lane" />
+                <span className="text-sm font-bold text-navy-900">Pieniądze</span>
+              </div>
+              <div
+                className="relative border-b border-line"
+                style={{ gridColumn: 2, gridRow: lanes.length + 2, height: ROW_HEIGHT }}
+              >
+                {payments.map((payment) => {
+                  const left = x(dayNumber(payment.start))
+                  const span = x(dayNumber(payment.end) + 1) - left
+                  const row = moneyLanes.indexOf(payment.lane)
+                  const top =
+                    moneyLanes.length === 1
+                      ? (ROW_HEIGHT - MONEY_CLIP) / 2
+                      : (ROW_HEIGHT - 2 * MONEY_CLIP - 4) / 2 + row * (MONEY_CLIP + 4)
+                  const option = timeline.segments.find((s) => s.id === payment.segment_id)?.tone === 'option'
+                  return (
+                    <MoneyClip
+                      key={payment.id}
+                      payment={payment}
+                      option={option}
+                      left={left}
+                      span={span}
+                      px={(span / 100) * width}
+                      top={top}
+                      active={selectedId === payment.id || hoveredId === payment.id}
+                      onClick={() => onSelect(payment.id)}
+                      onHover={(on) => onHover(on ? payment.id : null)}
+                    />
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1026,5 +1074,59 @@ function Clip({
         </span>
       )}
     </motion.button>
+  )
+}
+
+/** What is paid for a period, on the money track: green the mother's, navy the father's;
+ *  dashed while the period is still to decide. */
+function MoneyClip({
+  payment,
+  option,
+  left,
+  span,
+  px,
+  top,
+  active,
+  onClick,
+  onHover,
+}: {
+  payment: Payment
+  option: boolean
+  left: number
+  span: number
+  px: number
+  top: number
+  active: boolean
+  onClick: () => void
+  onHover: (on: boolean) => void
+}) {
+  const father = payment.lane === 'father'
+  const text =
+    px >= 116 ? `${formatPlnShort(payment.monthly)} / mies.` : px >= 64 ? formatPlnShort(payment.monthly) : ''
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      aria-label={`${payment.title}: ${formatPlnShort(payment.monthly)} miesięcznie, ${formatRate(payment.rate)}`}
+      title={`${payment.title} · ${formatRate(payment.rate)}`}
+      className={cn(
+        'absolute flex items-center overflow-hidden rounded-lg border px-2 text-xs font-bold whitespace-nowrap tabular-nums',
+        'transition-[left,width,box-shadow,background-color] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+        'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+        father
+          ? option
+            ? 'border-dashed border-navy-300 bg-navy-50/70 text-navy-700'
+            : 'border-navy-200 bg-navy-100 text-navy-900'
+          : option
+            ? 'border-dashed border-zus-300 bg-zus-50/70 text-zus-700'
+            : 'border-zus-200 bg-zus-100 text-zus-900',
+        active && 'ring-2 ring-navy-900/25 ring-offset-1',
+      )}
+      style={{ top, height: MONEY_CLIP, left: `${left}%`, width: `${span}%` }}
+    >
+      <span className="truncate">{text}</span>
+    </button>
   )
 }
