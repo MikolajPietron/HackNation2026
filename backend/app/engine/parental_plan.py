@@ -37,6 +37,7 @@ import math
 from dataclasses import dataclass
 from fractions import Fraction
 
+from app.engine.after_insurance import after_job_loss
 from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources
 from app.engine.father import MATERNITY_PARTS, _insurance_lines
 from app.engine.insurance import NOT_INSURED, Coverage, father_coverage
@@ -336,6 +337,12 @@ def _check_work(scenario: Scenario, params: Params, number: int, part: ParentalP
             f"({part.weeks} tyg.)."
         )
     work = scenario.mothers_work if part.parent == "mother" else scenario.fathers_work
+    if part.parent == "mother" and after_job_loss(scenario) is not None:
+        raise ScenarioError(
+            "Łączyć urlop rodzicielski z pracą może pracownik, u pracodawcy, który udziela tego "
+            "urlopu. Zatrudnienie mamy ustało w ciąży: ma zasiłek po ustaniu ubezpieczenia, a nie "
+            "urlop u pracodawcy, więc tej możliwości nie ma."
+        )
     if work in ("contract", "business", "none"):
         raise ScenarioError(
             "Łączyć urlop rodzicielski z pracą może pracownik, u pracodawcy, który udziela tego "

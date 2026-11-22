@@ -323,3 +323,22 @@ def test_a_part_after_the_deadline_cannot_be_planned() -> None:
     gone = Scenario(**born, parental_parts=[{"parent": "father", "weeks": 1}])
     with pytest.raises(ScenarioError, match="Czas na urlop rodzicielski minął 31.12.2026"):
         build_timeline(gone, PARAMS, dt.date(2027, 1, 5))
+
+
+def test_no_work_during_leave_after_the_job_ended_in_pregnancy() -> None:
+    """After the employer's bankruptcy in pregnancy the mother gets the maternity benefit after
+    the insurance ended (ustawa art. 30), not leave from an employer: combining parental leave
+    with work (KP art. 182¹ᵉ § 1, an employee at her employer) is not open to her."""
+    scenario = Scenario.model_validate(
+        {
+            "role": "mother",
+            "work": "employment",
+            "child_born": False,
+            "due_date": "2027-03-15",
+            "children_count": 1,
+            "job_loss": {"ended_on": "2026-11-30", "reason": "bankruptcy"},
+            "parental_parts": [{"parent": "mother", "weeks": 20, "work_fraction": "1/2"}],
+        }
+    )
+    with pytest.raises(ScenarioError, match="Zatrudnienie mamy ustało w ciąży"):
+        build_timeline(scenario, PARAMS, dt.date(2026, 11, 21))
