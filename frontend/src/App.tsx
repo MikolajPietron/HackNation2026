@@ -13,11 +13,13 @@ const loadPlan = () => import('@/components/plan/PlanScreen')
 const PlanScreen = lazy(() => loadPlan().then((m) => ({ default: m.PlanScreen })))
 const AdminScreen = lazy(() => import('@/components/admin/AdminScreen').then((m) => ({ default: m.AdminScreen })))
 const ReportScreen = lazy(() => import('@/components/report/ReportScreen').then((m) => ({ default: m.ReportScreen })))
+const SharedPlan = lazy(() => import('@/components/plan/SharedPlan').then((m) => ({ default: m.SharedPlan })))
 
 /** While a part of the app loads: a quiet page, marked busy for screen readers. */
 const Loading = () => <div className="h-dvh bg-white" aria-busy="true" aria-label="Wczytywanie" />
 
-/** `/admin` is the parameters panel, `/raport` the agreement report; the rest is the parents' app. */
+/** `/admin` is the parameters panel, `/raport` the agreement report, `/plan/<token>` a plan shared
+ *  read-only; the rest is the parents' app. */
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
@@ -26,6 +28,8 @@ export default function App() {
           <AdminScreen />
         ) : window.location.pathname.startsWith('/raport') ? (
           <ReportScreen />
+        ) : window.location.pathname.startsWith('/plan/') ? (
+          <SharedPlan token={window.location.pathname.split('/')[2] ?? ''} />
         ) : (
           <ParentsApp />
         )}

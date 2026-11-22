@@ -687,8 +687,22 @@ export type ChatEvent =
       question: InterviewQuestion | null
     }
   | { type: 'focus'; element_id: string }
-  | { type: 'done' }
+  | { type: 'done'; usage?: TurnUsage }
   | { type: 'error'; message: string }
+
+/** Time and tokens of one chat turn (api/chat.py `_Translator._measure`), for tools/eval; the UI
+ * does not need it. `input_tokens` include the cached ones; `cost_usd` is null for a model
+ * without a known price. */
+export interface TurnUsage {
+  first_text_s: number | null
+  total_s: number
+  requests: number
+  input_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  output_tokens: number
+  cost_usd: number | null
+}
 
 // Admin panel (backend/app/api/admin.py).
 

@@ -25,6 +25,9 @@ dates in the past). Shift every date by the same number of days to run it later.
 
 Step fields:
   say / event        the user's message, or the app event "timeline_ready"
+  patch              scenario fields the app changes before the message, without the chat
+                     (PATCH /api/session/{id}/scenario: the week tiles, the 81,5% switch)
+  no_setters         the turn must not record anything (no set_* tool call)
   tools              tool calls that must happen, with a subset of their arguments
   no_tools           tools that must NOT be called (e.g. a hypothetical question)
   timeline           expected timeline after the step (see checks.check_timeline)
@@ -1104,6 +1107,60 @@ SCENARIOS = [
                     "2027-07-18",
                     "2027-07-19",
                 ],
+            },
+        ],
+    },
+    {
+        # ZADANIA B.16: the parents split parental leave on the week tiles and choose 81,5% in
+        # the app (PATCH /scenario). The hidden note "Rodzic zmienił w aplikacji…" is in the
+        # history: the next turn records nothing again, does not retell the note and does not
+        # ask for the split from scratch; asked how to split, it points to the app.
+        # The plan by hand: maternity leave 15.03-01.08.2027 (20 weeks, no leave before the
+        # birth chosen yet), parental leave from 02.08.2027 (KP art. 182¹ᵃ, guide p. 5-7): the
+        # mother 20 weeks = 140 days, 02.08-19.12.2027; the father his 9 weeks at the same time
+        # (with_previous, KP art. 182¹ᵃ § 6) = 63 days, 02.08-03.10.2027.
+        "id": "app-change-note",
+        "about": "the split and the rate changed in the app: nothing recorded again, the note "
+        "not retold, the parent pointed to the app instead of asked for the split (B.16)",
+        "runs": 2,
+        "onboarding": {
+            **MOTHER_EXPECTED,
+            "payer_size": "over-20",
+            "pay": 8000,
+            "partner": {"work": "employment", "payer_size": "over-20", "pay": 6000},
+        },
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "patch": {
+                    "parental_parts": [
+                        {"parent": "mother", "weeks": 20},
+                        {"parent": "father", "weeks": 9, "with_previous": True},
+                    ],
+                    "rate_815": True,
+                },
+                "say": "Ustawiłam już w aplikacji podział urlopu i stawkę. Co dalej?",
+                "no_setters": True,
+                "timeline": {
+                    "segments": {
+                        "parental-mother-1": ["2027-08-02", "2027-12-19"],
+                        "parental-father-1": ["2027-08-02", "2027-10-03"],
+                    },
+                    "absent": ["parental", "parental-father"],
+                },
+                "forbid": [
+                    r"rate_815|parental_parts|with_previous|Rodzic zmienił",
+                    r"[Kk]to (weźmie|wykorzysta)|[Ii]le tygodni (weźmie|chce|wykorzyst)",
+                    r"w ilu częściach",
+                ],
+                "question": "leave-before-birth",
+            },
+            {
+                "say": "A jak najlepiej podzielić urlop rodzicielski między mnie a męża?",
+                "no_setters": True,
+                "require": [r"Jak dzielicie urlop|kafelk|Plan\w* dla Was|w aplikacji"],
+                "forbid": [r"[Kk]to (weźmie|wykorzysta)\b[^.?\n]{0,60}\?", r"w ilu częściach"],
+                "question": "leave-before-birth",
             },
         ],
     },

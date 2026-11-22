@@ -7,7 +7,7 @@
 // the engine's words of sympathy and what the family is entitled to, in full and calmly
 // (CLAUDE.md, phase 3).
 import { motion } from 'motion/react'
-import { Check, ChevronRight, Lock, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Check, ChevronRight, Lock, RotateCcw, Share2, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Pulse } from '@/components/timeline/Pulse'
@@ -41,6 +41,7 @@ export function Overview({
   onMoney,
   onAsk,
   onFill,
+  onShare,
 }: {
   timeline: Timeline
   changed: ChangeSet
@@ -56,6 +57,8 @@ export function Overview({
   onAsk: (prompt: string) => void
   /** Open a request to fill in (a document with a form). */
   onFill: (documentId: string) => void
+  /** "Udostępnij plan": a read-only link for the partner. */
+  onShare?: () => void
 }) {
   const { title, text } = headline(timeline)
   const right = entitlement(timeline.notes)
@@ -85,7 +88,12 @@ export function Overview({
               </>
             )}
           </div>
-          {wide && <StartOver onClick={onStartOver} />}
+          {wide && (
+            <div className="mt-6 flex shrink-0 items-center gap-1">
+              {onShare && <ShareButton onClick={onShare} />}
+              <StartOver onClick={onStartOver} />
+            </div>
+          )}
         </motion.header>
         {featured.map((note) => (
           <Featured key={note.id} note={note} changed={changed} onWhy={onWhy} />
@@ -136,7 +144,12 @@ export function Overview({
             </button>
           </p>
         </div>
-        {wide && <StartOver onClick={onStartOver} />}
+        {wide && (
+          <div className="mt-6 flex shrink-0 items-center gap-1">
+            {onShare && <ShareButton onClick={onShare} />}
+            <StartOver onClick={onStartOver} />
+          </div>
+        )}
       </motion.header>
 
       {task && (!decisionPending || task.tone !== 'calm') && (
@@ -248,9 +261,21 @@ function StartOver({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-6 flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-bold text-navy-500 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97]"
+      className="flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-bold text-navy-500 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97]"
     >
       <RotateCcw className="size-4" /> Od nowa
+    </button>
+  )
+}
+
+function ShareButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-bold text-navy-500 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97]"
+    >
+      <Share2 className="size-4" /> Udostępnij
     </button>
   )
 }

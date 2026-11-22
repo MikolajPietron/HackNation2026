@@ -5,14 +5,16 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
+from pydantic_ai import ModelConnectionError, ModelRateLimitError, ModelUnavailableError
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.fallback import FallbackModel
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.settings import CacheConfig, ModelSettings
 
 from app.clock import today_in_warsaw
 from app.config import LlmProvider, Settings, ThinkingLevel, get_settings
@@ -59,15 +61,48 @@ def get_chat_model(settings: Annotated[Settings, Depends(get_settings)]) -> Mode
             ),
         )
     return _chat_model(
-        settings.llm_provider, settings.llm_model_name, settings.llm_api_key, settings.llm_thinking
+        settings.llm_provider,
+        settings.llm_model_name,
+        settings.llm_api_key,
+        settings.llm_thinking,
+        settings.llm_fallback_model,
     )
+
+
+FALLBACK_ON = (ModelRateLimitError, ModelUnavailableError, ModelConnectionError)
+"""Errors after which the chat tries the fallback model (one retry of the same model comes
+first: `RetryOnModelErrors` in agent.py)."""
 
 
 @lru_cache(maxsize=4)
 def _chat_model(
+    provider: LlmProvider,
+    name: str,
+    api_key: str,
+    thinking: ThinkingLevel | None,
+    fallback: str = "",
+) -> Model:
+    primary = _provider_model(provider, name, api_key, thinking)
+    if not fallback or fallback == name:
+        return primary
+    return FallbackModel(
+        primary, _provider_model(provider, fallback, api_key, thinking), fallback_on=FALLBACK_ON
+    )
+
+
+def _provider_model(
     provider: LlmProvider, name: str, api_key: str, thinking: ThinkingLevel | None
 ) -> Model:
-    model_settings = ModelSettings(cache=True)
+    model_settings = ModelSettings(
+        # Prompt caching (ZADANIA B.17): the tools and the literal instructions (the base and the
+        # family's stage) are the cached prefix; the current state follows them and changes
+        # with almost every answer, so the conversation after it is not written to the cache
+        # (a write costs more than a plain input token and would rarely be read). Gemini caches
+        # the same prefix implicitly.
+        cache=CacheConfig(messages=False),
+        # One retry with a short wait is the agent's (`RetryOnModelErrors`), not the SDK's.
+        max_retries=0,
+    )
     if thinking is not None:
         model_settings["thinking"] = thinking
     if provider == "google":

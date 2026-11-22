@@ -15,8 +15,9 @@ import {
   CircleAlert,
   Info,
   LoaderCircle,
+  Download,
   Lock,
-  Printer,
+  Mail,
   Send,
   ShieldCheck,
   Sparkles,
@@ -28,7 +29,9 @@ import { PrimaryButton } from '@/components/onboarding/ChoiceCard'
 import { Emphasis } from '@/components/ui/emphasis'
 import { formatLongDate, formatShortDate, todayIso } from '@/lib/dates'
 import { EASE_OUT, SPRING_PRESS } from '@/lib/ease'
+import { personalValue, useProfile, withPersonalValue, type Profile } from '@/lib/personal'
 import { currentSessionId } from '@/lib/session'
+import { copyText } from '@/lib/clipboard'
 import { sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type {
@@ -52,7 +55,7 @@ const FILLED = '(wpisane)'
 type Step = 'fill' | 'send' | 'sent'
 type Values = Record<string, string>
 
-function initialValues(form: RequestForm): Values {
+function initialValues(form: RequestForm, profile: Profile): Values {
   const values: Values = {}
   for (const field of form.fields) {
     if (field.kind === 'period') {
@@ -61,7 +64,7 @@ function initialValues(form: RequestForm): Values {
     } else if (field.kind === 'date') {
       values[field.id] = dotted(field.start) || (field.value ?? '')
     } else {
-      values[field.id] = field.personal ? '' : (field.value ?? '')
+      values[field.id] = field.personal ? personalValue(field, form, profile) : (field.value ?? '')
     }
   }
   return values
@@ -99,7 +102,10 @@ export function ApplicationForm({
   onCertificate?: () => void
 }) {
   const form = document.form
-  const [values, setValues] = useState<Values>(() => (form ? initialValues(form) : {}))
+  const [profile, saveProfile] = useProfile()
+  const [values, setValues] = useState<Values>(() => (form ? initialValues(form, profile) : {}))
+  const [downloading, setDownloading] = useState(false)
+  const [hrOpen, setHrOpen] = useState(false)
   const [attached, setAttached] = useState<Set<string>>(new Set())
   const [step, setStep] = useState<Step>('fill')
   const [email, setEmail] = useState('')
@@ -109,6 +115,9 @@ export function ApplicationForm({
   if (!form) return null
   const set = (key: string) => (value: string) => {
     setValues((v) => ({ ...v, [key]: value }))
+    // Personal data typed here fills every other request too (kept in this browser only).
+    const field = form.fields.find((f) => f.id === key)
+    if (field?.personal) saveProfile(withPersonalValue(profile, field, form, value))
     if (check.status === 'done') setCheck({ status: 'stale', result: check.result })
   }
   const toggle = (id: string) => {
@@ -148,7 +157,15 @@ export function ApplicationForm({
     }
   }
 
-  const print = () => printRequest(form, document, values, attached)
+  const download = async () => {
+    setDownloading(true)
+    try {
+      const { downloadRequest } = await import('@/lib/pdf/documents')
+      await downloadRequest(document, values, profile, attached)
+    } finally {
+      setDownloading(false)
+    }
+  }
   const send = SEND_TO[form.addressee]
   const deadlinePassed = document.deadline !== null && document.deadline < timeline.today
 
@@ -255,8 +272,14 @@ export function ApplicationForm({
             </p>
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              <Secondary onClick={print}>
-                <Printer className="size-4" /> Drukuj albo PDF
+              {form.addressee === 'employer' && (
+                <Secondary onClick={() => setHrOpen((o) => !o)}>
+                  <Mail className="size-4" /> Wiadomość do kadr
+                </Secondary>
+              )}
+              <Secondary onClick={() => void download()} disabled={downloading}>
+                {downloading ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+                {form.official_form ? `Dane do ${form.official_form} (PDF)` : 'Pobierz wniosek (PDF)'}
               </Secondary>
               <Secondary onClick={() => void runCheck()} disabled={check.status === 'checking'}>
                 {check.status === 'checking' && !check.phrasing ? (
@@ -270,6 +293,9 @@ export function ApplicationForm({
                 <Send className="size-4" /> {send.button}
               </PrimaryButton>
             </div>
+            <AnimatePresence initial={false}>
+              {hrOpen && <HrMessage form={form} profile={profile} onClose={() => setHrOpen(false)} />}
+            </AnimatePresence>
           </motion.div>
         )}
 
@@ -362,8 +388,9 @@ export function ApplicationForm({
             </p>
             <p className="mt-4 max-w-sm text-sm text-pretty">Zachowaj kopię wniosku.</p>
             <div className="mt-5">
-              <Secondary onClick={print}>
-                <Printer className="size-4" /> Zachowaj kopię (PDF)
+              <Secondary onClick={() => void download()} disabled={downloading}>
+                {downloading ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Zachowaj kopię (PDF)
               </Secondary>
             </div>
           </motion.div>
@@ -671,32 +698,51 @@ function Secondary({ onClick, disabled, children }: { onClick: () => void; disab
   )
 }
 
-/** The request on paper: what the parent typed stays in this window only. */
-function printRequest(form: RequestForm, document: Document, values: Values, attached: Set<string>) {
-  const win = window.open('', '_blank', 'noopener=no')
-  if (!win) return
-  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  const rows = form.fields
-    .map((f) => `<tr><th>${esc(f.label)}</th><td>${esc(written(f, values) || '……………………………')}</td></tr>`)
-    .join('')
-  const attachments = form.attachments
-    .map((a) => `<li>${attached.has(a.id) ? '☒' : '☐'} ${esc(a.label)}</li>`)
-    .join('')
-  const basis = form.legal_basis.map((s) => esc(sourceLabel(s))).join('; ')
-  win.document.write(`<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${esc(form.title)}</title>
-<style>body{font-family:Georgia,serif;max-width:680px;margin:48px auto;line-height:1.55;color:#111}
-.r{text-align:right}h1{font-size:20px;text-align:center;margin:36px 0 24px}table{width:100%;border-collapse:collapse}
-th,td{text-align:left;vertical-align:top;padding:8px 0;border-bottom:1px solid #ddd}th{width:45%;font-weight:normal;color:#555;padding-right:16px}
-ul{list-style:none;padding:0}.s{margin-top:64px;text-align:right}.b{margin-top:24px;font-size:12px;color:#555}</style></head><body>
-<p class="r">……………, ${esc(formatLongDate(todayIso()))} r.</p>
-<p class="r">${esc(form.addressee_label)}</p>
-<h1>${esc(form.title)}</h1><table>${rows}</table>
-${attachments ? `<p><b>Załączniki</b></p><ul>${attachments}</ul>` : ''}
-<p class="s">……………………………<br>podpis</p>
-${basis ? `<p class="b">Podstawa: ${basis}</p>` : ''}
-<p class="b">${esc(document.title)} · przygotowane w aplikacji Zasiłkowy Przewodnik Przyszłego Rodzica (symulacja).</p>
-</body></html>`)
-  win.document.close()
-  win.focus()
-  win.print()
+/** A short e-mail to HR with the request attached: copy it, or open it in the mail app. */
+function HrMessage({ form, profile, onClose }: { form: RequestForm; profile: Profile; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const me = form.applicant === 'father' ? profile.father : profile.mother
+  const period =
+    form.start && form.end ? ` na okres od ${dotted(form.start)} do ${dotted(form.end)}` : form.start ? ` od ${dotted(form.start)}` : ''
+  const subject = form.title
+  const body =
+    `Dzień dobry,\n\nw załączeniu przesyłam ${form.title.charAt(0).toLowerCase()}${form.title.slice(1)}${period}. ` +
+    'Wniosek jest wypełniony i podpisany.\n\nProszę o potwierdzenie otrzymania.\n\nZ poważaniem\n' +
+    (me.name || '[imię i nazwisko]')
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return (
+    <motion.section
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.22, ease: EASE_OUT }}
+      className="overflow-hidden"
+      aria-label="Wiadomość do kadr"
+    >
+      <div className="mt-4 rounded-2xl border border-line px-4 py-3">
+        <p className="text-xs font-bold text-navy-500">Temat: {subject}</p>
+        <p className="mt-2 text-sm whitespace-pre-line text-navy-900">{body}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={async () => setCopied(await copyText(`${subject}\n\n${body}`))}
+            className="flex h-9 items-center gap-2 rounded-full border border-line px-3.5 text-sm font-bold text-navy-700 hover:bg-navy-50"
+          >
+            {copied ? <Check className="size-4 text-zus-600" /> : <Mail className="size-4" />}
+            {copied ? 'Skopiowano' : 'Kopiuj wiadomość'}
+          </button>
+          <a
+            href={mailto}
+            className="flex h-9 items-center gap-2 rounded-full bg-zus-600 px-3.5 text-sm font-bold text-white hover:bg-zus-700"
+          >
+            <Send className="size-4" /> Otwórz w poczcie
+          </a>
+          <button type="button" onClick={onClose} className="h-9 rounded-full px-3 text-sm font-bold text-navy-500 hover:bg-navy-50">
+            Zamknij
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-navy-400">Pobrany wniosek (PDF) dołącz do wiadomości jako załącznik.</p>
+      </div>
+    </motion.section>
+  )
 }

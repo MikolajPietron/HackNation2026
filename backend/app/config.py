@@ -36,7 +36,11 @@ class Settings(BaseSettings):
     llm_model: str = ""
     """Empty = the default model of the provider (Claude Opus 5.5)."""
     llm_thinking: ThinkingLevel | None = None
-    """Thinking effort; unset = the model's default (adaptive thinking on Claude Opus 5.5)."""
+    """Thinking effort of the chat's answers; unset = "low" (agent.py). The welcome turn after the
+    onboarding always thinks "low"."""
+    llm_fallback_model: str = ""
+    """A model of the same provider (same key) the chat falls back to when the main one is rate
+    limited, overloaded or unreachable even after one more attempt. Empty = no fallback."""
 
     # Example cases from ZUS (scanned PDFs, confidential, never in git): the folder they are in,
     # and where the facts read from them are kept. Empty = docs/dokumentyZUS/sprawy.
