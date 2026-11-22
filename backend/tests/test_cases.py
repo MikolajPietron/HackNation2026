@@ -545,7 +545,9 @@ def test_debt_of_an_employee_does_not_count() -> None:
     case = facts(contribution_debt=ContributionDebt(person="mother", amount=900))
     scenario, notes = to_scenario(case)
     assert scenario.mother_contribution_debt is None
-    assert any("tylko osobie prowadzącej działalność" in note for note in notes)
+    assert any(
+        "osobom prowadzącym działalność i osobom z nimi współpracującym" in note for note in notes
+    )
 
 
 def test_more_parts_of_parental_leave_than_the_rules_allow() -> None:

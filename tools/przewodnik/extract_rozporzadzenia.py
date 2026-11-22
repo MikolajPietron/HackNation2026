@@ -49,6 +49,9 @@ ACTS = {
             "§ 2 ust. 2",
             "§ 3 ust. 1",
             "§ 3 ust. 2",
+            # The resignation of a mother with a ruling of incapacity (art. 180 § 6, § 8).
+            "§ 4 ust. 1",
+            "§ 4 ust. 2",
             "§ 5 ust. 1",
             "§ 5 ust. 2",
             "§ 6 ust. 1",
@@ -59,6 +62,14 @@ ACTS = {
             "§ 8 ust. 2",
             "§ 9 ust. 1",
             "§ 9 ust. 2",
+            # The father's part after the death, abandonment or incapacity of an uninsured
+            # mother (art. 180 § 15-16).
+            "§ 10 ust. 1",
+            "§ 10 ust. 2",
+            "§ 11 ust. 1",
+            "§ 11 ust. 2",
+            "§ 12 ust. 1",
+            "§ 12 ust. 2",
             "§ 14 ust. 1",
             "§ 14 ust. 2",
             "§ 15 ust. 1",
@@ -79,19 +90,33 @@ ACTS = {
             "wysokość oraz dokumentów niezbędnych do przyznania i wypłaty zasiłków (Dz.U. "
             "z 2026 r. poz. 1316), z materiałów ZUS dla HackNation 2026"
         ),
-        # The sickness benefit (§ 2, annex 1) and the maternity benefit: the data of the request
+        # The sickness benefit (§ 2, annex 1), the benefits after the insurance ended (§ 4, § 11,
+        # § 15, § 17, annex 4) and the maternity benefit: the data of the request
         # (§ 12, annex 6), the documents from the birth (§ 13), for the father taking over
         # (§ 20, § 22, § 23), supplementary leave (§ 26), an uninsured mother (§ 32) and
         # paternity leave (§ 33).
         "provisions": [
             "§ 2",
+            # After the insurance ended (ustawa art. 7, 30; engine/applications.py): the
+            # statement for the sickness or rehabilitation benefit (§ 4, annex 4), the
+            # rehabilitation benefit (§ 11), the maternity benefit after losing the job (§ 15),
+            # the benefit equal to the maternity benefit until the birth (§ 17).
+            "§ 4",
+            "§ 11 ust. 1",
+            "§ 11 ust. 3",
+            "§ 15 ust. 1",
+            "§ 15 ust. 2",
+            "§ 17",
+            "zał. 4",
             "§ 12",
             "§ 13 ust. 1",
             "§ 13 ust. 2",
             "§ 13 ust. 3",
             "§ 20 ust. 1",
             "§ 20 ust. 3",
+            "§ 20 ust. 4",
             "§ 22 ust. 1",
+            "§ 22 ust. 2",
             "§ 23 ust. 1",
             "§ 26",
             # ZAM of a non-employee for parental leave: filed before the benefit starts.
@@ -160,13 +185,16 @@ def paragraph(text: str, number: str) -> str:
 
 
 def annex(text: str, number: str) -> str:
-    """The text of "Załącznik N." after its title line, to the next annex."""
+    """The text of "Załącznik N." after its title, to the next annex. A title may run over
+    several lines (annex 4): the text starts at the first point, "1) "."""
     match = re.search(rf"(?m)^Załącznik {number}\. .*$", text)
     if not match:
         raise SystemExit(f"Załącznik {number} not found")
     following = re.search(r"(?m)^Załącznik \d+\.", text[match.end() :])
     end = match.end() + following.start() if following else len(text)
-    return text[match.end() : end]
+    body = text[match.end() : end]
+    first = re.search(r"(?m)^\s*1\) ", body)
+    return body[first.start() :] if first else body
 
 
 def unit(body: str, number: str) -> str:

@@ -532,15 +532,17 @@ def _father_takes_over(
 
 
 def _contribution_debt(facts: CaseFacts, scenario: Scenario, notes: list[str]) -> None:
-    """Contribution debt counts only for a person with a business (ustawa art. 2a)."""
+    """Contribution debt counts for a person with a business and for one cooperating with them
+    (ustawa art. 2a ust. 1); the cases give us only the parent's own business."""
     debt = facts.contribution_debt
     if debt is None or debt.amount < 0:
         return
     work = scenario.mothers_work if debt.person == "mother" else scenario.fathers_work
     if work != "business":
         notes.append(
-            f"Zadłużenie składkowe ({WHO[debt.person]}) odbiera prawo do zasiłku tylko osobie "
-            "prowadzącej działalność: tu go nie uwzględniamy."
+            f"Zadłużenie składkowe ({WHO[debt.person]}) odbiera prawo do zasiłku osobom "
+            "prowadzącym działalność i osobom z nimi współpracującym (art. 2a ust. 1); tu go nie "
+            "uwzględniamy."
         )
         return
     if debt.person == "mother":

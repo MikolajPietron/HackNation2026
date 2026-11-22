@@ -693,26 +693,34 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
       const facts = answers[who]
       // The person asked about: the mother when she fills in herself, or when the father does.
       const registered = own === motherFills ? 'zgłoszona' : 'zgłoszony'
-      const options: { value: boolean | Unknown; label: string; hint?: string }[] = [
-        {
-          value: true,
-          label: own ? `Tak, jestem ${registered}` : `Tak, jest ${registered}`,
-          hint: own ? 'opłacam składkę chorobową' : 'opłaca składkę chorobową',
-        },
+      const options: { value: boolean | Unknown; label: string }[] = [
+        { value: true, label: own ? `Tak, jestem ${registered}` : `Tak, jest ${registered}` },
         { value: false, label: own ? `Nie, nie jestem ${registered}` : `Nie, nie jest ${registered}` },
         { value: 'unknown', label: 'Nie wiem' },
       ]
+      // Poradnik ZUS: the client registers a contractor and pays the contributions; sickness
+      // insurance is voluntary, at the contractor's request (and voluntary with one's own firm).
+      const she = own === motherFills
+      const subtitle =
+        facts.work === 'contract'
+          ? own
+            ? 'Przy umowie zlecenia ubezpieczenie chorobowe jest dobrowolne, na Twój wniosek. Zgłasza Cię i opłaca składki zleceniodawca.'
+            : `Przy umowie zlecenia ubezpieczenie chorobowe jest dobrowolne, na ${she ? 'jej' : 'jego'} wniosek. Zgłasza ${she ? 'ją' : 'go'} i opłaca składki zleceniodawca.`
+          : 'Przy własnej firmie ubezpieczenie chorobowe jest dobrowolne.'
       screen = (
         <Question
-          title={own ? 'Czy opłacasz składkę chorobową?' : `Czy ${partnerName} opłaca składkę chorobową?`}
-          subtitle={`Przy ${facts.work === 'contract' ? 'umowie zlecenia' : 'własnej firmie'} ubezpieczenie chorobowe jest dobrowolne. Od niego zależy prawo do zasiłku.`}
+          title={
+            own
+              ? `Czy jesteś ${registered} do dobrowolnego ubezpieczenia chorobowego?`
+              : `Czy ${partnerName} jest ${registered} do dobrowolnego ubezpieczenia chorobowego?`
+          }
+          subtitle={subtitle}
         >
           <Rows label="Ubezpieczenie chorobowe">
             {options.map((option) => (
               <TextChoice
                 key={String(option.value)}
                 label={option.label}
-                hint={option.hint}
                 {...pick(facts.insured === option.value)}
                 onSelect={() => chooseWork(who, { insured: option.value })}
               />
@@ -742,7 +750,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
               ? `Ile osób zgłasza do ubezpieczenia Twój ${payer}?`
               : `Ile osób zgłasza do ubezpieczenia ${payer} ${whose}?`
           }
-          subtitle={`Chodzi o ubezpieczenie chorobowe. Od tego zależy, kto wypłaci zasiłek i gdzie ${own ? 'złożysz' : 'trafi'} wniosek.`}
+          subtitle={`Chodzi o osoby zgłoszone do ubezpieczenia chorobowego według stanu na 30 listopada poprzedniego roku. Od tego zależy, kto wypłaci zasiłek i gdzie ${own ? 'złożysz' : 'trafi'} wniosek.`}
         >
           <Rows label="Kto wypłaci zasiłek">
             {options.map((option) => (
@@ -1044,14 +1052,14 @@ function payWording(work: WorkAnswers['work'], own: boolean, partnerName: string
         title: own
           ? 'Jaka jest Twoja podstawa składki chorobowej?'
           : `Jaka jest podstawa składki chorobowej ${whose}?`,
-        subtitle: `Miesięcznie, z umowy zlecenia. ${average}`,
+        subtitle: `Miesięcznie, z umowy zlecenia: kwota, od której zleceniodawca opłaca za ${own ? 'Ciebie' : partnerName === 'tata' ? 'niego' : 'nią'} składki. ${average}`,
       }
     default:
       return {
         title: own
           ? 'Jaką podstawę składki chorobowej deklarujesz?'
           : `Jaką podstawę składki chorobowej deklaruje ${partnerName}?`,
-        subtitle: `Miesięcznie, w firmie: kwota, od której ${own ? 'płacisz' : 'płaci'} składki, a nie przychód. ${average}`,
+        subtitle: `Miesięcznie, w firmie: kwota, od której ${own ? 'płacisz' : 'płaci'} składki (zadeklarowana podstawa), a nie obroty ani dochód firmy. ${average}`,
       }
   }
 }

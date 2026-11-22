@@ -190,19 +190,15 @@ def _work_questions(scenario: Scenario, role: Role) -> list[Question]:
         case "unknown-voluntary":
             if yourself:
                 text = (
-                    "Czy jesteś zgłoszona do dobrowolnego ubezpieczenia chorobowego (opłacasz "
-                    "składkę chorobową)?"
+                    "Czy jesteś zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
                     if mother
-                    else "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego "
-                    "(opłacasz składkę chorobową)?"
+                    else "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego?"
                 )
             else:
                 text = (
-                    "Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego (opłaca "
-                    "składkę chorobową)?"
+                    "Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
                     if mother
-                    else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego "
-                    "(opłaca składkę chorobową)?"
+                    else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego?"
                 )
             return [
                 Question(

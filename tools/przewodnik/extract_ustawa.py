@@ -36,6 +36,13 @@ OUT = ROOT / "backend" / "app" / "assistant" / "ustawa_zasilkowa.json"
 PROVISIONS = {
     "art. 3 pkt 3": ("Art. 3 [", "pkt", "3"),
     "art. 3 pkt 4": ("Art. 3 [", "pkt", "4"),
+    # The sickness benefit in pregnancy: the insurance it needs (art. 4, 6), the days the
+    # employer pays count in the benefit period (art. 12).
+    "art. 4 ust. 1": ("Art. 4 [", "ust", "1"),
+    "art. 4 ust. 2": ("Art. 4 [", "ust", "2"),
+    "art. 4 ust. 3": ("Art. 4 [", "ust", "3"),
+    "art. 6 ust. 1": ("Art. 6 [", "ust", "1"),
+    "art. 12 ust. 1": ("Art. 12 [", "ust", "1"),
     "art. 7": ("Art. 7 [", None, None),
     "art. 8 ust. 2": ("Art. 8 [", "ust", "2"),
     "art. 11 ust. 2": ("Art. 11 [", "ust", "2"),
@@ -50,6 +57,12 @@ PROVISIONS = {
     "art. 19 ust. 1": ("Art. 19 [", "ust", "1"),
     "art. 22": ("Art. 22 [", None, None),
     "art. 13 ust. 1": ("Art. 13 [", "ust", "1"),
+    # The father's maternity benefit in the special situations of section B (father.py).
+    "art. 29 ust. 3": ("Art. 29 [", "ust", "3"),
+    "art. 29 ust. 5": ("Art. 29 [", "ust", "5"),
+    "art. 29 ust. 6": ("Art. 29 [", "ust", "6"),
+    "art. 29 ust. 7": ("Art. 29 [", "ust", "7"),
+    "art. 29 ust. 9": ("Art. 29 [", "ust", "9"),
     "art. 29a ust. 1": ("Art. 29a [", "ust", "1"),
     "art. 30 ust. 1": ("Art. 30 [", "ust", "1"),
     "art. 30 ust. 3": ("Art. 30 [", "ust", "3"),

@@ -605,15 +605,12 @@ FATHER_WORK = (
     "Jak pracuje tata: na etacie (umowa o pracę), na umowie zlecenia, prowadzi własną firmę "
     "czy nie pracuje?"
 )
-FATHER_INSURED = (
-    "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłaca składkę chorobową)?"
-)
-FATHER_INSURED_HIMSELF = (
-    "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłacasz składkę chorobową)?"
-)
+FATHER_INSURED = "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego?"
+FATHER_INSURED_HIMSELF = "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego?"
 PAYER = (
-    " zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Od tego zależy, czy zasiłek "
-    "wypłaci on, czy ZUS. Możesz też odpowiedzieć, że nie wiesz."
+    " zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Chodzi o osoby zgłoszone do "
+    "ubezpieczenia chorobowego według stanu na 30 listopada poprzedniego roku. Od tego zależy, "
+    "czy zasiłek wypłaci on, czy ZUS. Możesz też odpowiedzieć, że nie wiesz."
 )
 MOTHER_PAYER_HERSELF = f"Czy Twój pracodawca{PAYER}"
 FATHER_PAYER_CONTRACT = f"Czy płatnik składek z Twojej umowy zlecenia (zleceniodawca){PAYER}"

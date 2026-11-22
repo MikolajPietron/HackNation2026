@@ -375,7 +375,7 @@ def _replace(
     }
     if "father" in segments:
         temp = Draft(segments=segments["father"])
-        _insurance_lines(temp, scenario, params, father_coverage(scenario))
+        _insurance_lines(temp, scenario, params, father_coverage(scenario), cover)
         segments["father"] = temp.segments
     for parent, default_id in (("mother", "parental"), ("father", "parental-father")):
         if parent not in segments:

@@ -83,6 +83,7 @@ def test_labour_code_provisions() -> None:
         "art. 177 § 1",
         "art. 177 § 1¹",
         "art. 177 § 3",
+        "art. 177 § 3¹",
         "art. 92 § 1",
         "art. 92 § 2",
         "art. 92 § 3",
@@ -101,6 +102,7 @@ def test_labour_code_provisions() -> None:
         "art. 180 § 12",
         "art. 180 § 13",
         "art. 180 § 14",
+        "art. 180 § 15",
         "art. 180 § 16",
         "art. 180¹ § 1",
         "art. 180¹ § 2",
@@ -110,6 +112,7 @@ def test_labour_code_provisions() -> None:
         "art. 180² § 4",
         "art. 180² § 5",
         "art. 180² § 7",
+        "art. 182",
         "art. 182¹ᵃ § 1",
         "art. 182¹ᵃ § 2",
         "art. 182¹ᵃ § 3",
@@ -190,6 +193,12 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert set(ustawa_articles()) == {
         "art. 3 pkt 3",
         "art. 3 pkt 4",
+        # The sickness benefit: the insurance it needs, the employer's days in the period.
+        "art. 4 ust. 1",
+        "art. 4 ust. 2",
+        "art. 4 ust. 3",
+        "art. 6 ust. 1",
+        "art. 12 ust. 1",
         "art. 7",
         "art. 8 ust. 2",
         "art. 11 ust. 2",
@@ -203,6 +212,12 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 19 ust. 1",
         "art. 22",
         "art. 13 ust. 1",
+        # The father's benefit in the mother's special situations (engine/father.py).
+        "art. 29 ust. 3",
+        "art. 29 ust. 5",
+        "art. 29 ust. 6",
+        "art. 29 ust. 7",
+        "art. 29 ust. 9",
         "art. 29a ust. 1",
         "art. 30 ust. 1",
         "art. 30 ust. 3",
@@ -252,6 +267,11 @@ def test_ustawa_zasilkowa_provisions() -> None:
     }
     texts = ustawa_articles()
     assert texts["art. 30a ust. 1"].startswith("Ubezpieczona - matka dziecka, nie później niż 21")
+    assert (
+        "90 dni nieprzerwanego ubezpieczenia chorobowego - jeżeli jest ubezpieczony"
+        in (texts["art. 4 ust. 1"])
+    )
+    assert texts["art. 12 ust. 1"].endswith("Okresy te wlicza się do okresu zasiłkowego.")
     assert "art. 182¹ᵃ § 4 Kodeksu pracy" in texts["art. 31 ust. 3f"]
     assert texts["art. 3 pkt 3"].startswith("wynagrodzenie - przychód pracownika")
     assert "13,71%" in texts["art. 3 pkt 4"]
@@ -280,19 +300,32 @@ def test_the_two_regulations_on_requests() -> None:
     wnioski = rozporzadzenie_provisions("rozp_wnioski")
     zasilki = rozporzadzenie_provisions("rozp_zasilki")
     assert set(wnioski) == {
-        *(f"§ {n} ust. {u}" for n in (2, 3, 5, 6, 7, 8, 9, 14, 15, 17) for u in (1, 2)),
+        *(
+            f"§ {n} ust. {u}"
+            for n in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 17)
+            for u in (1, 2)
+        ),
         "§ 16",
         "§ 22",
     }
     assert set(zasilki) == {
         "§ 2",
+        "§ 4",
+        "§ 11 ust. 1",
+        "§ 11 ust. 3",
+        "§ 15 ust. 1",
+        "§ 15 ust. 2",
+        "§ 17",
+        "zał. 4",
         "§ 12",
         "§ 13 ust. 1",
         "§ 13 ust. 2",
         "§ 13 ust. 3",
         "§ 20 ust. 1",
         "§ 20 ust. 3",
+        "§ 20 ust. 4",
         "§ 22 ust. 1",
+        "§ 22 ust. 2",
         "§ 23 ust. 1",
         "§ 26",
         "§ 29",
@@ -320,6 +353,12 @@ def test_the_two_regulations_on_requests() -> None:
     assert zasilki["zał. 6"].startswith("1) NIP i REGON płatnika składek")
     assert zasilki["zał. 6"].endswith("19) pouczenie dotyczące zasiłku macierzyńskiego.")
     assert zasilki["zał. 1"].endswith("10) pouczenie dotyczące zasiłku chorobowego.")
+    # Annex 4: its title runs over two lines and is not part of its text.
+    assert zasilki["zał. 4"].startswith("1) dane ubezpieczonego")
+    assert zasilki["zał. 4"].endswith("9) pouczenie dotyczące oświadczenia.")
+    # § 11 runs over a page break: the page header after its number is left out.
+    assert zasilki["§ 11 ust. 1"].startswith("Dokumentami niezbędnymi do przyznania i wypłaty")
+    assert zasilki["§ 17"].endswith("że nie zapewniono jej innego zatrudnienia.")
     assert "art. 180² § 5 Kodeksu pracy" in zasilki["§ 26"]
 
 
@@ -673,6 +712,32 @@ def father_scenarios() -> list[dict[str, Any]]:
         for kind in ("death", "abandonment")
         for father in ({}, {"father_work": "none"})
     ]
+    # A mother without sickness insurance (art. 180 § 15-16, ustawa art. 29 ust. 9): each kind,
+    # the father an employee, on a contract, not working; too late for any part of the leave.
+    uninsured = special | {"work": "none"}
+    cases += [
+        uninsured | {"mother_event": {"kind": kind, "start": "2026-10-15"}} | father
+        for kind in ("incapacity", "hospital", "death", "abandonment")
+        for father in (
+            {"father_work": "employment"},
+            {"father_work": "contract", "father_insured": True},
+            {"father_work": "none"},
+        )
+    ]
+    cases.append(
+        uninsured
+        | {"birth_date": "2026-03-01", "mother_event": {"kind": "death", "start": "2026-09-01"}}
+    )
+    # Before 8 weeks (art. 180 § 6, § 10): the father from the 57th day; a stay over by then.
+    cases += [
+        special | {"mother_event": e} | father
+        for e in (
+            {"kind": "incapacity", "start": "2026-11-10"},
+            {"kind": "hospital", "start": "2026-11-10", "end": "2026-12-10"},
+            {"kind": "hospital", "start": "2026-10-10", "end": "2026-11-20"},
+        )
+        for father in ({}, {"father_work": "contract", "father_insured": True})
+    ]
     return cases
 
 
@@ -805,6 +870,24 @@ def pregnancy_scenarios() -> list[dict[str, Any]]:
         | {"sick_leave": True, "sick_leave_start": "2026-11-02"}
         | {"rehab_benefit": "applied"},
     ]
+    # After the check against the documents: the rehabilitation benefit after the work ended,
+    # sick leave that began before the insurance, the right not acquired before the end.
+    ended = {"job_loss": {"ended_on": "2026-12-15", "reason": "other"}}
+    cases += [employed | long_sick | ended | {"rehab_benefit": s} for s in (None, "granted")]
+    cases += [
+        expecting
+        | who
+        | {"sick_leave": True, "sick_leave_start": "2026-10-01", "insured_since": "2026-10-20"}
+        for who in (
+            {"role": "mother", "work": "employment"},
+            {"role": "mother", "work": "contract", "mother_insured": True},
+        )
+    ]
+    cases.append(
+        employed
+        | {"job_loss": {"ended_on": "2026-11-30", "reason": "other"}}
+        | {"sick_leave": True, "sick_leave_start": "2026-12-05", "insured_since": "2026-11-10"}
+    )
     return cases
 
 

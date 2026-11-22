@@ -213,7 +213,7 @@ function Row({
       : left < 0
         ? `termin minął ${formatShortDate(d.deadline)}`
         : `najpóźniej ${formatShortDate(d.deadline)}`
-    : `na ${formatShortDate(d.needed_by)} · bez terminu w przepisach`
+    : `na ${formatShortDate(d.needed_by)} · bez terminu w materiałach`
 
   return (
     <motion.li

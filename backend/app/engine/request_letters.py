@@ -3,7 +3,7 @@ employer, as the letter an employee writes, and a short e-mail to HR to send it 
 
 Built from the finished form (forms.py, `Forms.build`) for each request whose addressee is the
 employer: the requests of the regulation of 11 March 2025 (rozp_wnioski: § 2 the part of
-maternity leave before the birth, § 3 the mother's resignation, § 5-§ 9 the father's part of
+maternity leave before the birth, § 3-§ 4 the mother's resignation, § 5-§ 12 the father's part of
 maternity leave, § 14 supplementary, § 15 parental, § 16 work during parental leave, § 17
 paternity) and the employed mother's request for maternity leave (guide A.4). The front lays the
 letter out on an A4 page and renders the PDF in the browser.
@@ -298,11 +298,15 @@ class Letters:
             "prenatal": self.prenatal,
             "maternity": self.maternity,
             "resignation": self.resignation,
+            "resignation-incapacity": self.resignation,
             "father-takeover": self.father_takeover,
             "father-hospital-employee": self.father_hospital,
             "father-hospital-insured": self.father_hospital,
             "father-death": self.father_death,
             "father-abandonment": self.father_abandonment,
+            "father-uninsured-death": self.father_after_uninsured_mother,
+            "father-uninsured-abandonment": self.father_after_uninsured_mother,
+            "father-uninsured-incapacity": self.father_after_uninsured_mother,
             "supplementary": self.supplementary,
             "parental": self.parental,
             "parental-work": self.parental_work,
@@ -407,12 +411,20 @@ class Letters:
 
     def resignation(self) -> Draft:
         """§ 3: the day of return to work; the copy of the father's request (an employee) or of
-        his statement (not an employee) — art. 180 § 4 pkt 1-2."""
+        his statement (not an employee) — art. 180 § 4 pkt 1-2. § 4: the same for a mother with
+        a ruling of incapacity, with a copy of the ruling — art. 180 § 6 pkt 1-2."""
         back, _ = self.field_dates("return-date")
         maternity = self.segment("maternity")
         assert maternity is not None
+        incapacity = self.kind == "resignation-incapacity"
+        article = "art. 180 § 6" if incapacity else "art. 180 § 4"
+        ruling = (
+            ", legitymując się orzeczeniem o niezdolności do samodzielnej egzystencji,"
+            if incapacity
+            else ""
+        )
         text = (
-            "Na podstawie art. 180 § 4 Kodeksu pracy rezygnuję z pozostałej części urlopu "
+            f"Na podstawie {article} Kodeksu pracy{ruling} rezygnuję z pozostałej części urlopu "
             f"macierzyńskiego po wykorzystaniu po porodzie {duration(maternity.days)} tego urlopu "
             f"i wnoszę o umożliwienie mi powrotu do pracy od dnia {date_r(back)}."
         )
@@ -426,6 +438,10 @@ class Letters:
             "zarobkową"
         )
         labels = {}
+        if incapacity:
+            labels["incapacity-ruling-copy"] = (
+                "Kopia prawomocnego orzeczenia o mojej niezdolności do samodzielnej egzystencji"
+            )
         match self.scenario.fathers_work:
             case "employment":
                 father = statement(
@@ -457,7 +473,7 @@ class Letters:
             "Wniosek w sprawie rezygnacji z pozostałej części urlopu macierzyńskiego i powrotu "
             "do pracy",
             [request(text), father],
-            ["art. 180 § 4"],
+            [article],
             f"od dnia {date_r(back)}",
             labels,
         )
@@ -570,6 +586,51 @@ class Letters:
             "art. 180 § 13",
             "w związku z porzuceniem dziecka przez matkę dziecka",
             "porzuciła dziecko",
+        )
+
+    def father_after_uninsured_mother(self) -> Draft:
+        """§ 10 (death), § 11 (abandonment), § 12 (incapacity) of a mother without sickness
+        insurance (art. 180 § 15): the father's part from the day after."""
+        start, _ = self.field_dates("leave-from")
+        his = self.segment("maternity-father")
+        assert his is not None
+        kind = self.kind.removeprefix("father-uninsured-")
+        uninsured = "nieobjęt{} ubezpieczeniem społecznym w razie choroby i macierzyństwa"
+        reason = {
+            "death": f"w związku ze zgonem matki dziecka {uninsured.format('ej')}",
+            "abandonment": (
+                f"w związku z porzuceniem dziecka przez matkę dziecka {uninsured.format('ą')}"
+            ),
+            "incapacity": (
+                "w związku z niemożnością sprawowania osobistej opieki nad dzieckiem przez matkę "
+                f"dziecka {uninsured.format('ą')}, legitymującą się orzeczeniem o niezdolności do "
+                "samodzielnej egzystencji"
+            ),
+        }[kind]
+        text = (
+            "Na podstawie art. 180 § 15 Kodeksu pracy wnoszę o udzielenie mi części urlopu "
+            f"macierzyńskiego w wymiarze {duration(his.days)}, w okresie "
+            f"{period(start, his.end)}, {reason}. {self.concerns()}"
+        )
+        body = [request(text)]
+        labels = {}
+        if kind == "incapacity":
+            labels["incapacity-ruling-copy"] = (
+                "Kopia prawomocnego orzeczenia o niezdolności matki dziecka do samodzielnej "
+                "egzystencji"
+            )
+        else:
+            happened, _ = self.field_dates("event-date")
+            event = "zmarła" if kind == "death" else "porzuciła dziecko"
+            body.append(
+                statement(f"Oświadczam, że matka dziecka {event} w dniu {date_r(happened)}.")
+            )
+        return Draft(
+            "Wniosek o udzielenie części urlopu macierzyńskiego",
+            body,
+            ["art. 180 § 15"],
+            period(start, his.end),
+            labels,
         )
 
     def supplementary(self) -> Draft:

@@ -104,7 +104,7 @@ export function dayLines(timeline: Timeline, day: number): DayLine[] {
       tone: 'money',
       lead: option ? 'Gdy wybierzecie' : 'Wpływa',
       title: `${formatPln(p.monthly)} miesięcznie`,
-      rest: `${p.lane === 'father' ? 'zasiłek taty' : 'zasiłek mamy'} · ${formatRate(p.rate)}`,
+      rest: `${p.lane === 'father' ? 'zasiłek taty' : 'zasiłek mamy'} · ${formatRate(p.rate)} · przed podatkiem`,
     })
   }
   return lines

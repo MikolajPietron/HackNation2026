@@ -383,7 +383,7 @@ async def set_mother_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
 @assistant.tool(sequential=True)
 async def set_voluntary_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
     """Mother on a contract of mandate or with her own business: record whether she is
-    registered for the voluntary sickness insurance (pays the sickness contribution).
+    registered for the voluntary sickness insurance.
 
     Args:
         registered: True if she is registered for it, False if she is not.
@@ -419,7 +419,7 @@ async def set_father_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
 @assistant.tool(sequential=True)
 async def set_father_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
     """Father on a contract of mandate or with his own business: record whether he is
-    registered for the voluntary sickness insurance (pays the sickness contribution).
+    registered for the voluntary sickness insurance.
 
     Args:
         registered: True if he is registered for it, False if he is not.
@@ -474,7 +474,8 @@ async def set_mother_situation(
     Args:
         situation: {"kind": "incapacity", "start": the day the father takes over} = the mother
             has a certificate of inability to live independently (orzeczenie o niezdolności do
-            samodzielnej egzystencji); {"kind": "hospital", "start": first day, "end": last
+            samodzielnej egzystencji); when the mother has no sickness insurance, "start" is the
+            day her incapacity arose; {"kind": "hospital", "start": first day, "end": last
             day} = she is in hospital and cannot look after the child (no `end` = still
             there); {"kind": "death", "start": the day she died}; {"kind": "abandonment",
             "start": the day she abandoned the child}. Null corrects an earlier answer.
@@ -664,11 +665,13 @@ async def set_insured_since(
 ) -> str:
     """Record since when the mother is covered by sickness insurance without a break (the day
     her employment contract, contract of mandate or business began, or she registered for the
-    voluntary insurance), and whether it began in this pregnancy. Give what the user said; the
-    other argument stays as it was.
+    voluntary insurance), and whether it began in this pregnancy. Earlier insurance counts when
+    the break between the periods was at most 30 days or was parental or unpaid leave (ustawa
+    art. 4 ust. 2): then give the first day of the earliest such period. Give what the user
+    said; the other argument stays as it was.
 
     Args:
-        since: The first day of her uninterrupted sickness insurance.
+        since: The first day of her sickness insurance, counted as above.
         started_in_pregnancy: True only if the user said the contract or business began during
             this pregnancy; never ask about it.
     """
@@ -698,8 +701,16 @@ async def set_mother_over_50(ctx: RunContext[AssistantDeps], over_50: bool) -> s
 @assistant.tool(sequential=True)
 async def set_job_loss(ctx: RunContext[AssistantDeps], job_loss: JobLoss | None) -> str:
     """Record that the mother's work ended during this pregnancy, and why. Call it only when the
-    user says so; never ask about it. If she now works elsewhere, record her work instead
-    (set_mother_work).
+    user says so; never ask whether her work ended. If she now works elsewhere, record her work
+    instead (set_mother_work).
+
+    When the user says her employment contract simply ran out in pregnancy, first ask whether it
+    was a fixed-term contract or a probation of more than a month (and not a fixed-term contract
+    to replace an absent employee). Such a contract that would end after the third month of
+    pregnancy is extended by law until the day of the birth (Labour Code art. 177 § 3-3¹): her
+    work does not end before the birth, so do not record it (null corrects an earlier answer);
+    after a fixed-term contract extended until the birth she has the maternity benefit after the
+    insurance ended. Record "other" only when the contract was not extended.
 
     Args:
         job_loss: {"ended_on": the last day of work, "reason": ...}. Reasons: "bankruptcy" =
@@ -707,8 +718,9 @@ async def set_job_loss(ctx: RunContext[AssistantDeps], job_loss: JobLoss | None)
             "employer-death" = the employer died, "unlawful" = the employment contract was
             terminated in breach of the law (then "court_confirmed": true if a final court
             judgment confirmed it, false if not or not yet, empty if unknown), "other" = any
-            other end of work (a contract that ended, she quit, a business closed). Null
-            corrects an earlier answer.
+            other end of work (an employment contract that was not extended until the birth,
+            she quit, a contract of mandate ended, a business closed). Null corrects an earlier
+            answer.
     """
     reason = job_loss.reason if job_loss is not None else None
     work = ctx.deps.scenario.mothers_work

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from app.documents.forms import abolished_on, abolished_text, find_forms
 from app.engine import Params, Scenario, Timeline
 from app.engine.draft import DAY, merge_sources
+from app.engine.insurance import NOT_INSURED, coverage
 from app.engine.models import Document, Marker, Segment, SourceRef
 from app.engine.params import Param, Rule
 from app.engine.wording import fmt
@@ -201,8 +202,11 @@ def deadline_passed(ctx: Context) -> list[Found]:
     if rule is None:
         return []
     event = ctx.scenario.mother_event if ctx.scenario else None
-    if r.kind == "maternity-father-request" and event and event.kind != "incapacity":
-        return []  # art. 180 § 16: the mother in hospital, dead or gone — no deadline
+    uninsured = ctx.scenario is not None and coverage(ctx.scenario) in NOT_INSURED
+    if r.kind == "maternity-father-request" and event and (event.kind != "incapacity" or uninsured):
+        # Art. 180 § 16: the mother in hospital, dead or gone, or (§ 15) a mother without
+        # sickness insurance — no deadline.
+        return []
     document = _document(ctx, r.kind)
     element = document.id if document else None
     anchor = rule.anchor(r)

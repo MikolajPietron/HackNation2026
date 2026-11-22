@@ -216,7 +216,7 @@ function RateChoice({
     {
       id: 'standard',
       title: '100% i 70%',
-      hint: 'bez wniosku',
+      hint: 'bez dodatkowego wniosku',
       selected: !chosen815,
       rows: [
         ['Macierzyński', monthly(standard, 'maternity')],
@@ -227,7 +227,7 @@ function RateChoice({
     },
     {
       id: 'flat',
-      title: '81,5% przez cały czas',
+      title: '81,5% za urlop macierzyński i rodzicielski',
       hint: 'na wniosek',
       selected: chosen815,
       rows: [
@@ -235,7 +235,7 @@ function RateChoice({
         ['Rodzicielski', monthly(flat, 'parental')],
       ] as const,
       value: true,
-      done: 'Wybrano 81,5% przez cały urlop',
+      done: 'Wybrano 81,5% za urlop macierzyński i rodzicielski',
     },
   ]
 

@@ -5,6 +5,12 @@ Applied after the mother's rules (section A), in this order:
    to live independently, is in hospital, died, or abandoned the child. The father takes the
    rest of maternity leave (for a hospital stay: the part the stay lasts) earlier than after
    14 weeks: once the mother has used 8 weeks after the birth, after her death with no minimum.
+   After abandoning the child the mother loses the rest of maternity leave, but not below 8 weeks
+   after the birth (art. 182), whether or not the father can take it.
+   A mother without sickness insurance (art. 180 § 15-16; ustawa art. 29 ust. 9): after her
+   death, after she abandoned the child, or after the day her incapacity arose, the father has
+   the part of maternity leave after that day, counted from the birth, with no 8-week minimum.
+   Her stay in hospital is not among these cases.
 2. Otherwise, taking over maternity leave (B.1; art. 180 § 4-5): after at least 14 weeks after
    the birth the mother leaves the rest to the father; his leave starts right after hers.
    In both cases the total length of maternity leave does not change (§ 14), so supplementary
@@ -17,27 +23,35 @@ Applied after the mother's rules (section A), in this order:
    the benefit for parental leave.
 5. A father on a contract or with a business gets the benefit for these periods, not leave
    (guide pages 4-5), and the benefit needs sickness insurance: when nobody said how the father
-   works, we assume he has it, as for the mother. Without a living child none of this applies.
+   works, we assume he has it, as for the mother. For the mother's maternity leave he has it once
+   he interrupted his work to look after the child (ustawa art. 29 ust. 3, 5-7, 9). Without a
+   living child none of this applies.
 
 Our readings, not settled by the materials (CLAUDE.md, open questions):
 - "until the child completes 12 months of life" ends on the day before the first birthday;
 - 8 weeks after the birth are 56 days with the day of birth as the first, so the father takes
-  over from the 57th day at the earliest;
+  over from the 57th day at the earliest; a stay in hospital or a ruling of incapacity that
+  starts earlier gives him the leave from the 57th day (a stay over by then gives nothing);
 - a hospital stay runs from the day of admission to the day of discharge: the father takes the
-  leave from the admission, the mother comes back the day after the discharge;
+  leave from the admission (not before the 57th day), the mother comes back the day after the
+  discharge;
 - with an uninsured mother, or after the mother died or abandoned the child, the father's
-  parental leave leaves out the 9 weeks art. 182¹ᵃ § 4 keeps for the other parent;
+  parental leave leaves out the 9 weeks art. 182¹ᵃ § 4 keeps for the other parent; after she
+  died or abandoned the child during her parental leave, the father has what is left of the
+  pool once her days, but at least her 9 weeks, are taken out;
 - after the mother's death (or once the father takes over after she abandoned the child) her
-  lane ends: supplementary leave, which either parent may take, passes to the father.
+  lane ends: supplementary leave, which either parent may take, passes to the father;
+- with an uninsured mother, "maternity leave" for art. 180 § 15 is the length of art. 180 § 1
+  counted from the day of the birth (she had no leave before it).
 """
 
 import datetime as dt
 
 from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources
 from app.engine.insurance import NOT_INSURED, Coverage, father_coverage
-from app.engine.loss import Loss
+from app.engine.loss import Loss, maternity_end_after_loss
 from app.engine.models import Marker, Scenario, ScenarioError, Segment, SourceRef
-from app.engine.params import Params
+from app.engine.params import Params, Rule
 from app.engine.parental import (
     deadline_marker,
     deadline_passed,
@@ -45,7 +59,7 @@ from app.engine.parental import (
     parental_table,
     parental_weeks,
 )
-from app.engine.wording import fmt
+from app.engine.wording import children_phrase, fmt, weeks_or_days
 
 ESTIMATE = "Liczymy od przewidywanej daty porodu. Po porodzie oś przeliczy się od faktycznej daty."
 WEEK_IS_7_DAYS = "Tydzień urlopu to 7 dni kalendarzowych."
@@ -74,7 +88,7 @@ def father_rules(
     if covered and child_lives and scenario.children_count is not None:
         paternity = _paternity(draft, scenario, params, birth, today)
         _parental(draft, scenario, params, birth, today, cover, paternity, mother_left)
-        _insurance_lines(draft, scenario, params, father)
+        _insurance_lines(draft, scenario, params, father, cover)
     if not any(s.id in ("parental", "parental-father") for s in draft.segments):
         _drop_marker(draft, "parental-deadline")  # nobody left to take parental leave
     # The mother's lane first, as the rules built it; the father's in the order of time.
@@ -93,6 +107,48 @@ def paternity_deadline(birth: dt.date, params: Params) -> dt.date:
     except ValueError:  # 29 February, 31st: the month is shorter, so the next month's first day
         completed = dt.date(birth.year + year + (month + 1) // 12, (month + 1) % 12 + 1, 1)
     return completed - DAY
+
+
+def uninsured_maternity_end(
+    scenario: Scenario, params: Params, birth: dt.date, loss: Loss | None
+) -> dt.date | None:
+    """Art. 180 § 15 with a mother who had no sickness insurance: the last day of maternity leave
+    as art. 180 § 1 gives it, counted from the day of the birth (after a loss, by the children
+    who live, art. 180¹). None until the number of children is known."""
+    count = scenario.children_count
+    if count is None:
+        return None
+    table = params.maternity.weeks_by_children.value
+
+    def end_for(children: int) -> dt.date:
+        return birth + table[min(children, len(table)) - 1] * WEEK - DAY
+
+    if loss is not None:
+        return maternity_end_after_loss(loss, params, birth, end_for)
+    return end_for(count)
+
+
+def interrupted_work_rule(scenario: Scenario, params: Params, cover: Coverage) -> Rule:
+    """A father who is not an employee: the provision that gives him the maternity benefit for
+    the mother's maternity leave once he interrupted his work to look after the child."""
+    f = params.father
+    event = scenario.mother_event
+    if cover in NOT_INSURED:
+        return f.special_uninsured_benefit
+    if event is None:
+        return f.interrupted_work_takeover
+    return {
+        "incapacity": f.interrupted_work_incapacity,
+        "hospital": f.interrupted_work_hospital,
+        "death": f.interrupted_work_death,
+        "abandonment": f.interrupted_work_death,
+    }[event.kind]
+
+
+INTERRUPTED_WORK = (
+    "Tata nie jest pracownikiem: zasiłek macierzyński za ten okres przysługuje mu, jeśli "
+    "przerwał działalność zarobkową w celu sprawowania osobistej opieki nad dzieckiem."
+)
 
 
 # 1-2. Maternity leave: special situations, taking over.
@@ -187,25 +243,24 @@ def _mother_event(
         )
     if event.kind in ("death", "abandonment") and event.start > today:
         raise ScenarioError(f"Data {fmt(event.start)} jest w przyszłości (dziś {fmt(today)}).")
-    maternity = draft.segment("maternity")
     child_lives = loss is None or not loss.none_survived
-    # Out of scope: an uninsured mother (art. 180 § 15-17 are not in the materials) and a birth
-    # after which no child lives. See the assumptions.
-    if maternity is None or cover in NOT_INSURED or not child_lives:
+    # Out of scope: a birth after which no child lives (see the assumptions).
+    if not child_lives:
+        return False
+    if cover in NOT_INSURED:
+        _uninsured_mother(draft, scenario, params, birth, loss, covered)
+        return False
+    maternity = draft.segment("maternity")
+    if maternity is None:
         return False
     f = params.father
     after = f.special_after_weeks.value
     earliest = birth + after * WEEK
-    if event.kind in ("incapacity", "hospital") and event.start < earliest:
-        raise ScenarioError(
-            f"W tej sytuacji tata może przejąć urlop macierzyński najwcześniej {fmt(earliest)}: "
-            f"mama musi najpierw wykorzystać po porodzie co najmniej {after} tygodni urlopu "
-            "macierzyńskiego."
-        )
     whole = maternity.end
     match event.kind:
         case "incapacity" | "hospital":
-            start = event.start
+            # Art. 180 § 6, § 10: only after 8 weeks of leave after the birth.
+            start = max(event.start, earliest)
         case "death":
             start = event.start + DAY
         case "abandonment":
@@ -245,20 +300,50 @@ def _mother_event(
         )
         return True
 
-    if not covered:
-        return False
     if event.kind == "abandonment":
+        # Art. 182: the mother loses the rest of maternity leave (not below 8 weeks after the
+        # birth) and, through art. 180² § 7 and 182¹ᵍ, the rest of her later leave, whoever
+        # takes it.
         _end_mother_lane(draft, params, start - DAY if applies else event.start, covered)
+        if not applies:
+            return True
+        if not covered:
+            _shorten_maternity(
+                draft,
+                params,
+                maternity,
+                start - DAY,
+                f"Mama porzuciła dziecko {fmt(event.start)}, więc część urlopu macierzyńskiego "
+                f"po tym dniu jej nie przysługuje. Urlop trwa do {fmt(start - DAY)}.",
+                whole=None,
+                sources=[f.abandonment_mother_loses.sources],
+            )
+            if start <= personal_end:
+                _drop_marker(draft, "personal-weeks")
+            return True
+    elif not covered:
+        return False
+    if event.kind == "hospital" and event.end is not None and event.end < start:
+        return False  # the stay ended before the mother used 8 weeks: nothing to interrupt
     if not applies:
-        return event.kind == "abandonment"
+        return False
 
     early = (
         f"Wcześniej niż po {f.takeover_after_weeks.value} tygodniach tata może przejąć urlop "
         f"w tej sytuacji, gdy mama wykorzystała po porodzie co najmniej {after} tygodni urlopu "
         "macierzyńskiego."
     )
+    waits = (
+        [
+            f"Mama musi najpierw wykorzystać po porodzie co najmniej {after} tygodni urlopu "
+            f"macierzyńskiego, dlatego urlop taty zaczyna się {fmt(start)}."
+        ]
+        if start > (event.start + DAY if event.kind == "abandonment" else event.start)
+        else []
+    )
     end = whole
     resumed: Segment | None = None
+    mother_sources: list[list[SourceRef]] = []
     match event.kind:
         case "incapacity":
             rule = [f.special.sources, f.special_incapacity.sources]
@@ -272,7 +357,7 @@ def _mother_event(
                 "z pozostałej części urlopu macierzyńskiego. Wykorzystuje ją tata: od "
                 f"{fmt(start)} do {fmt(end)}."
             )
-            details = [early]
+            details = [early, *waits]
         case "hospital":
             rule = [f.special.sources, f.special_hospital.sources]
             if event.end is not None and event.end < whole:
@@ -293,21 +378,19 @@ def _mother_event(
                 "macierzyńskiego. Gdy mama wyjdzie ze szpitala, wróci na urlop, a oś się "
                 "przeliczy."
             )
-            details = [early, stay]
+            details = [early, *waits, stay]
         case _:
             rule = [f.special.sources, f.special_abandonment.sources]
+            mother_sources = [f.abandonment_mother_loses.sources]
             mother = f"Mama wykorzystuje urlop macierzyński do {fmt(start - DAY)}."
             summary = (
                 "Tacie przysługuje część urlopu macierzyńskiego przypadająca po dniu porzucenia "
                 f"dziecka: od {fmt(start)} do {fmt(end)}."
             )
-            details = []
-            if start > event.start + DAY:
-                details.append(
-                    f"Mama musi najpierw wykorzystać po porodzie co najmniej {after} tygodni "
-                    f"urlopu macierzyńskiego, dlatego urlop taty zaczyna się {fmt(start)}."
-                )
-    _shorten_maternity(draft, params, maternity, start - DAY, mother, whole=whole, sources=rule)
+            details = waits
+    _shorten_maternity(
+        draft, params, maternity, start - DAY, mother, whole=whole, sources=rule + mother_sources
+    )
     if resumed is not None:
         index = next(i for i, s in enumerate(draft.segments) if s.id == "maternity")
         draft.segments.insert(index + 1, resumed)
@@ -328,6 +411,60 @@ def _mother_event(
         )
     )
     return event.kind == "abandonment"
+
+
+UNINSURED_AFTER = {
+    "death": "po dniu śmierci mamy",
+    "abandonment": "po dniu porzucenia przez nią dziecka",
+    "incapacity": "po dniu powstania jej niezdolności do samodzielnej egzystencji",
+}
+"""Art. 180 § 15: the part of maternity leave the father has, after which day."""
+
+
+def _uninsured_mother(
+    draft: Draft,
+    scenario: Scenario,
+    params: Params,
+    birth: dt.date,
+    loss: Loss | None,
+    covered: bool,
+) -> None:
+    """Art. 180 § 15-16, ustawa art. 29 ust. 9: the mother had no sickness insurance and died,
+    abandoned the child, or cannot look after it with a ruling of incapacity. The father has the
+    part of maternity leave after that day, with no 8-week minimum."""
+    event = scenario.mother_event
+    assert event is not None
+    end = uninsured_maternity_end(scenario, params, birth, loss)
+    if event.kind == "hospital" or end is None or not covered:
+        return
+    start = event.start + DAY
+    if start > end:
+        return
+    f = params.father
+    count = scenario.children_count
+    assert count is not None
+    weeks = params.maternity.weeks_by_children.value[
+        min(count, len(params.maternity.weeks_by_children.value)) - 1
+    ]
+    whole = (
+        f"Urlop macierzyński liczymy od dnia porodu: {weeks} tyg. przy urodzeniu "
+        f"{children_phrase(count)}, do {fmt(end)}."
+        if loss is None
+        else f"Urlop macierzyński liczymy od dnia porodu, do {fmt(end)}."
+    )
+    draft.segments.append(
+        _father_maternity(
+            params,
+            start,
+            end,
+            "Mama nie podlegała ubezpieczeniu chorobowemu. Tacie przysługuje część urlopu "
+            f"macierzyńskiego przypadająca {UNINSURED_AFTER[event.kind]}: od {fmt(start)} do "
+            f"{fmt(end)}.",
+            [whole, WEEK_IS_7_DAYS],
+            [f.special_uninsured.sources, params.maternity.weeks_by_children.sources],
+            cap=False,
+        )
+    )
 
 
 def _shorten_maternity(
@@ -375,7 +512,11 @@ def _father_maternity(
     summary: str,
     details: list[str],
     sources: list[list[SourceRef]],
+    *,
+    cap: bool = True,
 ) -> Segment:
+    """The father's part of maternity leave. `cap`: the total length of maternity leave does not
+    change (art. 180 § 14, not for an uninsured mother, § 15)."""
     f = params.father
     return Segment(
         id="maternity-father",
@@ -390,7 +531,7 @@ def _father_maternity(
         sources=merge_sources(
             f.benefit.sources,
             *sources,
-            f.total_cap.sources,
+            f.total_cap.sources if cap else [],
             params.rules.week_is_7_days.sources,
         ),
     )
@@ -587,8 +728,11 @@ def _parental(
     mother_left: bool,
 ) -> None:
     """Guide B.3: his 9 weeks after the mother's share. With an uninsured mother, or after the
-    mother's lane ended, the most one parent can use, after paternity leave (two options of his
-    are not drawn over each other)."""
+    mother's lane ended, the most one parent can use; after the mother died or abandoned the
+    child during her parental leave, what is left of the pool once her days (at least her 9
+    weeks, art. 182¹ᵃ § 4) are taken out. For a born child not before today; after his own
+    leave, and after paternity leave when they would overlap (two options of his are not drawn
+    over each other)."""
     p = params.parental
     f = params.father
     born = scenario.child_born is True
@@ -597,31 +741,44 @@ def _parental(
     deadline = parental_deadline(birth, params)
     mothers = draft.segment("parental")
     table = parental_table(scenario, params)
-    after_paternity = [paternity.end] if paternity is not None else []
+    used = 0  # days of parental leave the mother used before her lane ended
+    his = [s.end + DAY for s in draft.segments if s.lane == "father"]
     if cover in NOT_INSURED:
         if deadline < today:
             draft.warnings.append(deadline_passed(deadline, params))
             return
         draft.markers.append(deadline_marker(birth, born, params))
-        weeks = one_parent
+        length = one_parent * 7
         if paternity is not None:
             start = paternity.end + DAY
         else:
             start = max(birth + DAY, today) if born else birth + DAY
+        start = max([start, *his])  # after his part of maternity leave (art. 180 § 15)
+    elif mother_left:
+        if deadline < today:
+            return
+        used = mothers.days if mothers is not None else 0
+        length = total * 7 - max(used, exclusive * 7)
+        ids = (*MATERNITY_PARTS, "supplementary", "parental")
+        start = max(s.end for s in draft.segments if s.id in ids) + DAY
     elif mothers is not None:
-        weeks = exclusive
+        length = exclusive * 7
         start = mothers.end + DAY
-    elif mother_left and deadline >= today:
-        weeks = one_parent
-        leave = [s.end for s in draft.segments if s.id in (*MATERNITY_PARTS, "supplementary")]
-        start = max([*leave, *after_paternity]) + DAY
     else:
         return
-    if start > deadline:
+    if born:
+        start = max(start, today)
+    if (
+        paternity is not None
+        and paternity.end >= start
+        and paternity.start <= start + (length - 1) * DAY
+    ):
+        start = paternity.end + DAY
+    if start > deadline or length <= 0:
         return
-    full_end = start + weeks * WEEK - DAY
+    full_end = start + (length - 1) * DAY
     end = min(full_end, deadline)
-    shown = f"{weeks} tyg." if end == full_end else f"{days_between(start, end)} dni"
+    shown = weeks_or_days(days_between(start, end))
     sources: list[list[SourceRef]]
     if cover in NOT_INSURED:
         rule = (
@@ -633,7 +790,7 @@ def _parental(
         )
         summary = f"{rule} Pokazujemy {shown}: od {fmt(start)} do {fmt(end)}."
         sources = [f.parental_uninsured_mother.sources, table.sources, p.exclusive_weeks.sources]
-    elif mothers is not None:
+    elif not mother_left:
         summary = (
             f"Tata ma {exclusive} tyg. urlopu rodzicielskiego wyłącznie dla siebie: nie można "
             f"ich przenieść na mamę. Pozostała część z {total} tyg. jest wspólna. Rodzice mogą "
@@ -662,15 +819,23 @@ def _parental(
         f"najpóźniej do {fmt(deadline)}: to koniec roku kalendarzowego, w którym dziecko kończy "
         f"{p.deadline_age.value} lat."
     ]
-    if mothers is not None and cover not in NOT_INSURED:
+    most = weeks_or_days(length)
+    most += "" if most.endswith(".") else "."  # "32 tyg." ends the sentence itself
+    if cover not in NOT_INSURED and not mother_left:
         details.append(
             f"Gdy rodzice korzystają z urlopu jednocześnie, razem nie mogą przekroczyć {total} tyg."
+        )
+    elif used > exclusive * 7:
+        details.append(
+            f"Rodzice mają razem do {total} tyg. Mama wykorzystała {weeks_or_days(used)} urlopu "
+            f"rodzicielskiego, więcej niż {exclusive} tyg., których nie można przenieść na "
+            f"drugiego z rodziców. Dlatego pokazujemy najwięcej {most}"
         )
     else:
         details.append(
             f"Rodzice mają razem do {total} tyg., a {exclusive} tyg. z nich należy wyłącznie do "
             "każdego z rodziców i nie można ich przenieść na drugiego. Dlatego pokazujemy "
-            f"najwięcej {weeks} tyg."
+            f"najwięcej {most}"
         )
     if end < full_end:
         details.append(f"Urlop musi się skończyć do {fmt(deadline)}, dlatego pokazujemy go krócej.")
@@ -701,9 +866,12 @@ def _parental(
 # 5. The benefit, not leave; insurance assumed.
 
 
-def _insurance_lines(draft: Draft, scenario: Scenario, params: Params, father: Coverage) -> None:
+def _insurance_lines(
+    draft: Draft, scenario: Scenario, params: Params, father: Coverage, cover: Coverage
+) -> None:
     """Every period on the father's lane says when he only gets the benefit, and when we assume
-    his sickness insurance."""
+    his sickness insurance. His part of maternity leave, for a father who is not an employee,
+    also says the benefit needs him to interrupt his work (ustawa art. 29 ust. 3, 5-7, 9)."""
     b = params.benefit
     lines = []
     sources = []
@@ -713,7 +881,8 @@ def _insurance_lines(draft: Draft, scenario: Scenario, params: Params, father: C
             "Na razie zakładamy, że tata mu podlega."
         )
         sources.append(b.paid_to_the_insured.sources)
-    if scenario.fathers_work in ("contract", "business"):
+    not_employee = scenario.fathers_work in ("contract", "business")
+    if not_employee:
         lines.append(
             "Tata nie jest pracownikiem, więc nie dostaje urlopu: ma prawo do zasiłku "
             "macierzyńskiego za okres odpowiadający urlopowi, na tych samych zasadach co do "
@@ -722,14 +891,19 @@ def _insurance_lines(draft: Draft, scenario: Scenario, params: Params, father: C
         sources += [b.non_employees.sources, b.same_rules_for_non_employees.sources]
     if not lines:
         return
-    draft.segments = [
-        segment.model_copy(
+    interrupted = interrupted_work_rule(scenario, params, cover).sources
+
+    def with_lines(segment: Segment) -> Segment:
+        added, cited = lines, sources
+        if not_employee and segment.id == "maternity-father":
+            added, cited = [*lines, INTERRUPTED_WORK], [*sources, interrupted]
+        return segment.model_copy(
             update={
-                "details": [*segment.details, *lines],
-                "sources": merge_sources(segment.sources, *sources),
+                "details": [*segment.details, *added],
+                "sources": merge_sources(segment.sources, *cited),
             }
         )
-        if segment.lane == "father"
-        else segment
-        for segment in draft.segments
+
+    draft.segments = [
+        with_lines(segment) if segment.lane == "father" else segment for segment in draft.segments
     ]

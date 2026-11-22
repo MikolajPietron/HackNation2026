@@ -4,17 +4,24 @@ Applied after the applications (timeline.py, `add_forms`): each request document
 `Document.form`, built from a template in `params.forms` (the fields and attachments its sources
 name, each with its quote) and filled in from the scenario and the timeline:
 - an employee's leave requests follow the regulation of 11 March 2025 on the requests
-  (rozp_wnioski): § 2 the part of maternity leave before the birth, § 3 the mother's
-  resignation, § 5-§ 9 the father's part of maternity leave (taking over or the mother's
-  incapacity, her stay in hospital, death, abandonment), § 14 supplementary, § 15 parental
+  (rozp_wnioski): § 2 the part of maternity leave before the birth, § 3-§ 4 the mother's
+  resignation (after 14 weeks; with her ruling of incapacity), § 5-§ 9 the father's part of
+  maternity leave (taking over or the mother's incapacity, her stay in hospital, death,
+  abandonment), § 10-§ 12 his part after the death, abandonment or incapacity of a mother
+  without sickness insurance, § 14 supplementary, § 15 parental
   (also each part of the parents' plan), § 16 combining a part of the plan with work, § 17
   paternity leave; § 22: nothing the employer keeps in the personal files is attached;
 - ZAM (a parent who is not an employee, or a mother whose employment ended in pregnancy) follows
   annex 6 of the regulation of 27 September 2026 on the benefit documents (rozp_zasilki, § 12):
   the data of the request for the maternity benefit; its attachments: § 13 (the birth), § 20,
-  § 22, § 23 (the father after the mother), § 26 (supplementary leave), § 32 (a mother without
-  insurance), § 33 (paternity leave). The ZAM form itself is on www.zus.pl (guide page 12);
-- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2).
+  § 22, § 23 (the father after the mother; § 20 ust. 4 and § 22 ust. 2 when she had no sickness
+  insurance), § 26 (supplementary leave), § 32 (a mother without insurance), § 33 (paternity
+  leave). The ZAM form itself is on www.zus.pl (guide page 12);
+- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2); after the
+  work ended, filed with ZUS with the statement of annex 4 (§ 4);
+- after the employment ended in pregnancy (ustawa art. 30): ZAM with the documents of § 15, and
+  for the benefit equal to the maternity benefit until the birth the documents of § 17 (a form
+  without fields: the regulation lists only documents).
 
 The attachments for the maternity benefit (§ 13, guide A.4) go with the employee mother's
 request for maternity leave too: her employer determines the benefit on its basis (guide A.4).
@@ -46,7 +53,7 @@ from dataclasses import dataclass
 from app.engine.after_insurance import after_job_loss
 from app.engine.applications import MOTHER_LEAVE, PLAN_REQUESTS, WORK_REQUESTS, who_pays
 from app.engine.draft import DAY, days_between, merge_sources
-from app.engine.insurance import coverage
+from app.engine.insurance import NOT_INSURED, coverage
 from app.engine.models import (
     Addressee,
     Document,
@@ -54,6 +61,7 @@ from app.engine.models import (
     FormField,
     FormFieldKind,
     FormNote,
+    MotherEvent,
     RequestForm,
     Role,
     Scenario,
@@ -166,6 +174,10 @@ def request_form(
             return build.paternity()
         case "sick-benefit-request":
             return build.sick()
+        case "sick-after-insurance-request":
+            return build.sick_after()
+        case "job-loss-request":
+            return build.job_loss()
         case _:
             return None
 
@@ -527,6 +539,12 @@ class Forms:
             attachments.append(Attach("supplementary-other-parent"))
         if parent == "father":
             attachments += self.father_attachments()
+        if loss is not None:
+            # After the employment ended in pregnancy (rozp_zasilki § 15 ust. 1-2).
+            if loss.reason == "unlawful":
+                attachments += [Attach("pregnancy-certificate-unlawful"), Attach("court-ruling")]
+            else:
+                attachments += [Attach("pregnancy-certificate"), Attach("employment-end-document")]
         return self.build(
             "zam",
             applicant=parent,
@@ -598,12 +616,19 @@ class Forms:
 
     def father_attachments(self) -> list[Attach]:
         """The father who is not an employee: the documents for the situation on the timeline
-        (rozp_zasilki § 20, § 22, § 23, § 32, § 33)."""
+        (rozp_zasilki § 20, § 22, § 23, § 32, § 33; a mother without sickness insurance: § 20
+        ust. 4, § 22 ust. 2)."""
         s = self.scenario
         attachments = []
         his = self.segment("maternity-father")
         event = s.mother_event
-        if his is not None:
+        if his is not None and event is not None and coverage(s) in NOT_INSURED:
+            # § 20 ust. 4, § 22 ust. 2: a mother without sickness insurance.
+            if event.kind == "incapacity":
+                attachments.append(Attach("incapacity-ruling-uninsured"))
+            else:
+                attachments.append(Attach("mother-uninsured-event-statement"))
+        elif his is not None:
             if event is not None and event.kind == "hospital":
                 attachments += [
                     Attach("mother-benefit-certificate-hospital"),
@@ -770,11 +795,14 @@ class Forms:
         )
 
     def resignation(self) -> RequestForm:
-        """§ 3: the mother's return to work, the copy of the father's request (an employee) or
+        """§ 3 (taking over after 14 weeks) and § 4 (the mother's ruling of incapacity, with a copy
+        of it): the mother's return to work, the copy of the father's request (an employee) or
         of his statement (not an employee)."""
         maternity = self.segment("maternity")
         assert maternity is not None
         back = maternity.end + DAY
+        event = self.scenario.mother_event
+        incapacity = event is not None and event.kind == "incapacity"
         match self.scenario.fathers_work:
             case "employment":
                 hint = "Tata pracuje na umowie o pracę: kopia jego wniosku do pracodawcy."
@@ -782,8 +810,11 @@ class Forms:
                 hint = "Tata nie jest pracownikiem: kopia jego oświadczenia."
             case _:
                 hint = None
+        attachments = [Attach("father-request-copy", hint=hint)]
+        if incapacity:
+            attachments.append(Attach("incapacity-ruling-copy"))
         return self.build(
-            "resignation",
+            "resignation-incapacity" if incapacity else "resignation",
             applicant="mother",
             addressee=self.employer("mother"),
             fills={
@@ -791,19 +822,22 @@ class Forms:
                     back, "Dzień po ostatnim dniu urlopu macierzyńskiego mamy na osi czasu."
                 )
             },
-            attachments=[Attach("father-request-copy", hint=hint)],
+            attachments=attachments,
             notes=[self.personal_files()],
             start=back,
         )
 
     def father_maternity(self) -> RequestForm:
         """§ 5 (taking over, the mother's incapacity), § 6-§ 7 (her stay in hospital: employee or
-        not), § 8 (death), § 9 (abandonment)."""
+        not), § 8 (death), § 9 (abandonment); a mother without sickness insurance: § 10 (death),
+        § 11 (abandonment), § 12 (incapacity)."""
         s = self.scenario
         his = self.segment("maternity-father")
         assert his is not None
         event = s.mother_event
         employee = _employee(s, "mother")
+        if event is not None and coverage(s) in NOT_INSURED:
+            return self.father_after_uninsured_mother(his, event)
         fills: dict[str, Fill] = {"prenatal-leave": self.prenatal_statement()}
         if event is None or event.kind == "incapacity":
             kind = "father-takeover"
@@ -834,6 +868,26 @@ class Forms:
                 attachments = [Attach("birth-certificate")]
         return self.build(
             kind,
+            applicant="father",
+            addressee=self.employer("father"),
+            fills=fills,
+            attachments=attachments,
+            notes=[self.personal_files()],
+            start=his.start,
+            end=his.end,
+        )
+
+    def father_after_uninsured_mother(self, his: Segment, event: MotherEvent) -> RequestForm:
+        """§ 10-§ 12 (art. 180 § 15-16): the day of the mother's death or of abandoning the
+        child, and the day the father's part starts; for her incapacity, a copy of the ruling."""
+        fills: dict[str, Fill] = {"leave-from": _day(his.start, "Z osi czasu.")}
+        attachments = [Attach("birth-certificate")]
+        if event.kind == "incapacity":
+            attachments.append(Attach("incapacity-ruling-copy"))
+        else:
+            fills["event-date"] = _day(event.start, "Data podana w rozmowie.")
+        return self.build(
+            f"father-uninsured-{event.kind}",
             applicant="father",
             addressee=self.employer("father"),
             fills=fills,
@@ -902,4 +956,67 @@ class Forms:
             start=start,
             end=end,
             official_form="ZAS-53" if business else None,
+        )
+
+    def sick_after(self) -> RequestForm:
+        """The sickness benefit after the work ended: annex 1 (§ 2) for the periods after it,
+        filed with ZUS, which pays benefits for a period after the insurance ended (ustawa
+        art. 61 ust. 1 pkt 2 lit. d), with the statement of annex 4 (§ 4)."""
+        today = self.timeline.today
+        after = [
+            x
+            for x in self.timeline.segments
+            if x.lane == "mother" and x.id.startswith(SEGMENT_IDS["after"]) and x.end >= today
+        ]
+        start = min(x.start for x in after)
+        end = max(x.end for x in after)
+        loss = self.scenario.job_loss
+        assert loss is not None
+        return self.build(
+            "sick",
+            applicant="mother",
+            addressee=("zus", "ZUS"),
+            fills={
+                "sick-period": Fill(
+                    "; ".join(_days(x.start, x.end) for x in after),
+                    start,
+                    end,
+                    "Zasiłek chorobowy po ustaniu ubezpieczenia na osi czasu.",
+                ),
+                "insurance-period": Fill(
+                    f"po ustaniu tytułu ubezpieczenia; ustał {fmt(loss.ended_on)}",
+                    hint="Na osi: praca ustała tego dnia.",
+                ),
+            },
+            attachments=[Attach("after-insurance-statement")],
+            notes=[
+                FormNote(
+                    text=(
+                        "Zamiast tego dokumentu ZUS przyjmuje też wydruk zaświadczenia lekarskiego "
+                        "albo zaświadczenie płatnika składek."
+                    ),
+                    sources=self.params.forms.sick_alternatives.sources,
+                )
+            ],
+            start=start,
+            end=end,
+        )
+
+    def job_loss(self) -> RequestForm:
+        """The benefit equal to the maternity benefit until the birth after the employer's
+        bankruptcy, liquidation or death: the documents of § 17, filed with ZUS."""
+        segment = self.segment("job-loss-benefit")
+        assert segment is not None
+        return self.build(
+            "job-loss",
+            applicant="mother",
+            addressee=("zus", "ZUS"),
+            fills={},
+            attachments=[
+                Attach("pregnancy-certificate"),
+                Attach("employment-end-document"),
+                Attach("no-other-job-statement"),
+            ],
+            start=segment.start,
+            end=segment.end,
         )

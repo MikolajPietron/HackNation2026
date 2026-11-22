@@ -254,7 +254,7 @@ SCENARIOS = [
                 "question": "father-work",
             },
             {
-                "say": "Pomyliłam się: jednak jestem zgłoszona i opłacam składkę chorobową.",
+                "say": "Pomyliłam się: jednak jestem zgłoszona do dobrowolnego ubezpieczenia chorobowego.",
                 "tools": [{"name": "set_voluntary_insurance", "args": {"registered": True}}],
                 "timeline": {
                     "segments": {

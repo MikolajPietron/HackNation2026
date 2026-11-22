@@ -288,11 +288,9 @@ def interview_questions(scenario: Scenario) -> list[Question]:
     elif cover == "unknown-voluntary":
         questions.append(
             Question(
-                "Czy jesteś zgłoszona do dobrowolnego ubezpieczenia chorobowego (opłacasz "
-                "składkę chorobową)?"
+                "Czy jesteś zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
                 if mother
-                else "Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego "
-                "(opłaca składkę chorobową)?",
+                else "Czy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego?",
                 "`set_voluntary_insurance`",
                 "mother-insurance",
             )
@@ -412,11 +410,9 @@ def _father_questions(scenario: Scenario) -> list[Question]:
         case "unknown-voluntary":
             return [
                 Question(
-                    "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego (opłacasz "
-                    "składkę chorobową)?"
+                    "Czy jesteś zgłoszony do dobrowolnego ubezpieczenia chorobowego?"
                     if scenario.role == "father"
-                    else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego "
-                    "(opłaca składkę chorobową)?",
+                    else "Czy tata jest zgłoszony do dobrowolnego ubezpieczenia chorobowego?",
                     "`set_father_insurance`",
                     "father-insurance",
                 )
@@ -461,8 +457,10 @@ def _payer_questions(scenario: Scenario) -> list[Question]:
             )
         questions.append(
             Question(
-                f"Czy {who} zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Od tego "
-                "zależy, czy zasiłek wypłaci on, czy ZUS. Możesz też odpowiedzieć, że nie wiesz.",
+                f"Czy {who} zgłasza do ubezpieczenia chorobowego więcej niż 20 osób? Chodzi o "
+                "osoby zgłoszone do ubezpieczenia chorobowego według stanu na 30 listopada "
+                "poprzedniego roku. Od tego zależy, czy zasiłek wypłaci on, czy ZUS. Możesz też "
+                "odpowiedzieć, że nie wiesz.",
                 f'`set_payer_size` (parent: "{parent}")',
                 f"{parent}-payer",
             )
@@ -495,13 +493,16 @@ def _pregnancy_questions(scenario: Scenario) -> list[Question]:
     if not scenario.sick_leave:
         return []
     if scenario.insured_since is None:
+        # Ustawa art. 4 ust. 2: earlier insurance after a break of up to 30 days counts.
+        gap = (
+            "Przerwa do 30 dni między kolejnymi okresami ubezpieczenia (albo urlop wychowawczy "
+            "lub bezpłatny) się nie liczy: wtedy podaj początek pierwszego z nich."
+        )
         if work == "employment":
             text = (
-                "Od kiedy bez przerwy pracujesz na umowie o pracę (podlegasz ubezpieczeniu "
-                "chorobowemu)?"
+                "Od kiedy podlegasz ubezpieczeniu chorobowemu, np. z umowy o pracę?"
                 if mother
-                else "Od kiedy mama bez przerwy pracuje na umowie o pracę (podlega ubezpieczeniu "
-                "chorobowemu)?"
+                else "Od kiedy mama podlega ubezpieczeniu chorobowemu, np. z umowy o pracę?"
             )
         else:
             text = (
@@ -509,7 +510,7 @@ def _pregnancy_questions(scenario: Scenario) -> list[Question]:
                 if mother
                 else "Od kiedy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
             )
-        return [Question(text, "`set_insured_since`", "insured-since")]
+        return [Question(f"{text} {gap}", "`set_insured_since`", "insured-since")]
     params = load_params()
     try:
         sick = sick_leave(scenario, params, scenario.anchor_date)

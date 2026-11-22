@@ -95,7 +95,7 @@ export function Readout({
       icon: ICONS.pieniadze,
       lead: option ? 'Do wyboru' : 'Wpływa',
       title: `${formatPln(p.monthly)} miesięcznie`,
-      rest: `${p.lane === 'father' ? 'zasiłek taty' : 'zasiłek mamy'} · ${formatRate(p.rate)}`,
+      rest: `${p.lane === 'father' ? 'zasiłek taty' : 'zasiłek mamy'} · ${formatRate(p.rate)} · przed podatkiem`,
     })
   }
   if (active.length === 0 && upcoming) {
