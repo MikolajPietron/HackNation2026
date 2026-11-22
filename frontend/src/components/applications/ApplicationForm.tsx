@@ -1,4 +1,5 @@
-// A request from the plan, as a form to fill in (FUNKCJE F22, ZADANIA B.3). The fields, the
+// A request from the plan, filled in on the document itself (RequestPaper: a ZUS form or the
+// letter to the employer; FUNKCJE F22, ZADANIA B.3). The fields, the
 // attachments and the notes are the engine's (`Document.form`): only what the regulations on
 // leave requests (11.03.2025) and on benefit documents (27.09.2026) name. The app fills in what
 // the timeline knows; personal data (names, PESEL, addresses) the parent types in, and it stays
@@ -24,6 +25,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { checkRequest } from '@/api'
+import { RequestPaper } from '@/components/applications/RequestPaper'
 import { SimBadge } from '@/components/mocks/MockModal'
 import { PrimaryButton } from '@/components/onboarding/ChoiceCard'
 import { Emphasis } from '@/components/ui/emphasis'
@@ -212,54 +214,17 @@ export function ApplicationForm({
               </ul>
             )}
 
-            <section aria-label="Pola wniosku" className="mt-5 space-y-4">
-              {form.fields.map((field) => (
-                <FieldRow key={field.id} field={field} values={values} set={set} />
-              ))}
-            </section>
-
-            {form.attachments.length > 0 && (
-              <section className="mt-6">
-                <h3 className="font-bold text-navy-900">Załączniki</h3>
-                <p className="mt-0.5 text-sm text-navy-500">Zaznacz to, co już masz.</p>
-                <ul className="mt-3 space-y-2">
-                  {form.attachments.map((attachment) => {
-                    const on = attached.has(attachment.id)
-                    return (
-                      <li key={attachment.id}>
-                        <label
-                          className={cn(
-                            'flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-[border-color,background-color] duration-150',
-                            on ? 'border-zus-600 bg-zus-50/60' : 'border-line hover:border-navy-200',
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => toggle(attachment.id)}
-                            className="mt-1 size-4 shrink-0 accent-[var(--color-zus-600)]"
-                          />
-                          <span className="min-w-0 text-sm">
-                            <span className="font-bold text-navy-900">{attachment.label}</span>
-                            {!attachment.required && <span className="text-navy-400"> · jeśli dotyczy</span>}
-                            {attachment.hint && <span className="mt-0.5 block text-navy-500">{attachment.hint}</span>}
-                          </span>
-                        </label>
-                        {onCertificate && !on && /aktu urodzenia/i.test(attachment.label) && (
-                          <button
-                            type="button"
-                            onClick={onCertificate}
-                            className="mt-1 ml-11 text-sm font-bold text-zus-700 hover:text-zus-900"
-                          >
-                            Nie masz? Zamów odpis (symulacja)
-                          </button>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </section>
-            )}
+            <RequestPaper
+              form={form}
+              values={values}
+              set={set}
+              profile={profile}
+              saveProfile={saveProfile}
+              attached={attached}
+              toggle={toggle}
+              today={timeline.today}
+              onCertificate={onCertificate}
+            />
 
             <LegalBasis sources={form.legal_basis} />
 
@@ -405,91 +370,6 @@ const fade = {
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -6, transition: { duration: 0.12 } },
   transition: { duration: 0.22, ease: EASE_OUT },
-}
-
-// ---------------------------------------------------------------------------------------------
-// Fields
-
-const input =
-  'h-11 w-full rounded-2xl border border-line bg-white px-4 text-navy-900 outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-navy-300 focus:border-zus-400 focus:ring-4 focus:ring-zus-600/10'
-
-function FieldRow({ field, values, set }: { field: FormField; values: Values; set: (key: string) => (value: string) => void }) {
-  const id = `field-${field.id}`
-  const fromPlan = !field.personal && field.value !== null
-  return (
-    <div>
-      <label htmlFor={field.kind === 'period' ? `${id}-from` : id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm font-bold text-navy-900">{field.label}</span>
-        {!field.required && <span className="text-xs text-navy-400">jeśli dotyczy</span>}
-        {fromPlan && (
-          <span className="rounded-full bg-zus-50 px-2 py-0.5 text-[11px] font-bold text-zus-700">z planu</span>
-        )}
-        {field.personal && (
-          <span className="flex items-center gap-1 rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-bold text-navy-500">
-            <Lock className="size-3" /> dane osobowe
-          </span>
-        )}
-      </label>
-      <div className="mt-1.5">
-        {field.kind === 'period' ? (
-          <div className="grid grid-cols-2 gap-2">
-            <DateInput id={`${id}-from`} label="od" value={values[`${field.id}:from`] ?? ''} onChange={set(`${field.id}:from`)} />
-            <DateInput id={`${id}-to`} label="do" value={values[`${field.id}:to`] ?? ''} onChange={set(`${field.id}:to`)} />
-          </div>
-        ) : field.kind === 'date' ? (
-          <DateInput id={id} value={values[field.id] ?? ''} onChange={set(field.id)} />
-        ) : field.kind === 'statement' ? (
-          <textarea
-            id={id}
-            value={values[field.id] ?? ''}
-            onChange={(e) => set(field.id)(e.target.value)}
-            rows={2}
-            className={cn(input, 'h-auto min-h-11 resize-y py-2.5 leading-relaxed')}
-          />
-        ) : (
-          <input
-            id={id}
-            value={values[field.id] ?? ''}
-            onChange={(e) => set(field.id)(e.target.value)}
-            autoComplete={field.personal ? 'off' : undefined}
-            className={input}
-          />
-        )}
-      </div>
-      {field.kind === 'period' && field.value && <p className="mt-1 text-xs text-navy-400">Na osi: {field.value}</p>}
-      {field.hint && <p className="mt-1 text-xs text-navy-400">{field.hint}</p>}
-    </div>
-  )
-}
-
-/** A date written the way forms write it (DD.MM.RRRR), with a label inside when there is one. */
-function DateInput({
-  id,
-  label,
-  value,
-  onChange,
-}: {
-  id: string
-  label?: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <span className="relative block">
-      {label && (
-        <span className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-sm text-navy-400">{label}</span>
-      )}
-      <input
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        inputMode="numeric"
-        placeholder="DD.MM.RRRR"
-        aria-label={label}
-        className={cn(input, 'tabular-nums', label && 'pl-11')}
-      />
-    </span>
-  )
 }
 
 function LegalBasis({ sources }: { sources: SourceRef[] }) {
