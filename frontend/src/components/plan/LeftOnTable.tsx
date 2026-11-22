@@ -1,8 +1,9 @@
 // "Nie zostawiajcie tego na stole" (FUNKCJE F9): what the family can still use and loses if it
-// does nothing, the soonest first, as the engine lists it (`Timeline.left_on_table`). One card
-// each: whose right, what, how much (the engine's amount; the screen never adds anything up) and
-// the window it can still be used in, drawn to scale from the engine's dates: the dark end is the
-// latest the whole of it still fits. Each card leads to doing something about it: fill in the
+// does nothing, the soonest first, as the engine lists it (`Timeline.left_on_table`). One row
+// each, all built the same way (a list, not a grid of cards of different heights): whose right,
+// what and how long, the money for it (the engine's amount; the screen never adds anything up),
+// then the window it can still be used in, drawn to scale from the engine's dates: the amber end
+// is the latest the whole of it still fits. Each row leads to doing something about it: fill in the
 // request (the form the engine prepared for that period), choose 81,5% (with undo), open its
 // details (the title), or put the deadline into the parent's own calendar (an .ics file with a
 // reminder).
@@ -85,7 +86,7 @@ export function LeftOnTable({
   const items = timeline.left_on_table
   if (items.length === 0) return null
   return (
-    <section aria-labelledby="left-on-table" className="rounded-4xl border border-line px-4 pt-5 pb-4 sm:px-5">
+    <section aria-labelledby="left-on-table" className="@container rounded-4xl border border-line px-4 pt-5 pb-2 sm:px-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <Illustration src={ICONS.skarbonka} size="event" className="bg-sun-100/70" />
@@ -105,7 +106,7 @@ export function LeftOnTable({
           Wszystkie terminy do kalendarza
         </button>
       </header>
-      <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+      <ul className="mt-3 divide-y divide-line">
         {items.map((item, index) => (
           <Card
             key={item.id}
@@ -163,78 +164,82 @@ function Card({
 
   const days = marker?.irreversible?.days_left
   const note = rest(item)
-  // The figure parents look for first: the money, else the time, else (a choice) the days left.
+  // The same figure first in every row of leave: the time; the money for it goes under it. A
+  // choice leads with how much more it pays, else (close) the days left for the request.
   const hero =
-    amount !== null
-      ? { value: `${item.kind === 'choice' ? '+' : ''}${formatPln(amount)}`, label: item.days !== null ? `za ${length(item.days)}` : 'więcej' }
-      : item.days !== null
-        ? { value: length(item.days), label: 'do wykorzystania' }
+    item.days !== null
+      ? { value: length(item.days), label: 'do wykorzystania' }
+      : amount !== null
+        ? { value: `+${formatPln(amount)}`, label: 'więcej' }
         : urgent && days !== undefined
           ? { value: days === 0 ? 'dziś' : `${days} ${days === 1 ? 'dzień' : 'dni'}`, label: days === 0 ? 'ostatni dzień na wniosek' : 'zostało na wniosek' }
           : null
+  const money = item.days !== null && amount !== null ? formatPln(amount) : null
 
   return (
     <motion.li
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, delay: Math.min(index, 6) * 0.05, ease: EASE_OUT }}
-      className={cn(
-        'flex flex-col rounded-3xl border bg-white p-4 transition-[border-color,box-shadow] duration-200 hover:shadow-[0_16px_40px_-28px_rgb(26_36_56/0.4)] sm:p-5',
-        urgent ? 'border-sun-300' : 'border-line hover:border-navy-100',
-      )}
+      className="grid gap-x-8 gap-y-4 py-5 @[46rem]:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto]"
     >
-      {/* Whose, what. */}
-      <div className="flex items-center gap-3">
-        <Illustration src={icon} size="event" className="bg-navy-50/60" />
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-navy-500">
-              <span className={cn('size-2 rounded-full', who.dot)} aria-hidden />
-              {who.label}
-            </span>
-            {marker?.irreversible && <NoReturnTag />}
-          </p>
-          {target ? (
-            <button
-              type="button"
-              onClick={() => onSelect(target)}
-              className="group mt-0.5 flex items-center gap-0.5 rounded-md text-left text-[17px] leading-snug font-bold text-navy-900 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
-            >
-              {item.title}
-              <ChevronRight className="size-4 shrink-0 text-navy-300 transition-transform group-hover:translate-x-0.5 group-hover:text-navy-500" />
-            </button>
-          ) : (
-            <h3 className="mt-0.5 text-[17px] leading-snug font-bold text-navy-900">{item.title}</h3>
-          )}
+      {/* Whose, what, how much. */}
+      <div className="min-w-0">
+        <div className="flex items-center gap-3">
+          <Illustration src={icon} size="event" className="bg-navy-50/60" />
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-navy-500">
+                <span className={cn('size-2 rounded-full', who.dot)} aria-hidden />
+                {who.label}
+              </span>
+              {marker?.irreversible && <NoReturnTag />}
+            </p>
+            {target ? (
+              <button
+                type="button"
+                onClick={() => onSelect(target)}
+                className="group mt-0.5 flex items-center gap-0.5 rounded-md text-left text-[17px] leading-snug font-bold text-navy-900 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+              >
+                {item.title}
+                <ChevronRight className="size-4 shrink-0 text-navy-300 transition-transform group-hover:translate-x-0.5 group-hover:text-navy-500" />
+              </button>
+            ) : (
+              <h3 className="mt-0.5 text-[17px] leading-snug font-bold text-navy-900">{item.title}</h3>
+            )}
+          </div>
         </div>
+        {hero && (
+          <p className="mt-3 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[26px] leading-none font-bold tracking-tight text-navy-900 tabular-nums">{hero.value}</span>
+            <span className="text-sm font-bold text-navy-500">{hero.label}</span>
+          </p>
+        )}
+        {money && (
+          <p className="mt-1.5 text-sm text-navy-500">
+            zasiłek <b className="text-navy-900 tabular-nums">{money}</b>
+          </p>
+        )}
       </div>
 
-      {/* How much. */}
-      {hero && (
-        <p className="mt-4 flex flex-wrap items-baseline gap-x-2">
-          <span className="text-[28px] leading-none font-bold tracking-tight text-navy-900 tabular-nums">{hero.value}</span>
-          <span className="text-sm font-bold text-navy-500">{hero.label}</span>
-        </p>
-      )}
+      {/* Until when, and only what the figures do not already say. */}
+      <div className="min-w-0">
+        {item.kind === 'leave' && item.days !== null ? (
+          <Window item={item} timeline={timeline} start={segment?.start ?? null} urgent={urgent} />
+        ) : (
+          <p className={cn('text-[15px] font-bold', urgent ? 'text-sun-700' : 'text-navy-900')}>
+            Wniosek najpóźniej {formatShortDate(item.last_day)}
+            {!urgent && <span className="font-normal text-navy-500"> · {countdown}</span>}
+          </p>
+        )}
+        {note && (
+          <p className="mt-3 text-sm leading-relaxed text-pretty text-navy-500">
+            <Emphasis text={note} className="text-navy-700" />
+          </p>
+        )}
+      </div>
 
-      {/* Until when. */}
-      {item.kind === 'leave' && item.days !== null ? (
-        <Window item={item} timeline={timeline} start={segment?.start ?? null} urgent={urgent} />
-      ) : (
-        <p className={cn('mt-2 text-[15px] font-bold', urgent ? 'text-sun-700' : 'text-navy-900')}>
-          Wniosek najpóźniej {formatShortDate(item.last_day)}
-          {!urgent && <span className="font-normal text-navy-500"> · {countdown}</span>}
-        </p>
-      )}
-
-      {/* Only what the figures above do not already say. */}
-      {note && (
-        <p className="mt-3 text-sm leading-relaxed text-pretty text-navy-500">
-          <Emphasis text={note} className="text-navy-700" />
-        </p>
-      )}
-
-      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+      <div className="flex flex-wrap items-center gap-2 @[46rem]:flex-col @[46rem]:items-end">
         {item.kind === 'choice' && item.id === 'left-rate-815' ? (
           <>
             {chose815 && (
@@ -313,7 +318,7 @@ function Action({
         primary
           ? 'bg-zus-600 text-white hover:bg-zus-700'
           : quiet
-            ? 'ml-auto px-2.5 text-navy-500 hover:bg-navy-50 hover:text-navy-900'
+            ? 'ml-auto px-2.5 text-navy-500 hover:bg-navy-50 hover:text-navy-900 @[46rem]:-mr-2.5'
             : 'border border-line text-navy-700 hover:border-navy-200 hover:bg-navy-50',
       )}
     >
@@ -345,7 +350,7 @@ function Window({
   const latest = item.start_by ? dayNumber(item.last_day) - dayNumber(item.start_by) + 1 : (item.days ?? 0)
   const share = total > 0 ? Math.min(1, Math.max(0.025, latest / total)) : 1
   return (
-    <div className="mt-2">
+    <div>
       <p className={cn('text-[15px] font-bold', urgent ? 'text-sun-700' : 'text-navy-900')}>
         {item.start_by ? `Zacznij najpóźniej ${formatShortDate(item.start_by)}` : `Do ${formatShortDate(item.last_day)}`}
         {item.start_by && (

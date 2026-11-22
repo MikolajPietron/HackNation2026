@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { Check, ChevronDown, LoaderCircle } from 'lucide-react'
 import { proposePlans } from '@/api'
 import { ITEM } from '@/components/onboarding/motion'
+import { Emphasis } from '@/components/ui/emphasis'
 import { Illustration } from '@/components/ui/illustration'
 import type { PlanApply } from '@/hooks/usePlanChange'
 import { formatShortDate } from '@/lib/dates'
@@ -170,6 +171,11 @@ function PlanCard({
     goal !== 'longest-home' && f.home_until && { label: 'W domu do', value: formatShortDate(f.home_until) },
     goal !== 'quick-return' && f.mother.back_to_work && { label: 'Mama wraca', value: formatShortDate(f.mother.back_to_work) },
   ].filter(Boolean) as { label: string; value: string }[]
+  // The engine's summary one sentence a line, the facts in bold. The total is already the big
+  // figure or a row above, so its sentence is not said twice.
+  const lines = plan.summary
+    .split(/(?<=\.)\s+(?=[A-ZĄĆĘŁŃÓŚŹŻ])/)
+    .filter((line) => !(f.total !== null && line.startsWith('Zasiłki za urlopy w planie')))
 
   return (
     <motion.article
@@ -220,7 +226,18 @@ function PlanCard({
         </dl>
       )}
 
-      <p className="mt-3 text-sm leading-relaxed text-navy-500">{plan.summary}</p>
+      {lines.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-line pt-3 text-sm leading-snug text-navy-500">
+          {lines.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-navy-200" aria-hidden />
+              <span>
+                <Emphasis text={line} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {plan.given_up.length > 0 && (
         <ul className="mt-3 space-y-1 text-sm">

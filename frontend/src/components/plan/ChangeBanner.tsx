@@ -3,9 +3,10 @@
 // the axis rings the same elements and keeps the old plan as a shadow. A preview: the event, the
 // engine's verdict and lines, the money before and after (the engine's totals), the dates it
 // assumed, and the way back. "To się stało" hands the event to the assistant, which asks for the
-// real facts: the what-if's dates are made up, so it is never saved as it is. When the banner of a
-// preview scrolls out of view, a pill at the bottom keeps the way back at hand (in a portal: the
-// plan's sections animate with filters, which would pin a fixed element inside them).
+// real facts: the what-if's dates are made up, so it is never saved as it is. When the parent
+// scrolls away from the banner of a preview, a pill at the bottom keeps the way back at hand (in a
+// portal: the plan's sections animate with filters, which would pin a fixed element inside them).
+// Not while the page itself scrolls up to the banner: the pill would only flash for a moment.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
@@ -185,6 +186,10 @@ function PreviewCard({
 }) {
   const box = useRef<HTMLElement>(null)
   const [away, setAway] = useState(false)
+  // The preview opens far below the axis and the page scrolls up to it: the banner is out of view
+  // for that moment. The pill waits until the banner has been seen (or, if the page never got
+  // there, a moment longer than the scroll takes).
+  const [seen, setSeen] = useState(false)
   const [more, setMore] = useState(false)
   const verdict = VERDICT[event.verdict]
   const money = event.money
@@ -196,9 +201,16 @@ function PreviewCard({
   useEffect(() => {
     const element = box.current
     if (!element) return
-    const observer = new IntersectionObserver(([entry]) => setAway(!entry.isIntersecting))
+    const observer = new IntersectionObserver(([entry]) => {
+      setAway(!entry.isIntersecting)
+      if (entry.isIntersecting) setSeen(true)
+    })
     observer.observe(element)
-    return () => observer.disconnect()
+    const late = window.setTimeout(() => setSeen(true), 1500)
+    return () => {
+      observer.disconnect()
+      window.clearTimeout(late)
+    }
   }, [])
 
   return (
@@ -338,7 +350,7 @@ function PreviewCard({
 
       {createPortal(
         <AnimatePresence>
-          {away && (
+          {away && seen && (
           <motion.div
             key="pill"
             initial={{ opacity: 0, y: 12 }}
