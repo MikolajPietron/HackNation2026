@@ -242,6 +242,11 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 49 ust. 1",
         "art. 50 ust. 1",
         "art. 50 ust. 2",
+        # Contribution debt of a business (engine/debt.py).
+        "art. 2",
+        "art. 2a ust. 1",
+        "art. 2a ust. 2",
+        "art. 64 ust. 3",
     }
     texts = ustawa_articles()
     assert texts["art. 30a ust. 1"].startswith("Ubezpieczona - matka dziecka, nie później niż 21")

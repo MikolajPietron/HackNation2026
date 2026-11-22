@@ -438,6 +438,25 @@ class FormParams(BaseModel):
     """The sickness benefit: the e-ZLA printout or the payer's certificate also do."""
 
 
+# --- Contribution debt (engine/debt.py; ustawa zasiłkowa art. 2a, art. 64 ust. 3) -------------
+
+
+class ContributionDebtParams(BaseModel):
+    """A person running a business with contribution debt on the day the right arises."""
+
+    rule: Rule
+    """No benefit (the maternity benefit among them) until the whole debt is repaid."""
+    limit_percent: Param[float]
+    """The debt counts above this percent of the minimum wage (`benefit_base.minimum_wage`)."""
+    expiry_months: Param[int]
+    """Not repaid within this many months of the day the right arose: the right expires."""
+    paid_within_days: Param[int]
+    """After the whole debt is repaid, the benefit is paid at the latest within this many days."""
+
+
+# --- end contribution debt --------------------------------------------------------------------
+
+
 class Params(BaseModel):
     version: str
     description: str
@@ -456,6 +475,7 @@ class Params(BaseModel):
     benefit_base: BaseParams
     forms: FormParams
     """The request forms (engine/forms.py)."""
+    contribution_debt: ContributionDebtParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""
