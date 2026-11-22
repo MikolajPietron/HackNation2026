@@ -13,69 +13,20 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 
 ## Komputer B — logika
 
-Kolejność: **7** (endpoint, odblokowuje front) → **1** i **11** (podstawa wymiaru w sprawach, doczytanie spraw) → **2** (zgodność) → **3** i **10** (dane wniosków i organizacji dla frontu) → **4** → **5** i **6** (wymogi formalne) → **8**, **9** (funkcje wyróżniające).
+Zostało (stan 22.11.2026, wieczór):
 
-### 1. Pełna podstawa wymiaru → podpiąć pod przykładowe sprawy
-`engine/base.py` jest gotowy (Mikołaj, 22.11.2026: `Scenario.mother_pay_history` / `father_pay_history`, `PayHistory`, `Timeline.bases`). Zostało podpięcie odczytu spraw:
-- `backend/app/cases/assess.py`, funkcja `monthly_pay`, dziś liczy zwykłą średnią i wpisuje `mother_pay`. Zamień to na `PayHistory(months=[engine PayMonth(month, amount, days_required, days_worked, …)], insured_from=…)` z `CaseFacts.pay`. Uwaga na nazwy: `app.cases.models.PayMonth` to inny model niż `app.engine.models.PayMonth`.
-- Czytnik daje dziś `full_month` i `note`. Jeśli `base.py` potrzebuje dni wymaganych i przepracowanych oraz premii, dodaj te pola do `CaseFacts` (`cases/models.py`) i do instrukcji w `cases/reader.py`. Sprawy przeczytane wcześniej mają wtedy puste pola: przeczytaj je ponownie albo przyjmij domyślne.
-- Gotowe, gdy: S80 (12 miesięcy z Z-3) pokazuje podstawę z `base.py` krok po kroku, a notatka o uproszczeniu znika.
+### 2. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86”) — wymaga płatnego odczytu
+- Kod gotowy (B.1, B.11 w „Zrobione”): odczyt i przełożenie na scenariusz obsługują już utratę pracy, ustalenia ZUS („dla pozoru”, niepodleganie), zadłużenie, części rodzicielskiego, przejęcie urlopu i pełną podstawę z Z-3. Różnice mają kategorię (`reading` / `missing-rule` / `other-refusal`).
+- Stare odczyty z `.cases_cache` nie mają nowych pól. Trzeba przeczytać ponownie co najmniej: S21 (`job_loss`), S08 i S09 (`zus_finding`, ostrzejsza reguła „voluntary”), S10 i S04 (`contribution_debt`), sprawy z niepełnymi miesiącami w Z-3 (dni), sprawy z premiami, przejęcie urlopu w sytuacji szczególnej (`mother_event`). S19 i S11 mogą działać już na starych odczytach.
+- Potem: `uv run python -m app.cases.batch --jobs 1` (pozostałe 56 spraw i ponowny odczyt powyższych), `--only-cached` dla podsumowania; każdą różnicę opisać.
 
-### 2. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86” z CLAUDE.md)
-- `cd backend && uv run python -m app.cases.batch --summary /tmp/sprawy.json` czyta sprawy, których nie ma w pamięci odczytów (`backend/.cases_cache/`, poza gitem), i wypisuje zgodność oraz listę różnic.
-- Wynik z komputera A (22.11.2026, Gemini Pro): przeczytane 30 z 86 spraw. Wsad przerwał chwilowy limit Google (429 „temporarily rate-limited to prevent exceeding its monthly…”). Rozstrzygnięcie ZUS w aktach: przyznano 11, odmowa 8, częściowo 1, brak 10. **Zgodność: 15/20** tam, gdzie znane są obie strony. Oś powstała dla 19 spraw, kwoty dla 11. Różnice:
-  - S08 (zlecenie, odmowa macierzyńskiego): kalkulator mówi „ubezpieczona”; sprawdzić dobrowolne chorobowe w odczycie i `insured_voluntarily`.
-  - S09 (umowa pozorna, odmowa): ustalenie ZUS o niepodleganiu nie trafiło do okresu ubezpieczenia (`sickness: none`); poprawić instrukcję czytnika albo regułę.
-  - S10 (zadłużenie, odmowa ojcowskiego): zadłużenie składkowe na dzień powstania prawa nie jest modelowane.
-  - S19 (rodzina zastępcza, przyznano): kalkulator mówi „nieubezpieczona”; sprawdzić dzień powstania prawa przy przyjęciu dziecka (`right_day`, `taken_in_on`).
-  - S21 (zasiłek w wysokości macierzyńskiego po likwidacji, przyznano): fakty nie są przekładane na `JobLoss` / zasiłek po ustaniu ubezpieczenia (`after_insurance.py`).
-- Dalej: `uv run python -m app.cases.batch --jobs 1` doczyta pozostałe 56 spraw. Uwaga na miesięczny limit wydatków projektu Google: ten sam klucz obsługuje czat. `--only-cached` liczy samo podsumowanie, bez AI. Pamięć odczytów to dane z poufnych spraw: nie do gita. Żeby nie płacić drugi raz, można skopiować folder `.cases_cache` lokalnie (AirDrop, pendrive).
-- Przejrzyj wiersze „różnica” i popraw przełożenie faktów na scenariusz w `backend/app/cases/assess.py`: utrata pracy w ciąży → `JobLoss`, dobrowolne chorobowe przy zleceniu i JDG, zadłużenie składkowe (S04), umowa „dla pozoru” (S07), części rodzicielskiego (S11), sprawy taty, adopcja. Sprawdzenie ubezpieczenia jest w `check_insurance`, porównanie z ZUS w `compare`.
-- Gotowe, gdy: zgodność policzona na wszystkich sprawach z rozstrzygnięciem i każda różnica opisana (błąd odczytu, brak reguły albo inny powód odmowy).
+### 5. Demo online (wymóg formalny) — hosting do ustalenia
+- Decyzja (Mikołaj, 22.11.2026): na serwerze demo **nie ma skanów spraw**; jury wgrywa PDF samo, lista spraw pokazuje tylko numery i tematy. Dostawcę hostingu ustalimy później.
 
-### 3. Wnioski: dane do symulacji wypełnienia
-Zadanie: „symulacji wypełnienia wniosków o urlopy i świadczenia związane z rodzicielstwem i ewentualnie przesłanie ich do pracodawcy/ZUS (wnioski o urlopy wymagają zaprojektowania, wnioski o świadczenia dostępne są na stronie www.zus.pl)”.
-- Z materiałów (rozporządzenie z 11.03.2025 o wnioskach urlopowych; ZAM ze zus.pl) ustal pola każdego wniosku. Wypełnij je wartościami ze scenariusza i osi: kto, do kogo (pracodawca albo ZUS — `applications.py` już to wie), od kiedy, ile tygodni, podstawa prawna.
-- Wystaw to przez API, np. `Document.form: {title, addressee, fields: [{label, value, source}]}` przy dokumentach osi albo `GET /api/session/{id}/forms`. Dopisz typy do `frontend/src/types.ts`.
-- Front (A) zbuduje na tym widok formularza i atrapę „Wyślij”. Do tego czasu korzysta z `timeline.documents`.
-
-### 4. Czat nie może wymyślać terminów
-Test na Gemini: asystent napisał „wniosek o urlop macierzyński musisz złożyć do pracodawcy najpóźniej 21 lutego 2027”. W materiałach nie ma takiego terminu (CLAUDE.md, „Otwarte pytania”). Popraw `prompts.py` / `describe.py`, żeby terminy brał wyłącznie z `applications.py`. Dodaj przypadek do `tools/eval`.
-
-### 5. Demo online (wymóg formalny)
-Zadanie: „linki do demonstracji będącej stroną internetową; na stronie powinna być możliwość przetestowania wybranych załączonych przykładów (formularze w pdf)”.
-- Hosting backendu (FastAPI) i frontendu (build Vite, `VITE_API_URL`), `CORS_ORIGINS`, klucze w zmiennych środowiska, migracje Supabase (`sessions`, `param_versions`).
-- Na serwerze: folder ze sprawami (`CASES_DIR`, poza gitem) i skopiowana pamięć odczytów, żeby jury dostawało wyniki od razu.
-- Gotowe, gdy: na publicznym adresie da się wybrać i wgrać sprawę, zobaczyć wynik i oś na telefonie i desktopie.
-
-### 6. README i lista funkcji AI (wymóg formalny)
-README jest nieaktualny („zrobiona jest faza 1”, „Claude przez OpenRouter”). Wymóg: „wskazanie, które z funkcjonalności działają ze wsparciem mechanizmów opartych na sztucznej inteligencji”.
-- Funkcje AI: czat-wywiad i wyjaśnienia (Gemini Flash albo Claude) oraz odczyt spraw ze skanów (Gemini Pro albo Claude).
-- Bez AI: silnik dat i kwot, sprawdzenie ubezpieczenia, porównanie z ZUS.
-
-### 7. Endpoint do zmiany scenariusza z interfejsu (front na to czeka)
-- `PATCH /api/session/{id}/scenario` z wybranymi polami (`parental_parts`, `rate_815`, `job_loss`, `mother_pay_history` itd.), walidowany przez silnik. Zwraca `SessionStart` (oś, scenariusz, następne pytanie). Ma też zapisać w historii czatu krótką notatkę, co zmieniono, żeby asystent wiedział.
-- FUNKCJE (agent): „Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny”. Bez tego front nie zrobi suwaka etatu (F6), kafelków tygodni (F13) ani przełącznika 81,5% bez czatu.
-- Gotowe, gdy: test API (zmiana `parental_parts` przelicza oś, złe dane dają 422 z polskim komunikatem) i typy w `frontend/src/types.ts`.
-
-### 8. Silnik: funkcje wyróżniające (FUNKCJE 4.2, P1)
-Każda jako czysta funkcja silnika z testem; front je narysuje.
-- **F9 „Zostawiacie na stole”:** niewykorzystane tygodnie i złotówki (np. 9 tygodni taty, ojcowski przed końcem okna, wariant 81,5% po terminie), z dniem, do którego jeszcze można.
-- **F10 Punkty bez powrotu:** oznacz znaczniki decyzji nieodwracalnych (np. pole `irreversible` przy `Marker`): wniosek o 81,5% do 21 dni po porodzie, koniec okna na ojcowski, koniec rodzicielskiego w roku 6. urodzin.
-- **F11 Stress-test planu:** przelicz bieżący plan przez zdarzenia z F7 (wcześniak, szpital, utrata pracy, choroba mamy) i zwróć, gdzie grozi utrata prawa albo zmiana kwoty.
-- **F14 „Nie przysługuje” z dalszą drogą:** przy braku prawa punkt wyjaśnienia „co zamiast” i „co zrobić, żeby przysługiwało”. Tylko to, co jest w materiałach (np. zasiłek po ustaniu ubezpieczenia, dobrowolne chorobowe).
-- **F8 Planowanie od celu:** 2–3 plany dla celu („najwięcej pieniędzy”, „najdłużej w domu”, „równy podział”, „szybki powrót”) z `parental_parts` i `rate_815`, porównane silnikiem. Łączy się z drzewem decyzyjnym kolegi (front: „Plany dla Was”).
-
-### 9. „Przetłumacz pismo z ZUS” i sprawdzanie wniosku (F24, F23; P1, funkcje AI)
-- F24: endpoint, który z obrazu pisma ZUS (zdjęcie albo PDF) zwraca prostym językiem: co to jest, czy trzeba coś zrobić i do kiedy. Tak jak przy sprawach: czytnik `app/cases/pages.py` + model z `CASES_MODEL` (tylko Claude albo Gemini), daty i terminy przepisane, nie liczone.
-- F23: sprawdzenie wypełnionego wniosku: brakujące pola, niezgodne daty, brak załącznika, nieaktualny formularz (ZUR, ZAO i Z-3b zlikwidowane 24.10.2026). Na danych z punktu 3.
-
-### 10. Organizacje wsparcia: źródło danych (wymóg i zadania, F28)
-Sprawdź, czy materiały (Poradnik ZUS 2026, wyciągi) wymieniają organizacje wsparcia przy śmierci dziecka, wcześniaku, poronieniu i ciężko chorym dziecku. Jeśli tak, wpisz je z cytatem i stroną (np. do `params/2026.json` albo osobnego JSON-a) i wystaw w API. Jeśli nie, napisz to tutaj: front (A) zrobi listę ze sprawdzonych stron organizacji, z odnośnikami.
-
-### 11. Domknąć odczyt spraw
-- Gdy limit Google zostanie podniesiony: `uv run python -m app.cases.batch --jobs 1` doczyta pozostałe 56 spraw (wsad czeka i ponawia po 429). Albo skopiuj `.cases_cache` z komputera A.
-- Odczyt ma też wypełniać pola, których potrzebuje `base.py` (punkt 1) i scenariusz: utrata pracy (`JobLoss`), zadłużenie (dla S04, S10), części rodzicielskiego, przejęcie urlopu przez tatę.
+### Drobne, gdy będzie czas
+- Wniosek o łączenie rodzicielskiego z pracą (rozporządzenie § 16, KP art. 182¹ᵉ § 2) jako dokument z formularzem.
+- Terminy ZAM dla osoby niebędącej pracownikiem „przed rozpoczęciem korzystania z zasiłku” (rozporządzenie z 27.09.2026) — do decyzji, czy pokazywać jako termin (CLAUDE.md, „Otwarte pytania”).
+- `api/cases.py` mógłby brać model przez `document_model.py` (dziś nie odrzuca modeli innych niż Claude i Gemini).
 
 ## Komputer A — front
 Zrobione 22.11.2026 (szczegóły w „Zrobione”): pieniądze na planie (F4, F5), raport zgodności (F37), porównanie 100/70 a 81,5% (F12), organizacje wsparcia (F28), wniosek o urlop z wysyłką-atrapą (F22). Dalej:
@@ -94,6 +45,23 @@ Zrobione 22.11.2026 (szczegóły w „Zrobione”): pieniądze na planie (F4, F5
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- **Dla frontu (A), 22.11.2026 wieczór — wszystko w `main`, typy w `frontend/src/types.ts`, wywołania w `api.ts`:**
+  - **B.3 Wnioski do wypełnienia:** każdy dokument osi ma `form: RequestForm | null` — `title`, `applicant`, `addressee` (`employer` / `payer` / `zus` / `payer-or-zus`) z `addressee_label`, `official_form` (`ZAM`, `ZAS-53` albo null), `legal_basis`, `start`/`end`, `fields[]` (`id`, `label`, `kind`: text / date / period / statement, `value`, `personal`, `required`, `hint`, `sources`), `attachments[]`, `notes[]`. Pola `personal` (imiona, PESEL, adres, konto, podpis) są puste: wpisuje je użytkownik. Każda część planu rodzicielskiego ma własny wniosek (`parental-request-<k>`, `parental-father-request-<k>`). Źródła `rozp_wnioski` / `rozp_zasilki` — `ElementDetails` `Sources` musi je pokazywać (dziś pokazuje tylko Przewodnik/Załącznik i KP/ustawę).
+  - **B.4 Terminy:** `Document.deadline` tylko tam, gdzie termin liczy Kodeks pracy; inaczej data na osi to dzień startu, nie termin.
+  - **F23 Sprawdzenie wniosku:** `checkRequest({request, session_id?, phrase?})` → `RequestCheckResult` (`problems` z `severity`, `message`, `sources`, `element_id`). Wysyłaj pola formularza z ich `id` (`RequestField.id`), wtedy daty nie są zgadywane z etykiet. `phrase: true` = AI tylko przeredagowuje komunikaty.
+  - **F24 Przetłumacz pismo z ZUS (AI):** `explainLetter(file, sessionId?)` → `LetterExplanation` (zawsze `ai: true`, `ai_label`): rodzaj pisma, co zrobić i do kiedy (daty przepisane z pisma), co przygotować, odwołanie, cytaty ze stronami, powiązane elementy osi. PDF/JPG/PNG, do 20 MB i 10 stron, nic nie zapisujemy.
+  - **F8 Plany od celu:** `proposePlans(scenario, goal)` (`most-money` / `longest-home` / `equal-split` / `quick-return`) → do 3 planów z `figures` (dni urlopu, powrót do pracy, kwoty), `given_up`, `changed`; wybrany plan stosujesz przez `changeScenario(sessionId, plan.patch)`. `PLAN_GOAL_LABEL` w `lib/ui.ts`.
+  - **F11 Test odporności:** `stressTest(scenario, timelines?)` → `events[]` z `verdict` (`loss` / `risk` / `kept`), `lines` (gotowe zdania), `assumed` (przyjęte daty), `money`, `periods`, `sensitive` (choroba albo śmierć mamy: pokazuj zwinięte). `patch` zdarzenia tylko do podglądu, nie do zapisu.
+  - **F9 Zostawiacie na stole:** `Timeline.left_on_table: Leftover[]` (najbliższy termin pierwszy): `left-parental`, `left-parental-father`, `left-paternity`, `left-supplementary`, `left-parental-pool`, `left-rate-815` (`kind: "choice"`, `amount` = o ile więcej). Pusto po stracie dziecka albo śmierci mamy.
+  - **F10 Punkty bez powrotu:** `Marker.irreversible: {lost, days_left, sources} | null` na `rate-815-deadline`, `paternity-deadline`, `parental-deadline` (kłódka z odliczaniem).
+  - **F14 Nie przysługuje z dalszą drogą:** punkty wyjaśnienia `insurance-way`, `father-way`, `taken-in-way` (rodzaj `risk`) zaraz po punkcie o braku prawa.
+  - **F37 Raport zgodności:** `GET /api/cases/agreement` → `CaseAgreement` (z pamięci odczytów, bez AI); każda różnica ma `reason` i `reason_text`. Typ miesiąca z Z-3 w sprawach to teraz `CasePayMonth`.
+  - **B.10 Organizacje wsparcia:** żaden z materiałów ZUS ich nie wymienia (Poradnik: tylko kontakty ZUS i PIP). Listę robisz ze sprawdzonych stron organizacji.
+  - Asystent ma narzędzia `propose_plans` i `stress_test` (tylko do odczytu) oraz zna punkty bez powrotu i „Zostawiacie na stole”.
+- B.1 (kod): odczyt spraw daje `PayHistory` z miesięcy Z-3, podstawa z `base.py` krok po kroku; notatka o uproszczeniu usunięta. B.11 (kod): nowe pola odczytu i przełożenie na scenariusz (utrata pracy, ustalenia ZUS, zadłużenie, części, przejęcie, rodzina zastępcza).
+- B.8 (F8, F9, F10, F11, F14), B.9 (F23, F24), B.3, B.4, B.10 — szczegóły wyżej i w CLAUDE.md.
+- B.6 (22.11.2026): README od nowa: co potrafi aplikacja (wymagania a–j), lista funkcji z AI i bez AI (wymóg formalny), start, komendy, dane ZUS. Do uzupełnienia po scaleniu: tłumacz pism (F24) jako kolejna funkcja AI, adres demo.
+- B.7 (22.11.2026): `PATCH /api/session/{id}/scenario` — body to obiekt z polami `Scenario` do zmiany (np. `{"parental_parts": [...]}`, `{"rate_815": true}`, `{"job_loss": {...}}`, `{"mother_pay_history": {...}}`; `null` czyści pole). Silnik waliduje jak po narzędziu czatu; odpowiedź to `SessionStart` (scenariusz, oś, następne pytanie). Błąd: 422 z polskim `detail` (np. „Nieznane pola scenariusza…”, „Nieprawidłowa wartość pola…”, komunikat silnika przy złym planie). Do historii czatu trafia ukryta notatka, co zmieniono, więc asystent tego nie dopytuje. Front: `changeScenario(sessionId, changes)` w `api.ts`, typ `ScenarioChanges` w `types.ts`. Testy: `backend/tests/test_scenario_patch.py`.
 - Front (A, 22.11.2026): „Ile dostaniecie?”, ścieżka Pieniądze, karta Pieniądze ze wykresem schodkowym, „Dlaczego tyle?”, porównanie 100/70 a 81,5%, raport zgodności `/raport` (`GET /api/cases/report`), wniosek o urlop (wypełnienie, druk, wysyłka-atrapa), organizacje wsparcia.
 - B.0 (22.11.2026): pytanie wywiadu dokleja serwer (`chat.py`), nie model; trafia też do historii modelu i do rozmowy po odświeżeniu. Front bez zmian: tekst odpowiedzi kończy się pytaniem, a szybkie odpowiedzi nadal idą po `question.key`. Test `test_the_interview_question_comes_from_the_code_not_the_model`, przypadek `premature-question-known-due-date` w `tools/eval`.
 - Pełna podstawa wymiaru `engine/base.py` (B). Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).

@@ -2,16 +2,23 @@ import type {
   AdminView,
   CaseFacts,
   CaseList,
-  CaseReport,
+  CaseAgreement,
   CaseResult,
   ChatEvent,
   ChatRequest,
+  LetterExplanation,
   OnboardingAnswers,
   ParamPreview,
   ParamValues,
+  PlanGoal,
+  PlansResult,
+  RequestCheckRequest,
+  RequestCheckResult,
   Scenario,
+  ScenarioChanges,
   SessionStart,
   SessionView,
+  StressReport,
   Timeline,
 } from './types'
 
@@ -167,6 +174,17 @@ export async function uploadCase(file: File, signal?: AbortSignal): Promise<Case
 export const assessCase = (body: { id: string | null; pages: number; pages_read: number; facts: CaseFacts }) =>
   requestJson<CaseResult>('/api/cases/assess', { method: 'POST', body: JSON.stringify(body) })
 
+/**
+ * The interface changes the scenario without the chat (sliders, week tiles, the 81,5% switch):
+ * the engine recalculates and validates it like a chat answer; a refused change throws with
+ * the Polish message. The chat gets a hidden note of what changed.
+ */
+export const changeScenario = (sessionId: string, changes: ScenarioChanges) =>
+  requestJson<SessionStart>(`/api/session/${sessionId}/scenario`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  })
+
 /** The case becomes the plan: a new conversation from its facts. */
 export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
   requestJson<SessionStart>(`/api/cases/session/${sessionId}`, {
@@ -178,5 +196,55 @@ export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>
 export const calculateTimeline = (scenario: Scenario, signal?: AbortSignal) =>
   requestJson<Timeline>('/api/timeline', { method: 'POST', body: JSON.stringify(scenario), signal })
 
-/** The agreement report: the calculator against ZUS for the cases already read. */
-export const fetchCaseReport = () => requestJson<CaseReport>('/api/cases/report')
+// ---------------------------------------------------------------------------------------------
+// F8 plans for a goal and F11 the stress test (no AI). A chosen plan's `patch` goes to
+// PATCH /api/session/{id}/scenario.
+
+/** 2-3 plans for the goal, ranked and compared by the engine. */
+export const proposePlans = (scenario: Scenario, goal: PlanGoal, signal?: AbortSignal) =>
+  requestJson<PlansResult>('/api/plans', {
+    method: 'POST',
+    body: JSON.stringify({ scenario, goal }),
+    signal,
+  })
+
+/** What every event that can still happen would change; `timelines` adds both timelines. */
+export const stressTest = (scenario: Scenario, timelines = false, signal?: AbortSignal) =>
+  requestJson<StressReport>('/api/stress', {
+    method: 'POST',
+    body: JSON.stringify({ scenario, timelines }),
+    signal,
+  })
+
+// Letters from ZUS (F24, AI) and the request check (F23)
+
+/** "Przetłumacz pismo z ZUS": a photo or PDF of a letter in plain Polish (AI; nothing stored). */
+export async function explainLetter(
+  file: File,
+  sessionId?: string | null,
+  signal?: AbortSignal,
+): Promise<LetterExplanation> {
+  const body = new FormData()
+  body.append('file', file)
+  if (sessionId) body.append('session_id', sessionId)
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}/api/letters/explain`, { method: 'POST', body, signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new Error(OFFLINE)
+  }
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as LetterExplanation
+}
+
+/** Check a filled request before filing it: no AI, unless `phrase` asks AI to reword. */
+export const checkRequest = (body: RequestCheckRequest, signal?: AbortSignal) =>
+  requestJson<RequestCheckResult>('/api/requests/check', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    signal,
+  })
+
+/** The agreement report: the calculator against ZUS for the cases already read (cache only). */
+export const fetchAgreement = () => requestJson<CaseAgreement>('/api/cases/agreement')

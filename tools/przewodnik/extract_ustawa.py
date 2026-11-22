@@ -91,6 +91,11 @@ PROVISIONS = {
     "art. 49 ust. 1": ("Art. 49 [", "ust", "1"),
     "art. 50 ust. 1": ("Art. 50 [", "ust", "1"),
     "art. 50 ust. 2": ("Art. 50 [", "ust", "2"),
+    # Contribution debt of a business on the day the right arises (engine/debt.py).
+    "art. 2": ("Art. 2 [", None, None),
+    "art. 2a ust. 1": ("Art. 2a [", "ust", "1"),
+    "art. 2a ust. 2": ("Art. 2a [", "ust", "2"),
+    "art. 64 ust. 3": ("Art. 64 [", "ust", "3"),
 }
 
 GLUED = {

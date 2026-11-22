@@ -981,4 +981,130 @@ SCENARIOS = [
             },
         ],
     },
+    {
+        # ZADANIA B.4: on Gemini the assistant wrote that the request for maternity leave must be
+        # filed with the employer "najpóźniej" by a date. The materials give no deadline for it
+        # (CLAUDE.md, open questions): the timeline shows it on the first day of the leave,
+        # 2 weeks before 15.03.2027 = 01.03.2027, and only the Labour Code requests have one:
+        # parental leave from 19.07.2027 (20 - 2 = 18 weeks after the birth end 18.07.2027),
+        # 21 days before = 28.06.2027 (KP art. 182¹ᵈ § 1).
+        "id": "no-deadline-maternity-request",
+        "about": "asked by when to file the request for maternity leave, the assistant says the "
+        "materials give no deadline and never turns the first day of the leave into one",
+        "runs": 2,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Chcę zacząć urlop macierzyński 2 tygodnie przed porodem.",
+                "tools": [{"name": "set_leave_before_birth", "args": {"weeks": 2}}],
+                "timeline": {
+                    "segments": {
+                        "maternity-prenatal": ["2027-03-01", "2027-03-14"],
+                        "maternity": ["2027-03-15", "2027-07-18"],
+                        "parental": ["2027-07-19", "2028-02-27"],
+                    },
+                    "documents": {
+                        "maternity-request": "2027-03-01",
+                        "parental-request": "2027-06-28",
+                    },
+                },
+                "question": "certificate",
+            },
+            {
+                "say": "Do kiedy najpóźniej muszę złożyć pracodawcy wniosek o urlop macierzyński?",
+                "no_tools": ["set_leave_before_birth", "set_due_date", "set_birth_date"],
+                "require": [r"nie podaj|nie określaj|nie ma (w nich )?terminu|bez terminu"],
+                "forbid": [
+                    r"najpóźniej[^.\n]{0,40}(1 marca|01\.03\.2027|2027-03-01|lutego)",
+                    r"(musisz|trzeba|należy) (go )?złożyć[^.\n]{0,40}(do|przed) "
+                    r"(1 marca|01\.03\.2027|2027-03-01|\d{1,2} lutego)",
+                    r"21 lutego 2027",
+                ],
+                "question": "certificate",
+            },
+        ],
+    },
+    {
+        # ZADANIA B.8, F8: plans for a goal come from the engine; the model shows the options and
+        # leaves the choice to the parents. Hand-computed (tests/test_plans.py): bases 8000 ×
+        # 0,8629 = 6903,20 and 6000 × 0,8629 = 5177,40; the whole pool, the mother 32 weeks
+        # 30.03-08.11.2027, the father 9 weeks 09.11.2027-10.01.2028. 100% and 70%: 140 × 230,11
+        # + 224 × 161,07 + 14 × 172,58 + 63 × 120,81 = 78 322,23 zł; 81,5% (request by
+        # 10.11.2026 + 21 days = 01.12.2026): 364 × 187,54 + 10 027,15 = 78 291,71 zł.
+        "id": "plans-most-money",
+        "about": "the most money: two plans from the engine (100% and 70% or 81,5%), nothing "
+        "saved until the parents choose (FUNKCJE F8)",
+        "runs": 2,
+        "onboarding": {
+            "role": "mother",
+            "child_born": True,
+            "date": "2026-11-10",
+            "children_count": 1,
+            "work": "employment",
+            "payer_size": "over-20",
+            "pay": 8000,
+            "partner": {"work": "employment", "payer_size": "over-20", "pay": 6000},
+            "hospital_care": False,
+            "leave_before_birth_weeks": 0,
+        },
+        "steps": [
+            {"event": "timeline_ready"},
+            {
+                "say": "Jak podzielić urlop rodzicielski, żebyśmy dostali najwięcej pieniędzy?",
+                "tools": [{"name": "propose_plans", "args": {"goal": "most-money"}}],
+                "no_tools": ["set_parental_plan", "set_rate_choice", "set_father_takeover"],
+                "require": [r"78\s?322,23", r"81,5"],
+                "forbid": [r"polecam|radzę|najlepiej wybierz|powinniście wybrać"],
+                "extra_dates": [
+                    "2026-12-01",
+                    "2027-03-30",
+                    "2027-11-08",
+                    "2027-11-09",
+                    "2028-01-10",
+                ],
+            },
+        ],
+    },
+    {
+        # ZADANIA B.8, F11: the stress test of an expected child (tests/test_stress.py). A birth
+        # 6 weeks early (01.02.2027), 28 days in hospital: 4 weeks of supplementary leave
+        # 21.06-18.07.2027 (KP art. 180² § 1 pkt 2, § 3). The work ending on 18.01.2027 for a
+        # reason the guide does not name: no insurance on the day of the birth, no maternity
+        # benefit (guide p. 3-4, section H).
+        "id": "stress-test-expected",
+        "about": "what if the child comes early or the job ends: the engine's stress test, no "
+        "change saved (FUNKCJE F11)",
+        "runs": 2,
+        "onboarding": {
+            **MOTHER_EXPECTED,
+            "payer_size": "over-20",
+            "pay": 8000,
+            "partner": {"work": "employment", "payer_size": "over-20", "pay": 6000},
+        },
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Co się stanie z naszym planem, jeśli coś pójdzie nie tak, np. dziecko "
+                "urodzi się wcześniej albo stracę pracę?",
+                "tools": [{"name": "stress_test"}],
+                "no_tools": ["set_birth_date", "set_hospital_care", "set_job_loss"],
+                "require": [r"uzupełniając", r"ubezpiecz"],
+                "forbid": [r"!"],
+                "question": "leave-before-birth",
+                "extra_dates": [
+                    "2027-01-18",
+                    "2027-01-19",
+                    "2027-02-01",
+                    "2027-02-28",
+                    "2027-03-14",
+                    "2027-05-10",
+                    "2027-06-20",
+                    "2027-06-21",
+                    "2027-07-18",
+                    "2027-07-19",
+                ],
+            },
+        ],
+    },
 ]

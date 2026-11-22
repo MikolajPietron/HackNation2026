@@ -6,14 +6,14 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ArrowLeft, Check, ChevronDown, Minus, X } from 'lucide-react'
-import { fetchCaseReport } from '@/api'
+import { fetchAgreement } from '@/api'
 import { Brand } from '@/components/layout/Brand'
 import { ITEM, STEP } from '@/components/onboarding/motion'
 import { Illustration } from '@/components/ui/illustration'
 import { EASE_OUT } from '@/lib/ease'
 import { ICONS } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import type { CaseOutcome, CaseReport, CaseReportRow } from '@/types'
+import type { CaseAgreement, CaseAgreementRow, CaseOutcome, DifferenceReason } from '@/types'
 
 type Filter = 'all' | 'agree' | 'differ' | 'undecided' | 'unread'
 
@@ -24,7 +24,7 @@ const OUTCOME: Record<CaseOutcome, string> = {
   unknown: '—',
 }
 
-const statusOf = (row: CaseReportRow): Exclude<Filter, 'all'> =>
+const statusOf = (row: CaseAgreementRow): Exclude<Filter, 'all'> =>
   !row.read ? 'unread' : row.match === true ? 'agree' : row.match === false ? 'differ' : 'undecided'
 
 const STATUS: Record<Exclude<Filter, 'all'>, { label: string; icon: ReactNode; className: string }> = {
@@ -32,6 +32,13 @@ const STATUS: Record<Exclude<Filter, 'all'>, { label: string; icon: ReactNode; c
   differ: { label: 'Inaczej niż ZUS', icon: <X className="size-4" strokeWidth={3} />, className: 'bg-alert-600 text-white' },
   undecided: { label: 'Bez decyzji w aktach', icon: <Minus className="size-4" strokeWidth={3} />, className: 'bg-navy-100 text-navy-500' },
   unread: { label: 'Jeszcze nieprzeczytana', icon: <Minus className="size-4" strokeWidth={3} />, className: 'border-2 border-dashed border-navy-200 text-navy-300' },
+}
+
+/** Why the calculator and ZUS differ (backend/app/cases/agreement.py). */
+const REASON: Record<DifferenceReason, string> = {
+  reading: 'błąd odczytu sprawy',
+  'missing-rule': 'brak reguły w kalkulatorze',
+  'other-refusal': 'ZUS odmówił z innego powodu',
 }
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -43,12 +50,12 @@ const FILTERS: { id: Filter; label: string }[] = [
 ]
 
 export function ReportScreen() {
-  const [report, setReport] = useState<CaseReport | null>(null)
+  const [report, setReport] = useState<CaseAgreement | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
 
   useEffect(() => {
-    fetchCaseReport()
+    fetchAgreement()
       .then(setReport)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Nie udało się wczytać raportu.'))
   }, [])
@@ -94,8 +101,18 @@ export function ReportScreen() {
               <p className="mt-2 text-pretty text-navy-500">
                 Liczymy tylko sprawy, w których akta zawierają rozstrzygnięcie ZUS, a kalkulator potrafi
                 odpowiedzieć. Przeczytane: <b className="text-navy-900">{report.read}</b> z{' '}
-                <b className="text-navy-900">{report.rows.length}</b>.
+                <b className="text-navy-900">{report.total}</b> · z osią: {report.with_timeline} · z kwotami:{' '}
+                {report.with_amounts}.
               </p>
+              {Object.keys(report.reasons).length > 0 && (
+                <p className="mt-3 flex flex-wrap gap-1.5 text-xs font-bold">
+                  {(Object.entries(report.reasons) as [DifferenceReason, number][]).map(([reason, n]) => (
+                    <span key={reason} className="rounded-full bg-alert-50 px-2.5 py-1 text-alert-600">
+                      {REASON[reason]}: {n}
+                    </span>
+                  ))}
+                </p>
+              )}
               <p className="mt-3 flex items-start gap-2 rounded-2xl bg-navy-50/60 px-3 py-2 text-sm text-navy-700">
                 <span className="mt-0.5 shrink-0 rounded-full bg-zus-600 px-1.5 text-[10px] font-black text-white">AI</span>
                 Dane ze skanów przepisuje AI, z numerami stron. Sprawdzenie ubezpieczenia i porównanie z
@@ -175,7 +192,7 @@ function Ring({ agree, decided }: { agree: number; decided: number }) {
   )
 }
 
-function Row({ row }: { row: CaseReportRow }) {
+function Row({ row }: { row: CaseAgreementRow }) {
   const [open, setOpen] = useState(false)
   const status = STATUS[statusOf(row)]
   const expandable = row.read
@@ -205,8 +222,8 @@ function Row({ row }: { row: CaseReportRow }) {
         </span>
         {row.read && (
           <span className="hidden shrink-0 items-center gap-1.5 text-xs font-bold sm:flex">
-            <Outcome who="ZUS" outcome={row.zus} />
-            <Outcome who="Kalkulator" outcome={row.ours} />
+            <Outcome who="ZUS" outcome={row.zus ?? 'unknown'} />
+            <Outcome who="Kalkulator" outcome={row.ours ?? 'unknown'} />
           </span>
         )}
         {expandable && (
@@ -224,11 +241,20 @@ function Row({ row }: { row: CaseReportRow }) {
           >
             <div className="space-y-3 px-4 pb-4 sm:pr-5 sm:pl-[104px]">
               <div className="flex flex-wrap gap-1.5 text-xs font-bold sm:hidden">
-                <Outcome who="ZUS" outcome={row.zus} />
-                <Outcome who="Kalkulator" outcome={row.ours} />
+                <Outcome who="ZUS" outcome={row.zus ?? 'unknown'} />
+                <Outcome who="Kalkulator" outcome={row.ours ?? 'unknown'} />
               </div>
-              <Detail icon={ICONS.parasol} title="Ubezpieczenie chorobowe" text={row.insurance} />
-              <Detail icon={ICONS.koperta} title="Kalkulator a decyzja ZUS" text={row.comparison} />
+              {row.reason && (
+                <p className="text-sm font-bold text-alert-600">Powód różnicy: {REASON[row.reason]}</p>
+              )}
+              {row.reason_text && <Detail icon={ICONS.koperta} title="Kalkulator a decyzja ZUS" text={row.reason_text} />}
+              {row.covered !== null && (
+                <Detail
+                  icon={ICONS.parasol}
+                  title="Ubezpieczenie chorobowe"
+                  text={row.covered ? 'Kalkulator: ubezpieczenie w dniu powstania prawa.' : 'Kalkulator: brak ubezpieczenia w dniu powstania prawa.'}
+                />
+              )}
               {row.problem && <Detail icon={ICONS.kalendarz} title="Oś" text={row.problem} />}
               {!row.problem && (
                 <p className="text-sm text-navy-500">

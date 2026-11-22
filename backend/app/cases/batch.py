@@ -11,16 +11,15 @@ prints how often the calculator agrees with the decisions of ZUS (the goal in CL
 import argparse
 import asyncio
 import time
-from collections import Counter
 from pathlib import Path
 
 from pydantic_ai.exceptions import ModelRateLimitError
 
 from app.api.cases import get_case_cache, get_cases_folder, get_reader_factory
+from app.cases.agreement import agreement
 from app.cases.cache import CachedRead, file_digest
 from app.cases.catalog import CaseFile, list_case_files
 from app.cases.pages import render_pages
-from app.cases.report import build_report
 from app.clock import today_in_warsaw
 from app.config import get_settings
 from app.services.params import load_params
@@ -81,21 +80,22 @@ async def main() -> None:
     if not args.only_cached:
         await asyncio.gather(*(read(case) for case in cases))
 
-    report = build_report(get_cases_folder(settings), cache, load_params(), today_in_warsaw())
-    read = [row for row in report.rows if row.read]
+    report = agreement(cases, cache, load_params(), today_in_warsaw())
     print()
-    print(f"Przeczytane: {report.read}/{len(report.rows)}")
-    print(f"Decyzja ZUS w aktach: {Counter(row.zus for row in read)}")
+    print(f"Przeczytane: {report.read}/{report.total}")
+    print(f"Decyzja ZUS w aktach: {report.zus}")
     print(f"Zgodność z decyzjami ZUS: {report.agree}/{report.decided} (gdzie obie strony są znane)")
-    with_amounts = sum(1 for row in read if row.payments)
-    print(f"Z osią: {sum(row.timeline for row in read)} · z kwotami: {with_amounts}")
-    for row in read:
+    print(f"Z osią: {report.with_timeline} · z kwotami: {report.with_amounts}")
+    print(f"Różnice według powodu: {report.reasons}")
+    for row in report.rows:
         if row.match is False:
             print(
-                f"  różnica {row.id} ({row.category}): ZUS {row.zus}, my {row.ours} — {row.title}"
+                f"  różnica {row.id} ({row.category}): ZUS {row.zus}, my {row.ours}, "
+                f"powód {row.reason} — {row.title}"
             )
     if args.summary:
-        args.summary.write_text(report.model_dump_json(indent=1), encoding="utf-8")
+        rows = [row.model_dump(mode="json") for row in report.rows]
+        args.summary.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

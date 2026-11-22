@@ -11,6 +11,7 @@ import datetime as dt
 from app.engine.after_insurance import after_job_loss, insurance_note, leave_before_cut
 from app.engine.applications import application_notes
 from app.engine.base import add_base_notes
+from app.engine.debt import add_debt_notes
 from app.engine.draft import DAY, days_between
 from app.engine.explain_adoption import taken_in_notes
 from app.engine.father import MATERNITY_PARTS
@@ -19,6 +20,7 @@ from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
 from app.engine.money import NOTE_ID as MONEY_NOTE
 from app.engine.money import add_money_notes
+from app.engine.no_right import add_way_notes
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
 from app.engine.parental_plan import parental_plan_notes
@@ -31,11 +33,17 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    # Contribution debt of a parent with a business (debt.py), after that parent's right.
+    return add_debt_notes(_all_notes(scenario, timeline, params), scenario, timeline, params)
+
+
+def _all_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     if scenario.taken_in is not None:
         # Section G for the leave of a child taken in, too.
-        return add_money_notes(
+        notes = add_money_notes(
             taken_in_notes(scenario, timeline, params), scenario, timeline, params
         )
+        return add_way_notes(notes, scenario, timeline, params)  # F14 (no_right.py)
     notes = _case_notes(scenario, timeline, params)
     # Guide E and B.3: the parents' plan of parental leave, before "Co policzyliśmy".
     plan = parental_plan_notes(scenario, timeline, params)
@@ -44,7 +52,9 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
     # Section G: the choice of rate joins the choices, the amounts come after the dates.
     notes = add_money_notes(notes, scenario, timeline, params)
     # The benefit base in detail (base.py): how it was computed, before the amounts.
-    return add_base_notes(notes, timeline, before=MONEY_NOTE)
+    notes = add_base_notes(notes, timeline, before=MONEY_NOTE)
+    # F14 (no_right.py): what instead and what would give the right, after each "no right".
+    return add_way_notes(notes, scenario, timeline, params)
 
 
 def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:

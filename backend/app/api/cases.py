@@ -2,6 +2,7 @@
 wniosków"; the jury checks the insurance and the calculation on them).
 
 GET  /api/cases                      the catalogue S01–S86 (ids and categories, no file names)
+GET  /api/cases/agreement            agreement with the decisions of ZUS, from the cache only
 POST /api/cases/{id}/read            read a catalogue case with Claude (once; then from cache)
 POST /api/cases/upload               read an uploaded PDF or photo the same way
 POST /api/cases/assess               recalculate after the facts were corrected by hand (no AI)
@@ -24,10 +25,12 @@ from starlette.concurrency import run_in_threadpool
 from app.api.deps import KEY_NAMES, _chat_model, get_params, get_session_store, get_today
 from app.api.session import SessionStart
 from app.assistant.describe import next_question
+from app.cases.agreement import agreement
 from app.cases.assess import assess
 from app.cases.cache import CachedRead, CaseCache, digest, file_digest
 from app.cases.catalog import find_case, list_case_files
 from app.cases.models import (
+    AgreementReport,
     ApplyRequest,
     AssessRequest,
     CaseList,
@@ -36,7 +39,6 @@ from app.cases.models import (
 )
 from app.cases.pages import page_count, render_pages
 from app.cases.reader import CaseReader, ModelCaseReader
-from app.cases.report import Report, build_report
 from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -119,6 +121,20 @@ async def list_cases(folder: Folder, cache: Cache) -> CaseList:
     return CaseList(configured=folder.is_dir(), cases=await run_in_threadpool(items))
 
 
+@router.get("/agreement")
+async def agreement_report(
+    folder: Folder,
+    cache: Cache,
+    params: Annotated[Params, Depends(get_params)],
+    today: Annotated[dt.date, Depends(get_today)],
+) -> AgreementReport:
+    """How often the calculator agrees with ZUS, from the cases already read (like
+    `batch --only-cached`): nothing is read, no key is needed."""
+    return await run_in_threadpool(
+        lambda: agreement(list_case_files(folder), cache, params, today, configured=folder.is_dir())
+    )
+
+
 async def _read(
     data: bytes,
     case_id: str | None,
@@ -155,17 +171,6 @@ async def _read(
         params=params,
         today=today,
     )
-
-
-@router.get("/report")
-async def report(
-    folder: Folder,
-    cache: Cache,
-    params: Annotated[Params, Depends(get_params)],
-    today: Annotated[dt.date, Depends(get_today)],
-) -> Report:
-    """FUNKCJE F37: the calculator against the decisions of ZUS, for the cases already read."""
-    return await run_in_threadpool(build_report, folder, cache, params, today)
 
 
 @router.post("/{case_id}/read")

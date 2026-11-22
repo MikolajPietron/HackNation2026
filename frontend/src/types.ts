@@ -20,9 +20,12 @@ export type TakenIn = 'adoption' | 'foster'
 /**
  * A literal quote: from the guide (section and pages), from the Labour Code ('kp') or from the
  * ustawa zasiłkowa ('ustawa'; both: article), or from the ZUS Załącznik ('zalacznik': section).
+ * The request forms also quote two regulations (article: "§ 15 ust. 1", "zał. 6"):
+ * 'rozp_wnioski' (11.03.2025, the leave requests) and 'rozp_zasilki' (27.09.2026, the documents
+ * for the benefits).
  */
 export interface SourceRef {
-  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik'
+  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik' | 'rozp_wnioski' | 'rozp_zasilki'
   quote: string
   section: string | null
   page: number | null
@@ -178,6 +181,12 @@ export interface Scenario {
   /** Months given win over `mother_pay`; the other fields apply either way. */
   mother_pay_history: PayHistory | null
   father_pay_history: PayHistory | null
+  // --- Contribution debt (engine/debt.py; ustawa zasiłkowa art. 2a) ---
+  /** A parent with a business: social insurance contribution debt on the day the right arises,
+   *  in PLN, from a ZUS document (example cases only; the interview does not ask). */
+  mother_contribution_debt: number | null
+  father_contribution_debt: number | null
+  // --- end contribution debt ---
 }
 
 /** Applied for (no decision yet), granted or refused. */
@@ -300,6 +309,126 @@ export interface Marker {
   summary: string
   details: string[]
   sources: SourceRef[]
+  /** F10: after this day a right is lost for good (a padlock with a countdown). */
+  irreversible: Irreversible | null
+}
+
+// --- F9 "Zostawiacie na stole", F10 "Punkty bez powrotu" (ZADANIA B.8; engine/leftover.py) ---
+
+/**
+ * A point of no return: `rate-815-deadline`, `paternity-deadline`, `parental-deadline`.
+ * `days_left`: from today to the marker's day; 0 = today is the last day, negative = passed.
+ */
+export interface Irreversible {
+  /** What is lost after that day, one sentence. */
+  lost: string
+  days_left: number
+  /** The quotes that say so (a subset of the marker's sources). */
+  sources: SourceRef[]
+}
+
+/**
+ * Something the family can still use and loses if they do nothing, the soonest first in
+ * `Timeline.left_on_table`. Ids: `left-parental`, `left-parental-father`, `left-paternity`,
+ * `left-supplementary` (the option on the timeline, `segment_id`), `left-parental-pool` (weeks a
+ * plan leaves out) and `left-rate-815` (kind `choice`: the request for 81,5%). Empty after the
+ * loss of a child or the mother's death.
+ */
+export interface Leftover {
+  id: string
+  /** leave = days not used yet; choice = an option that closes on `last_day`. */
+  kind: 'leave' | 'choice'
+  /** Whose right; null = either parent. */
+  parent: Role | null
+  title: string
+  text: string
+  /** Days that can still be used; null for a choice. */
+  days: number | null
+  /**
+   * PLN lost if nothing is done: the benefit for those days; for a choice, how much more the
+   * other option pays (0 when it pays no more). null = no base known yet.
+   */
+  amount: number | null
+  /** The last day it can still be used (for a choice: the request filed). */
+  last_day: string
+  /** The last day to start so that all `days` fit before `last_day`. */
+  start_by: string | null
+  segment_id: string | null
+  /** The point of no return on the timeline, when there is one. */
+  marker_id: string | null
+  sources: SourceRef[]
+}
+
+// --- end F9, F10 ---
+
+// Request forms (ZADANIA B.3, backend/app/engine/forms.py): each request on the timeline as a
+// form to fill in. Only what the sources name: the regulation on the leave requests
+// ('rozp_wnioski') and the annexes of the regulation on the benefit documents ('rozp_zasilki':
+// annex 6 = the data of ZAM, annex 1 = the sickness benefit). The ZUS forms themselves (ZAM,
+// ZAS-53) are on www.zus.pl, not in our materials.
+
+/**
+ * text = words or numbers; date = one day (`start`); period = from `start` to `end`;
+ * statement = a declaration the person makes in the request (`value` says what it is about).
+ */
+export type FormFieldKind = 'text' | 'date' | 'period' | 'statement'
+
+/**
+ * Who the request goes to: the employer; the payer of contributions (the principal of a contract
+ * of mandate) that pays the benefit itself; ZUS; the payer or ZUS (the payer's size not known).
+ */
+export type Addressee = 'employer' | 'payer' | 'zus' | 'payer-or-zus'
+
+export interface FormField {
+  /** Stable within the form, e.g. "employee-name", "leave-period", "child-birth-date". */
+  id: string
+  label: string
+  kind: FormFieldKind
+  /** Filled in by the app, in Polish (dates DD.MM.RRRR); null = the person types it in. */
+  value: string | null
+  /** The filled value as dates: kind "date" — `start`; kind "period" — `start` to `end`. */
+  start: string | null
+  end: string | null
+  /** Personal data (names, PESEL, addresses, NIP, bank account, signature): never filled in. */
+  personal: boolean
+  /** false = only in the case the source names (e.g. "jeżeli są niezbędne"). */
+  required: boolean
+  /** Where the value comes from, or what to write in. */
+  hint: string | null
+  sources: SourceRef[]
+}
+
+export interface FormAttachment {
+  id: string
+  label: string
+  /** false = only in the case `hint` describes (e.g. when the payer, not ZUS, pays). */
+  required: boolean
+  hint: string | null
+  sources: SourceRef[]
+}
+
+/** A line about the whole request, e.g. that the ZUS form is on www.zus.pl. */
+export interface FormNote {
+  text: string
+  sources: SourceRef[]
+}
+
+export interface RequestForm {
+  title: string
+  applicant: Role
+  addressee: Addressee
+  /** "Pracodawca mamy", "ZUS", "Płatnik składek (zleceniodawca) albo ZUS". */
+  addressee_label: string
+  /** "ZAM", "ZAS-53" (on www.zus.pl); null = a request the employee writes. */
+  official_form: string | null
+  /** The provisions that name this request and say what it contains. */
+  legal_basis: SourceRef[]
+  /** The period on the timeline the request is for. */
+  start: string | null
+  end: string | null
+  fields: FormField[]
+  attachments: FormAttachment[]
+  notes: FormNote[]
 }
 
 export interface Document {
@@ -311,6 +440,14 @@ export interface Document {
   rule: string
   segment_id: string | null
   sources: SourceRef[]
+  /**
+   * The last day to file it under a Labour Code deadline, for the day on the timeline (may have
+   * passed). null = the materials give no deadline: `needed_by` is only the day the leave, the
+   * benefit or the sick leave starts — show it as "na dzień startu", never as a deadline.
+   */
+  deadline: string | null
+  /** The request as a form to fill in; null for documents that are not requests. */
+  form: RequestForm | null
 }
 
 /**
@@ -386,6 +523,9 @@ export interface BenefitBase {
  * One point of the case explanation: situation = which case this is, right = what the mother is
  * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
  * decide, relief = an easier or longer path the rules give them, computed = what we calculated.
+ * F14 "Nie przysługuje" z dalszą drogą: `insurance-way`, `father-way`, `taken-in-way` (kind risk,
+ * right after the point that says there is no right): "Co zamiast: …" and "Co zrobić, żeby
+ * przysługiwał: …" (engine/no_right.py).
  */
 export interface CaseNote {
   id: string
@@ -414,6 +554,8 @@ export interface Timeline {
   payments: Payment[]
   /** Each parent's benefit base behind `payments`, step by step. */
   bases: BenefitBase[]
+  /** F9: what the family can still use and loses if they do nothing (see `Leftover`). */
+  left_on_table: Leftover[]
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */
@@ -439,6 +581,13 @@ export interface SessionView {
   timeline: Timeline | null
   question: InterviewQuestion | null
 }
+
+/**
+ * Fields of the scenario the interface changes without the chat (`PATCH
+ * /api/session/{id}/scenario`): e.g. `parental_parts`, `rate_815`, `job_loss`,
+ * `mother_pay_history`. A field given replaces the saved one; null clears it.
+ */
+export type ScenarioChanges = Partial<Scenario>
 
 /** The onboarding answers as stored, and the first timeline. */
 export interface SessionStart {
@@ -564,6 +713,15 @@ export type InsuranceTitle = 'employment' | 'contract' | 'business' | 'other'
 export type SicknessInsurance = 'mandatory' | 'voluntary' | 'none' | 'unknown'
 export type LeaveKind = 'maternity' | 'parental' | 'paternity' | 'supplementary' | 'sick' | 'other'
 export type CaseOutcome = 'granted' | 'refused' | 'partial' | 'unknown'
+/**
+ * Why the calculator and ZUS differ: reading = the facts as read lack or contradict what the
+ * decision rests on (read the case again); missing-rule = the calculator has no rule for it;
+ * other-refusal = ZUS refused for a reason the calculator does not check (documents, deadlines).
+ */
+export type DifferenceReason = 'reading' | 'missing-rule' | 'other-refusal'
+/** What ZUS established about an insurance period: a sham contract or business, or no sickness
+ *  insurance for another reason. */
+export type ZusFinding = 'sham' | 'not-subject'
 
 export interface CaseDocument {
   kind: string
@@ -577,6 +735,8 @@ export interface InsurancePeriod {
   start: string | null
   end: string | null
   sickness: SicknessInsurance
+  /** A finding of ZUS wins over what the payer declared: the period gives no sickness insurance. */
+  zus_finding: ZusFinding | null
   pages: number[]
 }
 
@@ -588,13 +748,65 @@ export interface LeavePeriod {
   pages: number[]
 }
 
-export interface PayMonth {
+/** A month of pay as read from the case (Z-3, Z-3a); not the engine's `PayMonth`. */
+export interface CasePayMonth {
   month: string
   amount: number
   kind: 'salary' | 'contribution_base'
   person: Role
   full_month: boolean | null
+  /** A month not worked in full: days required and days worked, as in Z-3. */
+  days_required: number | null
+  days_worked: number | null
+  /** Only when Z-3 gives them apart: fixed pay from the contract, variable pay, overtime etc. */
+  fixed: number | null
+  variable: number | null
+  not_topped: number | null
   note: string
+  pages: number[]
+}
+
+/** A quarterly or annual bonus from Z-3, as listed there (the calculator sums them). */
+export interface CaseBonus {
+  person: Role
+  kind: 'quarterly' | 'annual'
+  period: string
+  amount: number
+  pages: number[]
+}
+
+/** What else the benefit base depends on: full time, the start of insurance, the contract pay. */
+export interface CasePayDetails {
+  person: Role
+  full_time: boolean | null
+  insured_from: string | null
+  contract_pay: number | null
+  pages: number[]
+}
+
+/** The mother's work ended in pregnancy (becomes `Scenario.job_loss`). */
+export interface CaseJobLoss {
+  ended_on: string
+  reason: JobLossReason
+  court_confirmed: boolean | null
+  pages: number[]
+}
+
+/** A special situation of the mother (becomes `Scenario.mother_event`). */
+export interface CaseMotherEvent {
+  kind: MotherEventKind
+  start: string
+  end: string | null
+  pages: number[]
+}
+
+/** Contribution debt of a person with a business, from a ZUS document (ustawa art. 2a). */
+export interface CaseContributionDebt {
+  person: Role
+  amount: number
+  /** The day the document gives the debt for. */
+  on: string | null
+  repaid_on: string | null
   pages: number[]
 }
 
@@ -634,7 +846,12 @@ export interface CaseFacts {
   documents: CaseDocument[]
   insurance: InsurancePeriod[]
   leaves: LeavePeriod[]
-  pay: PayMonth[]
+  pay: CasePayMonth[]
+  bonuses: CaseBonus[]
+  pay_details: CasePayDetails[]
+  job_loss: CaseJobLoss | null
+  mother_event: CaseMotherEvent | null
+  contribution_debt: CaseContributionDebt | null
   decision: CaseDecision | null
   unreadable: string[]
 }
@@ -666,6 +883,45 @@ export interface CaseComparison {
   zus: CaseOutcome
   match: boolean | null
   text: string
+  /** Set when `match` is false. */
+  reason: DifferenceReason | null
+  /** The difference in a sentence or two, for the agreement report. */
+  reason_text: string
+}
+
+/** One catalogue case in the agreement report (GET /api/cases/agreement, cache only). */
+export interface CaseAgreementRow {
+  id: string
+  category: string
+  /** Read already (in the cache); the other fields are empty until then. */
+  read: boolean
+  title: string
+  zus: CaseOutcome | null
+  ours: CaseOutcome | null
+  match: boolean | null
+  reason: DifferenceReason | null
+  reason_text: string
+  covered: boolean | null
+  timeline: boolean
+  payments: number
+  problem: string | null
+}
+
+/** "Zgodność z decyzjami ZUS: agree/decided", from the cases already read; nothing is read. */
+export interface CaseAgreement {
+  configured: boolean
+  total: number
+  read: number
+  /** Cases where both the calculator and ZUS have an answer. */
+  decided: number
+  agree: number
+  /** The decisions of ZUS among the cases read. */
+  zus: Partial<Record<CaseOutcome, number>>
+  /** The differences by reason. */
+  reasons: Partial<Record<DifferenceReason, number>>
+  with_timeline: number
+  with_amounts: number
+  rows: CaseAgreementRow[]
 }
 
 export interface CaseResult {
@@ -682,26 +938,397 @@ export interface CaseResult {
   problem: string | null
 }
 
-/** FUNKCJE F37: the calculator against the decisions of ZUS (backend/app/cases/report.py). */
-export interface CaseReportRow {
-  id: string
-  category: string
-  read: boolean
-  title: string
-  zus: CaseOutcome
-  ours: CaseOutcome
-  match: boolean | null
-  covered: boolean | null
-  timeline: boolean
-  payments: number
-  insurance: string
-  comparison: string
-  problem: string | null
+// ---------------------------------------------------------------------------------------------
+// F8 plans for a goal and F11 the stress test (backend/app/engine/plans.py, stress.py,
+// compare.py; POST /api/plans and POST /api/stress). Deterministic, no AI.
+
+export type PlanGoal = 'most-money' | 'longest-home' | 'equal-split' | 'quick-return'
+
+/** The Scenario fields a plan sets; send them as they are to PATCH /api/session/{id}/scenario. */
+export type PlanPatch = Pick<
+  Scenario,
+  'parental_parts' | 'rate_815' | 'father_takes_over' | 'mother_weeks_before_takeover'
+>
+
+/**
+ * One parent's leave in a plan: maternity, supplementary and paternity leave as drawn, parental
+ * leave only where the plan decides it (a share still "do wyboru" is left out).
+ */
+export interface PlanParentFigures {
+  leave_days: number
+  /** Days of parental leave combined with part-time work. */
+  work_days: number
+  first_day: string | null
+  last_day: string | null
+  /** The first day back at work, also part-time; null = no leave. */
+  back_to_work: string | null
+  /** PLN for the leave counted; null = no amount known for this parent. */
+  total: number | null
 }
 
-export interface CaseReport {
-  rows: CaseReportRow[]
-  read: number
-  decided: number
-  agree: number
+export interface PlanFigures {
+  mother: PlanParentFigures
+  father: PlanParentFigures
+  /** Both parents' money; null when no amount is known. */
+  total: number | null
+  amounts_known: boolean
+  /** The child is at home with a parent on leave, without a break from the birth, until then. */
+  home_until: string | null
+  /** Weeks of the parental pool the plan takes, of `pool_total`. */
+  pool_used: number
+  pool_total: number
+  rate_815: boolean | null
+}
+
+export interface Plan {
+  id: string
+  goal: PlanGoal
+  /** 1 = the best for the goal. */
+  rank: number
+  title: string
+  summary: string
+  patch: PlanPatch
+  figures: PlanFigures
+  /** What the family gives up or leaves for later with this plan. */
+  given_up: string[]
+  /** Elements that differ from the current timeline. */
+  changed: string[]
+  /** The family already has this plan. */
+  current: boolean
+  sources: SourceRef[]
+}
+
+export interface PlansResult {
+  goal: PlanGoal
+  plans: Plan[]
+  /** The same figures for the timeline as it is now. */
+  current: PlanFigures | null
+  /** What the comparison assumes and cannot compare. */
+  notes: string[]
+  /** After a child's death or the mother's death: no plans. */
+  sensitive: boolean
+  /** Why there are no plans. */
+  reason: string | null
+}
+
+export type StressEventId =
+  | 'premature'
+  | 'twins'
+  | 'job-loss-bankruptcy'
+  | 'job-loss-liquidation'
+  | 'job-loss-employer-death'
+  | 'job-loss-unlawful'
+  | 'job-loss-other'
+  | 'mother-incapacity'
+  | 'mother-hospital'
+  | 'mother-death'
+  | 'father-takeover'
+  | 'za-zyciem'
+
+/**
+ * loss = an entitlement lost or shortened, or the plan stops fitting; risk = a new risk; kept =
+ * the entitlements stay (possibly moved, longer or new).
+ */
+export type StressVerdict = 'loss' | 'risk' | 'kept'
+
+export type RightKind =
+  | 'maternity'
+  | 'supplementary'
+  | 'paternity'
+  | 'parental'
+  | 'job-loss'
+  | 'sick'
+
+/** An entitlement gained (days_before 0), lost (days_after 0), longer or shorter: both lanes. */
+export interface RightChange {
+  kind: RightKind
+  label: string
+  days_before: number
+  days_after: number
+}
+
+export interface PeriodChange {
+  id: string
+  element: 'segment' | 'marker'
+  lane: Lane
+  title: string
+  change: 'added' | 'removed' | 'moved'
+  start_before: string | null
+  /** null for a marker (its day is `start_before`). */
+  end_before: string | null
+  start_after: string | null
+  end_after: string | null
+}
+
+export interface PaymentChange {
+  id: string
+  title: string
+  lane: 'mother' | 'father'
+  monthly_before: number | null
+  monthly_after: number | null
+  total_before: number | null
+  total_after: number | null
+}
+
+/** All the money on the timeline before and after, PLN. */
+export interface MoneyChange {
+  total_before: number
+  total_after: number
+  diff: number
+  mother_before: number
+  mother_after: number
+  father_before: number
+  father_after: number
+  payments: PaymentChange[]
+}
+
+export interface StressEvent {
+  id: StressEventId
+  title: string
+  /** The synthetic facts of the what-if (dates, weeks, weight). */
+  assumed: string[]
+  /** The Scenario fields the event changes (for a preview only, never to save). */
+  patch: Partial<Scenario>
+  /** "Today" of the event's timeline; the reference is computed for the real today. */
+  as_of: string
+  verdict: StressVerdict
+  /** The mother's illness, stay in hospital or death: show gently (e.g. collapsed). */
+  sensitive: boolean
+  /** The parents' plan of parental leave no longer fits: the engine's reason. */
+  plan_breaks: string | null
+  rights: RightChange[]
+  periods: PeriodChange[]
+  /** null when amounts are not known. */
+  money: MoneyChange | null
+  /** New or reworded points of the explanation of kind "risk". */
+  risks: CaseNote[]
+  warnings: string[]
+  changed: string[]
+  changed_notes: string[]
+  /** The changes in plain Polish, one per line. */
+  lines: string[]
+  sources: SourceRef[]
+  /** Both timelines, only with `timelines: true` in the request. */
+  reference: Timeline | null
+  timeline: Timeline | null
+}
+
+export interface SkippedStressEvent {
+  id: StressEventId
+  title: string
+  reason: string
+}
+
+export interface StressReport {
+  events: StressEvent[]
+  skipped: SkippedStressEvent[]
+  /** After a child's death or the mother's death: no what-ifs. */
+  sensitive: boolean
+  /** Why there are no events. */
+  reason: string | null
+}
+
+// Letters from ZUS (F24, AI) and the request check (F23): backend/app/letters,
+// app/request_check, api/letters.py, api/request_check.py
+
+/** A ZUS form the guide names (pages 3, 6, 12). ZUR, ZAO and Z-3b are abolished since 24.10.2026. */
+export interface KnownForm {
+  code: string
+  name: string
+  abolished: boolean
+  /** The form it was merged into (ZUR and ZAO: ZAM). */
+  merged_into: string | null
+  sources: SourceRef[]
+}
+
+/** decision = decyzja, summons = wezwanie, notice = zawiadomienie, information = informacja. */
+export type LetterKind = 'decision' | 'summons' | 'notice' | 'information' | 'other'
+export type LetterOutcome = 'granted' | 'refused' | 'partial' | 'changed' | 'none'
+/** job_loss = zasiłek w wysokości zasiłku macierzyńskiego; rate_815 = zasiłek 81,5%. */
+export type LetterBenefit =
+  | 'maternity'
+  | 'parental'
+  | 'paternity'
+  | 'supplementary'
+  | 'sickness'
+  | 'rehabilitation'
+  | 'job_loss'
+  | 'rate_815'
+  | 'other'
+
+/** A literal fragment of the letter (personal data replaced with "[…]"). */
+export interface LetterQuote {
+  text: string
+  page: number
+}
+
+export interface LetterItem {
+  text: string
+  quote: LetterQuote
+}
+
+export interface LetterAction {
+  what: string
+  /** The deadline in the letter's words, e.g. "w terminie 7 dni od dnia doręczenia pisma". */
+  deadline_text: string | null
+  /** Only a date written in the letter (checked against its quote); never computed. */
+  deadline_date: string | null
+  quote: LetterQuote
+}
+
+export interface LetterPeriod {
+  benefit: LetterBenefit
+  start: string | null
+  end: string | null
+  quote: LetterQuote
+}
+
+/** A letter from ZUS in plain Polish. Always AI: label it in the UI with `ai_label`. */
+export interface LetterExplanation {
+  ai: true
+  ai_label: string
+  /** The model that read the letter (Claude or Gemini). */
+  model: string
+  is_zus_letter: boolean
+  kind: LetterKind
+  kind_label: string
+  heading: string
+  subject: string
+  outcome: LetterOutcome
+  outcome_label: string | null
+  summary: string
+  reason: LetterItem | null
+  /** The letter asks the parent to do something (`actions` not empty). */
+  action_needed: boolean
+  actions: LetterAction[]
+  prepare: LetterItem[]
+  periods: LetterPeriod[]
+  /** How and by when to appeal, when the letter says so: a right, not a duty. */
+  appeal: LetterAction | null
+  forms: KnownForm[]
+  /** Form codes in the letter that the guide does not describe. */
+  other_forms: string[]
+  /** Timeline element ids the letter is about (with a session: only those on its timeline). */
+  timeline_elements: string[]
+  quotes: LetterQuote[]
+  pages: number
+  pages_read: number
+  personal_data_removed: boolean
+  warnings: string[]
+  unreadable: string[]
+}
+
+/** What a request field means for the check; inferred from the label when not given. */
+export type RequestFieldKey =
+  | 'start'
+  | 'end'
+  | 'period'
+  | 'weeks'
+  | 'return_to_work'
+  | 'maternity_end'
+  | 'birth_date'
+  | 'filed_on'
+  | 'rate_815'
+
+/** One labelled field of a filled request (the request form's shape: label, value, source). */
+export interface RequestField {
+  label: string
+  value: string | null
+  source?: string | null
+  key?: RequestFieldKey | null
+  /** The field's id in the timeline's form (`FormField.id`): its meaning is known, not guessed. */
+  id?: string | null
+  /** An empty required field is a problem; default true. */
+  required?: boolean
+}
+
+export interface FilledRequest {
+  title: string
+  addressee?: string | null
+  fields: RequestField[]
+  attachments?: string[]
+  /** The timeline document the request is for, e.g. "parental-request". */
+  form_id?: string | null
+  parent?: Role | null
+  /** Default: a "data złożenia" field, else today. */
+  filed_on?: string | null
+}
+
+export interface RequestCheckRequest {
+  request: FilledRequest
+  /** The session whose timeline the dates are checked against. */
+  session_id?: string | null
+  /** Instead of a session (e.g. an example case). */
+  scenario?: Scenario | null
+  /** Ask the AI to reword the problems (it finds none and adds no rules). */
+  phrase?: boolean
+}
+
+export type RequestKind =
+  | 'maternity-request'
+  | 'maternity-father-request'
+  | 'maternity-resignation'
+  | 'supplementary-request'
+  | 'parental-request'
+  | 'parental-father-request'
+  | 'paternity-request'
+  | 'zam'
+  | 'rate-815'
+  | 'zas-53'
+  | 'unknown'
+
+/**
+ * form-abolished = ZUR, ZAO, Z-3b after 24.10.2026; field-empty; dates-order = ends before it
+ * starts; weeks-mismatch; deadline-passed = Labour Code days before the leave; leave-order =
+ * parental before maternity ends, supplementary not right after it; after-limit = after the last
+ * possible day; rate-815-late; differs-from-plan; attachment-missing (A.4); wrong-addressee;
+ * unknown-form and no-timeline = what could not be checked.
+ */
+export type RequestCheckKind =
+  | 'form-abolished'
+  | 'field-empty'
+  | 'dates-order'
+  | 'weeks-mismatch'
+  | 'deadline-passed'
+  | 'leave-order'
+  | 'after-limit'
+  | 'rate-815-late'
+  | 'differs-from-plan'
+  | 'attachment-missing'
+  | 'wrong-addressee'
+  | 'unknown-form'
+  | 'no-timeline'
+
+export type RequestSeverity = 'error' | 'warning' | 'info'
+
+export interface RequestProblem {
+  id: string
+  check: RequestCheckKind
+  severity: RequestSeverity
+  /** The label of the field it is about. */
+  field: string | null
+  /** Found and worded by the app, without AI. */
+  message: string
+  sources: SourceRef[]
+  /** The timeline element it is about, to highlight. */
+  element_id: string | null
+  /** The same problem reworded by AI (only with `phrase`): label it as AI. */
+  phrased: string | null
+}
+
+export interface RequestCheckResult {
+  kind: RequestKind
+  kind_label: string
+  recognized: boolean
+  /** No errors. */
+  ok: boolean
+  problems: RequestProblem[]
+  /** The checks that ran. */
+  checks: RequestCheckKind[]
+  timeline_used: boolean
+  /** True only when AI reworded the problems. */
+  ai: boolean
+  ai_model: string | null
+  ai_note: string | null
+  filed_on: string
 }

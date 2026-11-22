@@ -918,13 +918,24 @@ def _choice_note(scenario: Scenario, timeline: Timeline, params: Params) -> Case
     )
 
 
-def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Request) -> str:
-    """Both ways, for the requesting parent's leave and parental leave as the timeline shows
-    them (the same rules as the payments: part-time work, the first year)."""
+@dataclass(frozen=True)
+class RequestTotals:
+    """The requesting parent's leave and parental leave as the timeline shows them, paid both
+    ways (the same rules as the payments: part-time work, the first year)."""
+
+    days: int
+    standard: Decimal
+    """At 100% and 70%."""
+    single: Decimal
+    """At 81,5%, after the request."""
+
+
+def request_totals(scenario: Scenario, timeline: Timeline, params: Params) -> RequestTotals | None:
+    """None until the requesting parent's base is known (also used by leftover.py, F9)."""
+    req = request(scenario, params, timeline.birth_date)
     if _bases_of(timeline).get(req.who) is None:
-        return ""
+        return None
     bases, _, _ = bases_for(timeline.segments, scenario, params)
-    rf, rp, rs = rates(params)
     periods = [
         s for s in timeline.segments if s.lane == req.who and _kind(s) in ("maternity", "parental")
     ]
@@ -941,12 +952,21 @@ def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Req
                 Decimal(0),
             )
         )
-    days = sum(s.days for s in periods)
+    return RequestTotals(sum(s.days for s in periods), totals[0], totals[1])
+
+
+def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Request) -> str:
+    """Both ways, for the requesting parent's leave and parental leave as the timeline shows
+    them."""
+    totals = request_totals(scenario, timeline, params)
+    if totals is None:
+        return ""
+    rf, rp, rs = rates(params)
     whose = WHOSE[req.who]
     leave = LEAVE[req.leave]
     return (
-        f" Za {leave} i rodzicielski {whose} pokazany na osi ({days} dni) to razem "
-        f"{pln(totals[0])} przy {rf} i {rp} albo {pln(totals[1])} przy {rs}."
+        f" Za {leave} i rodzicielski {whose} pokazany na osi ({totals.days} dni) to razem "
+        f"{pln(totals.standard)} przy {rf} i {rp} albo {pln(totals.single)} przy {rs}."
     )
 
 

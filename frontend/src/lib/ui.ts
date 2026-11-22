@@ -1,4 +1,4 @@
-import type { Lane, SourceRef, Tone, Work } from '../types'
+import type { Lane, PlanGoal, SourceRef, Tone, Work } from '../types'
 import { formatDate } from './dates'
 import { formatPln } from './money'
 
@@ -109,11 +109,18 @@ export function segmentLook({ lane, tone }: { lane: Lane; tone: Tone }): Segment
   return { ...PARENT[parent], kind: KIND[tone], ...STYLE[parent][tone] }
 }
 
-/** The two acts the app quotes besides the guide, as their labels start. */
-const LAW_NAME: Record<'kp' | 'ustawa', string> = {
+/**
+ * The acts the app quotes besides the guide, as their labels start. The two regulations are
+ * quoted by the request forms (`Document.form`, ZADANIA B.3).
+ */
+type LawDoc = 'kp' | 'ustawa' | 'rozp_wnioski' | 'rozp_zasilki'
+const LAW_NAME: Record<LawDoc, string> = {
   kp: 'Kodeks pracy',
   ustawa: 'Ustawa zasiłkowa',
+  rozp_wnioski: 'Rozporządzenie w sprawie wniosków urlopowych',
+  rozp_zasilki: 'Rozporządzenie w sprawie dokumentów do zasiłków',
 }
+const LAW_DOCS: LawDoc[] = ['kp', 'ustawa', 'rozp_wnioski', 'rozp_zasilki']
 
 export const sourceLabel = (source: SourceRef) =>
   source.doc === 'przewodnik'
@@ -125,11 +132,17 @@ export const sourceLabel = (source: SourceRef) =>
 /**
  * Where a set of quotes comes from, in one short line: the guide's pages and the articles of
  * the Labour Code and the ustawa zasiłkowa (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 ·
- * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31", and the ZUS Załącznik.
+ * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31", the paragraphs of the two
+ * regulations ("Rozporządzenie w sprawie wniosków urlopowych, § 15") and the ZUS Załącznik.
  */
 export function sourcesSummary(sources: SourceRef[]): string {
   const pages = new Set<number>()
-  const articles = { kp: new Set<string>(), ustawa: new Set<string>() }
+  const articles: Record<LawDoc, Set<string>> = {
+    kp: new Set(),
+    ustawa: new Set(),
+    rozp_wnioski: new Set(),
+    rozp_zasilki: new Set(),
+  }
   let zalacznik = false
   for (const source of sources) {
     if (source.doc === 'zalacznik') {
@@ -146,8 +159,10 @@ export function sourcesSummary(sources: SourceRef[]): string {
   }
   const parts = []
   if (pages.size > 0) parts.push(`Przewodnik ZUS, s. ${pageRanges([...pages])}`)
-  for (const doc of ['kp', 'ustawa'] as const) {
-    if (articles[doc].size > 0) parts.push(`${LAW_NAME[doc]}, art. ${[...articles[doc]].join(', ')}`)
+  for (const doc of LAW_DOCS) {
+    if (articles[doc].size === 0) continue
+    const kind = doc === 'kp' || doc === 'ustawa' ? 'art. ' : ''
+    parts.push(`${LAW_NAME[doc]}, ${kind}${[...articles[doc]].join(', ')}`)
   }
   if (zalacznik) parts.push('Załącznik ZUS')
   return parts.join(' · ')
@@ -171,6 +186,14 @@ export const WORK_LABEL: Record<Work, string> = {
   contract: 'na umowie zlecenia',
   business: 'własna firma (JDG)',
   none: 'nie pracuje',
+}
+
+/** The goals of planning parental leave (F8, backend engine/plans.py `GOAL_LABEL`). */
+export const PLAN_GOAL_LABEL: Record<PlanGoal, string> = {
+  'most-money': 'najwięcej pieniędzy',
+  'longest-home': 'najdłużej w domu',
+  'equal-split': 'równy podział',
+  'quick-return': 'szybki powrót do pracy',
 }
 
 /** "jedno dziecko", "bliźnięta", "trojaczki", "4 dzieci" — for headers. */
@@ -297,6 +320,11 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
         ? `Praca ${who} w czasie urlopu rodzicielskiego: ${args.work_fraction} etatu`
         : `Bez pracy ${who} w czasie urlopu rodzicielskiego`
     }
+    // F8 plans for a goal and F11 the stress test: computed by the engine, nothing changes.
+    case 'propose_plans':
+      return `Układam plany: ${PLAN_GOAL_LABEL[args.goal as PlanGoal] ?? 'Wasz cel'}`
+    case 'stress_test':
+      return 'Sprawdzam, co zmieniłoby się w planie'
     default:
       return name
   }

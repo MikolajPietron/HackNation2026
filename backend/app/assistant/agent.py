@@ -22,6 +22,7 @@ from app.assistant.describe import (
     describe_person,
     describe_timeline,
 )
+from app.assistant.describe_plans import describe_plans, describe_stress
 from app.assistant.prompts import STATIC_INSTRUCTIONS, WEEKDAYS
 from app.engine import (
     Params,
@@ -50,12 +51,15 @@ from app.engine.models import (
 )
 from app.engine.money import pay_matters, requester_cover
 from app.engine.parental_plan import default_part, part_ids
+from app.engine.plans import Goal
+from app.engine.plans import propose_plans as plans_for_goal
 from app.engine.plausibility import (
     birth_date_problem,
     child_birth_problem,
     due_date_problem,
     taken_in_problem,
 )
+from app.engine.stress import stress_test as run_stress_test
 from app.engine.timeline import fmt
 
 USAGE_LIMITS = UsageLimits(request_limit=12)
@@ -114,6 +118,8 @@ BIRTH_ONLY = {
     "set_father_takeover",
     "set_mother_situation",
     "set_rehab_benefit",
+    "propose_plans",
+    "stress_test",
 }
 """Pregnancy and the birth (section A, B.1-B.2): the child's own birth date of a child taken in
 goes through `set_taken_in`. `set_hospital_care` serves both paths (art. 183 § 3¹)."""
@@ -527,7 +533,7 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         ids = ", ".join(e.id for e in timeline.elements())
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
-    return describe_element(element)
+    return describe_element(element, timeline.today)
 
 
 # Applications and protection (guide A.4, I).
@@ -1125,3 +1131,40 @@ async def set_rate_choice(ctx: RunContext[AssistantDeps], rate_815: bool | None)
     return await _apply(
         ctx, scenario, "rate-815-deadline", "pay-maternity", "pay-adoption-leave", "pay-parental"
     )
+
+
+# F8 plans for a goal and F11 the stress test (engine/plans.py, engine/stress.py). Read-only:
+# the engine computes, the model shows the options and their effects, the parents decide.
+
+
+@assistant.tool
+async def propose_plans(ctx: RunContext[AssistantDeps], goal: Goal) -> str:
+    """Propose 2-3 plans of parental leave for the parents' goal, computed and compared by the
+    calculator: money, weeks at home for each parent, the return to work, what is given up. It
+    changes nothing: record a plan only when the user chooses one, with the tools the result
+    names. Call it when the user asks how to plan or split the leave for a goal.
+
+    Args:
+        goal: "most-money" = najwięcej pieniędzy; "longest-home" = najdłużej w domu;
+            "equal-split" = równy podział między rodziców; "quick-return" = szybki powrót do
+            pracy.
+    """
+    try:
+        result = plans_for_goal(ctx.deps.scenario, ctx.deps.params, ctx.deps.today, goal)
+    except ScenarioError as exc:
+        raise ModelRetry(f"Nie da się ułożyć planów: {exc}") from exc
+    return describe_plans(result)
+
+
+@assistant.tool
+async def stress_test(ctx: RunContext[AssistantDeps]) -> str:
+    """Check what would change on the current timeline and plan if something happened: a
+    premature birth, twins, a job loss in pregnancy, the mother's illness, stay in hospital or
+    death, the father taking over maternity leave, the "Za życiem" certificate. Computed by the
+    calculator with example dates; it changes nothing. Call it when the user asks what could go
+    wrong or what happens if something changes."""
+    try:
+        report = run_stress_test(ctx.deps.scenario, ctx.deps.params, ctx.deps.today)
+    except ScenarioError as exc:
+        raise ModelRetry(f"Nie da się sprawdzić planu: {exc}") from exc
+    return describe_stress(report)

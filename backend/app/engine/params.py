@@ -1,5 +1,6 @@
 """Legal parameters. Every number carries its sources; the engine never hardcodes them."""
 
+import datetime as dt
 from fractions import Fraction
 
 from pydantic import BaseModel, Field
@@ -359,6 +360,18 @@ class Rules(BaseModel):
     rest_after_birth: Rule
 
 
+class KnownForm(BaseModel):
+    """A ZUS form the guide names: for reading letters from ZUS and checking requests."""
+
+    code: str
+    name: str
+    abolished: bool = False
+    """Abolished on `ApplicationParams.forms_abolished_on`."""
+    merged_into: str | None = None
+    """The form it was merged into (ZUR and ZAO: ZAM)."""
+    sources: list[SourceRef] = Field(min_length=1)
+
+
 class ApplicationParams(BaseModel):
     """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
     page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
@@ -375,6 +388,10 @@ class ApplicationParams(BaseModel):
     contract_zam: Rule
     attachments: Rule
     zam_form: Rule
+    forms: list[KnownForm]
+    """The forms the guide names (pages 3, 6, 12): for letters from ZUS and the request check."""
+    forms_abolished_on: Param[dt.date]
+    """ZUR and ZAO merged into ZAM, Z-3b abolished, from this day (guide page 12, footnotes)."""
     parental_days_before: Param[int]
     supplementary_days_before_end: Param[int]
     supplementary_hospital_certificate: Rule
@@ -401,6 +418,62 @@ class ApplicationParams(BaseModel):
     """A business: ZAS-53 to ZUS."""
 
 
+# Request forms (engine/forms.py): what each request contains, as the regulations name it.
+
+
+class FormItem(BaseModel):
+    """A field or an attachment of a request: its label in the form and the words of the source
+    that name it."""
+
+    label: str
+    personal: bool = False
+    """Personal data: never filled in by the app (FormField.personal)."""
+    sources: list[SourceRef] = Field(min_length=1)
+
+
+class FormTemplate(BaseModel):
+    """One kind of request: the provisions that name it, its fields and attachments, by id, in
+    the order of the source. engine/forms.py fills the fields and picks the attachments."""
+
+    basis: list[SourceRef] = Field(min_length=1)
+    fields: dict[str, FormItem] = {}
+    attachments: dict[str, FormItem] = {}
+
+
+class FormParams(BaseModel):
+    templates: dict[str, FormTemplate]
+    """By kind of request: "prenatal", "maternity", "resignation", "father-takeover",
+    "father-hospital-employee", "father-hospital-insured", "father-death",
+    "father-abandonment", "supplementary", "parental", "paternity", "zam", "sick"."""
+    personal_files: Rule
+    """An employee attaches nothing the employer keeps in the personal files."""
+    zus_forms: Rule
+    """The ZUS forms are on www.zus.pl."""
+    zus_birth_data: Rule
+    """When ZUS pays: no birth certificate, the child's data instead."""
+    sick_alternatives: Rule
+    """The sickness benefit: the e-ZLA printout or the payer's certificate also do."""
+
+
+# --- Contribution debt (engine/debt.py; ustawa zasiłkowa art. 2a, art. 64 ust. 3) -------------
+
+
+class ContributionDebtParams(BaseModel):
+    """A person running a business with contribution debt on the day the right arises."""
+
+    rule: Rule
+    """No benefit (the maternity benefit among them) until the whole debt is repaid."""
+    limit_percent: Param[float]
+    """The debt counts above this percent of the minimum wage (`benefit_base.minimum_wage`)."""
+    expiry_months: Param[int]
+    """Not repaid within this many months of the day the right arose: the right expires."""
+    paid_within_days: Param[int]
+    """After the whole debt is repaid, the benefit is paid at the latest within this many days."""
+
+
+# --- end contribution debt --------------------------------------------------------------------
+
+
 class Params(BaseModel):
     version: str
     description: str
@@ -417,6 +490,9 @@ class Params(BaseModel):
     parental_plan: ParentalPlanParams
     money: MoneyParams
     benefit_base: BaseParams
+    forms: FormParams
+    """The request forms (engine/forms.py)."""
+    contribution_debt: ContributionDebtParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""
@@ -430,6 +506,9 @@ class Params(BaseModel):
                     walk(getattr(value, name))
             elif isinstance(value, list):
                 for item in value:
+                    walk(item)
+            elif isinstance(value, dict):
+                for item in value.values():
                     walk(item)
 
         walk(self)
