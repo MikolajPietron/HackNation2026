@@ -239,6 +239,7 @@ export function PlanScreen({
                     onStartOver={onStartOver}
                     onMoney={() => setMoneyOpen(true)}
                     onAsk={choose}
+                    onFill={openFill}
                   />
 
                   {timeline.warnings.map((warning) => (

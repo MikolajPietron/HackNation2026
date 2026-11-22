@@ -7,7 +7,7 @@
 // the engine's words of sympathy and what the family is entitled to, in full and calmly
 // (CLAUDE.md, phase 3).
 import { motion } from 'motion/react'
-import { Check, ChevronRight, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Check, ChevronRight, Lock, RotateCcw, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Pulse } from '@/components/timeline/Pulse'
@@ -18,7 +18,10 @@ import { TextStates } from '@/components/ui/text-states'
 import type { ChangeSet } from '@/hooks/useAssistant'
 import { SPRING_LAYOUT, SPRING_PRESS } from '@/lib/ease'
 import { formatPlnShort, formatRate, headlinePayment } from '@/lib/money'
-import { entitlement, headline, leaveBudget, length, nextSteps, periodName } from '@/lib/plan'
+import { COUNTDOWN_DAYS, daysLeftLabel, entitlement, headline, leaveBudget, length, nextSteps, periodName } from '@/lib/plan'
+import type { Step } from '@/lib/plan'
+import { dayNumber, formatDistance, formatShortDate } from '@/lib/dates'
+import { documentIcon, markerIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { CaseNote, Segment, Timeline } from '@/types'
 
@@ -37,6 +40,7 @@ export function Overview({
   onStartOver,
   onMoney,
   onAsk,
+  onFill,
 }: {
   timeline: Timeline
   changed: ChangeSet
@@ -50,12 +54,15 @@ export function Overview({
   onMoney: () => void
   /** Say something to the assistant (e.g. give the pay). */
   onAsk: (prompt: string) => void
+  /** Open a request to fill in (a document with a form). */
+  onFill: (documentId: string) => void
 }) {
   const { title, text } = headline(timeline)
   const right = entitlement(timeline.notes)
   const budget = leaveBudget(timeline)
   const steps = nextSteps(timeline)
   const step = steps.now[0] ?? steps.soon[0]
+  const task = todayTask(timeline, step)
   const risks = timeline.notes.filter((n) => n.kind === 'risk')
   const featured = timeline.notes.filter((n) => FEATURED.has(n.id))
   const changedIds = new Set(changed.ids)
@@ -101,7 +108,6 @@ export function Overview({
     right ? 'right' : null,
     budget.totalDays > 0 ? 'budget' : null,
     money || askPay ? 'money' : null,
-    step && !decisionPending ? 'step' : null,
   ].filter(Boolean)
   // The tiles sit in a row when the plan column is wide enough, else two by two.
   const columns = tiles.length >= 4 ? '@[52rem]:grid-cols-4' : tiles.length === 3 ? '@[44rem]:grid-cols-3' : ''
@@ -132,6 +138,10 @@ export function Overview({
         </div>
         {wide && <StartOver onClick={onStartOver} />}
       </motion.header>
+
+      {task && (!decisionPending || task.tone !== 'calm') && (
+        <TodayStrip task={task} pulse={changedIds.has(task.id) ? changed.version : null} onSelect={onSelect} onFill={onFill} />
+      )}
 
       {tiles.length > 0 && (
         <motion.div variants={ITEM} className="@container mt-5">
@@ -166,8 +176,9 @@ export function Overview({
               pulse={[...budget.mother, ...budget.father].some((s) => changedIds.has(s.id)) ? changed.version : null}
 
             >
-              <span className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-navy-900">
+              {/* The number never breaks; on a narrow tile the words go under it. */}
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-2xl font-bold whitespace-nowrap text-navy-900">
                   <TextStates text={length(budget.totalDays)} />
                 </span>
                 <span className="text-sm text-navy-500">urlopu razem</span>
@@ -211,21 +222,6 @@ export function Overview({
             </Tile>
           )}
 
-          {step && !decisionPending && (
-            <Tile
-              question={steps.now.length > 0 ? 'Co teraz?' : 'Co dalej?'}
-              onClick={() => onSelect(step.id)}
-              pulse={changedIds.has(step.id) ? changed.version : null}
-            >
-              <span className="flex items-start gap-2">
-                <Illustration src={step.icon} size="hint" />
-                <span className="min-w-0 text-lg leading-snug font-bold text-navy-900">
-                  {step.decide ? `Wybierzcie: ${step.title.toLowerCase()}` : step.title}
-                </span>
-              </span>
-              <span className="mt-1.5 block text-sm leading-snug text-navy-500">{step.detail}</span>
-            </Tile>
-          )}
           </div>
         </motion.div>
       )}
@@ -395,5 +391,147 @@ function Budget({ mother, father }: { mother: Segment[]; father: Segment[] }) {
         )}
       </span>
     </span>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Na dziś" (FUNKCJE F15): the plan starts with one thing to do and its deadline.
+
+interface Today {
+  id: string
+  icon: string
+  title: string
+  detail: string
+  /** overdue = the deadline has passed; soon = a deadline or a point of no return within weeks. */
+  tone: 'overdue' | 'soon' | 'calm'
+  /** A request to fill in. */
+  fill: boolean
+  noReturn: boolean
+}
+
+/** Picks the one thing: a missed deadline first, then the nearest deadline of a request or point
+ *  of no return within the next weeks, then the first step ahead. Dates are the engine's. */
+function todayTask(timeline: Timeline, step: Step | undefined): Today | null {
+  const today = dayNumber(timeline.today)
+  // A leave still to choose can start later, so its passed deadline is not missed: only the
+  // requests for fixed days (supplementary leave, a takeover) can be overdue.
+  const optional = (d: (typeof timeline.documents)[number]) =>
+    timeline.segments.find((s) => s.id === d.segment_id)?.tone === 'option'
+  const requests = timeline.documents
+    .filter((d) => !d.done && d.deadline && !(optional(d) && dayNumber(d.deadline) < today))
+    .sort((a, b) => a.deadline!.localeCompare(b.deadline!))
+  const overdue = requests.find((d) => dayNumber(d.deadline!) < today)
+  if (overdue)
+    return {
+      id: overdue.id,
+      icon: documentIcon(overdue),
+      title: `Złóż: ${overdue.title.charAt(0).toLowerCase()}${overdue.title.slice(1)}`,
+      detail: `termin minął ${formatShortDate(overdue.deadline!)}`,
+      tone: 'overdue',
+      fill: overdue.form !== null,
+      noReturn: false,
+    }
+  const near = [
+    ...requests
+      .filter((d) => dayNumber(d.deadline!) - today <= COUNTDOWN_DAYS)
+      .map((d) => ({
+        day: dayNumber(d.deadline!),
+        task: {
+          id: d.id,
+          icon: documentIcon(d),
+          title: `Złóż: ${d.title.charAt(0).toLowerCase()}${d.title.slice(1)}`,
+          detail: `najpóźniej ${formatShortDate(d.deadline!)} · ${formatDistance(timeline.today, d.deadline!)}`,
+          tone: 'soon' as const,
+          fill: d.form !== null,
+          noReturn: false,
+        },
+      })),
+    ...timeline.markers
+      .filter((m) => m.irreversible && m.irreversible.days_left >= 0 && m.irreversible.days_left <= COUNTDOWN_DAYS)
+      .map((m) => ({
+        day: dayNumber(m.date),
+        task: {
+          id: m.id,
+          icon: markerIcon(m),
+          title: m.title,
+          detail: `${daysLeftLabel(m.irreversible!.days_left)} · ${formatShortDate(m.date)}`,
+          tone: 'soon' as const,
+          fill: false,
+          noReturn: true,
+        },
+      })),
+  ].sort((a, b) => a.day - b.day)
+  if (near.length) return near[0].task
+  if (!step) return null
+  return { id: step.id, icon: step.icon, title: step.decide ? `Wybierzcie: ${step.title.toLowerCase()}` : step.title, detail: step.detail, tone: 'calm', fill: false, noReturn: false }
+}
+
+function TodayStrip({
+  task,
+  pulse,
+  onSelect,
+  onFill,
+}: {
+  task: Today
+  pulse: number | null
+  onSelect: (id: string) => void
+  onFill: (id: string) => void
+}) {
+  const open = () => (task.fill ? onFill(task.id) : onSelect(task.id))
+  const urgent = task.tone !== 'calm'
+  const body = (
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <Illustration src={task.icon} size="event" className="bg-white" />
+      <div className="min-w-0">
+        <p className="text-xs font-black tracking-wider text-navy-500 uppercase">Na dziś</p>
+        <p className="leading-snug font-bold text-navy-900">{task.title}</p>
+        <p
+          className={cn(
+            'flex flex-wrap items-center gap-1.5 text-sm',
+            task.tone === 'overdue' ? 'font-bold text-alert-600' : urgent ? 'font-bold text-sun-700' : 'text-navy-500',
+          )}
+        >
+          {task.noReturn && <Lock className="size-3.5" strokeWidth={2.5} />}
+          {task.detail}
+        </p>
+      </div>
+    </div>
+  )
+  // Nothing pressing: the strip is a quiet card that opens the step.
+  if (!urgent)
+    return (
+      <motion.button
+        variants={ITEM}
+        type="button"
+        onClick={open}
+        aria-label={`Na dziś: ${task.title}`}
+        whileTap={{ scale: 0.99, transition: SPRING_PRESS }}
+        className="group relative mt-5 flex w-full items-center gap-3 rounded-3xl border border-line bg-white p-3 pr-4 text-left transition-colors hover:border-navy-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none sm:pl-4"
+      >
+        {pulse !== null && <Pulse key={pulse} className="rounded-3xl" />}
+        {body}
+        <ChevronRight className="size-5 shrink-0 text-navy-300 transition-transform group-hover:translate-x-0.5 group-hover:text-navy-500" />
+      </motion.button>
+    )
+  return (
+    <motion.section
+      variants={ITEM}
+      aria-label="Na dziś"
+      className={cn(
+        'relative mt-5 flex flex-col gap-3 rounded-3xl border p-3 sm:flex-row sm:items-center sm:gap-4 sm:pr-3 sm:pl-4',
+        task.tone === 'overdue' ? 'border-alert-600/30 bg-alert-50/60' : 'border-sun-300 bg-sun-100/50',
+      )}
+    >
+      {pulse !== null && <Pulse key={pulse} className="rounded-3xl" />}
+      {body}
+      <motion.button
+        type="button"
+        onClick={open}
+        whileTap={{ scale: 0.97, transition: SPRING_PRESS }}
+        className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-full bg-zus-600 px-5 text-sm font-bold text-white transition-colors hover:bg-zus-700 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        {task.fill ? 'Wypełnij wniosek' : 'Zobacz'} <ChevronRight className="size-4" />
+      </motion.button>
+    </motion.section>
   )
 }
