@@ -1,0 +1,17 @@
+Zrób film (Video Overview) po polsku dla jury HackNation 2026, wyzwanie ZUS „Zasiłkowy Przewodnik Przyszłego Rodzica”. Najwyżej 3 minuty, jeden spokojny lektor, tempo rzeczowe. Treść bierz wyłącznie ze źródła „zrodlo-opis-aplikacji.md” i z dołączonych zrzutów ekranu. Nie dopisuj liczb, funkcji ani obietnic, których tam nie ma, i nie podawaj liczby zgodnych spraw w formie „X z Y”.
+
+Myśl przewodnia: rodzic mówi, co się u niego dzieje, a aplikacja pokazuje na jednej osi czasu, co mu się należy, ile dostanie, kto zapłaci i jaki wniosek złożyć do kiedy. Liczy silnik reguł, nie AI.
+
+Akcentuj to, co najważniejsze dla ZUS: uprawnienia dla konkretnej rodziny (także gdy zasiłek NIE przysługuje), mniej sporów dzięki informacji z wyprzedzeniem, jeden zintegrowany kalkulator, wskazanie, czy wniosek złożyć u pracodawcy czy w ZUS, trafność i sprawdzalność, zmiana przepisów bez programisty.
+
+Kolejność scen (w nawiasach zrzuty do pokazania):
+1. Problem, ok. 15 s: rodzice mają dziesiątki pytań, przepisy są rozproszone, część decyzji nie ma powrotu (81,5% tylko do 21 dni po porodzie, urlop ojcowski do 12 miesięcy życia dziecka). [slajd-01-tytul]
+2. Kilka pytań na start i osobisty plan, ok. 15 s. [slajd-08-telefon]
+3. Oś czasu: jeden kalkulator zamiast dziesięciu, ścieżki Dziecko, Mama, Tata, Dokumenty, Pieniądze; każdy element z dosłownym cytatem z przepisu, ok. 20 s. [slajd-03-os-czasu]
+4. Należy się albo nie: przy odmowie aplikacja mówi dlaczego, co zamiast i co zrobić, żeby przysługiwało, ok. 20 s. [slajd-04-nalezy-sie-albo-nie]
+5. Pieniądze i wnioski: podstawa wymiaru krok po kroku z przepisem przy każdym kroku, kto wypłaca, wniosek wypełniony danymi z planu, ok. 25 s. [slajd-05-pieniadze, slajd-06-wnioski]
+6. Od celu do konkretu: rodzina wybiera cel (najwięcej pieniędzy, najdłużej w domu), silnik układa konkretne plany z datami i kwotami, a potem plan można przetestować scenariuszem „co, jeśli urodzi się wcześniak”, ok. 25 s. [13-plany-dla-celu, slajd-07-co-jesli]
+7. Prawdziwe sprawy ZUS i trafność, ok. 35 s: sprawę wybiera się albo wgrywa; AI tylko przepisuje fakty ze stronami akt, a silnik sprawdza ubezpieczenie, liczy kwoty i stawia wynik obok decyzji ZUS. Każda data co do dnia, każda kwota co do grosza; ponad 2 500 testów; ponad 480 dosłownych cytatów sprawdzanych co do znaku. [slajd-09a-sprawy-zus]
+8. Gotowe do wdrożenia i zakończenie, ok. 20 s: panel administracyjny ze zmianą parametrów od daty obowiązywania i podglądem skutków; asystent AI tłumaczy plan liczbami z silnika i ze źródłem, każda funkcja AI oznaczona; działa na telefonie i komputerze; adres demo przewodnik-rodzica.up.railway.app. [slajd-09b-panel-admina, slajd-10-asystent-ai]
+
+Styl obrazu: zrzuty ekranu jako główny element, duże i czytelne, bez przerabiania ich treści. Białe tło albo bardzo jasna szarozieleń, zieleń #007834 jako kolor główny, granat #283754 w napisach, bursztyn #fab856 tylko przy terminach. Krótkie napisy na ekranie (najwyżej kilka słów). Bez logo ZUS i bez udawania strony ZUS. Język prosty, bez żargonu i bez wykrzykników.
