@@ -248,3 +248,11 @@ export const checkRequest = (body: RequestCheckRequest, signal?: AbortSignal) =>
 
 /** The agreement report: the calculator against ZUS for the cases already read (cache only). */
 export const fetchAgreement = () => requestJson<CaseAgreement>('/api/cases/agreement')
+
+/** "Udostępnij plan": a read-only copy of the plan under a new id, for the partner. */
+export const shareSession = (sessionId: string) =>
+  requestJson<{ token: string }>(`/api/session/${sessionId}/share`, { method: 'POST' })
+
+/** The plan someone shared (`/plan/<token>`): read only. */
+export const fetchShared = (token: string) =>
+  requestJson<{ scenario: Scenario; timeline: Timeline; shared: boolean }>(`/api/shared/${token}`)

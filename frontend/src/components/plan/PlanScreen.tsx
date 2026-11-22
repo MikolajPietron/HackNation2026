@@ -36,6 +36,9 @@ import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, Scenario, SessionStart, StressEventId, Timeline } from '@/types'
 import { ApplicationForm } from '@/components/applications/ApplicationForm'
+import { DocumentsCard } from '@/components/folder/DocumentsCard'
+import { PersonalData } from '@/components/folder/PersonalData'
+import { ShareDialog } from '@/components/folder/ShareDialog'
 import { MoneyCard } from '@/components/money/MoneyCard'
 import { SupportList, SupportWindow } from '@/components/support/SupportList'
 import { Illustration } from '@/components/ui/illustration'
@@ -143,6 +146,9 @@ export function PlanScreen({
   const [zusOpen, setZusOpen] = useState(false)
   const [casesOpen, setCasesOpen] = useState(false)
   const [letterOpen, setLetterOpen] = useState(false)
+  /** "Twoje dane do wniosków": typed once, kept in this browser. */
+  const [personalOpen, setPersonalOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const plan = usePlanChange(scenario, onUpdate)
   /** Changes from the interface wait while the assistant is writing (it may be changing the
    *  same plan). */
@@ -172,6 +178,19 @@ export function PlanScreen({
     setChatOpen(true)
     onSend(prompt)
   }
+
+  const personalData = (
+    <PersonalData
+      role={scenario?.role ?? 'mother'}
+      withFather={timeline?.segments.some((s) => s.lane === 'father') ?? false}
+      persona={persona}
+      onLogin={() => {
+        setPersonalOpen(false)
+        setLoginOpen(true)
+      }}
+      onDone={() => setPersonalOpen(false)}
+    />
+  )
 
   const chat = (
     <ChatPanel
@@ -215,6 +234,7 @@ export function PlanScreen({
           onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
           onMock={showMock}
+          onShare={timeline ? () => setShareOpen(true) : undefined}
         />
       )}
 
@@ -239,6 +259,7 @@ export function PlanScreen({
                     onStartOver={onStartOver}
                     onMoney={() => setMoneyOpen(true)}
                     onAsk={choose}
+                    onShare={() => setShareOpen(true)}
                   />
 
                   {timeline.warnings.map((warning) => (
@@ -316,6 +337,16 @@ export function PlanScreen({
                     )}
                   </motion.section>
 
+                  <motion.div variants={ITEM} className="mt-5">
+                    <DocumentsCard
+                      timeline={timeline}
+                      scenario={scenario}
+                      onFill={openFill}
+                      onSelect={onSelect}
+                      onPersonal={() => setPersonalOpen(true)}
+                    />
+                  </motion.div>
+
                   {scenario && !timeline.taken_in && (
                     <div className="mt-5">
                       <ParentalEditor scenario={scenario} onApply={apply} />
@@ -373,6 +404,16 @@ export function PlanScreen({
               {fillDocument && timeline && (
                 <Dialog key="fill" label={fillDocument.title} onClose={() => setFill(null)}>
                   <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
+                </Dialog>
+              )}
+              {shareOpen && (
+                <Dialog key="share" label="Udostępnij plan" onClose={() => setShareOpen(false)}>
+                  <ShareDialog />
+                </Dialog>
+              )}
+              {personalOpen && (
+                <Dialog key="personal" label="Twoje dane do wniosków" onClose={() => setPersonalOpen(false)}>
+                  {personalData}
                 </Dialog>
               )}
               {supportOpen && (
@@ -466,6 +507,12 @@ export function PlanScreen({
             {fillDocument && timeline && (
               <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
             )}
+          </Sheet>
+          <Sheet open={shareOpen} onOpenChange={setShareOpen} title="Udostępnij plan">
+            <ShareDialog />
+          </Sheet>
+          <Sheet open={personalOpen} onOpenChange={setPersonalOpen} title="Twoje dane do wniosków">
+            {personalData}
           </Sheet>
           <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
             <SupportWindow />

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronDown, ChevronRight, FileText, Lock, Wallet } from 'lucide-react'
 import { Emphasis } from '@/components/ui/emphasis'
+import { CopyValue } from '@/components/ui/copy-value'
 import { formatDayMonthLong, formatDistance, formatShortDate } from '@/lib/dates'
 import { EASE_OUT } from '@/lib/ease'
 import { formatPln, formatRate, paymentFor } from '@/lib/money'
@@ -22,7 +23,12 @@ interface Props {
 interface Fact {
   label: string
   value: string
+  /** What "Kopiuj" puts on the clipboard (a date as DD.MM.RRRR, an amount), when it helps. */
+  copy?: string
 }
+
+/** 2027-08-02 -> 02.08.2027, as forms and e-mails write dates. */
+const dotted = (iso: string) => iso.split('-').reverse().join('.')
 
 /**
  * What the parent needs about one element. The facts come first and big (from, to, how long;
@@ -50,8 +56,8 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
           <Title>{s.title}</Title>
           <Facts
             facts={[
-              { label: 'Od', value: formatShortDate(s.start) },
-              { label: 'Do', value: formatShortDate(s.end) },
+              { label: 'Od', value: formatShortDate(s.start), copy: dotted(s.start) },
+              { label: 'Do', value: formatShortDate(s.end), copy: dotted(s.end) },
               { label: 'Ile', value: weeksOrDays(s.days) },
             ]}
           />
@@ -141,9 +147,9 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
           <Title>{p.title}</Title>
           <Facts
             facts={[
-              { label: 'Miesięcznie', value: formatPln(p.monthly) },
+              { label: 'Miesięcznie', value: formatPln(p.monthly), copy: formatPln(p.monthly) },
               { label: 'Stawka', value: formatRate(p.rate) },
-              { label: `Za ${p.days} dni`, value: formatPln(p.total) },
+              { label: `Za ${p.days} dni`, value: formatPln(p.total), copy: formatPln(p.total) },
             ]}
           />
           <p className="mt-5">
@@ -174,8 +180,12 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
               // A Labour Code deadline is a deadline; otherwise the day is only when the leave
               // or the benefit starts (Document.deadline).
               d.deadline
-                ? { label: 'Złóż najpóźniej', value: formatShortDate(d.deadline) }
-                : { label: d.form ? 'Na dzień startu' : 'Potrzebne na', value: formatShortDate(d.needed_by) },
+                ? { label: 'Złóż najpóźniej', value: formatShortDate(d.deadline), copy: dotted(d.deadline) }
+                : {
+                    label: d.form ? 'Na dzień startu' : 'Potrzebne na',
+                    value: formatShortDate(d.needed_by),
+                    copy: dotted(d.needed_by),
+                  },
               { label: 'Od dziś', value: formatDistance(timeline.today, d.deadline ?? d.needed_by) },
               { label: 'Status', value: d.done ? 'już jest' : d.form ? 'do złożenia' : 'do zdobycia' },
             ]}
@@ -221,8 +231,9 @@ function Facts({ facts }: { facts: Fact[] }) {
       className="mt-4 grid gap-2"
       style={{ gridTemplateColumns: `repeat(${facts.length}, minmax(0, 1fr))` }}
     >
-      {facts.map(({ label, value }) => (
-        <div key={label} className="rounded-2xl bg-navy-50/70 px-4 py-3">
+      {facts.map(({ label, value, copy }) => (
+        <div key={label} className="relative rounded-2xl bg-navy-50/70 px-4 py-3">
+          {copy && <CopyValue value={copy} label={label.toLowerCase()} className="absolute top-1.5 right-1.5" />}
           <dt className="text-xs font-bold text-navy-500">{label}</dt>
           <dd className="mt-0.5 text-lg leading-tight font-bold whitespace-nowrap text-navy-900">
             {value}

@@ -4,6 +4,7 @@ import { AdminScreen } from '@/components/admin/AdminScreen'
 import { ReportScreen } from '@/components/report/ReportScreen'
 import { Onboarding } from '@/components/onboarding/Onboarding'
 import { PlanScreen } from '@/components/plan/PlanScreen'
+import { SharedPlan } from '@/components/plan/SharedPlan'
 import { useAssistant } from '@/hooks/useAssistant'
 import { formatLongDate } from '@/lib/dates'
 import { EASE_IN_OUT, EASE_OUT } from '@/lib/ease'
@@ -18,6 +19,8 @@ export default function App() {
         <AdminScreen />
       ) : window.location.pathname.startsWith('/raport') ? (
         <ReportScreen />
+      ) : window.location.pathname.startsWith('/plan/') ? (
+        <SharedPlan token={window.location.pathname.split('/')[2] ?? ''} />
       ) : (
         <ParentsApp />
       )}

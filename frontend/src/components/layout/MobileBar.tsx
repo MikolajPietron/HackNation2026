@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  Share2,
   Type,
   UserRound,
   Volume2,
@@ -39,6 +40,8 @@ interface Props {
   onSupport: () => void
   onStartOver: () => void
   onMock: (message: string) => void
+  /** "Udostępnij plan": a read-only link for the partner. */
+  onShare?: () => void
 }
 
 export function MobileBar(props: Props) {
@@ -95,6 +98,7 @@ function MenuContent({
   onSupport,
   onStartOver,
   onMock,
+  onShare,
   close,
 }: Props & { close: () => void }) {
   const [largeText, setLargeText] = useLargeText()
@@ -105,6 +109,11 @@ function MenuContent({
   return (
     <nav aria-label="Menu" className="space-y-5">
       <Group>
+        {onShare && (
+          <Item icon={<Share2 />} onClick={then(onShare)}>
+            Udostępnij plan partnerowi
+          </Item>
+        )}
         <Item icon={<Mail />} onClick={then(onLetter)} meta="AI">
           Przetłumacz pismo z ZUS
         </Item>
