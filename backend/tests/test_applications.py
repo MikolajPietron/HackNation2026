@@ -232,11 +232,24 @@ def test_a_mother_on_a_contract_files_zam() -> None:
     assert [d.id for d in t.documents] == ["maternity-request", "zam-parental"]
     zam = document(t, "zam-parental")
     assert (zam.deadline, zam.needed_by) == (dt.date(2027, 8, 1), dt.date(2027, 8, 1))
-    assert zam.rule.endswith(
+    assert zam.rule.startswith("Mama nie jest pracownicą: wniosek o zasiłek za ten okres")
+    assert (
         "Najpóźniej 01.08.2027: wniosek składa się przed rozpoczęciem korzystania z zasiłku "
         "(02.08.2027)."
+    ) in zam.rule
+    # With it, the statement of the benefit for parental leave already paid (§ 29 pkt 4).
+    assert zam.rule.endswith(
+        "Do wniosku za okres urlopu rodzicielskiego dołącza się oświadczenie z NIP i nazwami "
+        "płatników zasiłku oraz z okresem, liczbą części i stawką zasiłku za ten urlop już "
+        "wypłaconego."
     )
     assert {s.article for s in zam.sources if s.doc == "rozp_zasilki"} == {"§ 29"}
+    # "Co złożyć i do kiedy" lists it: for a parent who is not an employee it is the only
+    # request with a deadline.
+    assert (
+        "Wniosek o zasiłek macierzyński za okres: urlop rodzicielski (ZAM) — do ZUS, najpóźniej "
+        "1 sierpnia 2027."
+    ) in note(t, "applications").text
     assert "Za uzupełniający, rodzicielski i ojcowski" in request.rule
     assert "protection-end" not in {m.id for m in t.markers}
     protection = note(t, "protection")
@@ -338,11 +351,23 @@ def test_the_mother_in_hospital_the_father_asks_without_a_deadline() -> None:
 def test_a_father_with_a_business_files_zam_with_zus() -> None:
     t = expecting(**MOTHER, father_work="business", father_insured=True, children_count=1)
     request = document(t, "father-benefit-request")
-    assert (request.needed_by, request.segment_id) == (DUE, "paternity")
+    # His first period is paternity leave from the due date: ZAM for it is filed before the
+    # benefit starts (rozporządzenie § 33 ust. 1 pkt 3), at the latest 14.03.2027.
+    assert (request.needed_by, request.deadline, request.segment_id) == (
+        dt.date(2027, 3, 14),
+        dt.date(2027, 3, 14),
+        "paternity",
+    )
     assert "także ojcowskiego (formularze ZUR i ZAO połączono z ZAM)" in request.rule
+    assert "Za okres: urlop ojcowski. Najpóźniej 14.03.2027" in request.rule
+    assert "materiały nie podają terminu" not in request.rule
     assert any("dla taty przyjmujemy to samo" in a for a in t.assumptions)
-    assert any("zasiłek wypłaca ZUS" in a for a in t.assumptions)
-    assert segment(t, "paternity").details[-1].startswith("Zasiłek taty wypłaca ZUS")
+    # ZUS pays with a business: ustawa art. 61 ust. 1 pkt 2 lit. b, no longer our reading.
+    assert not any("zasiłek wypłaca ZUS" in a for a in t.assumptions)
+    line = segment(t, "paternity").details[-1]
+    assert line.startswith("Zasiłek taty wypłaca ZUS: wypłaca zasiłki osobom prowadzącym")
+    paternity = segment(t, "paternity")
+    assert {s.article for s in paternity.sources if s.doc == "ustawa"} >= {"art. 61 ust. 1"}
 
 
 # Protection (section I; art. 177).
@@ -353,7 +378,12 @@ def test_the_employed_mother_is_protected_until_her_leave_ends() -> None:
     protection = marker(t, "protection-end")
     assert (protection.date, protection.lane) == (dt.date(2028, 2, 27), "child")
     assert "pracodawca nie może wypowiedzieć ani rozwiązać umowy" in protection.summary
-    assert articles(protection) == {"art. 177 § 1", "art. 177 § 1¹"}
+    assert articles(protection) == {"art. 177 § 1", "art. 177 § 1¹", "art. 177 § 4"}
+    # The second exception: notice only on the employer's bankruptcy or liquidation (§ 4).
+    assert protection.details[1] == (
+        "Wypowiedzieć umowę w tym czasie pracodawca może tylko w razie ogłoszenia upadłości albo "
+        "likwidacji; termin rozwiązania umowy musi uzgodnić z zakładową organizacją związkową."
+    )
     assert sections(protection) == {"I"}
     assert any(
         "zakaz zaczyna obowiązywać 21 dni przed tym urlopem" in d for d in protection.details
@@ -537,8 +567,8 @@ def test_with_a_business_zas53_goes_to_zus() -> None:
     )
     assert "złożyć do ZUS wniosek o zasiłek chorobowy ZAS-53" in request.rule
     assert segment(t, "sick-benefit").details[-1] == (
-        "Zasiłek chorobowy mamy wypłaca ZUS: przy własnej firmie wniosek o zasiłek chorobowy "
-        "(ZAS-53) składa się do ZUS."
+        "Zasiłek chorobowy mamy wypłaca ZUS: wypłaca zasiłki osobom prowadzącym własną firmę, "
+        "a wniosek o zasiłek chorobowy (ZAS-53) składa się do ZUS."
     )
     payer = note(t, "payer")
     assert payer.title == "Zasiłek mamy wypłaca ZUS"
@@ -547,7 +577,9 @@ def test_with_a_business_zas53_goes_to_zus() -> None:
         "Wniosek o zasiłek chorobowy (ZAS-53) — do ZUS. Terminu materiały nie podają; na osi jest "
         "na 30 grudnia 2026, dzień, od którego przysługuje zasiłek."
     ) in note(t, "applications").text
-    assert any("zasiłek chorobowy wypłaca ZUS" in a for a in t.assumptions)
+    # Ustawa art. 61 ust. 1 pkt 2 lit. b says ZUS pays: no longer our reading.
+    assert not any("wypłaca ZUS" in a for a in t.assumptions)
+    assert "art. 61 ust. 1" in {s.article for s in segment(t, "sick-benefit").sources}
 
 
 def test_no_sick_benefit_documents_after_the_sick_leave_ended() -> None:
@@ -624,9 +656,19 @@ def test_zam_deadlines_of_a_father_with_a_business() -> None:
         father_work="business",
         father_insured=True,
     )
-    paternity = document(t, "zam-paternity")
+    # Paternity leave is his first period: his ZAM is that request, with that deadline, not
+    # a second document without one.
+    paternity = document(t, "father-benefit-request")
     assert (paternity.deadline, paternity.segment_id) == (dt.date(2027, 3, 14), "paternity")
     assert {s.article for s in paternity.sources if s.doc == "rozp_zasilki"} == {"§ 33 ust. 1"}
+    assert "zam-paternity" not in {d.id for d in t.documents}
+    assert note(t, "applications").text.startswith(
+        "Wniosek taty o zasiłek macierzyński (ZAM) — do ZUS, najpóźniej 14 marca 2027."
+    )
+    assert (
+        "Wniosek taty o zasiłek macierzyński za okres: urlop rodzicielski (ZAM) — do ZUS, "
+        "najpóźniej 12 marca 2028."
+    ) in note(t, "applications").text
     parental = document(t, "zam-parental-father")
     assert segment(t, "parental-father").start == dt.date(2028, 3, 13)
     assert parental.deadline == dt.date(2028, 3, 12)

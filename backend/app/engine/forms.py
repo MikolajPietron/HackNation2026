@@ -12,9 +12,14 @@ name, each with its quote) and filled in from the scenario and the timeline:
 - ZAM (a parent who is not an employee, or a mother whose employment ended in pregnancy) follows
   annex 6 of the regulation of 27 September 2026 on the benefit documents (rozp_zasilki, § 12):
   the data of the request for the maternity benefit; its attachments: § 13 (the birth), § 20,
-  § 22, § 23 (the father after the mother), § 26 (supplementary leave), § 32 (a mother without
+  § 22, § 23 (the father after the mother), § 26 (supplementary leave), § 29 pkt 4 and § 30
+  ust. 1 pkt 5 (parental leave: the benefit for it already paid), § 32 (a mother without
   insurance), § 33 (paternity leave). The ZAM form itself is on www.zus.pl (guide page 12);
-- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2).
+- a mother who is not an employee stops her benefit when the father takes it on: § 18 ust. 1
+  (taking over), § 21 (her ruling of incapacity), § 24 ust. 1 (her stay in hospital);
+- the documents for the sickness benefit follow annex 1 of the same regulation (§ 2): they are
+  for ZUS, so with a payer that pays the benefit itself there is no form (e-ZLA is enough,
+  applications.py).
 
 The attachments for the maternity benefit (§ 13, guide A.4) go with the employee mother's
 request for maternity leave too: her employer determines the benefit on its basis (guide A.4).
@@ -35,6 +40,10 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
   parents together, parental_plan.py);
 - "termin zakończenia urlopu macierzyńskiego" (§ 14 ust. 1 pkt 2): the day before supplementary
   leave starts, since it starts right after maternity leave;
+- a request for an option moved to today (its deadline passed for the day on the timeline):
+  the employee's form and letter ask for the leave from the first day a request filed today is in
+  time for (applications.py, `in_time_period`); ZAM keeps the timeline's periods and its hint
+  says from when a request filed today is in time;
 - the request to combine parental leave with work (§ 16): the period of work is the first weeks
   of the part (parental_plan.py), and the statement on the extension says "no": on the timeline
   the extension is added at the end of the part, without work.
@@ -44,7 +53,21 @@ import datetime as dt
 from dataclasses import dataclass
 
 from app.engine.after_insurance import after_job_loss
-from app.engine.applications import MOTHER_LEAVE, PLAN_REQUESTS, WORK_REQUESTS, who_pays
+from app.engine.applications import (
+    PARENTAL_PERIODS,
+    PLAN_REQUESTS,
+    STOP_REQUEST,
+    WORK_REQUESTS,
+    ZAM_REQUESTS,
+    files_with,
+    in_time_from,
+    in_time_period,
+    is_mother_leave,
+    parental_statement_applies,
+    parental_zam_rule,
+    period_kind,
+    who_pays,
+)
 from app.engine.draft import DAY, days_between, merge_sources
 from app.engine.insurance import coverage
 from app.engine.models import (
@@ -74,6 +97,8 @@ KINDS: dict[str, FormFieldKind] = {
     "due-date": "date",
     "maternity-end": "date",
     "event-date": "date",
+    "resign-from": "date",
+    "father-from": "date",
     "leave-period": "period",
     "benefit-period": "period",
     "sick-period": "period",
@@ -160,6 +185,8 @@ def request_form(
             return build.parental(parent, document.segment_id)
         case "maternity-resignation":
             return build.resignation()
+        case doc_id if doc_id == STOP_REQUEST:
+            return build.mother_stop()
         case "maternity-father-request":
             return build.father_maternity()
         case "paternity-request":
@@ -194,9 +221,17 @@ def _whose(segment: Segment) -> str:
     return f"{who}: {name}" if who else name
 
 
-def _period(segment: Segment) -> Fill:
+def _period(segment: Segment, axis: Segment | None = None) -> Fill:
+    """The period a request asks for; `axis`, the period on the timeline when the request asks
+    for a later one (`Forms.requested`)."""
     hint = "Okres z osi czasu."
-    if segment.tone == "option":
+    if axis is not None and axis.start != segment.start:
+        hint = (
+            f"Na osi ten urlop zaczyna się {fmt(axis.start)}, ale termin wniosku dla tego dnia "
+            f"minął: złożony dziś jest w terminie dla urlopu od {fmt(segment.start)}. Ten urlop "
+            "jest do wyboru, więc możesz wpisać inny okres, nie wcześniejszy."
+        )
+    elif segment.tone == "option":
         hint = "Okres z osi czasu; ten urlop jest do wyboru, więc możesz wpisać inny."
     return Fill(_days(segment.start, segment.end), segment.start, segment.end, hint)
 
@@ -292,19 +327,35 @@ class Forms:
         return "employer", f"Pracodawca {WHOSE[parent]}"
 
     def zus_or_payer(self, parent: Role) -> tuple[Addressee, str]:
-        """Where a parent who is not an employee files: straight with ZUS with a business (or
-        after losing the job); on a contract of mandate the payer that pays the benefit itself,
-        otherwise ZUS (guide A.4)."""
-        work = self.scenario.mothers_work if parent == "mother" else self.scenario.fathers_work
-        if work == "business" or (parent == "mother" and after_job_loss(self.scenario)):
-            return "zus", "ZUS"
-        match who_pays(self.scenario, parent):
+        """Where a parent who is not an employee files: the same rule as the timeline's
+        summary (applications.py, `files_with`)."""
+        match files_with(self.scenario, parent):
             case "payer":
                 return "payer", "Płatnik składek (zleceniodawca)"
             case "zus":
                 return "zus", "ZUS"
             case _:
                 return "payer-or-zus", "Płatnik składek (zleceniodawca) albo ZUS"
+
+    def requested(self, segment: Segment) -> Segment:
+        """The period this request asks for: the timeline's, or for a request moved to today
+        the same leave from the first day a request filed today is in time for
+        (applications.py, `in_time_period`)."""
+        start, end = in_time_period(self.document, segment, self.timeline)
+        if (start, end) == (segment.start, segment.end):
+            return segment
+        return segment.model_copy(
+            update={"start": start, "end": end, "days": days_between(start, end)}
+        )
+
+    def zam_request(self, segment: Segment) -> Document | None:
+        """The ZAM on the timeline that asks for this period: this form's own (its first
+        period) or the later one for that period ("zam-<id>")."""
+        if self.document.segment_id == segment.id:
+            return self.document
+        return next(
+            (d for d in self.timeline.documents if d.id == f"{ZAM_REQUESTS}{segment.id}"), None
+        )
 
     def personal_files(self) -> FormNote:
         return FormNote(
@@ -458,21 +509,27 @@ class Forms:
         § 20-§ 23, § 26, § 32 and § 33 for the situation on the timeline."""
         s = self.scenario
         if parent == "mother":
-            periods = [x for x in self.timeline.segments if x.lane == "mother"]
-            periods = [x for x in periods if x.id in MOTHER_LEAVE]
+            periods = [x for x in self.timeline.segments if is_mother_leave(x)]
         else:
             periods = [x for x in self.timeline.segments if x.lane == "father"]
         periods = [x for x in periods if x.end >= self.timeline.today]
         start = min((x.start for x in periods), default=None)
         end = max((x.end for x in periods), default=None)
         lines = [f"{_name(x)}: {_days(x.start, x.end)}" for x in periods]
+        late = [
+            f" Termin wniosku za okres od {fmt(x.start)} minął: złożony dziś jest w terminie dla "
+            f"zasiłku od {fmt(day)}."
+            for x in periods
+            if (request := self.zam_request(x)) is not None
+            and (day := in_time_from(request, self.timeline)) is not None
+        ]
         fills: dict[str, Fill] = {
             "child-birth-date": self.birth_date(),
             "benefit-period": Fill(
                 f"Zasiłek macierzyński za okres: {'; '.join(lines)}." if lines else None,
                 start,
                 end,
-                "Okresy z osi czasu.",
+                "Okresy z osi czasu." + "".join(late),
             ),
             "reason": Fill("urodzenie dziecka"),
         }
@@ -525,6 +582,10 @@ class Forms:
                 )
         if supplementary is not None:
             attachments.append(Attach("supplementary-other-parent"))
+        parental = [x for x in periods if period_kind(x.id) in PARENTAL_PERIODS]
+        rule = parental_zam_rule(s, self.params, parent)
+        if parental and parental_statement_applies(rule, self.params):
+            attachments.append(self.parental_statement(parental[0]))
         if parent == "father":
             attachments += self.father_attachments()
         return self.build(
@@ -596,6 +657,22 @@ class Forms:
             lines.append(f"{_name(paternity)}: {_days(paternity.start, paternity.end)}")
         return ("; ".join(lines) + ".").capitalize() if lines else None
 
+    def parental_statement(self, first: Segment) -> Attach:
+        """§ 29 pkt 4, § 30 ust. 1 pkt 5: with ZAM for parental leave, the statement of the
+        benefit for parental leave already paid (the payers, the period, the parts, the rate);
+        the timeline shows what came before this ZAM's first period of parental leave."""
+        before = self.parental_before(first)
+        if before:
+            hint = (
+                "Na osi przed tym okresem: "
+                + "; ".join(f"{_whose(x)}: {_days(x.start, x.end)}" for x in before)
+                + f". Części: {len(before)}. Wpisz płatników, okresy i stawkę naprawdę "
+                "wypłaconego zasiłku."
+            )
+        else:
+            hint = "Na osi wcześniej nie ma urlopu rodzicielskiego: to pierwsza jego część."
+        return Attach("parental-benefit-statement", hint=hint)
+
     def father_attachments(self) -> list[Attach]:
         """The father who is not an employee: the documents for the situation on the timeline
         (rozp_zasilki § 20, § 22, § 23, § 32, § 33)."""
@@ -648,10 +725,13 @@ class Forms:
 
     def parental(self, parent: Role, segment_id: str) -> RequestForm:
         """§ 15: the parental leave used so far and the period asked for; the other parent's
-        statement says what the timeline shows of their parental leave at that time."""
-        leave = self.segment(segment_id)
-        assert leave is not None
-        before = self.parental_before(leave)
+        statement says what the timeline shows of their parental leave at that time. A request
+        moved to today asks for the leave from the day it is in time for (`requested`); what the
+        other parent does is read against the timeline's period (their leave there follows it)."""
+        axis = self.segment(segment_id)
+        assert axis is not None
+        leave = self.requested(axis)
+        before = self.parental_before(axis)
         if before:
             used = Fill(
                 "Na osi przed tym okresem: "
@@ -668,8 +748,8 @@ class Forms:
             for x in self.timeline.segments
             if x.lane == other
             and x.id.startswith("parental")
-            and x.start <= leave.end
-            and x.end >= leave.start
+            and x.start <= axis.end
+            and x.end >= axis.start
         ]
         statement = (
             "Na osi drugi z rodziców ma w tym czasie urlop rodzicielski: "
@@ -688,7 +768,7 @@ class Forms:
             "parental",
             applicant=parent,
             addressee=self.employer(parent),
-            fills={"used-so-far": used, "leave-period": _period(leave)},
+            fills={"used-so-far": used, "leave-period": _period(leave, axis)},
             attachments=attachments,
             notes=[self.personal_files()],
             start=leave.start,
@@ -843,15 +923,46 @@ class Forms:
             end=his.end,
         )
 
+    def mother_stop(self) -> RequestForm:
+        """A mother who is not an employee stops her benefit when the father takes it on
+        (rozp_zasilki § 18 ust. 1 pkt 1 and 3; § 21 pkt 1, 3 and 4; § 24 ust. 1 pkt 1-2): the
+        day she gives it up, the day the father starts, from the timeline."""
+        his = self.segment("maternity-father")
+        assert his is not None
+        event = self.scenario.mother_event
+        situation = event.kind if event is not None else "takeover"
+        fills = {"father-from": _day(his.start, "Pierwszy dzień części urlopu taty na osi czasu.")}
+        attachments: list[Attach] = []
+        if situation == "hospital":
+            attachments.append(Attach("admission-certificate"))
+        else:
+            fills["resign-from"] = _day(
+                his.start,
+                "Dzień, od którego zasiłek ma tata: na osi czasu dzień po ostatnim "
+                "dniu zasiłku mamy.",
+            )
+        if situation == "incapacity":
+            attachments.append(Attach("incapacity-ruling"))
+        return self.build(
+            f"mother-stop-{situation}",
+            applicant="mother",
+            addressee=self.zus_or_payer("mother"),
+            fills=fills,
+            attachments=attachments,
+            start=his.start,
+        )
+
     def paternity(self) -> RequestForm:
-        """§ 17: the period of paternity leave."""
-        leave = self.segment("paternity")
-        assert leave is not None
+        """§ 17: the period of paternity leave; a request moved to today asks for it from the
+        day it is in time for (`requested`)."""
+        axis = self.segment("paternity")
+        assert axis is not None
+        leave = self.requested(axis)
         return self.build(
             "paternity",
             applicant="father",
             addressee=self.employer("father"),
-            fills={"leave-period": _period(leave)},
+            fills={"leave-period": _period(leave, axis)},
             attachments=[Attach("birth-certificate"), Attach("paternity-statement")],
             notes=[self.personal_files()],
             start=leave.start,
@@ -881,6 +992,22 @@ class Forms:
         ]
         if business:
             notes.insert(0, self.zus_forms("ZAS-53"))
+        elif who_pays(self.scenario, "mother") == "payer-or-zus":
+            a = self.params.applications
+            notes.insert(
+                0,
+                FormNote(
+                    text=(
+                        "Te dane są dla ZUS. Jeśli zleceniodawca zgłasza do ubezpieczenia "
+                        f"chorobowego więcej niż {a.payer_more_than_insured.value} osób, sam "
+                        "wypłaca zasiłek na podstawie zaświadczenia lekarskiego e-ZLA i tego "
+                        "wniosku nie trzeba składać."
+                    ),
+                    sources=merge_sources(
+                        a.sick_e_zla_enough.sources, a.payer_more_than_insured.sources
+                    ),
+                ),
+            )
         return self.build(
             "sick",
             applicant="mother",

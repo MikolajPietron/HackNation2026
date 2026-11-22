@@ -72,6 +72,8 @@ PROVISIONS = {
     "art. 48 ust. 1": ("Art. 48 [", "ust", "1"),
     "art. 52": ("Art. 52 [", None, None),
     "art. 61 ust. 1": ("Art. 61 [", "ust", "1"),
+    # A payer that pays the sickness benefit itself does so on the basis of e-ZLA.
+    "art. 61b ust. 2": ("Art. 61b [", "ust", "2"),
     # The benefit base in detail (engine/base.py).
     "art. 36 ust. 2": ("Art. 36 [", "ust", "2"),
     "art. 36 ust. 4": ("Art. 36 [", "ust", "4"),
@@ -146,8 +148,9 @@ def provision(text: str, kind: str | None, number: str | None) -> str:
     if kind is None:
         body = text[text.index("]") + 1 :]
     else:
-        # "3a. " starts a paragraph (ust.), "3) " a point (pkt).
-        mark = r"\. " if kind == "ust" else r"\) "
+        # "3a. " starts a paragraph (ust.), "3) " a point (pkt). A footnote's number may follow
+        # the paragraph's own ("2.7 " in art. 61b is ust. 2 with footnote 7).
+        mark = r"\.\d* " if kind == "ust" else r"\) "
         any_start = rf"\d+[a-z]?{mark}"
         this = rf"{re.escape(number or '')}{mark}"
         match = re.search(rf"(?ms)^{this}(.*?)(?=^{any_start}|\Z)", text)

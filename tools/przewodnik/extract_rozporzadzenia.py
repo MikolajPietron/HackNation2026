@@ -89,10 +89,15 @@ ACTS = {
             "§ 13 ust. 1",
             "§ 13 ust. 2",
             "§ 13 ust. 3",
+            # The mother stops her maternity benefit: the father takes over (§ 18), she has
+            # a ruling of incapacity (§ 21) or is in hospital (§ 24).
+            "§ 18 ust. 1",
             "§ 20 ust. 1",
             "§ 20 ust. 3",
+            "§ 21",
             "§ 22 ust. 1",
             "§ 23 ust. 1",
+            "§ 24 ust. 1",
             "§ 26",
             # ZAM of a non-employee for parental leave: filed before the benefit starts.
             "§ 29",

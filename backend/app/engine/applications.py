@@ -6,8 +6,8 @@ art. 180 § 8, § 9 and § 16, art. 180² § 4-5, art. 182¹ᵈ § 1, art. 182¹
 
 Applied last, on the finished timeline (`add_applications`, before the case notes):
 - who pays: every benefit period says it. The payer of contributions pays when it reports more
-  than 20 people to sickness insurance, otherwise ZUS; with her own business the mother files
-  ZAM straight with ZUS, so ZUS pays;
+  than 20 people to sickness insurance, otherwise ZUS; with a business ZUS pays (ustawa art. 61
+  ust. 1 pkt 2 lit. b), and ZAM goes straight to ZUS;
 - requests as documents: an employee asks the employer for each leave (one request may cover
   maternity and parental leave right after it; each part of the parents' plan of parental leave
   is its own request, art. 182¹ᵈ § 2, and a part combined with work also needs the request to
@@ -18,16 +18,18 @@ Applied last, on the finished timeline (`add_applications`, before the case note
   (on a contract of mandate the payer determines the benefit or ZUS does, with Z-3a from the
   payer). What each request contains is forms.py's (applied after this module);
 - protection: for an employed mother, the last day of the special protection her leave on the
-  timeline gives, and the extension of a fixed-term contract until the birth;
+  timeline gives (every period of her leave, the parts of the parents' plan too, `period_kind`),
+  and the extension of a fixed-term contract until the birth (after which the maternity benefit
+  is due after the insurance ended, ustawa art. 30 ust. 4); the exceptions: her fault with the
+  trade union's consent (art. 177 § 1 pkt 2), notice on the employer's bankruptcy or liquidation
+  (art. 177 § 4);
 - sick leave in pregnancy (guide page 3, pregnancy.py draws the periods): e-ZLA goes straight to
   ZUS and to the employer's profile; an employee informs her employer of the absence; the
   employer pays its days (wynagrodzenie chorobowe), then the sickness benefit is paid by the
   payer or ZUS by the same rule of more than 20 insured, the payer sending Z-3 (ZAS-12 for a
   further period) or, on a contract of mandate, Z-3a; with a business ZAS-53 goes to ZUS;
 - the benefit after losing the job (guide page 4): after an unlawful termination, the final court
-  judgment it needs.
-  timeline gives, and the extension of a fixed-term contract until the birth (after which the
-  maternity benefit is due after the insurance ended, ustawa art. 30 ust. 4);
+  judgment it needs;
 - a mother whose employment ended in pregnancy and who has the benefit after it (ustawa art. 30
   ust. 1, after_insurance.py) is no longer an employee: she files ZAM with ZUS, ZUS pays (art. 61
   ust. 1 pkt 2 lit. d), and no protection marker is drawn.
@@ -42,12 +44,22 @@ Our readings (CLAUDE.md, open questions):
   request filed today is in time; for a fixed day (supplementary leave, taking over) the passed
   deadline stays where it was;
 - the guide says where a mother who is not an employee files ZAM; we show the same for the father;
-- with her own business the guide sends ZAM straight to ZUS: we say that ZUS pays;
+- a request moved to today (an option whose deadline passed): the form and the letter ask for
+  the leave (the benefit) from the first day a request filed today is in time for, as long as on
+  the timeline but not past the last day it may be used (`in_time_period`); the timeline still
+  draws the option from where it was;
+- a parent who is not an employee and whose first period is not maternity leave (paternity,
+  parental, supplementary leave) files the first ZAM by that period's deadline: one document, not
+  a second one without a deadline;
+- the mother who is not an employee stops her benefit when the father takes it on (regulation
+  of 27.09.2026 § 18 ust. 1, § 21, § 24 ust. 1): the materials give no deadline, so it is shown
+  on the day from which the father has the benefit, filed with the payer of her benefit;
 - sick leave: the guide sends an employee to the Labour Code for informing the employer, and
   those provisions are not in the materials: we show it on the first day of the sick leave, and
   only while that day is ahead; the documents for the sickness benefit (contract, business) have
-  no deadline in the materials: shown on the day the benefit starts, like ZAM; with a business
-  ZAS-53 goes to ZUS, so ZUS pays the sickness benefit too;
+  no deadline in the materials: shown on the day the benefit starts, like ZAM; a payer that pays
+  the sickness benefit itself does so on the basis of e-ZLA, so on a contract of mandate with
+  a payer of more than 20 insured there is nothing more to file;
 - the guide does not say by when the court judgment must come, nor what to file for the benefit
   after losing the job or who pays it: the judgment is shown on the day the benefit would start,
   the rest is not on the timeline.
@@ -70,7 +82,7 @@ from app.engine.models import (
     Timeline,
     Work,
 )
-from app.engine.params import Params
+from app.engine.params import Params, Rule
 from app.engine.parental_plan import fraction, planned_parts, work_end
 from app.engine.pregnancy import JOB_LOSS_SEGMENT, SEGMENT_IDS
 from app.engine.wording import fmt, long_date
@@ -78,9 +90,28 @@ from app.engine.wording import fmt, long_date
 Parent = Literal["mother", "father"]
 Payer = Literal["payer", "zus", "payer-or-zus"]
 
-MOTHER_LEAVE = ("maternity-prenatal", "maternity", "maternity-resumed", "supplementary", "parental")
-"""The mother's periods of leave (or of the benefit for that time)."""
+MOTHER_LEAVE = (
+    "maternity-prenatal",
+    "maternity",
+    "maternity-resumed",
+    "supplementary",
+    "parental",
+    "parental-mother",
+)
+"""The mother's periods of leave (or of the benefit for that time), by `period_kind`: the parts
+of the parents' plan are "parental-mother-1", "parental-mother-2"..."""
 BENEFIT_PERIODS = (*MOTHER_LEAVE, "prenatal-window")
+MATERNITY_PERIODS = ("maternity-prenatal", "maternity", "maternity-resumed", "maternity-father")
+"""Periods of maternity leave: ZAM for them has no deadline in the materials."""
+PARENTAL_PERIODS = ("parental", "parental-mother", "parental-father")
+"""Periods of parental leave, by `period_kind`."""
+LIMIT_MARKERS = {
+    "paternity": "paternity-deadline",
+    "parental": "parental-deadline",
+    "parental-mother": "parental-deadline",
+    "parental-father": "parental-deadline",
+}
+"""The marker of the last day a leave of this kind may be used (father.py, parental.py)."""
 REQUESTS = (
     "maternity-request",
     "supplementary-request",
@@ -90,8 +121,11 @@ REQUESTS = (
     "paternity-request",
     "parental-father-request",
     "father-benefit-request",
+    "maternity-benefit-stop",
 )
 """The requests for leave and the maternity benefit this module adds, by id."""
+ZAM_REQUESTS = "zam-"
+"""Prefix of ZAM for a later period of a parent who is not an employee: "zam-parental"."""
 PLAN_REQUESTS = ("parental-request-", "parental-father-request-")
 """Prefixes of the requests for the parts of a parental plan: "parental-request-2" is the
 mother's second part (segment "parental-mother-2"), "parental-father-request-1" the father's
@@ -101,6 +135,11 @@ WORK_REQUESTS = ("parental-work-request-", "parental-father-work-request-")
 like the request for that part: "parental-work-request-1" goes with "parental-request-1"."""
 SICK_DOCUMENTS = ("sick-leave-notice", "sick-benefit-request")
 """Sick leave in pregnancy: informing the employer; the documents for the sickness benefit."""
+SICK_E_ZLA = "sick-e-zla"
+"""On a contract of mandate with a payer of more than 20 insured: nothing to file, e-ZLA is
+enough (the payer pays on its basis)."""
+STOP_REQUEST = "maternity-benefit-stop"
+"""A mother who is not an employee stops her benefit when the father takes it on."""
 COURT_JUDGMENT = "court-judgment"
 """The final court judgment the benefit after an unlawful termination needs."""
 SICK_PAY, SICK_BENEFIT = SEGMENT_IDS["employer"], SEGMENT_IDS["benefit"]
@@ -108,6 +147,16 @@ WORKING = ("employment", "contract", "business")
 
 WHOSE = {"mother": "mamy", "father": "taty"}
 WHO = {"mother": "Mama", "father": "Tata"}
+
+
+def period_kind(segment_id: str) -> str:
+    """The kind of a period: "parental-mother" for the part "parental-mother-2" of the parents'
+    plan (parental_plan.py), "sick-benefit" for "sick-benefit-2"; any other id as it is."""
+    return segment_id.rsplit("-", 1)[0] if segment_id[-1].isdigit() else segment_id
+
+
+def is_mother_leave(segment: Segment) -> bool:
+    return segment.lane == "mother" and period_kind(segment.id) in MOTHER_LEAVE
 
 
 def add_applications(timeline: Timeline, scenario: Scenario, params: Params) -> None:
@@ -193,9 +242,9 @@ def payer_line(scenario: Scenario, parent: Parent, params: Params) -> tuple[str,
     match who_pays(scenario, parent):
         case "zus" if work == "business":
             return (
-                f"Zasiłek {whose} wypłaca ZUS: przy własnej firmie wniosek o zasiłek macierzyński "
-                "(ZAM) składa się bezpośrednio do ZUS.",
-                merge_sources(a.non_employee_zam.sources, a.paid_by_payer_or_zus.sources),
+                f"Zasiłek {whose} wypłaca ZUS: wypłaca zasiłki osobom prowadzącym własną firmę, "
+                "a wniosek o zasiłek macierzyński (ZAM) składa się bezpośrednio do ZUS.",
+                merge_sources(a.business_paid_by_zus.sources, a.non_employee_zam.sources),
             )
         case "payer":
             text = (
@@ -239,7 +288,7 @@ def _with_payer(segment: Segment, scenario: Scenario, params: Params) -> Segment
                 "sources": merge_sources(segment.sources, sources),
             }
         )
-    if segment.lane == "mother" and segment.id in BENEFIT_PERIODS:
+    if segment.lane == "mother" and period_kind(segment.id) in BENEFIT_PERIODS:
         parent: Parent = "mother"
     elif segment.lane == "father":
         parent = "father"
@@ -276,9 +325,9 @@ def sick_payer_line(scenario: Scenario, params: Params) -> tuple[str, list[Sourc
     work = scenario.mothers_work
     if work == "business":
         return (
-            "Zasiłek chorobowy mamy wypłaca ZUS: przy własnej firmie wniosek o zasiłek chorobowy "
-            "(ZAS-53) składa się do ZUS.",
-            merge_sources(a.sick_business.sources, a.paid_by_payer_or_zus.sources),
+            "Zasiłek chorobowy mamy wypłaca ZUS: wypłaca zasiłki osobom prowadzącym własną firmę, "
+            "a wniosek o zasiłek chorobowy (ZAS-53) składa się do ZUS.",
+            merge_sources(a.business_paid_by_zus.sources, a.sick_business.sources),
         )
     limit = a.payer_more_than_insured.value
     if work == "employment":
@@ -355,6 +404,8 @@ def _sick_documents(
         return []
     first = min(benefit, key=lambda s: s.start)
     line, line_sources = sick_payer_line(scenario, params)
+    if work == "contract" and payer_by_size(scenario, "mother") == "payer":
+        return [_e_zla_enough(first, params)]
     if work == "business":
         title, label = "Wniosek o zasiłek chorobowy (ZAS-53)", "Wniosek ZAS-53"
         rule = [
@@ -387,6 +438,30 @@ def _sick_documents(
             sources=merge_sources(*sources),
         )
     ]
+
+
+def _e_zla_enough(first: Segment, params: Params) -> Document:
+    """A contract of mandate with a payer of more than 20 insured: the payer pays the sickness
+    benefit on the basis of e-ZLA (guide page 3, ustawa art. 61b ust. 2 pkt 1 lit. a); the
+    documents of annex 1 are for ZUS (regulation of 27.09.2026 § 2). Nothing more to file."""
+    a = params.applications
+    return Document(
+        id=SICK_E_ZLA,
+        label="Zasiłek chorobowy: e-ZLA wystarczy",
+        title="Zasiłek chorobowy na podstawie e-ZLA",
+        needed_by=first.start,
+        done=False,
+        rule=(
+            "Mama pracuje na umowie zlecenia: na zwolnieniu powinna powstrzymać się od pracy "
+            "zawodowej. Jej zleceniodawca zgłasza do ubezpieczenia chorobowego więcej niż "
+            f"{a.payer_more_than_insured.value} osób, więc sam wypłaca zasiłek chorobowy na "
+            "podstawie zaświadczenia lekarskiego e-ZLA, udostępnionego na jego profilu "
+            "informacyjnym. Innych dokumentów do zasiłku nie trzeba składać: wniosek z danymi "
+            "z rozporządzenia jest potrzebny, gdy zasiłek wypłaca ZUS."
+        ),
+        segment_id=first.id,
+        sources=merge_sources(a.sick_e_zla_enough.sources, a.payer_more_than_insured.sources),
+    )
 
 
 def _job_loss_documents(
@@ -449,21 +524,205 @@ def _by(
     )
 
 
+def in_time_from(document: Document, timeline: Timeline) -> dt.date | None:
+    """For a request moved to today (an option whose deadline passed for the start drawn on the
+    timeline, `Document.deadline`): the first day of leave (of the benefit) a request filed
+    today is in time for, the same number of days after today as the deadline was before the
+    start. None for any other document."""
+    if document.deadline is None or document.segment_id is None:
+        return None
+    if document.deadline >= timeline.today or document.needed_by <= document.deadline:
+        return None
+    segment = _segment(timeline, document.segment_id)
+    if segment is None:
+        return None
+    return timeline.today + (segment.start - document.deadline)
+
+
+def in_time_period(
+    document: Document | None, segment: Segment, timeline: Timeline
+) -> tuple[dt.date, dt.date]:
+    """The period a request can ask for: the timeline's, or for a request moved to today the
+    same length from `in_time_from`, but not past the last day this leave may be used (its
+    marker). When even that first day is too late, the timeline's period."""
+    start = in_time_from(document, timeline) if document is not None else None
+    if start is None:
+        return segment.start, segment.end
+    end = start + (segment.end - segment.start)
+    limit = next(
+        (m.date for m in timeline.markers if m.id == LIMIT_MARKERS.get(period_kind(segment.id))),
+        None,
+    )
+    if limit is not None:
+        if start > limit:
+            return segment.start, segment.end
+        end = min(end, limit)
+    return start, end
+
+
 def _requests(
     scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
 ) -> list[Document]:
     documents: list[Document] = []
     if _covered(scenario, "mother"):
         if scenario.mothers_work == "employment" and not _after_job_loss(scenario, "mother"):
-            documents += _employee_mother(scenario, timeline, params, today)
+            documents += _takeover_notes(
+                _employee_mother(scenario, timeline, params, today), scenario, params
+            )
         else:
             documents += _zam(scenario, timeline, params, today, "mother")
+            documents += _mother_stops(scenario, timeline, params, today)
     if _covered(scenario, "father") and any(s.lane == "father" for s in timeline.segments):
         if scenario.fathers_work == "employment":
             documents += _employee_father(scenario, timeline, params, today)
         else:
             documents += _zam(scenario, timeline, params, today, "father")
     return documents
+
+
+# The mother stops her benefit when the father takes it on (guide B.1-B.2; regulation of
+# 27.09.2026 § 18 ust. 1, § 21, § 24 ust. 1).
+
+
+def _stop_situation(scenario: Scenario) -> str | None:
+    """Why the father takes on the mother's benefit: "takeover" (after her 14 weeks),
+    "incapacity", "hospital"; None otherwise (or after her death or abandonment: she files
+    nothing)."""
+    event = scenario.mother_event
+    if event is None:
+        return "takeover" if scenario.father_takes_over else None
+    return event.kind if event.kind in ("incapacity", "hospital") else None
+
+
+def _benefit_payer_words(scenario: Scenario) -> str:
+    """Who pays the mother's benefit when she is not an employee, after "płatnikowi swojego
+    zasiłku": the same rule as where she files ZAM (`files_with`)."""
+    return {"payer": "zleceniodawcy", "zus": "ZUS"}.get(
+        files_with(scenario, "mother"), "zleceniodawcy albo ZUS"
+    )
+
+
+def _mother_stops(
+    scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
+) -> list[Document]:
+    """A mother who is not an employee stops her maternity benefit when the father takes it on:
+    the request with the day she gives it up (taking over, § 18 ust. 1 pkt 3; her incapacity,
+    § 21 pkt 3, with the ruling, pkt 4) or the hospital's admission certificate (her stay in
+    hospital, § 24 ust. 1 pkt 1), and her statement of the day from which the father has the
+    benefit (pkt 1, § 24 ust. 1 pkt 2). Filed with the payer of her benefit; the materials give
+    no deadline, so it is shown on that day."""
+    situation = _stop_situation(scenario)
+    his = _segment(timeline, "maternity-father")
+    if situation is None or his is None or his.start < today:
+        return []
+    stop = params.applications.stop_benefit[situation]
+    payer = _benefit_payer_words(scenario)
+    day = fmt(his.start)
+    if situation == "hospital":
+        assert stop.attachment is not None
+        title = "Przerwa w zasiłku macierzyńskim na czas pobytu w szpitalu"
+        label = "Przerwa w zasiłku: szpital"
+        rule = [
+            "Mama nie jest pracownicą: na czas pobytu w szpitalu przerywa pobieranie zasiłku "
+            f"macierzyńskiego, a od {day} zasiłek ma tata. Płatnikowi swojego zasiłku ({payer}) "
+            "składa zaświadczenie szpitala o dacie przyjęcia i oświadczenie o dacie, od której "
+            "tata będzie korzystał z zasiłku."
+        ]
+        sources = [stop.basis.sources, stop.attachment.sources, stop.father_from.sources]
+    else:
+        assert stop.request is not None
+        title = "Wniosek o rezygnację z pobierania zasiłku macierzyńskiego"
+        label = "Rezygnacja z zasiłku"
+        why = (
+            "dalszą część zasiłku przejmuje tata"
+            if situation == "takeover"
+            else "ma orzeczenie o niezdolności do samodzielnej egzystencji i dalszą część "
+            "zasiłku przejmuje tata"
+        )
+        rule = [
+            f"Mama nie jest pracownicą, a {why}. Płatnikowi swojego zasiłku ({payer}) składa "
+            "wniosek z datą, od której rezygnuje z pobierania zasiłku macierzyńskiego "
+            f"({day}), i oświadczenie o dacie, od której tata będzie korzystał z zasiłku."
+        ]
+        sources = [stop.basis.sources, stop.request.sources, stop.father_from.sources]
+        if stop.attachment is not None:
+            rule.append("Do wniosku dołącza orzeczenie o niezdolności do samodzielnej egzystencji.")
+            sources.append(stop.attachment.sources)
+    rule.append("Materiały nie podają terminu: pokazujemy to na dzień, od którego zasiłek ma tata.")
+    maternity = _segment(timeline, "maternity")
+    return [
+        Document(
+            id=STOP_REQUEST,
+            label=label,
+            title=title,
+            needed_by=his.start,
+            done=False,
+            rule=" ".join(rule),
+            segment_id=maternity.id if maternity is not None else his.id,
+            sources=merge_sources(*sources),
+        )
+    ]
+
+
+def _takeover_notes(
+    documents: list[Document], scenario: Scenario, params: Params
+) -> list[Document]:
+    """The employed mother's requests when the father takes on her leave. Guide B.1: she
+    resigns from the rest of maternity leave or asks for 14 weeks right away — the two requests
+    are alternatives. § 18 ust. 1 pkt 1-2 (§ 21 pkt 1-2): when ZUS pays her benefit, her
+    statement of the day the father starts and her employer's certificate of the end of her
+    leave go to ZUS."""
+    resignation = next((d for d in documents if d.id == "maternity-resignation"), None)
+    situation = _stop_situation(scenario)
+    if resignation is None or situation is None:
+        return documents
+    weeks = params.maternity.mother_personal_weeks.value
+    alternative = (
+        situation == "takeover" and (scenario.mother_weeks_before_takeover or weeks) == weeks
+    )
+    added: dict[str, tuple[list[str], list[list[SourceRef]]]] = {}
+    if alternative:
+        both = params.father.takeover_starts_after.sources
+        added["maternity-request"] = (
+            [
+                f"Na osi mama bierze {weeks} tygodni urlopu, a dalszą część przejmuje tata: może "
+                f"od razu wnioskować tylko o {weeks} tygodni (tak jest w tym wniosku) albo "
+                "wnioskować o cały urlop i potem zrezygnować z jego dalszej części. To dwie drogi "
+                "do wyboru."
+            ],
+            [both],
+        )
+        added["maternity-resignation"] = (
+            ["Wtedy wniosku o rezygnację nie składa: to dwie drogi do wyboru."],
+            [both],
+        )
+    payer = who_pays(scenario, "mother")
+    if payer != "payer":
+        stop = params.applications.stop_benefit[situation]
+        when = (
+            "Zasiłek mamy wypłaca ZUS, więc do ZUS"
+            if payer == "zus"
+            else "Jeśli zasiłek mamy wypłaca ZUS, do ZUS"
+        )
+        lines, sources = added.get("maternity-resignation", ([], []))
+        lines.append(
+            f"{when} trafia też zaświadczenie pracodawcy o terminie zaprzestania korzystania "
+            "z urlopu macierzyńskiego i oświadczenie mamy o dacie, od której tata będzie "
+            "korzystał z zasiłku."
+        )
+        sources += [stop.basis.sources, stop.employer_certificate.sources, stop.father_from.sources]
+        added["maternity-resignation"] = (lines, sources)
+    return [
+        d.model_copy(
+            update={
+                "rule": " ".join([d.rule, *added[d.id][0]]),
+                "sources": merge_sources(d.sources, *added[d.id][1]),
+            }
+        )
+        if d.id in added
+        else d
+        for d in documents
+    ]
 
 
 def _employee_mother(
@@ -828,7 +1087,7 @@ def _zam(
     contract of mandate the payer or ZUS determines the benefit, with Z-3a from the payer."""
     a = params.applications
     if parent == "mother":
-        periods = [s for s in timeline.segments if s.lane == "mother" and s.id in MOTHER_LEAVE]
+        periods = [s for s in timeline.segments if is_mother_leave(s)]
     else:
         periods = [s for s in timeline.segments if s.lane == "father"]
     periods = [s for s in periods if s.end >= today]
@@ -886,14 +1145,6 @@ def _zam(
         "i rodzicielskiego, a od 24 października 2026 r. także ojcowskiego (formularze ZUR i ZAO "
         "połączono z ZAM)."
     )
-    rule.append(
-        "Za okres urlopu macierzyńskiego materiały nie podają terminu tego wniosku: pokazujemy go "
-        "na dzień, od którego przysługuje zasiłek. Za uzupełniający, rodzicielski i ojcowski "
-        "osoba niebędąca pracownikiem składa wniosek wcześniej: terminy są osobno na osi."
-        if any(s.id != first.id for s in periods)
-        else "Materiały nie podają terminu tego wniosku: pokazujemy go na dzień, od którego "
-        "przysługuje zasiłek."
-    )
     sources.append(a.zam_form.sources)
     if parent == "mother":
         supplementary = _segment(timeline, "supplementary")
@@ -908,6 +1159,35 @@ def _zam(
     later = _zam_deadlines(
         scenario, [s for s in timeline.segments if s.lane == parent], params, today, parent
     )
+    needed_by, deadline = first.start, None
+    own = (
+        None
+        if period_kind(first.id) in MATERNITY_PERIODS
+        else _zam_deadline(scenario, first, params, today, parent)
+    )
+    if own is None:
+        rule.append(
+            "Za okres urlopu macierzyńskiego materiały nie podają terminu tego wniosku: pokazujemy "
+            "go na dzień, od którego przysługuje zasiłek. Za uzupełniający, rodzicielski "
+            "i ojcowski osoba niebędąca pracownikiem składa wniosek wcześniej: terminy są osobno "
+            "na osi."
+            if later
+            else "Materiały nie podają terminu tego wniosku: pokazujemy go na dzień, od którego "
+            "przysługuje zasiłek."
+        )
+    else:
+        # The first period has its own deadline (§ 26, § 29, § 30, § 32, § 33): this is that
+        # ZAM, not a second one without a deadline.
+        later = [d for d in later if d.segment_id != first.id]
+        needed_by, deadline, what, when, deadline_rule = own
+        rule.append(f"Za okres: {what}. {when}")
+        sources.append(deadline_rule.sources)
+        if later:
+            rule.append("Za kolejne okresy terminy są osobno na osi.")
+        statement = _parental_statement(params, deadline_rule)
+        if statement is not None:
+            rule.append(statement[0])
+            sources.append(statement[1])
     return [
         Document(
             id="maternity-request" if parent == "mother" else "father-benefit-request",
@@ -915,11 +1195,12 @@ def _zam(
             title="Wniosek o zasiłek macierzyński (ZAM)"
             if parent == "mother"
             else "Wniosek taty o zasiłek macierzyński (ZAM)",
-            needed_by=first.start,
+            needed_by=needed_by,
             done=False,
             rule=" ".join(rule),
             segment_id=first.id,
             sources=merge_sources(*sources),
+            deadline=deadline,
         ),
         *later,
     ]
@@ -931,72 +1212,115 @@ def _zam(
 # and "przed zakończeniem okresu pobierania": the latest day is the day before.
 
 
+def _zam_deadline(
+    scenario: Scenario, segment: Segment, params: Params, today: dt.date, parent: Parent
+) -> tuple[dt.date, dt.date, str, str, Rule] | None:
+    """ZAM for one later period: when it is due, its deadline, what the period is, the sentence
+    that says when, and the rule; None for a period without a deadline in the regulation."""
+    a = params.applications
+    stem = period_kind(segment.id)
+    if stem == "supplementary":
+        day = segment.start - DAY  # the last day of the maternity benefit
+        deadline = day - DAY
+        what = "uzupełniający urlop macierzyński"
+        before = f"przed końcem zasiłku za okres urlopu macierzyńskiego ({fmt(day)})"
+        rule = a.zam_supplementary_before
+    elif stem in PARENTAL_PERIODS:
+        deadline = segment.start - DAY
+        what = "urlop rodzicielski"
+        before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
+        rule = parental_zam_rule(scenario, params, parent)
+    elif stem == "paternity":
+        deadline = segment.start - DAY
+        what = "urlop ojcowski"
+        before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
+        rule = a.zam_paternity_before
+    else:
+        return None
+    if deadline >= today:
+        when = f"Najpóźniej {fmt(deadline)}: wniosek składa się {before}."
+        return deadline, deadline, what, when, rule
+    if segment.tone == "option":
+        when = (
+            f"Wniosek składa się {before}, więc dla tego dnia termin minął {fmt(deadline)}. "
+            f"Złożony dziś jest w terminie dla zasiłku od {fmt(today + DAY)}."
+        )
+        return today, deadline, what, when, rule
+    when = f"Termin minął {fmt(deadline)}: wniosek składa się {before}."
+    return deadline, deadline, what, when, rule
+
+
 def _zam_deadlines(
     scenario: Scenario, periods: list[Segment], params: Params, today: dt.date, parent: Parent
 ) -> list[Document]:
     a = params.applications
     documents = []
     for segment in sorted(periods, key=lambda s: s.start):
-        stem = segment.id.rsplit("-", 1)[0] if segment.id[-1].isdigit() else segment.id
         if segment.start < today:
             continue  # the benefit is already being paid: the request is behind
-        if stem == "supplementary":
-            day = segment.start - DAY  # the last day of the maternity benefit
-            deadline = day - DAY
-            what = "uzupełniający urlop macierzyński"
-            before = f"przed końcem zasiłku za okres urlopu macierzyńskiego ({fmt(day)})"
-            rule = a.zam_supplementary_before
-        elif stem in ("parental", "parental-mother", "parental-father"):
-            deadline = segment.start - DAY
-            what = "urlop rodzicielski"
-            before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
-            if parent == "mother" or scenario.father_takes_over:
-                rule = a.zam_parental_before
-            elif coverage(scenario) in NOT_INSURED:
-                rule = a.zam_parental_before_father
-            else:
-                rule = a.zam_parental_before_other
-        elif stem == "paternity":
-            deadline = segment.start - DAY
-            what = "urlop ojcowski"
-            before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
-            rule = a.zam_paternity_before
-        else:
+        due = _zam_deadline(scenario, segment, params, today, parent)
+        if due is None:
             continue
-        if deadline >= today:
-            needed_by, when = deadline, f"Najpóźniej {fmt(deadline)}: wniosek składa się {before}."
-        elif segment.tone == "option":
-            needed_by, when = (
-                today,
-                (
-                    f"Wniosek składa się {before}, więc dla tego dnia termin minął "
-                    f"{fmt(deadline)}. Złożony dziś jest w terminie dla zasiłku od "
-                    f"{fmt(today + DAY)}."
-                ),
-            )
-        else:
-            needed_by, when = (
-                deadline,
-                f"Termin minął {fmt(deadline)}: wniosek składa się {before}.",
-            )
+        needed_by, deadline, what, when, rule = due
         whose = "" if parent == "mother" else " taty"
+        employee = "pracownicą" if parent == "mother" else "pracownikiem"
+        text = [
+            f"{WHO[parent]} nie jest {employee}: wniosek o zasiłek za ten okres składa "
+            f"płatnikowi zasiłku (ZUS albo płatnikowi składek, jak ZAM). {when}"
+        ]
+        sources = [rule.sources, a.zam_form.sources]
+        statement = _parental_statement(params, rule)
+        if statement is not None:
+            text.append(statement[0])
+            sources.append(statement[1])
         documents.append(
             Document(
-                id=f"zam-{segment.id}",
+                id=f"{ZAM_REQUESTS}{segment.id}",
                 label=f"ZAM{whose}: {what}",
                 title=f"Wniosek{whose} o zasiłek macierzyński za okres: {what} (ZAM)",
                 needed_by=needed_by,
                 done=False,
-                rule=(
-                    f"{WHO[parent]} nie jest pracownikiem: wniosek o zasiłek za ten okres składa "
-                    f"płatnikowi zasiłku (ZUS albo płatnikowi składek, jak ZAM). {when}"
-                ),
+                rule=" ".join(text),
                 segment_id=segment.id,
-                sources=merge_sources(rule.sources, a.zam_form.sources),
+                sources=merge_sources(*sources),
                 deadline=deadline,
             )
         )
     return documents
+
+
+def parental_zam_rule(scenario: Scenario, params: Params, parent: Parent) -> Rule:
+    """Which provision names the documents for this parent's benefit for parental leave:
+    § 29 (the benefit before it was the same parent's), § 32 (the father, the mother without
+    an insurance title), § 30 ust. 1 (the other parent's)."""
+    a = params.applications
+    if parent == "mother" or scenario.father_takes_over:
+        return a.zam_parental_before
+    if coverage(scenario) in NOT_INSURED:
+        return a.zam_parental_before_father
+    return a.zam_parental_before_other
+
+
+def parental_statement_applies(rule: Rule, params: Params) -> bool:
+    """§ 29 pkt 4 and § 30 ust. 1 pkt 5 name the statement of the benefit for parental leave
+    already paid; § 32 (the father, the mother without an insurance title) does not."""
+    a = params.applications
+    return rule in (a.zam_parental_before, a.zam_parental_before_other)
+
+
+def _parental_statement(params: Params, rule: Rule) -> tuple[str, list[SourceRef]] | None:
+    """The sentence and the source of that statement, for ZAM under `rule`; None when the
+    provision does not name it."""
+    if not parental_statement_applies(rule, params):
+        return None
+    paragraph = rule.sources[0].article
+    statement = params.forms.templates["zam"].attachments["parental-benefit-statement"]
+    return (
+        "Do wniosku za okres urlopu rodzicielskiego dołącza się oświadczenie z NIP i nazwami "
+        "płatników zasiłku oraz z okresem, liczbą części i stawką zasiłku za ten urlop już "
+        "wypłaconego.",
+        [s for s in statement.sources if s.article == paragraph],
+    )
 
 
 def _attachments(
@@ -1030,7 +1354,8 @@ def _attachments(
 def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> Marker | None:
     """Guide I; art. 177 § 1, § 1¹: an employed mother is protected in pregnancy, on maternity
     leave, and from the request for further leave until it ends. The marker is the last day of
-    the leave that follows on from maternity leave on the timeline."""
+    the leave that follows on from maternity leave on the timeline, or, once that is over, of the
+    next stretch of leave (a later part of parental leave: from its request until it ends)."""
     if scenario.mothers_work != "employment" or not _covered(scenario, "mother"):
         return None
     if scenario.mother_event is not None and scenario.mother_event.kind == "death":
@@ -1038,23 +1363,19 @@ def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> M
     if _after_job_loss(scenario, "mother"):
         return None  # no longer employed: the benefit after the insurance ended
     a = params.applications
-    leave = sorted(
-        (s for s in timeline.segments if s.lane == "mother" and s.id in MOTHER_LEAVE),
-        key=lambda s: s.start,
-    )
+    leave = sorted((s for s in timeline.segments if is_mother_leave(s)), key=lambda s: s.start)
     if not any(s.id == "maternity" for s in leave):
         return None
-    chain = [leave[0]]
-    for segment in leave[1:]:
-        if segment.start == chain[-1].end + DAY:
-            chain.append(segment)
-    end = chain[-1].end
-    if end < timeline.today:
+    chain = _protected_stretch(leave, timeline.today)
+    if chain is None:
         return None
-    later = [s for s in leave if s not in chain]
+    end = chain[-1].end
+    later = [s for s in leave if s.start > end]
     details = [
         "Wyjątek: przyczyny uzasadniające rozwiązanie umowy bez wypowiedzenia z winy pracownicy, "
-        "gdy zgodzi się na to reprezentująca ją zakładowa organizacja związkowa."
+        "gdy zgodzi się na to reprezentująca ją zakładowa organizacja związkowa.",
+        "Wypowiedzieć umowę w tym czasie pracodawca może tylko w razie ogłoszenia upadłości albo "
+        "likwidacji; termin rozwiązania umowy musi uzgodnić z zakładową organizacją związkową.",
     ]
     options = [_leave_name(s) for s in chain if s.tone == "option"]
     if options:
@@ -1074,6 +1395,12 @@ def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> M
     )
     if not timeline.child_born:
         details.append("Liczymy od przewidywanej daty porodu.")
+    when = (
+        "W ciąży i w czasie urlopu macierzyńskiego, a także od dnia złożenia wniosku o kolejny "
+        "urlop do dnia jego zakończenia"
+        if any(s.id == "maternity" for s in chain)
+        else f"Od dnia złożenia wniosku o {_leave_name(chain[0])} do dnia zakończenia urlopu"
+    )
     return Marker(
         id="protection-end",
         lane="child",
@@ -1081,14 +1408,27 @@ def _protection_end(scenario: Scenario, timeline: Timeline, params: Params) -> M
         title="Koniec ochrony mamy przed zwolnieniem",
         date=end,
         summary=(
-            "W ciąży i w czasie urlopu macierzyńskiego, a także od dnia złożenia wniosku o kolejny "
-            "urlop do dnia jego zakończenia, pracodawca nie może wypowiedzieć ani rozwiązać umowy "
-            "o pracę z mamą ani prowadzić do tego przygotowań. Przy urlopach jak na osi ochrona "
-            f"trwa do {fmt(end)}."
+            f"{when} pracodawca nie może wypowiedzieć ani rozwiązać umowy o pracę z mamą ani "
+            f"prowadzić do tego przygotowań. Przy urlopach jak na osi ochrona trwa do {fmt(end)}."
         ),
         details=details,
-        sources=merge_sources(a.protection.sources, a.protection_early_request_days.sources),
+        sources=merge_sources(
+            a.protection.sources,
+            a.protection_bankruptcy.sources,
+            a.protection_early_request_days.sources,
+        ),
     )
+
+
+def _protected_stretch(leave: list[Segment], today: dt.date) -> list[Segment] | None:
+    """The first stretch of leave, one period right after another, that has not ended yet."""
+    stretches: list[list[Segment]] = []
+    for segment in leave:
+        if stretches and segment.start == stretches[-1][-1].end + DAY:
+            stretches[-1].append(segment)
+        else:
+            stretches.append([segment])
+    return next((s for s in stretches if s[-1].end >= today), None)
 
 
 def _leave_name(segment: Segment) -> str:
@@ -1136,20 +1476,29 @@ def _assumptions(scenario: Scenario, timeline: Timeline) -> list[str]:
             "trzeba złożyć najpóźniej 21. dnia przed pierwszym dniem urlopu (tak samo przy 7 i 14 "
             "dniach)."
         )
-    if shown & {"maternity-request", "father-benefit-request"}:
+    if any(
+        d.id in ("maternity-request", "father-benefit-request") and d.deadline is None
+        for d in timeline.documents
+    ):
         assumptions.append(
-            "Terminu wniosku o urlop macierzyński ani wniosku ZAM materiały nie podają: pokazujemy "
-            "go na dzień, w którym zaczyna się urlop (zasiłek)."
+            "Terminu wniosku o urlop macierzyński ani wniosku ZAM za ten urlop materiały nie "
+            "podają: pokazujemy go na dzień, w którym zaczyna się urlop (zasiłek)."
         )
     if "father-benefit-request" in shown:
         assumptions.append(
             "Gdzie składa wniosek ZAM osoba, która nie jest pracownikiem, Przewodnik mówi przy "
             "mamie; dla taty przyjmujemy to samo."
         )
-    if "business" in (scenario.mothers_work, scenario.fathers_work):
+    if any(in_time_from(d, timeline) is not None for d in timeline.documents):
         assumptions.append(
-            "Przy własnej firmie wniosek ZAM składa się bezpośrednio do ZUS, więc przyjmujemy, "
-            "że zasiłek wypłaca ZUS."
+            "Gdy termin wniosku o urlop do wyboru minął dla dnia pokazanego na osi, formularz "
+            "i pismo proszą o ten urlop od pierwszego dnia, dla którego wniosek złożony dziś jest "
+            "w terminie."
+        )
+    if STOP_REQUEST in shown:
+        assumptions.append(
+            "Terminu dokumentów, którymi mama kończy pobieranie zasiłku, gdy przejmuje go tata, "
+            "materiały nie podają: pokazujemy je na dzień, od którego zasiłek ma tata."
         )
     # Sick leave in pregnancy and the benefit after losing the job (guide pages 3-4).
     if "sick-leave-notice" in shown:
@@ -1162,12 +1511,6 @@ def _assumptions(scenario: Scenario, timeline: Timeline) -> list[str]:
         assumptions.append(
             "Terminu dokumentów do zasiłku chorobowego materiały nie podają: pokazujemy je na "
             "dzień, od którego przysługuje zasiłek."
-            + (
-                " Wniosek ZAS-53 przy własnej firmie idzie do ZUS, więc przyjmujemy, że zasiłek "
-                "chorobowy wypłaca ZUS."
-                if scenario.mothers_work == "business"
-                else ""
-            )
         )
     if any(d.id == COURT_JUDGMENT and not d.done for d in timeline.documents):
         assumptions.append(
@@ -1198,7 +1541,9 @@ def application_notes(scenario: Scenario, timeline: Timeline, params: Params) ->
 def _has_leave(timeline: Timeline, parent: Parent) -> bool:
     if parent == "father":
         return any(s.lane == "father" for s in timeline.segments)
-    return any(s.lane == "mother" and s.id in BENEFIT_PERIODS for s in timeline.segments)
+    return any(
+        s.lane == "mother" and period_kind(s.id) in BENEFIT_PERIODS for s in timeline.segments
+    )
 
 
 def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
@@ -1210,9 +1555,10 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
         and _covered(scenario, "father")
         and _has_leave(timeline, "father")
     )
+    early, early_sources = _fathers_early_request(timeline, params)
     his = (
         " Tatę, który pracuje na umowie o pracę, chroni to samo od dnia złożenia wniosku "
-        "o urlop do dnia jego zakończenia."
+        f"o urlop do dnia jego zakończenia.{early}"
     )
     employed = not _after_job_loss(scenario, "mother")
     if alive and employed and mother == "employment" and _has_leave(timeline, "mother"):
@@ -1221,9 +1567,13 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
             "Mama pracuje na umowie o pracę, więc w ciąży i w czasie urlopu macierzyńskiego, "
             "a także od dnia złożenia wniosku o kolejny urlop do dnia jego zakończenia, "
             "pracodawca nie może wypowiedzieć ani rozwiązać z nią umowy ani się do tego "
-            "przygotowywać (wyjątek: rozwiązanie umowy z jej winy za zgodą związku zawodowego)."
+            "przygotowywać (wyjątki: rozwiązanie umowy bez wypowiedzenia z jej winy za zgodą "
+            "związku zawodowego, a wypowiedzenie tylko przy upadłości albo likwidacji "
+            "pracodawcy)."
         )
-        sources = [a.protection.sources]
+        sources = [a.protection.sources, a.protection_bankruptcy.sources]
+        if father:
+            sources.append(early_sources)
         if marker is not None:
             text += f" Przy urlopach jak na osi ochrona trwa do {long_date(marker.date)}."
         if not timeline.child_born:
@@ -1255,7 +1605,9 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
                 f"pracowników. Mama {how}, więc jej nie obejmuje." + (his if father else "")
             ),
             sources=merge_sources(
-                a.protection_employees_only.sources, a.protection.sources if father else []
+                a.protection_employees_only.sources,
+                a.protection.sources if father else [],
+                early_sources if father else [],
             ),
         )
     if father:
@@ -1266,11 +1618,39 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
             text=(
                 "Tata pracuje na umowie o pracę: od dnia złożenia wniosku o urlop do dnia jego "
                 "zakończenia pracodawca nie może wypowiedzieć ani rozwiązać z nim umowy ani się do "
-                "tego przygotowywać."
+                "tego przygotowywać (wyjątki: rozwiązanie umowy bez wypowiedzenia z jego winy za "
+                "zgodą związku zawodowego, a wypowiedzenie tylko przy upadłości albo likwidacji "
+                f"pracodawcy).{early}"
             ),
-            sources=a.protection.sources,
+            sources=merge_sources(
+                a.protection.sources, a.protection_bankruptcy.sources, early_sources
+            ),
         )
     return None
+
+
+def _fathers_early_request(timeline: Timeline, params: Params) -> tuple[str, list[SourceRef]]:
+    """Art. 177 § 1¹: a request filed earlier than the Labour Code's deadline starts the ban 14
+    days before a part of maternity leave, 21 before supplementary or parental leave, 7 before
+    paternity leave; only the father's leaves on the timeline, in the provision's order."""
+    a = params.applications
+    maternity, longer, paternity = a.protection_early_request_days.value
+    kinds = {period_kind(s.id) for s in timeline.segments if s.lane == "father"}
+    leaves = [
+        (maternity, "częścią urlopu macierzyńskiego", "maternity-father" in kinds),
+        (longer, "urlopem uzupełniającym", "supplementary" in kinds),
+        (longer, "urlopem rodzicielskim", "parental-father" in kinds),
+        (paternity, "urlopem ojcowskim", "paternity" in kinds),
+    ]
+    named = [f"{days} dni przed {leave}" for days, leave, shown in leaves if shown]
+    if not named:
+        return "", []
+    listed = named[0] if len(named) == 1 else f"{', '.join(named[:-1])} i {named[-1]}"
+    return (
+        " Jeśli złoży wniosek wcześniej niż w terminie z Kodeksu pracy, zakaz zaczyna obowiązywać "
+        f"{listed}.",
+        a.protection_early_request_days.sources,
+    )
 
 
 def _payer_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
@@ -1346,27 +1726,38 @@ def _sick_payer_lines(
     return lines
 
 
-def _destination(document: Document, scenario: Scenario) -> str:
-    """Where the request goes, in a few words."""
-    if document.id == "father-benefit-request":
-        work = scenario.fathers_work
-    elif document.id in ("maternity-request", "sick-benefit-request"):
-        work = scenario.mothers_work
-        if _after_job_loss(scenario, "mother"):
-            return "do ZUS"
+def _destination(document: Document, scenario: Scenario, timeline: Timeline) -> str:
+    """Where the request goes, in a few words: by the same rule as the form (`files_with`)."""
+    if document.id.startswith(ZAM_REQUESTS):
+        segment = _segment(timeline, document.segment_id or "")
+        parent: Parent = "father" if segment is not None and segment.lane == "father" else "mother"
+    elif document.id == "father-benefit-request":
+        parent = "father"
+    elif document.id in ("maternity-request", "sick-benefit-request", STOP_REQUEST):
+        parent = "mother"
     else:
         return "do pracodawcy"
-    match work:
-        case "employment":
-            return "do pracodawcy"
-        case "business":
-            return "do ZUS"
-        case _:
-            return "do płatnika składek albo do ZUS"
+    if _work(scenario, parent) == "employment" and not _after_job_loss(scenario, parent):
+        return "do pracodawcy"
+    return {
+        "zus": "do ZUS",
+        "payer": "do płatnika składek (zleceniodawcy)",
+        "payer-or-zus": "do płatnika składek albo do ZUS",
+    }[files_with(scenario, parent)]
 
 
-def _applications_line(document: Document, scenario: Scenario, today: dt.date) -> str:
-    destination = _destination(document, scenario)
+def files_with(scenario: Scenario, parent: Parent) -> Payer:
+    """Where a parent who is not an employee files ZAM and the documents for the sickness
+    benefit: straight with ZUS with a business (or after losing the job); on a contract of
+    mandate the payer that pays the benefit itself, otherwise ZUS (guide A.4, page 3)."""
+    if _work(scenario, parent) == "business" or _after_job_loss(scenario, parent):
+        return "zus"
+    return who_pays(scenario, parent)
+
+
+def _applications_line(document: Document, scenario: Scenario, timeline: Timeline) -> str:
+    destination = _destination(document, scenario, timeline)
+    today = timeline.today
     match document.id:
         case "sick-leave-notice":
             return (
@@ -1384,13 +1775,22 @@ def _applications_line(document: Document, scenario: Scenario, today: dt.date) -
                 "ZAM" in document.title
             )
             day = (
-                "dzień, od którego przysługuje zasiłek"
+                "dzień, od którego zasiłek ma tata"
+                if document.id == STOP_REQUEST
+                else "dzień, od którego przysługuje zasiłek"
                 if benefit
                 else "dzień, w którym zaczyna się urlop"
             )
             return (
                 f"{document.title} — {destination}. Terminu materiały nie podają; na osi jest "
                 f"na {long_date(document.needed_by)}, {day}."
+            )
+        # An option whose deadline passed for the day on the timeline: not lost, it moves.
+        case _ if (moved := in_time_from(document, timeline)) is not None:
+            what = "zasiłku" if "ZAM" in document.title else "urlopu"
+            return (
+                f"{document.title} — {destination}: złóż dziś — w terminie dla {what} od "
+                f"{long_date(moved)}."
             )
         case _ if document.deadline < today:
             return f"{document.title} — {destination}: termin minął {long_date(document.deadline)}."
@@ -1400,17 +1800,18 @@ def _applications_line(document: Document, scenario: Scenario, today: dt.date) -
 
 def _applications_note(scenario: Scenario, timeline: Timeline) -> CaseNote | None:
     listed = (*REQUESTS, *SICK_DOCUMENTS, COURT_JUDGMENT)
+    prefixes = (*PLAN_REQUESTS, *WORK_REQUESTS, ZAM_REQUESTS)
     documents = sorted(
         (
             d
             for d in timeline.documents
-            if (d.id in listed or d.id.startswith((*PLAN_REQUESTS, *WORK_REQUESTS))) and not d.done
+            if (d.id in listed or d.id.startswith(prefixes)) and not d.done
         ),
         key=lambda d: d.needed_by,
     )
     if not documents:
         return None
-    lines = [_applications_line(d, scenario, timeline.today) for d in documents]
+    lines = [_applications_line(d, scenario, timeline) for d in documents]
     return CaseNote(
         id="applications",
         kind="computed",

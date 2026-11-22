@@ -1336,6 +1336,25 @@
         }
       ]
     },
+    "business_paid_by_zus": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "Prawo do zasiłków określonych w ustawie i ich wysokość ustalają oraz zasiłki te wypłacają:"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "2) Zakład Ubezpieczeń Społecznych:"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 61 ust. 1",
+          "quote": "b) ubezpieczonym prowadzącym pozarolniczą działalność i osobom z nimi współpracującym"
+        }
+      ]
+    },
     "contract_zam": {
       "sources": [
         {
@@ -1651,6 +1670,20 @@
         }
       ]
     },
+    "protection_bankruptcy": {
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 177 § 4",
+          "quote": "Rozwiązanie przez pracodawcę umowy o pracę za wypowiedzeniem w okresie ciąży oraz w okresie urlopu macierzyńskiego"
+        },
+        {
+          "doc": "kp",
+          "article": "art. 177 § 4",
+          "quote": "może nastąpić tylko w razie ogłoszenia upadłości lub likwidacji pracodawcy. Pracodawca jest obowiązany uzgodnić termin rozwiązania umowy o pracę z zakładową organizacją związkową reprezentującą tę pracownicę lub tego pracownika."
+        }
+      ]
+    },
     "protection_early_request_days": {
       "value": [
         14,
@@ -1731,6 +1764,26 @@
         }
       ]
     },
+    "sick_e_zla_enough": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "ZC",
+          "page": 3,
+          "quote": "uprawniony płatnik składek wypłaca zasiłek na podstawie zaświadczenie lekarskiego e-ZLA"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 61b ust. 2",
+          "quote": "Postępowanie w sprawie przyznania i wypłaty zasiłku chorobowego wszczyna się: 1) jeżeli płatnikiem zasiłku jest płatnik składek - na podstawie: a) zaświadczenia lekarskiego, o którym mowa w art. 55 ust. 1, udostępnionego na profilu informacyjnym płatnika składek"
+        },
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 2",
+          "quote": "Dokumentami niezbędnymi do przyznania i wypłaty przez Zakład Ubezpieczeń Społecznych, zwany dalej „Zakładem”, zasiłku chorobowego są dokument zawierający dane i informacje określone w załączniku nr 1 do rozporządzenia"
+        }
+      ]
+    },
     "sick_business": {
       "sources": [
         {
@@ -1785,6 +1838,131 @@
           "quote": "złożony przed terminem rozpoczęcia korzystania z zasiłku macierzyńskiego, zawierający datę, od której ubezpieczony zamierza korzystać z zasiłku macierzyńskiego – w przypadku ubezpieczonego, który nie jest pracownikiem"
         }
       ]
+    },
+    "stop_benefit": {
+      "takeover": {
+        "basis": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 18 ust. 1",
+              "quote": "Dokumentami niezbędnymi do zaniechania wypłaty zasiłku macierzyńskiego w związku z rezygnacją z pobierania zasiłku macierzyńskiego przez ubezpieczoną matkę dziecka za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego w przypadku, o którym mowa w art. 180 § 4 Kodeksu pracy, są:"
+            }
+          ]
+        },
+        "father_from": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 18 ust. 1",
+              "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+            }
+          ]
+        },
+        "request": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 18 ust. 1",
+              "quote": "wniosek ubezpieczonej zawierający datę, od której rezygnuje ona z pobierania zasiłku macierzyńskiego – w przypadku ubezpieczonej, która nie jest pracownicą"
+            }
+          ]
+        },
+        "employer_certificate": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 18 ust. 1",
+              "quote": "zaświadczenie pracodawcy o terminie zaprzestania korzystania z urlopu macierzyńskiego – w przypadku pracownicy, której zasiłek macierzyński wypłaca Zakład"
+            }
+          ]
+        }
+      },
+      "incapacity": {
+        "basis": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 21",
+              "quote": "Dokumentami niezbędnymi do zaniechania wypłaty zasiłku macierzyńskiego w związku z rezygnacją z pobierania zasiłku macierzyńskiego za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego albo uzupełniającego urlopu macierzyńskiego przez ubezpieczoną matkę dziecka legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji są:"
+            }
+          ]
+        },
+        "father_from": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 21",
+              "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka albo inny ubezpieczony członek najbliższej rodziny będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+            }
+          ]
+        },
+        "request": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 21",
+              "quote": "wniosek ubezpieczonej zawierający datę, od której rezygnuje ona z pobierania zasiłku macierzyńskiego – w przypadku ubezpieczonej niebędącej pracownicą"
+            }
+          ]
+        },
+        "employer_certificate": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 21",
+              "quote": "zaświadczenie pracodawcy o terminie zaprzestania korzystania z urlopu macierzyńskiego albo uzupełniającego urlopu macierzyńskiego – w przypadku pracownicy, której zasiłek macierzyński wypłaca Zakład"
+            }
+          ]
+        },
+        "attachment": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 21",
+              "quote": "orzeczenie o niezdolności ubezpieczonej matki dziecka do samodzielnej egzystencji"
+            }
+          ]
+        }
+      },
+      "hospital": {
+        "basis": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 24 ust. 1",
+              "quote": "Dokumentami niezbędnymi do przerwania wypłaty zasiłku macierzyńskiego ubezpieczonej matce dziecka w związku z jej pobytem w placówce leczniczej są:"
+            }
+          ]
+        },
+        "father_from": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 24 ust. 1",
+              "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka albo inny ubezpieczony członek najbliższej rodziny będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+            }
+          ]
+        },
+        "employer_certificate": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 24 ust. 1",
+              "quote": "zaświadczenie pracodawcy o terminie zaprzestania korzystania z urlopu macierzyńskiego, urlopu na warunkach urlopu macierzyńskiego, uzupełniającego urlopu macierzyńskiego lub urlopu rodzicielskiego – w przypadku pracownicy, której zasiłek macierzyński wypłaca Zakład"
+            }
+          ]
+        },
+        "attachment": {
+          "sources": [
+            {
+              "doc": "rozp_zasilki",
+              "article": "§ 24 ust. 1",
+              "quote": "zaświadczenie o dacie przyjęcia ubezpieczonej matki dziecka do placówki leczniczej, wystawione w tej placówce"
+            }
+          ]
+        }
+      }
     }
   },
   "parental_plan": {
@@ -3077,6 +3255,113 @@
           }
         }
       },
+      "mother-stop-takeover": {
+        "basis": [
+          {
+            "doc": "rozp_zasilki",
+            "article": "§ 18 ust. 1",
+            "quote": "Dokumentami niezbędnymi do zaniechania wypłaty zasiłku macierzyńskiego w związku z rezygnacją z pobierania zasiłku macierzyńskiego przez ubezpieczoną matkę dziecka za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego w przypadku, o którym mowa w art. 180 § 4 Kodeksu pracy, są:"
+          }
+        ],
+        "fields": {
+          "resign-from": {
+            "label": "Data, od której rezygnujesz z pobierania zasiłku macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 18 ust. 1",
+                "quote": "wniosek ubezpieczonej zawierający datę, od której rezygnuje ona z pobierania zasiłku macierzyńskiego – w przypadku ubezpieczonej, która nie jest pracownicą"
+              }
+            ]
+          },
+          "father-from": {
+            "label": "Data, od której tata będzie korzystał z zasiłku macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 18 ust. 1",
+                "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+              }
+            ]
+          }
+        }
+      },
+      "mother-stop-incapacity": {
+        "basis": [
+          {
+            "doc": "rozp_zasilki",
+            "article": "§ 21",
+            "quote": "Dokumentami niezbędnymi do zaniechania wypłaty zasiłku macierzyńskiego w związku z rezygnacją z pobierania zasiłku macierzyńskiego za okres ustalony przepisami Kodeksu pracy jako okres urlopu macierzyńskiego albo uzupełniającego urlopu macierzyńskiego przez ubezpieczoną matkę dziecka legitymującą się orzeczeniem o niezdolności do samodzielnej egzystencji są:"
+          }
+        ],
+        "fields": {
+          "resign-from": {
+            "label": "Data, od której rezygnujesz z pobierania zasiłku macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 21",
+                "quote": "wniosek ubezpieczonej zawierający datę, od której rezygnuje ona z pobierania zasiłku macierzyńskiego – w przypadku ubezpieczonej niebędącej pracownicą"
+              }
+            ]
+          },
+          "father-from": {
+            "label": "Data, od której tata będzie korzystał z zasiłku macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 21",
+                "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka albo inny ubezpieczony członek najbliższej rodziny będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "incapacity-ruling": {
+            "label": "Orzeczenie o niezdolności mamy do samodzielnej egzystencji",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 21",
+                "quote": "orzeczenie o niezdolności ubezpieczonej matki dziecka do samodzielnej egzystencji"
+              }
+            ]
+          }
+        }
+      },
+      "mother-stop-hospital": {
+        "basis": [
+          {
+            "doc": "rozp_zasilki",
+            "article": "§ 24 ust. 1",
+            "quote": "Dokumentami niezbędnymi do przerwania wypłaty zasiłku macierzyńskiego ubezpieczonej matce dziecka w związku z jej pobytem w placówce leczniczej są:"
+          }
+        ],
+        "fields": {
+          "father-from": {
+            "label": "Data, od której tata będzie korzystał z zasiłku macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 24 ust. 1",
+                "quote": "oświadczenie ubezpieczonej o dacie, od której ubezpieczony ojciec dziecka albo inny ubezpieczony członek najbliższej rodziny będzie korzystał z uprawnień do zasiłku macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "admission-certificate": {
+            "label": "Zaświadczenie szpitala o dacie przyjęcia mamy",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 24 ust. 1",
+                "quote": "zaświadczenie o dacie przyjęcia ubezpieczonej matki dziecka do placówki leczniczej, wystawione w tej placówce"
+              }
+            ]
+          }
+        }
+      },
       "father-takeover": {
         "basis": [
           {
@@ -4047,6 +4332,21 @@
                 "doc": "rozp_zasilki",
                 "article": "§ 26",
                 "quote": "oświadczenie ubezpieczonego o braku zamiaru korzystania przez drugiego z rodziców dziecka z zasiłku macierzyńskiego za okres ustalony przepisami Kodeksu pracy jako okres uzupełniającego urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "parental-benefit-statement": {
+            "label": "Oświadczenie: NIP i nazwy płatników zasiłku, okres wypłaconego już zasiłku za urlop rodzicielski, liczba jego części i stawka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 29",
+                "quote": "oświadczenie ubezpieczonego zawierające NIP i nazwy płatników zasiłku oraz informacje o okresie, za który wypłacono zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego, liczbie części wypłaconego zasiłku za okres tego urlopu oraz stawce procentowej, w jakiej zasiłek macierzyński został wypłacony"
+              },
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 30 ust. 1",
+                "quote": "oświadczenie ubezpieczonego zawierające NIP i nazwy płatników zasiłku oraz informacje o okresie, za który wypłacono zasiłek macierzyński za okres ustalony przepisami Kodeksu pracy jako okres urlopu rodzicielskiego, liczbie części wypłaconego zasiłku za okres tego urlopu oraz stawce procentowej, w jakiej zasiłek macierzyński został wypłacony"
               }
             ]
           },
