@@ -297,7 +297,14 @@ def test_zam_with_her_own_business() -> None:
     # Only what applies: no hospital stay, it is the mother's own request.
     assert not {"hospital", "mother-situation", "other-parent-use"} & {x.id for x in f.fields}
     assert all(s.article == "zał. 6" for x in f.fields for s in x.sources)
-    assert f.attachments == []
+    # ZAM for parental leave comes with the statement of the benefit for it already paid
+    # (rozp_zasilki § 29 pkt 4, § 30 ust. 1 pkt 5): here the first part of it.
+    assert attachments(f) == [("parental-benefit-statement", True)]
+    statement = f.attachments[0]
+    assert {s.article for s in statement.sources} == {"§ 29", "§ 30 ust. 1"}
+    assert (
+        statement.hint == "Na osi wcześniej nie ma urlopu rodzicielskiego: to pierwsza jego część."
+    )
     assert f.notes[0].text.startswith("Formularz ZAM jest na www.zus.pl")
     assert "odpisu aktu urodzenia dziecka się nie przedstawia" in f.notes[1].text
 
@@ -312,6 +319,16 @@ def test_zam_of_the_father_whose_partner_does_not_work() -> None:
         "Mama nie pracuje, więc nie podlega ubezpieczeniu chorobowemu."
     )
     assert values(f)["parts"] == "Urlop ojcowski (do wyboru): od 21.11.2026 do 04.12.2026 (2 tyg.)."
+    # His first period is paternity leave from today: ZAM for it is filed before the benefit
+    # starts (§ 33 ust. 1 pkt 3), so it is in time for paternity leave from 22.11.2026. ZAM keeps
+    # the timeline's periods and says so.
+    benefit = next(x for x in f.fields if x.id == "benefit-period")
+    assert benefit.hint == (
+        "Okresy z osi czasu. Termin wniosku za okres od 21.11.2026 minął: złożony dziś jest "
+        "w terminie dla zasiłku od 22.11.2026."
+    )
+    # § 32 (his parental leave, the mother without an insurance title) names no statement of
+    # the benefit already paid, unlike § 29 pkt 4 and § 30 ust. 1 pkt 5.
     assert attachments(f) == [
         ("birth-certificate", False),
         ("mother-uninsured-statement", True),

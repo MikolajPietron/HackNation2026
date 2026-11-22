@@ -413,6 +413,23 @@ class KnownForm(BaseModel):
     sources: list[SourceRef] = Field(min_length=1)
 
 
+class StopDocuments(BaseModel):
+    """The documents that stop the mother's maternity benefit when the father takes it on: the
+    father takes over (regulation of 27.09.2026 § 18 ust. 1), her ruling of incapacity (§ 21),
+    her stay in hospital (§ 24 ust. 1)."""
+
+    basis: Rule
+    """The provision's opening words."""
+    father_from: Rule
+    """The mother's statement of the day from which the father has the benefit."""
+    request: Rule | None = None
+    """The request of a mother who is not an employee, with the day she stops (§ 18, § 21)."""
+    employer_certificate: Rule
+    """An employee whose benefit ZUS pays: the employer's certificate of the end of her leave."""
+    attachment: Rule | None = None
+    """The ruling of incapacity (§ 21 pkt 4), the hospital's admission certificate (§ 24)."""
+
+
 class ApplicationParams(BaseModel):
     """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
     page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
@@ -426,6 +443,8 @@ class ApplicationParams(BaseModel):
     one_request: Rule
     employer_pays_or_z3: Rule
     non_employee_zam: Rule
+    business_paid_by_zus: Rule
+    """ZUS pays the benefits of the insured with their own business (ustawa art. 61 ust. 1)."""
     contract_zam: Rule
     attachments: Rule
     zam_form: Rule
@@ -443,6 +462,9 @@ class ApplicationParams(BaseModel):
     """The mother in hospital, dead or gone: a request with no deadline (art. 180 § 16)."""
     resignation_days_before: Param[int]
     protection: Rule
+    protection_bankruptcy: Rule
+    """Notice in the protected time only on the employer's bankruptcy or liquidation (art. 177
+    § 4)."""
     protection_early_request_days: Param[list[int]]
     """An early request: the ban starts this many days before a part of maternity leave,
     supplementary or parental leave, paternity leave."""
@@ -457,6 +479,9 @@ class ApplicationParams(BaseModel):
     """The authorized payer pays on the basis of e-ZLA, otherwise sends Z-3 or ZAS-12 to ZUS."""
     sick_contract: Rule
     """A contract of mandate: documents to ZUS or the payer; Z-3a."""
+    sick_e_zla_enough: Rule
+    """A payer that pays the sickness benefit itself does so on the basis of e-ZLA; the documents
+    of annex 1 are for ZUS (ustawa art. 61b ust. 2, regulation of 27.09.2026 § 2)."""
     sick_business: Rule
     """A business: ZAS-53 to ZUS."""
     # When a non-employee files ZAM for the later periods (regulation of 27.09.2026).
@@ -470,6 +495,8 @@ class ApplicationParams(BaseModel):
     """§ 32 ust. 1 pkt 3: the same, for the father when the mother has no insurance title."""
     zam_paternity_before: Rule
     """§ 33 ust. 1 pkt 3: before the benefit for paternity leave starts."""
+    stop_benefit: dict[str, StopDocuments]
+    """By situation: "takeover", "incapacity", "hospital"."""
 
 
 # Request forms (engine/forms.py): what each request contains, as the regulations name it.
@@ -500,7 +527,8 @@ class FormParams(BaseModel):
     "father-takeover", "father-hospital-employee", "father-hospital-insured", "father-death",
     "father-abandonment", "father-uninsured-death", "father-uninsured-abandonment",
     "father-uninsured-incapacity", "supplementary", "parental", "parental-work", "paternity",
-    "zam", "sick", "job-loss"."""
+    "zam", "sick", "job-loss", and the mother who is not an employee stopping her benefit:
+    "mother-stop-takeover", "mother-stop-incapacity", "mother-stop-hospital"."""
     personal_files: Rule
     """An employee attaches nothing the employer keeps in the personal files."""
     zus_forms: Rule

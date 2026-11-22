@@ -84,6 +84,7 @@ def test_labour_code_provisions() -> None:
         "art. 177 § 1¹",
         "art. 177 § 3",
         "art. 177 § 3¹",
+        "art. 177 § 4",
         "art. 92 § 1",
         "art. 92 § 2",
         "art. 92 § 3",
@@ -240,6 +241,7 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 48 ust. 1",
         "art. 52",
         "art. 61 ust. 1",
+        "art. 61b ust. 2",
         # The benefit base in detail (engine/base.py).
         "art. 36 ust. 2",
         "art. 36 ust. 4",
@@ -286,6 +288,8 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert "3) kwota zmiennych składników" in texts["art. 37 ust. 2"]
     assert texts["art. 38 ust. 2"].endswith("co najmniej połowę obowiązującego go czasu pracy.")
     assert texts["art. 43"].endswith("krótsza niż miesiąc kalendarzowy.")
+    # A footnote's number glued to the paragraph's ("2.7") is not part of it.
+    assert texts["art. 61b ust. 2"].startswith("Postępowanie w sprawie przyznania i wypłaty")
     assert texts["art. 49 ust. 1"].endswith(
         "na rzecz danego płatnika składek za miesiąc, w którym "
         "powstało prawo do zasiłku - dla osób wykonujących "
@@ -321,12 +325,15 @@ def test_the_two_regulations_on_requests() -> None:
         "§ 13 ust. 1",
         "§ 13 ust. 2",
         "§ 13 ust. 3",
+        "§ 18 ust. 1",
         "§ 20 ust. 1",
         "§ 20 ust. 3",
         "§ 20 ust. 4",
+        "§ 21",
         "§ 22 ust. 1",
         "§ 22 ust. 2",
         "§ 23 ust. 1",
+        "§ 24 ust. 1",
         "§ 26",
         "§ 29",
         "§ 30 ust. 1",
@@ -360,6 +367,9 @@ def test_the_two_regulations_on_requests() -> None:
     assert zasilki["§ 11 ust. 1"].startswith("Dokumentami niezbędnymi do przyznania i wypłaty")
     assert zasilki["§ 17"].endswith("że nie zapewniono jej innego zatrudnienia.")
     assert "art. 180² § 5 Kodeksu pracy" in zasilki["§ 26"]
+    # § 18 and § 24 start after a page header: it is left out.
+    assert zasilki["§ 18 ust. 1"].startswith("Dokumentami niezbędnymi do zaniechania wypłaty")
+    assert zasilki["§ 24 ust. 1"].endswith("której zasiłek macierzyński wypłaca Zakład.")
 
 
 def test_the_forms_quote_only_what_the_regulations_and_the_guide_say() -> None:

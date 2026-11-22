@@ -138,8 +138,11 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "49": ("pay-history",),
     "50": ("pay-history",),
     "52": ("money",),
-    # ZUS pays for a period after the insurance ended; page 1 of the guide says who pays otherwise.
-    "61": ("job-loss", "sick"),
+    # Who pays: ZUS for a period after the insurance ended and for a business; page 1 of the guide
+    # says who pays otherwise.
+    "61": ("core",),
+    # A payer that pays the sickness benefit itself does so on the basis of e-ZLA.
+    "61b": ("sick",),
 }
 USTAWA_EXCEPTIONS: dict[str, tuple[Topic, ...]] = {
     # The maternity benefit after the insurance ended: the insurance point says when it applies
