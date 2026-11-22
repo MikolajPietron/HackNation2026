@@ -5,8 +5,10 @@ the migration is applied, sessions are kept in memory so the app still works (an
 /api/health).
 """
 
+import asyncio
 import datetime as dt
 import logging
+import weakref
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -26,6 +28,29 @@ class Session(BaseModel):
     scenario: Scenario = Field(default_factory=Scenario)
     history: list[dict[str, Any]] = Field(default_factory=list)
     """Pydantic AI message history, as JSON."""
+
+
+_locks: "weakref.WeakValueDictionary[UUID, asyncio.Lock]" = weakref.WeakValueDictionary()
+
+
+def session_lock(session_id: UUID) -> asyncio.Lock:
+    """One writer per session at a time (ZADANIA B.15). A chat turn holds it from loading the
+    session to saving it, so a change from the interface (`PATCH …/scenario`) cannot be lost when
+    the turn saves at its end: the change is refused with 409 while the turn runs, and a turn
+    that starts during a change waits for it. In-process only: one backend process, as in the
+    demo; several processes would need a version column in the `sessions` table instead."""
+    lock = _locks.get(session_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks[session_id] = lock
+    return lock
+
+
+BUSY = (
+    "Asystent właśnie odpowiada w tej rozmowie. Zmianę zapiszesz, gdy skończy: spróbuj ponownie "
+    "za chwilę."
+)
+"""The 409 detail for a change from the interface while a chat turn runs."""
 
 
 class SessionStore(Protocol):

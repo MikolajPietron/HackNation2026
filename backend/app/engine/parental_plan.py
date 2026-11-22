@@ -37,6 +37,7 @@ import math
 from dataclasses import dataclass
 from fractions import Fraction
 
+from app.engine.after_insurance import after_job_loss
 from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources
 from app.engine.father import MATERNITY_PARTS, _insurance_lines
 from app.engine.insurance import NOT_INSURED, Coverage, father_coverage
@@ -79,12 +80,24 @@ class Planned:
         """The last day of the weeks combined with work."""
         if self.part.work_fraction is None:
             return None
-        return self.start + work_weeks(self.part) * WEEK - DAY
+        return work_end(self.part, self.start)
 
 
 def work_weeks(part: ParentalPart) -> int:
     """Weeks of the part combined with work (all of it unless said otherwise)."""
     return part.work_weeks or part.weeks
+
+
+def work_end(part: ParentalPart, start: dt.date) -> dt.date:
+    """The last day of the weeks combined with work in a part that starts on `start`: they are
+    the first weeks of the part (our reading, see the module's docstring)."""
+    return start + work_weeks(part) * WEEK - DAY
+
+
+def planned_parts(scenario: Scenario) -> dict[str, ParentalPart]:
+    """The parts of the plan by the id of their segment (`parental-mother-1`...)."""
+    parts = scenario.parental_parts
+    return dict(zip(part_ids(parts), parts, strict=True))
 
 
 def extension_days(part: ParentalPart) -> int:
@@ -324,6 +337,12 @@ def _check_work(scenario: Scenario, params: Params, number: int, part: ParentalP
             f"({part.weeks} tyg.)."
         )
     work = scenario.mothers_work if part.parent == "mother" else scenario.fathers_work
+    if part.parent == "mother" and after_job_loss(scenario) is not None:
+        raise ScenarioError(
+            "Łączyć urlop rodzicielski z pracą może pracownik, u pracodawcy, który udziela tego "
+            "urlopu. Zatrudnienie mamy ustało w ciąży: ma zasiłek po ustaniu ubezpieczenia, a nie "
+            "urlop u pracodawcy, więc tej możliwości nie ma."
+        )
     if work in ("contract", "business", "none"):
         raise ScenarioError(
             "Łączyć urlop rodzicielski z pracą może pracownik, u pracodawcy, który udziela tego "

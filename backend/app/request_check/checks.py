@@ -5,9 +5,9 @@ the timeline element it comes from).
 - the form: ZUR, ZAO and Z-3b are abolished from 24 October 2026 (guide page 12);
 - the fields: required fields left empty; the leave ending before it starts; dates that do not
   give the weeks asked for (a week of leave is 7 calendar days);
-- the deadline: the Labour Code days before the leave (the same parameters as
-  `engine/applications.py`), counted from the request's own date or, without one, the request's
-  document on the timeline;
+- the deadline: the Labour Code days before the leave, or before the work during parental leave
+  (the same parameters as `engine/applications.py`), counted from the request's own date or,
+  without one, the request's document on the timeline;
 - the timeline: parental leave of the mother before her maternity leave ends, supplementary leave
   not right after it, leave after its last possible day, the 81,5% request after 21 days from the
   birth, dates other than the plan;
@@ -181,6 +181,10 @@ def _deadlines(p: Params) -> dict[RequestKind, Deadline]:
             lambda r: r.start,
             "przed rozpoczęciem tej części urlopu",
             False,
+        ),
+        # Art. 182¹ᵉ § 2: the request to combine parental leave with work, before the work.
+        "parental-work-request": Deadline(
+            p.parental_plan.work_request_days, lambda r: r.start, "przed rozpoczęciem pracy", False
         ),
     }
 

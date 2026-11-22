@@ -51,7 +51,7 @@ from app.assistant.agent import (
 from app.assistant.describe import interview_questions, next_question, opening_notes
 from app.assistant.prompts import timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
-from app.services.sessions import Session, SessionStore
+from app.services.sessions import Session, SessionStore, session_lock
 
 router = APIRouter(prefix="/api", tags=["assistant"])
 logger = logging.getLogger(__name__)
@@ -88,25 +88,35 @@ async def chat(
     today: Annotated[dt.date, Depends(get_today)],
     store: Annotated[SessionStore, Depends(get_session_store)],
 ) -> StreamingResponse:
-    session = await store.load(request.session_id)
-    deps = AssistantDeps(scenario=session.scenario, params=params, today=today)
-    if session.scenario.anchor_date is not None:
-        try:
-            deps.timeline = build_timeline(session.scenario, params, today)
-        except ScenarioError:
-            # Saved under older rules: keep the conversation, ask for the facts again.
-            deps.scenario = Scenario()
-    turn = _Turn(request.session_id, session, store)
-    if request.message is not None:
-        prompt = request.message
-    else:  # the only event: "timeline_ready"
-        deps.answers_allowed = False
-        questions = interview_questions(deps.scenario)
-        notes = opening_notes(deps.timeline.notes) if deps.timeline else []
-        points = [note.title for note in notes]
-        prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
-    stream = _stream(prompt, load_history(session), deps, model, turn)
+    stream = _locked_turn(request, model, params, today, store)
     return StreamingResponse(stream, media_type="application/x-ndjson")
+
+
+async def _locked_turn(
+    request: ChatRequest, model: Model, params: Params, today: dt.date, store: SessionStore
+) -> AsyncIterator[str]:
+    """The whole turn holds the session's lock, from loading the session to saving it (ZADANIA
+    B.15): a change from the interface meanwhile gets 409 instead of being overwritten."""
+    async with session_lock(request.session_id):
+        session = await store.load(request.session_id)
+        deps = AssistantDeps(scenario=session.scenario, params=params, today=today)
+        if session.scenario.anchor_date is not None:
+            try:
+                deps.timeline = build_timeline(session.scenario, params, today)
+            except ScenarioError:
+                # Saved under older rules: keep the conversation, ask for the facts again.
+                deps.scenario = Scenario()
+        turn = _Turn(request.session_id, session, store)
+        if request.message is not None:
+            prompt = request.message
+        else:  # the only event: "timeline_ready"
+            deps.answers_allowed = False
+            questions = interview_questions(deps.scenario)
+            notes = opening_notes(deps.timeline.notes) if deps.timeline else []
+            points = [note.title for note in notes]
+            prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
+        async for line in _stream(prompt, load_history(session), deps, model, turn):
+            yield line
 
 
 @dataclass

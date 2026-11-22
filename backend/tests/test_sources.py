@@ -279,6 +279,7 @@ def test_the_two_regulations_on_requests() -> None:
     zasilki = rozporzadzenie_provisions("rozp_zasilki")
     assert set(wnioski) == {
         *(f"§ {n} ust. {u}" for n in (2, 3, 5, 6, 7, 8, 9, 14, 15, 17) for u in (1, 2)),
+        "§ 16",
         "§ 22",
     }
     assert set(zasilki) == {
@@ -308,6 +309,11 @@ def test_the_two_regulations_on_requests() -> None:
     assert wnioski["§ 14 ust. 1"].startswith("Wniosek, o którym mowa w art. 180² § 4 Kodeksu pracy")
     assert "art. 182¹ᵈ § 1" in wnioski["§ 15 ust. 1"]
     assert "art. 182¹ᵃ § 2 Kodeksu pracy" in wnioski["§ 15 ust. 2"]
+    # § 16 runs over a page break: the page header between its points is left out.
+    assert wnioski["§ 16"].startswith("Wniosek, o którym mowa w art. 182¹ᵉ § 2 Kodeksu pracy")
+    assert wnioski["§ 16"].endswith(
+        "z określeniem wymiaru czasu pracy, albo o braku takiego zamiaru."
+    )
     assert all("Legalis" not in t for t in (*wnioski.values(), *zasilki.values()))
     assert zasilki["zał. 6"].startswith("1) NIP i REGON płatnika składek")
     assert zasilki["zał. 6"].endswith("19) pouczenie dotyczące zasiłku macierzyńskiego.")

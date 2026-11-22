@@ -13,6 +13,7 @@ from typing import get_args
 from app.documents.dates import dates_in
 from app.documents.forms import find_forms
 from app.engine import Params
+from app.engine.applications import WORK_REQUESTS
 from app.engine.models import Role
 
 from .models import FieldKey, FilledRequest, RequestKind
@@ -37,6 +38,7 @@ KIND_LABELS: dict[RequestKind, str] = {
     "supplementary-request": "Wniosek o uzupełniający urlop macierzyński",
     "parental-request": "Wniosek o urlop rodzicielski",
     "parental-father-request": "Wniosek taty o urlop rodzicielski",
+    "parental-work-request": "Wniosek o łączenie urlopu rodzicielskiego z pracą",
     "paternity-request": "Wniosek o urlop ojcowski",
     "zam": "Wniosek o zasiłek macierzyński (ZAM)",
     "rate-815": "Wniosek o zasiłek macierzyński w wysokości 81,5%",
@@ -85,8 +87,12 @@ FORM_FIELD_KEYS: dict[str, FieldKey] = {
     "return-date": "return_to_work",
     "maternity-end": "maternity_end",
     "child-birth-date": "birth_date",
+    "work-period": "period",
 }
 """The timeline's request form fields (params `forms`, engine/forms.py) the checks read, by id."""
+NOT_READ = {"work-fraction", "extension-work"}
+"""Form fields the checks do not read: by their labels ("wymiar czasu pracy") they would pass
+for the weeks of leave."""
 
 
 def field_key(label: str) -> FieldKey | None:
@@ -120,6 +126,8 @@ def request_kind(request: FilledRequest, params: Params) -> RequestKind:
         return DOCUMENT_KINDS[request.form_id]
     if request.form_id in KINDS:
         return request.form_id  # type: ignore[return-value]
+    if (request.form_id or "").startswith(WORK_REQUESTS):
+        return "parental-work-request"
     codes = {form.code for form in find_forms(request.title, params)}
     if codes & {"ZAM", "ZUR", "ZAO"}:
         return "zam"
@@ -135,6 +143,8 @@ def request_kind(request: FilledRequest, params: Params) -> RequestKind:
         return "supplementary-request"
     if "ojcowsk" in title:
         return "paternity-request"
+    if "rodzicielsk" in title and "lacz" in title and "prac" in title:
+        return "parental-work-request"
     if "rodzicielsk" in title:
         return "parental-father-request" if father else "parental-request"
     if "zasil" in title and "macierzynsk" in title:
@@ -170,6 +180,8 @@ def read_request(request: FilledRequest, params: Params, today: dt.date) -> Read
                 read.attachments.append(f.label)
             elif value.lower() != "nie":
                 read.attachments.append(value)
+            continue
+        if f.key is None and f.id in NOT_READ:
             continue
         key = f.key or FORM_FIELD_KEYS.get(f.id or "") or field_key(f.label)
         if key is None:

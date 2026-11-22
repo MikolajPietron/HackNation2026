@@ -2,7 +2,7 @@
 special protection of employees. Guide A.4 "Dokumenty stanowiące podstawę do ustalenia zasiłku"
 (page 6), page 1 with footnote 1 (who pays), the forms on page 12 and section I "Szczególna
 ochrona" (page 10), with the Labour Code provisions on the requests and their deadlines (art. 177,
-art. 180 § 8, § 9 and § 16, art. 180² § 4-5, art. 182¹ᵈ § 1, art. 182³ § 2).
+art. 180 § 8, § 9 and § 16, art. 180² § 4-5, art. 182¹ᵈ § 1, art. 182¹ᵉ § 2, art. 182³ § 2).
 
 Applied last, on the finished timeline (`add_applications`, before the case notes):
 - who pays: every benefit period says it. The payer of contributions pays when it reports more
@@ -10,7 +10,9 @@ Applied last, on the finished timeline (`add_applications`, before the case note
   ZAM straight with ZUS, so ZUS pays;
 - requests as documents: an employee asks the employer for each leave (one request may cover
   maternity and parental leave right after it; each part of the parents' plan of parental leave
-  is its own request, art. 182¹ᵈ § 2); the Labour Code deadlines are counted back from the leave
+  is its own request, art. 182¹ᵈ § 2, and a part combined with work also needs the request to
+  work during the leave, 21 days before the work starts, art. 182¹ᵉ § 2: only an employee
+  combines the leave with work); the Labour Code deadlines are counted back from the leave
   and kept in `Document.deadline` (None: the materials give no deadline, and the day shown is
   only the start of the leave or benefit, ZADANIA B.4); a mother who is not an employee files ZAM
   (on a contract of mandate the payer determines the benefit or ZUS does, with Z-3a from the
@@ -61,6 +63,7 @@ from app.engine.models import (
     CaseNote,
     Document,
     Marker,
+    ParentalPart,
     Scenario,
     Segment,
     SourceRef,
@@ -68,6 +71,7 @@ from app.engine.models import (
     Work,
 )
 from app.engine.params import Params
+from app.engine.parental_plan import fraction, planned_parts, work_end
 from app.engine.pregnancy import JOB_LOSS_SEGMENT, SEGMENT_IDS
 from app.engine.wording import fmt, long_date
 
@@ -92,6 +96,9 @@ PLAN_REQUESTS = ("parental-request-", "parental-father-request-")
 """Prefixes of the requests for the parts of a parental plan: "parental-request-2" is the
 mother's second part (segment "parental-mother-2"), "parental-father-request-1" the father's
 first."""
+WORK_REQUESTS = ("parental-work-request-", "parental-father-work-request-")
+"""Prefixes of the requests to combine a part of the plan with work (art. 182¹ᵉ § 2), numbered
+like the request for that part: "parental-work-request-1" goes with "parental-request-1"."""
 SICK_DOCUMENTS = ("sick-leave-notice", "sick-benefit-request")
 """Sick leave in pregnancy: informing the employer; the documents for the sickness benefit."""
 COURT_JUDGMENT = "court-judgment"
@@ -131,7 +138,20 @@ def _covered(scenario: Scenario, parent: Parent) -> bool:
 
 
 def who_pays(scenario: Scenario, parent: Parent) -> Payer:
-    if _work(scenario, parent) == "business" or _after_job_loss(scenario, parent):
+    """Who pays the parent's maternity benefit: after the mother's employment ended in
+    pregnancy, ZUS (the benefit for the time after the insurance ended); otherwise
+    `payer_by_size`."""
+    if _after_job_loss(scenario, parent):
+        return "zus"
+    return payer_by_size(scenario, parent)
+
+
+def payer_by_size(scenario: Scenario, parent: Parent) -> Payer:
+    """The payer of contributions that reports more than 20 people to sickness insurance pays
+    the benefit, otherwise ZUS; with a business ZUS (guide page 1, footnote 1). Also the
+    sickness benefit for the days the mother still worked, before an employment that ended in
+    pregnancy."""
+    if _work(scenario, parent) == "business":
         return "zus"
     size = scenario.mother_payer_size if parent == "mother" else scenario.father_payer_size
     match size:
@@ -267,7 +287,7 @@ def sick_payer_line(scenario: Scenario, params: Params) -> tuple[str, list[Sourc
     else:
         payer, short, rule = "płatnik składek (zleceniodawca)", "zleceniodawca", a.sick_contract
         certificate = "Z-3a"
-    match who_pays(scenario, "mother"):
+    match payer_by_size(scenario, "mother"):
         case "payer":
             text = (
                 f"Zasiłek chorobowy mamy wypłaca jej {payer} na podstawie zaświadczenia e-ZLA: "
@@ -526,7 +546,7 @@ def _employee_mother(
                 deadline=deadline,
             )
         )
-    documents += _plan_part_requests(timeline, params, today, "mother")
+    documents += _plan_part_requests(scenario, timeline, params, today, "mother")
     his = _segment(timeline, "maternity-father")
     if (
         scenario.father_takes_over
@@ -604,11 +624,13 @@ def _supplementary_request(
 
 # Requests for the parts of the parents' plan of parental leave (ZADANIA B.3): every part is its
 # own request (the number of parts is the number of requests, art. 182¹ᵈ § 2), filed at least
-# 21 days before the part starts (art. 182¹ᵈ § 1). Parts already under way need none any more.
+# 21 days before the part starts (art. 182¹ᵈ § 1). A part combined with work also needs the
+# request to work during the leave (ZADANIA B.13, art. 182¹ᵉ § 2). Parts already under way need
+# none any more.
 
 
 def _plan_part_requests(
-    timeline: Timeline, params: Params, today: dt.date, parent: Parent
+    scenario: Scenario, timeline: Timeline, params: Params, today: dt.date, parent: Parent
 ) -> list[Document]:
     a = params.applications
     days = a.parental_days_before.value
@@ -616,6 +638,7 @@ def _plan_part_requests(
         (s for s in timeline.segments if s.id.startswith(f"parental-{parent}-")),
         key=lambda s: s.start,
     )
+    plan = planned_parts(scenario)
     whose = "" if parent == "mother" else " taty"
     to = "pracodawcy" if parent == "mother" else "swojemu pracodawcy"
     documents = []
@@ -649,7 +672,56 @@ def _plan_part_requests(
                 deadline=deadline,
             )
         )
+        planned = plan.get(part.id)
+        if planned is not None and planned.work_fraction is not None:
+            documents.append(_work_request(part, planned, number, parent, params, today))
     return documents
+
+
+def _work_request(
+    part: Segment,
+    planned: ParentalPart,
+    number: int,
+    parent: Parent,
+    params: Params,
+    today: dt.date,
+) -> Document:
+    """Art. 182¹ᵉ § 2: work during parental leave starts on the employee's request, filed at
+    least 21 days before the work starts. Only an employee combines the leave with work, at the
+    employer that grants it (guide E, art. 182¹ᵉ § 1). The weeks of work are the first weeks of
+    the part (parental_plan.py), so the work starts on the part's first day."""
+    pp = params.parental_plan
+    assert planned.work_fraction is not None
+    days = pp.work_request_days.value
+    start = part.start
+    deadline = start - days * DAY
+    _, when = _by(deadline, days, f"przed rozpoczęciem pracy ({fmt(start)})", today, movable=False)
+    whose = "" if parent == "mother" else " taty"
+    to = "pracodawcy" if parent == "mother" else "swojemu pracodawcy"
+    who = "mama" if parent == "mother" else "tata"
+    return Document(
+        id=f"{WORK_REQUESTS[parent == 'father']}{number}",
+        label=f"Wniosek{whose}: praca w czasie urlopu, cz. {number}",
+        title=f"Wniosek{whose} o łączenie urlopu rodzicielskiego z pracą (część {number})",
+        needed_by=deadline,
+        done=False,
+        rule=(
+            f"W planie {who} od {fmt(start)} do {fmt(work_end(planned, start))} łączy urlop "
+            f"z pracą na {fraction(planned.work_fraction)} etatu. Wniosek składa {to}, który "
+            f"udziela urlopu. {when} Łączyć urlop rodzicielski z pracą może tylko pracownik, "
+            "u pracodawcy, który udziela tego urlopu, i najwyżej na "
+            f"{fraction(pp.max_work_fraction.value)} etatu. Pracodawca uwzględnia wniosek, chyba "
+            "że nie pozwala na to organizacja pracy albo rodzaj pracy; o przyczynie odmowy "
+            f"informuje w ciągu {pp.employer_answer_days.value} dni od otrzymania wniosku."
+        ),
+        segment_id=part.id,
+        sources=merge_sources(
+            pp.work_request_days.sources,
+            pp.max_work_fraction.sources,
+            pp.employer_answer_days.sources,
+        ),
+        deadline=deadline,
+    )
 
 
 def _employee_father(
@@ -745,7 +817,7 @@ def _employee_father(
                 deadline=deadline,
             )
         )
-    documents += _plan_part_requests(timeline, params, today, "father")
+    documents += _plan_part_requests(scenario, timeline, params, today, "father")
     return documents
 
 
@@ -1223,7 +1295,7 @@ def _payer_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseN
         _is_sick_benefit(s) for s in timeline.segments
     )
     if any(who_pays(scenario, p) == "payer-or-zus" for p in parents) or (
-        sick_by_size and who_pays(scenario, "mother") == "payer-or-zus"
+        sick_by_size and payer_by_size(scenario, "mother") == "payer-or-zus"
     ):
         lines.append(
             "Liczbę ubezpieczonych ustala się według stanu na 30 listopada poprzedniego roku."
@@ -1332,7 +1404,7 @@ def _applications_note(scenario: Scenario, timeline: Timeline) -> CaseNote | Non
         (
             d
             for d in timeline.documents
-            if (d.id in listed or d.id.startswith(PLAN_REQUESTS)) and not d.done
+            if (d.id in listed or d.id.startswith((*PLAN_REQUESTS, *WORK_REQUESTS))) and not d.done
         ),
         key=lambda d: d.needed_by,
     )

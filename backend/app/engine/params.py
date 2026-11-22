@@ -199,6 +199,9 @@ class ParentalPlanParams(BaseModel):
     """The most an employee may work during parental leave, as a part of full time."""
     work_request_days: Param[int]
     """The request to start work is filed at least this many days before."""
+    employer_answer_days: Param[int]
+    """The employer grants that request unless the organisation or the kind of work rules it
+    out, and gives the reason for a refusal within this many days of receiving it."""
     max_weeks_with_work: Param[list[int]]
     """The longest parental leave extended by work: one child, more children."""
     max_weeks_with_work_za_zyciem: Param[list[int]]
@@ -455,7 +458,8 @@ class FormParams(BaseModel):
     templates: dict[str, FormTemplate]
     """By kind of request: "prenatal", "maternity", "resignation", "father-takeover",
     "father-hospital-employee", "father-hospital-insured", "father-death",
-    "father-abandonment", "supplementary", "parental", "paternity", "zam", "sick"."""
+    "father-abandonment", "supplementary", "parental", "parental-work", "paternity", "zam",
+    "sick"."""
     personal_files: Rule
     """An employee attaches nothing the employer keeps in the personal files."""
     zus_forms: Rule
