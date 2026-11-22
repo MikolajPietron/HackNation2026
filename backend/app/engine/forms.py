@@ -22,6 +22,10 @@ request for maternity leave too: her employer determines the benefit on its basi
 Personal data (names, PESEL, addresses, NIP and REGON, bank account, signature) is never filled
 in: the person types it in. Dates and periods are read from the finished timeline, not computed.
 
+A request filed with the employer also gets the letter an employee writes and an e-mail to HR
+(request_letters.py); a ZUS form (ZAM, ZAS-53) gets where the guide says it is (`official`), and
+its fields are the data to copy into it.
+
 Our readings, not settled by the materials (CLAUDE.md, open questions):
 - the regulation gives the content of the employee's request for maternity leave only for the
   part before the birth (§ 2): without that part the form has no fields, only the period on the
@@ -59,6 +63,8 @@ from app.engine.models import (
 from app.engine.params import Params
 from app.engine.parental_plan import formula, fraction, planned_parts, work_end, work_weeks
 from app.engine.pregnancy import SEGMENT_IDS
+from app.engine.request_letters import official_form as official
+from app.engine.request_letters import request_letter
 from app.engine.wording import fmt, weeks_or_days
 
 KINDS: dict[str, FormFieldKind] = {
@@ -252,7 +258,7 @@ class Forms:
                     sources=item.sources,
                 )
             )
-        return RequestForm(
+        form = RequestForm(
             title=self.document.title,
             applicant=applicant,
             addressee=addressee[0],
@@ -274,6 +280,13 @@ class Forms:
             ],
             notes=notes or [],
         )
+        if official_form is not None:
+            form.official = official(official_form, self.params)
+        if form.addressee == "employer":
+            form.letter, form.hr_message = request_letter(
+                kind, form, self.document, self.timeline, self.scenario, self.params
+            )
+        return form
 
     def employer(self, parent: Role) -> tuple[Addressee, str]:
         return "employer", f"Pracodawca {WHOSE[parent]}"

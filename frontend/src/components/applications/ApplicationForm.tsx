@@ -692,11 +692,20 @@ function HrMessage({ form, profile, onClose }: { form: RequestForm; profile: Pro
   const me = form.applicant === 'father' ? profile.father : profile.mother
   const period =
     form.start && form.end ? ` na okres od ${dotted(form.start)} do ${dotted(form.end)}` : form.start ? ` od ${dotted(form.start)}` : ''
-  const subject = form.title
-  const body =
-    `Dzień dobry,\n\nw załączeniu przesyłam ${form.title.charAt(0).toLowerCase()}${form.title.slice(1)}${period}. ` +
-    'Wniosek jest wypełniony i podpisany.\n\nProszę o potwierdzenie otrzymania.\n\nZ poważaniem\n' +
-    (me.name || '[imię i nazwisko]')
+  // The engine's e-mail (RequestForm.hr_message) with the placeholders filled in this browser.
+  const filled = (text: string) =>
+    text.replace(/\{\{([a-z0-9-]+)\}\}/g, (_, id: string) => {
+      const field = form.letter?.fields.find((f) => f.id === id)
+      if (field?.meaning === 'applicant-name') return me.name || '[imię i nazwisko]'
+      if (field?.meaning === 'child-name') return profile.child.name || '[imię dziecka]'
+      return '[…]'
+    })
+  const subject = form.hr_message ? filled(form.hr_message.subject) : form.title
+  const body = form.hr_message
+    ? filled(form.hr_message.body)
+    : `Dzień dobry,\n\nw załączeniu przesyłam ${form.title.charAt(0).toLowerCase()}${form.title.slice(1)}${period}. ` +
+      'Wniosek jest wypełniony i podpisany.\n\nProszę o potwierdzenie otrzymania.\n\nZ poważaniem\n' +
+      (me.name || '[imię i nazwisko]')
   const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   return (
     <motion.section

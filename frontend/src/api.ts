@@ -18,6 +18,8 @@ import type {
   ScenarioChanges,
   SessionStart,
   SessionView,
+  SharedPlan,
+  ShareLink,
   StressReport,
   Timeline,
 } from './types'
@@ -249,10 +251,12 @@ export const checkRequest = (body: RequestCheckRequest, signal?: AbortSignal) =>
 /** The agreement report: the calculator against ZUS for the cases already read (cache only). */
 export const fetchAgreement = () => requestJson<CaseAgreement>('/api/cases/agreement')
 
-/** "Udostępnij plan": a read-only copy of the plan under a new id, for the partner. */
-export const shareSession = (sessionId: string) =>
-  requestJson<{ token: string }>(`/api/session/${sessionId}/share`, { method: 'POST' })
+// Share the plan with the other parent: a read-only copy, no conversation, no personal data.
 
-/** The plan someone shared (`/plan/<token>`): read only. */
-export const fetchShared = (token: string) =>
-  requestJson<{ scenario: Scenario; timeline: Timeline; shared: boolean }>(`/api/shared/${token}`)
+/** A new link token for a copy of the plan as it is now (each call makes a new copy). */
+export const shareSession = (sessionId: string) =>
+  requestJson<ShareLink>(`/api/session/${sessionId}/share`, { method: 'POST' })
+
+/** The shared plan; an unknown link throws with the Polish message (404). */
+export const fetchShared = (token: string, signal?: AbortSignal) =>
+  requestJson<SharedPlan>(`/api/shared/${encodeURIComponent(token)}`, { signal })

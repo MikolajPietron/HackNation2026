@@ -5,7 +5,7 @@ import { formatLongDate, todayIso } from '@/lib/dates'
 import { formatPln } from '@/lib/money'
 import { applicantOf, personalValue, type Profile } from '@/lib/personal'
 import { sourceLabel } from '@/lib/ui'
-import type { Document, FormField, RequestForm, Scenario, Timeline } from '@/types'
+import type { Document, FormField, Letter, RequestForm, Scenario, Timeline } from '@/types'
 import { fileName, GREEN, MUTED, NAVY, newWriter, type Writer } from './core'
 
 const APP = 'Zasiłkowy Przewodnik Przyszłego Rodzica · symulacja, nie decyzja ZUS'
@@ -43,6 +43,83 @@ export function written(field: FormField, values: FormValues): string {
 }
 
 const BLANK = '……………………………………'
+
+/**
+ * The values of a letter's `{{field-id}}` placeholders (engine/request_letters.py): what the
+ * parent typed into the form first, then the profile typed once; the date is today's.
+ */
+export function letterValues(form: RequestForm, profile: Profile, values: FormValues): Record<string, string> {
+  const { me, job } = applicantOf(form, profile)
+  const out: Record<string, string> = {}
+  for (const field of form.letter?.fields ?? []) {
+    const typed = values[field.id]?.trim()
+    if (typed) {
+      out[field.id] = typed
+      continue
+    }
+    switch (field.meaning) {
+      case 'applicant-name':
+        out[field.id] = me.name
+        break
+      case 'applicant-address':
+        out[field.id] = me.address
+        break
+      case 'employer':
+        out[field.id] = [job.name, job.address].filter(Boolean).join('\n')
+        break
+      case 'child-name':
+        out[field.id] = profile.child.name
+        break
+      case 'child-birth-date':
+        out[field.id] = ''
+        break
+      case 'place':
+        out[field.id] = profile.place
+        break
+      case 'date':
+        out[field.id] = `${dotted(todayIso())} r.`
+        break
+    }
+  }
+  return out
+}
+
+/** "… dziecka {{child-name}} …" with the values; a missing value is a line to write by hand. */
+export const fill = (text: string, values: Record<string, string>) =>
+  text.replace(/\{\{([a-z0-9-]+)\}\}/g, (_, id: string) => values[id]?.trim() || '……………………')
+
+/** The letter an employee files (engine/request_letters.py), laid out as on paper. */
+function writeLetter(w: Writer, letter: Letter, values: Record<string, string>) {
+  w.text(fill(letter.place_date, values), { align: 'right', after: 7 })
+  letter.applicant.forEach((line, i) =>
+    fill(line, values)
+      .split('\n')
+      .forEach((part) => w.text(part, { bold: i === 0, color: i === 0 ? undefined : MUTED, after: 0.5 })),
+  )
+  w.space(6)
+  letter.addressee.forEach((line, i) =>
+    fill(line, values)
+      .split('\n')
+      .forEach((part) => w.text(part, { align: 'right', bold: i > 0, after: 0.5 })),
+  )
+  w.space(9)
+  w.text(letter.title.toUpperCase(), { size: 13, bold: true, align: 'center', color: NAVY, after: 6 })
+  for (const paragraph of letter.body) {
+    w.text(fill(paragraph.text, values), { size: 10.5, after: paragraph.kind === 'choice' ? 1.5 : 3, lineHeight: 1.5 })
+    for (const option of paragraph.options) w.checkbox(fill(option, values), false, { size: 10, indent: 4 })
+    if (paragraph.options.length) w.space(2)
+  }
+  if (letter.attachments.length > 0) {
+    w.space(2)
+    w.text('Załączniki:', { bold: true, after: 1 })
+    letter.attachments.forEach((a, i) => w.text(`${i + 1}. ${fill(a, values)}`, { size: 10, indent: 3, after: 0.8 }))
+  }
+  w.ensure(28)
+  w.space(16)
+  w.text('…………………………………………', { align: 'right', after: 0.5 })
+  w.text(letter.signature, { size: 8, color: MUTED, align: 'right', after: 6 })
+  w.text(letter.legal_basis, { size: 7.5, color: MUTED })
+}
 
 function header(w: Writer, form: RequestForm, profile: Profile) {
   const { me, job } = applicantOf(form, profile)
@@ -92,6 +169,10 @@ export function writeRequest(
     writeOfficial(w, document, form, values)
     return
   }
+  if (form.letter) {
+    writeLetter(w, form.letter, letterValues(form, profile, values))
+    return
+  }
   header(w, form, profile)
   w.text(form.title, { size: 15, bold: true, align: 'center', color: NAVY, after: 6 })
   for (const field of form.fields) {
@@ -111,11 +192,18 @@ function firstNameField(form: RequestForm): string | undefined {
 
 /** A ZUS form (ZAM, ZAS-53): the official form is on zus.pl; this page lists what to write in. */
 function writeOfficial(w: Writer, document: Document, form: RequestForm, values: FormValues) {
-  w.text(`Dane do formularza ${form.official_form}`, { size: 15, bold: true, color: NAVY, after: 1 })
+  const official = form.official
+  w.text(official?.sheet_title ?? `Dane do formularza ${form.official_form}`, {
+    size: 15,
+    bold: true,
+    color: NAVY,
+    after: 1,
+  })
   w.text(document.title, { color: MUTED, after: 4 })
   w.text(
-    `Oficjalny formularz ${form.official_form} pobierzesz ze strony www.zus.pl (zakładka Wzory formularzy, ` +
-      'Zasiłki). Poniżej dane z Twojego planu, które do niego wpiszesz.',
+    `Oficjalny formularz ${form.official_form} (${official?.name ?? 'wniosek'}) pobierzesz ze strony ` +
+      `${official?.where ?? 'www.zus.pl (w zakładce Wzory formularzy, Zasiłki)'}. Poniżej dane z Twojego ` +
+      'planu, które do niego wpiszesz.',
     { size: 9.5, after: 4 },
   )
   w.text(`Składasz go: ${form.addressee_label}.`, { size: 9.5, bold: true, color: GREEN, after: 4 })

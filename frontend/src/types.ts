@@ -413,6 +413,90 @@ export interface FormNote {
   sources: SourceRef[]
 }
 
+/**
+ * The request as a letter (engine/request_letters.py), laid out on an A4 page by the front.
+ * Placeholders: `{{field-id}}` in any string of `Letter` and `HrMessage`; `field-id` is one of
+ * `Letter.fields` (the form's own field id when the form has it: "employee-name",
+ * "father-name", "child-name", "child-birth-date"; otherwise "letter-place", "letter-date",
+ * "applicant-address", "employer"). Replace each with what the parent typed, or a dotted line:
+ * `text.replace(/\{\{([a-z0-9-]+)\}\}/g, (_, id) => values[id] || '…………')`.
+ */
+export type LetterMeaning =
+  | 'applicant-name'
+  | 'applicant-address'
+  | 'employer'
+  | 'child-name'
+  | 'child-birth-date'
+  | 'place'
+  | 'date'
+
+/**
+ * A placeholder of the letter. `meaning` lets values typed once fill every letter: the
+ * applicant is `RequestForm.applicant`, "employer" is the applicant's employer.
+ */
+export interface LetterField {
+  id: string
+  /** "Imię i nazwisko pracownicy", "Nazwa i adres pracodawcy". */
+  label: string
+  meaning: LetterMeaning
+  /** Names, addresses, the employer, the place: typed in the browser, never sent anywhere. */
+  personal: boolean
+}
+
+export interface LetterParagraph {
+  /**
+   * request = "Na podstawie … wnoszę o …"; statement = a declaration filled from the timeline;
+   * choice = the parent ticks one of `options` (`text` is the lead-in, "Oświadczam, że:").
+   */
+  kind: 'request' | 'statement' | 'choice'
+  text: string
+  options: string[]
+}
+
+export interface Letter {
+  /** Top right: "{{letter-place}}, dnia {{letter-date}}". */
+  place_date: string
+  /** Top left, one line each: the applicant's name and address. */
+  applicant: string[]
+  /** Right, below: "Pracodawca", "{{employer}}". */
+  addressee: string[]
+  title: string
+  body: LetterParagraph[]
+  /** "Załączniki:", numbered; empty = no list. */
+  attachments: string[]
+  /** Under the signature line: "(czytelny podpis pracownicy)". */
+  signature: string
+  /** Small print: "Podstawa prawna: art. … Kodeksu pracy; § … rozporządzenia …". */
+  legal_basis: string
+  /** Every placeholder used in the letter and in the e-mail to HR, in order. */
+  fields: LetterField[]
+}
+
+/** A short e-mail to HR with the letter attached; placeholders as in the letter. */
+export interface HrMessage {
+  subject: string
+  /** Lines separated by "\n". */
+  body: string
+}
+
+/**
+ * A ZUS form the parent fills in on www.zus.pl; the form's `fields` are the data to copy into
+ * it (print them under `sheet_title`).
+ */
+export interface OfficialForm {
+  /** "ZAM", "ZAS-53". */
+  code: string
+  /** "wniosek o zasiłek macierzyński". */
+  name: string
+  /** The guide's own words: "www.zus.pl (w zakładce Wzory formularzy, Zasiłki)". */
+  where: string
+  /** "https://www.zus.pl": the guide gives no deeper address. */
+  url: string
+  /** "Dane do wpisania do formularza ZAM". */
+  sheet_title: string
+  sources: SourceRef[]
+}
+
 export interface RequestForm {
   title: string
   applicant: Role
@@ -429,6 +513,12 @@ export interface RequestForm {
   fields: FormField[]
   attachments: FormAttachment[]
   notes: FormNote[]
+  /** The request as a letter to the employer; only for requests filed with the employer. */
+  letter: Letter | null
+  /** An e-mail to HR with the letter attached; only with `letter`. */
+  hr_message: HrMessage | null
+  /** Where the ZUS form is (with `official_form`). */
+  official: OfficialForm | null
 }
 
 export interface Document {
@@ -654,6 +744,19 @@ export interface SessionStart {
   scenario: Scenario
   timeline: Timeline
   question: InterviewQuestion | null
+}
+
+/** `POST /api/session/{id}/share`: a new read-only link to a copy of the plan as it is now. */
+export interface ShareLink {
+  token: string
+}
+
+/** `GET /api/shared/{token}`: the plan for the other parent, read-only, no conversation. */
+export interface SharedPlan {
+  scenario: Scenario
+  /** null when the shared answers no longer give a timeline under the current rules. */
+  timeline: Timeline | null
+  shared: true
 }
 
 export type StoredPart =
