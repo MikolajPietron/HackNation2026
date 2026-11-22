@@ -365,15 +365,26 @@ def opening_note_ids(notes: list[dict]) -> list[str]:
     ]
 
 
+APP_CARD_NAMES = [
+    "Jak dzielicie urlop rodzicielski?",
+    "Plany dla Was",
+    "Jak wolisz dostawać zasiłek?",
+    "Wnioski i dokumenty",
+    "Twoje dane do wniosków",
+]
+"""Names of the app's cards the assistant may point to (B.16): in „…” but not quotes of sources."""
+
 BRIEF_CHARS = 600
 """The longest reply, without the interview question, that is not yet a wall of text: about
 three short sentences with a source or two."""
 
 
-def check_brief(text: str, question: dict | None, soft: bool = False) -> Check:
+def check_brief(
+    text: str, question: dict | None, soft: bool = False, limit: int = BRIEF_CHARS
+) -> Check:
     rest = text.replace(question["text"], "") if question else text
     n = len(rest.strip())
-    return Check("brief (no wall of text)", n <= BRIEF_CHARS, f"{n} chars", soft=soft)
+    return Check("brief (no wall of text)", n <= limit, f"{n} chars (limit {limit})", soft=soft)
 
 
 def check_notes_covered(text: str, note_ids: list[str]) -> Check:

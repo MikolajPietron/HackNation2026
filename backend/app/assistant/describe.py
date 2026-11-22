@@ -29,6 +29,7 @@ from app.engine.models import (
 from app.engine.money import pay_matters
 from app.engine.pregnancy import employer_days_by_year, sick_leave
 from app.engine.timeline import fmt
+from app.engine.wording import long_date, weeks_or_days
 from app.services.params import load_params
 
 WORK = {
@@ -749,7 +750,38 @@ def opening_notes(notes: list[CaseNote]) -> list[CaseNote]:
     ]
 
 
-def describe_note_changes(timeline: Timeline, changed_notes: list[str] | None) -> str:
+def opening_facts(timeline: Timeline) -> list[str]:
+    """The key dates of a timeline that has just appeared, ready to repeat (eval 22.11.2026: the
+    welcome named the case but not "ile i do kiedy"): how long the leave on the terms of
+    maternity leave lasts and until when, and how early the leave before the birth can start.
+    Nothing after the loss of a child: the loss note says what is left, calmly."""
+    if any(n.id == "loss" for n in timeline.notes):
+        return []
+    facts = []
+    seg = {s.id: s for s in timeline.segments}
+    leave = seg.get("adoption-leave") or seg.get("maternity")
+    if leave is not None:
+        before = seg.get("maternity-prenatal")
+        days = leave.days + (before.days if before is not None else 0)
+        what = (
+            "urlop na warunkach urlopu macierzyńskiego"
+            if leave.id == "adoption-leave"
+            else "urlop macierzyński"
+        )
+        after = "" if leave.id == "adoption-leave" else " po porodzie"
+        facts.append(f"{what}: {weeks_or_days(days)},{after} do {long_date(leave.end)}")
+    window = seg.get("prenatal-window")
+    if window is not None and window.start >= timeline.today:
+        facts.append(
+            f"urlop przed porodem można zacząć najwcześniej {long_date(window.start)} "
+            f"({weeks_or_days(window.days)} przed przewidywaną datą porodu)"
+        )
+    return facts
+
+
+def describe_note_changes(
+    timeline: Timeline, changed_notes: list[str] | None, changed: list[str] | None = None
+) -> str:
     """What to talk about after a recalculation. None = the timeline has just appeared."""
     if changed_notes is None:
         titles = [f"„{n.title}”" for n in opening_notes(timeline.notes)]
@@ -758,7 +790,24 @@ def describe_note_changes(timeline: Timeline, changed_notes: list[str] | None) -
             f"{', '.join(titles)}, w najwyżej trzech krótkich zdaniach. Pozostałe punkty "
             "użytkownik ma nad osią i w „Dlaczego tak?”."
         )
-    titles = [f"„{n.title}”" for n in timeline.notes if n.id in changed_notes]
+    notes = [n for n in timeline.notes if n.id in changed_notes]
+    titles = [f"„{n.title}”" for n in notes]
+    # Eval 22.11.2026: a new length of leave was said without its source. Give the label to say.
+    cite = [
+        f"„{n.title}” — ({source_label(n.sources[0])})"
+        for n in notes
+        if n.kind != "situation" and n.sources
+    ]
+    money = [i for i in changed or [] if i.startswith("pay-")]
+    extra = ""
+    if cite:
+        extra += (
+            " Przy nowym prawie albo nowej długości urlopu dodaj w nawiasie źródło: "
+            + "; ".join(cite)
+            + "."
+        )
+    if money:
+        extra += " Zmieniły się kwoty zasiłku: podaj nową kwotę miesięczną z osi."
     if not titles:
         return (
             "Wyjaśnienie sytuacji się nie zmieniło: powiedz jednym zdaniem, co zmieniło się na osi."
@@ -767,7 +816,7 @@ def describe_note_changes(timeline: Timeline, changed_notes: list[str] | None) -
         f"Zmienione punkty wyjaśnienia (użytkownik widzi je podświetlone nad osią): "
         f"{', '.join(titles)}. Powiedz tylko, co z tej zmiany wynika dla rodzica — najpierw nowe "
         "daty albo to, co trzeba zrobić — w najwyżej trzech krótkich zdaniach. Pozostałych "
-        "punktów nie powtarzaj."
+        f"punktów nie powtarzaj.{extra}"
     )
 
 

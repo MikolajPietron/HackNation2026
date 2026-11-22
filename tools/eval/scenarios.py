@@ -483,14 +483,14 @@ SCENARIOS = [
                     {"name": "set_leave_before_birth", "args": {"weeks": 0}},
                     {"name": "set_hospital_care", "args": {"applies": False}},
                 ],
-                "question": None,
+                "question": "mother-payer",  # who pays is asked after the rest (B.3)
             },
             {
                 "say": "Przy bliźniętach przysługują mi 4 tygodnie urlopu ojcowskiego, prawda?",
                 "no_tools": ["set_children_count", "set_father_takeover"],
                 "mention": {"numbers": [14]},
                 "require": [r"nie wydłuża|nie wydłużają|nie zmienia|nie jest dłuższ"],
-                "question": None,
+                "question": "mother-payer",  # who pays is asked after the rest (B.3)
             },
             {
                 "say": "Żona wykorzysta 14 tygodni po porodzie, a dalszą część urlopu "
@@ -505,7 +505,7 @@ SCENARIOS = [
                 "changed": ["maternity", "maternity-father"],
                 "changed_notes": ["takeover", "computed"],
                 "mention": {"dates": ["2026-12-22", "2027-04-19"]},
-                "question": None,
+                "question": "mother-payer",  # who pays is asked after the rest (B.3)
             },
         ],
     },
@@ -531,7 +531,7 @@ SCENARIOS = [
                     {"name": "set_leave_before_birth", "args": {"weeks": 0}},
                     {"name": "set_hospital_care", "args": {"applies": False}},
                 ],
-                "question": None,
+                "question": "mother-payer",  # who pays is asked after the rest (B.3)
             },
             {
                 "say": "Żona trafiła do szpitala 10 listopada 2026 i wyszła 20 listopada 2026; "
@@ -548,7 +548,7 @@ SCENARIOS = [
                 "changed_notes": ["mother-event"],
                 "mention": {"dates": ["2026-11-10", "2026-11-20"]},
                 "require": [r"180\s*§\s*1[01]|s\.\s*7\b"],
-                "question": None,
+                "question": "mother-payer",  # who pays is asked after the rest (B.3)
             },
         ],
     },
@@ -829,7 +829,7 @@ SCENARIOS = [
                 "require": [r"100\s*%"],
             },
             {
-                "say": "Chcę wybrać wariant 81,5%. Na czym on polega?",
+                "say": "Na czym polega wariant 81,5%?",
                 "no_tools": ["set_rate_choice"],
                 "require": [r"21 dni", r"81,5"],
             },
@@ -979,6 +979,8 @@ SCENARIOS = [
             {
                 "say": "Co się zmieni, jeśli dziecko urodzi się przedwcześnie?",
                 "no_tools": ["set_due_date", "set_birth_date", "set_hospital_care"],
+                "hypothetical": True,
+                "max_chars": 800,
                 "question": "leave-before-birth",
                 "forbid": [r"[Kk]iedy (jest|będzie) przewidywany poród", r"[Kk]iedy urodziło się"],
             },
@@ -1056,6 +1058,7 @@ SCENARIOS = [
             {
                 "say": "Jak podzielić urlop rodzicielski, żebyśmy dostali najwięcej pieniędzy?",
                 "tools": [{"name": "propose_plans", "args": {"goal": "most-money"}}],
+                "max_chars": 800,
                 "no_tools": ["set_parental_plan", "set_rate_choice", "set_father_takeover"],
                 "require": [r"78\s?322,23", r"81,5"],
                 "forbid": [r"polecam|radzę|najlepiej wybierz|powinniście wybrać"],
@@ -1091,6 +1094,8 @@ SCENARIOS = [
                 "say": "Co się stanie z naszym planem, jeśli coś pójdzie nie tak, np. dziecko "
                 "urodzi się wcześniej albo stracę pracę?",
                 "tools": [{"name": "stress_test"}],
+                "max_chars": 800,
+                "hypothetical": True,
                 "no_tools": ["set_birth_date", "set_hospital_care", "set_job_loss"],
                 "require": [r"uzupełniając", r"ubezpiecz"],
                 "forbid": [r"!"],

@@ -53,7 +53,7 @@ from app.assistant.agent import (
     TimelineUpdated,
     assistant,
 )
-from app.assistant.describe import interview_questions, next_question, opening_notes
+from app.assistant.describe import interview_questions, next_question, opening_facts, opening_notes
 from app.assistant.prompts import timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore, session_lock
@@ -119,7 +119,8 @@ async def _locked_turn(
             questions = interview_questions(deps.scenario)
             notes = opening_notes(deps.timeline.notes) if deps.timeline else []
             points = [note.title for note in notes]
-            prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
+            facts = opening_facts(deps.timeline) if deps.timeline else []
+            prompt = timeline_ready_prompt(questions[0].text if questions else None, points, facts)
         async for line in _stream(prompt, load_history(session), deps, model, turn):
             yield line
 

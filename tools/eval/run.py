@@ -28,6 +28,8 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from checks import (  # noqa: E402
+    APP_CARD_NAMES,
+    BRIEF_CHARS,
     OUT_OF_SCOPE,
     SYMPATHY,
     Check,
@@ -147,7 +149,10 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
     }
     extra = user_dates | src_dates | (timeline_dates(before) if before else set())
     extra |= {dt.date.fromisoformat(iso) for iso in step.get("extra_dates", [])}
-    checks.append(check_reply_dates(text, after, extra))
+    dates_check = check_reply_dates(text, after, extra)
+    # "Gdyby…": a what-if gives example dates that are not on the family's timeline.
+    dates_check.soft = bool(step.get("hypothetical"))
+    checks.append(dates_check)
     mention = step.get("mention", {})
     checks += check_mentions(text, mention.get("dates", []), mention.get("numbers", []))
     for pattern in step.get("require", []):
@@ -178,7 +183,15 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
         note_check.soft = True
         checks.append(note_check)
     # A loss or a question for details may take more words.
-    checks.append(check_brief(text, question, soft=bool(step.get("sensitive"))))
+    # A list of plans or of what-ifs may take a few more lines ("max_chars" on the step).
+    checks.append(
+        check_brief(
+            text,
+            question,
+            soft=bool(step.get("sensitive")),
+            limit=step.get("max_chars", BRIEF_CHARS),
+        )
+    )
     leak = re.search(
         r"bez źródła: to opis|nie dopisuj do niego źródła|⟦|Następne pytanie wywiadu", text
     )
@@ -197,7 +210,8 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
                 "next question key", got == step["question"], f"want {step['question']}, got {got}"
             )
         )
-    ignore = [question["text"]] if question else []
+    # The question, and the names of the app's cards the assistant points to (B.16).
+    ignore = ([question["text"]] if question else []) + APP_CARD_NAMES
     checks += check_quotes(text, sources, ignore, app_texts(before, after))
     return checks
 

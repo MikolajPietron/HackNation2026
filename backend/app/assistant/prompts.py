@@ -49,12 +49,14 @@ mamy), wywołaj `stress_test`. Oba narzędzia niczego nie zmieniają.
 - Pokaż możliwości i ich skutki z wyniku narzędzia: kwoty, tygodnie, daty, z czego się \
 rezygnuje. Liczby bierz tylko z wyniku, niczego nie przeliczaj i nie sumuj. Plany podaj \
 krótką listą, jedna linia na plan: tytuł i to, co mówi o celu (kwota, data powrotu, tygodnie); \
-z testu planu — zdarzenia, przy których grozi utrata prawa albo plan przestaje pasować.
+z testu planu — najwyżej trzy zdarzenia, przy których grozi utrata prawa albo plan przestaje \
+pasować, po jednym zdaniu. Całość najwyżej około 600 znaków: szczegóły rodzic ma w aplikacji.
 - Decyzję zostaw rodzicom: nie mów, który plan jest najlepszy ani który wybrać. Kolejność \
 planów to tylko kolejność według celu.
 - Plan zapisz dopiero wtedy, gdy rodzic sam go wybierze: narzędziami i wartościami podanymi przy \
 tym planie.
-- W teście planu daty zdarzeń są przykładowe: mów „gdyby…”, bez straszenia. O zdarzeniach \
+- W teście planu daty zdarzeń są przykładowe: mów „gdyby…” albo „na przykład”, bez straszenia \
+i bez słów „test” czy „z testu”. O zdarzeniach \
 dotyczących zdrowia albo śmierci mamy mów tylko wtedy, gdy rodzic sam o nie zapyta.
 - Po stracie dziecka albo śmierci mamy nie proponuj planów ani testu planu i nie podsuwaj, jak \
 coś zoptymalizować.
@@ -384,7 +386,9 @@ PATCH_NOTE = "Rodzic zmienił w aplikacji, bez czatu:"
 EVENT_MARKER = "⟦Zdarzenie z aplikacji⟧"
 
 
-def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
+def timeline_ready_prompt(
+    next_question: str | None, points: list[str], facts: list[str] | None = None
+) -> str:
     """The onboarding built the timeline (or a saved one nobody has talked about was resumed):
     the assistant says only the opening points of the explanation (`points`, their titles, see
     `describe.opening_notes`) and asks `next_question`, computed from the interview state. The
@@ -395,6 +399,11 @@ def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
         else "Na końcu zapytaj, o który element osi chce się dowiedzieć więcej."
     )
     listed = " ".join(f"{i}. „{title}”." for i, title in enumerate(points, 1))
+    dates = (
+        " Powiedz też, z liczbami i datami dokładnie tak: " + "; ".join(facts) + "."
+        if facts
+        else ""
+    )
     return (
         f"{EVENT_MARKER} Oś czasu właśnie powstała z odpowiedzi z wywiadu. Użytkownik widzi ją "
         "razem z „Twoją sytuacją” nad osią i całym wyjaśnieniem w „Dlaczego tak?”. W tej turze "
@@ -402,7 +411,8 @@ def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
         f"Z „Wyjaśnienia sytuacji” powiedz tylko te punkty, w tej kolejności: {listed} Najwyżej "
         "trzy krótkie zdania; punkt „Uwaga” albo o stracie powiedz spokojnie i w całości. Daty "
         "bierz z punktów. Pozostałych punktów nie omawiaj. Podświetl na osi element, o którym "
-        "mówisz (`explain_timeline_element` z id elementu osi podanym w nawiasach, jeden raz). "
+        "mówisz (`explain_timeline_element` z id elementu osi podanym w nawiasach, jeden raz)."
+        f"{dates} "
         f"{ending}"
     )
 
