@@ -564,6 +564,35 @@ def test_a_loss_is_recorded_only_when_the_parent_says_so(client: TestClient) -> 
     assert "parental" in [s["id"] for s in update["timeline"]["segments"]]
 
 
+def test_after_a_loss_every_message_reminds_the_model_of_sympathy(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """Eval 22.11.2026: with the rule only in the instructions, a follow-up answer after a
+    stillbirth started with the rules. The reminder goes with the message and stays hidden."""
+    remember(
+        store,
+        {"birth_date": "2026-11-10", "children_count": 1, "losses": [{"stillborn": True}]},
+    )
+    sent: list[Any] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        sent.append(messages[-1].parts[-1].content)  # type: ignore[union-attr]
+        yield "Bardzo mi przykro. Urlop rodzicielski nie przysługuje."
+
+    ask(client, FunctionModel(stream_function=stream), "Czy mam urlop rodzicielski?")
+    assert sent[0][0] == "Czy mam urlop rodzicielski?"
+    assert sent[0][1].startswith("⟦Wskazówka aplikacji⟧ Rodzina straciła dziecko")
+    restored = client.get(f"/api/session/{SESSION}").json()["messages"]
+    assert [m["role"] for m in restored] == ["user", "assistant"]
+    assert restored[0]["parts"] == [{"kind": "text", "text": "Czy mam urlop rodzicielski?"}]
+
+    # Without a loss the message goes alone.
+    remember(store, {"birth_date": "2026-11-10", "children_count": 1})
+    sent.clear()
+    ask(client, FunctionModel(stream_function=stream), "Czy mam urlop rodzicielski?")
+    assert sent == ["Czy mam urlop rodzicielski?"]
+
+
 def test_a_loss_needs_a_born_child(client: TestClient) -> None:
     client.put(f"/api/session/{SESSION}/onboarding", json={**ONBOARDING, "role": "mother"})
     out = ask(client, scripted("set_child_loss", {"losses": [{"stillborn": True}]}, "…"), "…")

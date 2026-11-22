@@ -28,7 +28,11 @@ export function SharedPlan({ token }: { token: string }) {
 
   useEffect(() => {
     fetchShared(token)
-      .then((d) => setData({ scenario: d.scenario, timeline: d.timeline }))
+      .then((d) =>
+        d.timeline
+          ? setData({ scenario: d.scenario, timeline: d.timeline })
+          : setError('Tego planu nie da się już pokazać według obecnych zasad. Poproś o nowy link.'),
+      )
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Nie udało się otworzyć planu.'))
   }, [token])
 

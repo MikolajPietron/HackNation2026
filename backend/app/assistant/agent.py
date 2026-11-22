@@ -191,6 +191,14 @@ def current_state(ctx: RunContext[AssistantDeps]) -> str:
         lines.append("Oś czasu jest pusta.")
     else:
         lines += ["", "Aktualny stan osi czasu:", describe_timeline(ctx.deps.timeline)]
+        if any(n.id == "loss" for n in ctx.deps.timeline.notes):
+            # The turn that records the loss; later turns also get `grief_hint` with the
+            # parent's message (api/chat.py).
+            lines += [
+                "",
+                "Rodzina straciła dziecko: zacznij tę odpowiedź od jednego krótkiego, ludzkiego "
+                "zdania współczucia, dopiero potem odpowiedz.",
+            ]
     return "\n".join(lines)
 
 
@@ -229,7 +237,7 @@ async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, *focus: str
     return "\n\n".join(
         [
             describe_timeline_changes(old, timeline, changed),
-            describe_note_changes(timeline, None if old is None else changed_notes),
+            describe_note_changes(timeline, None if old is None else changed_notes, changed),
             describe_interview(scenario),
         ]
     )

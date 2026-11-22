@@ -12,6 +12,7 @@ The two static parts come first, so the provider can serve them from its prompt 
 from app.assistant.guide import guide_sections
 from app.assistant.law import kp_articles, ustawa_articles, zalacznik_sections
 from app.assistant.stage import SourceKey, Topic, sources_for
+from app.engine.models import Scenario
 
 
 def source_text(keys: list[SourceKey]) -> str:
@@ -49,12 +50,14 @@ mamy), wywołaj `stress_test`. Oba narzędzia niczego nie zmieniają.
 - Pokaż możliwości i ich skutki z wyniku narzędzia: kwoty, tygodnie, daty, z czego się \
 rezygnuje. Liczby bierz tylko z wyniku, niczego nie przeliczaj i nie sumuj. Plany podaj \
 krótką listą, jedna linia na plan: tytuł i to, co mówi o celu (kwota, data powrotu, tygodnie); \
-z testu planu — zdarzenia, przy których grozi utrata prawa albo plan przestaje pasować.
+z testu planu — najwyżej trzy zdarzenia, przy których grozi utrata prawa albo plan przestaje \
+pasować, po jednym zdaniu. Całość najwyżej około 600 znaków: szczegóły rodzic ma w aplikacji.
 - Decyzję zostaw rodzicom: nie mów, który plan jest najlepszy ani który wybrać. Kolejność \
 planów to tylko kolejność według celu.
 - Plan zapisz dopiero wtedy, gdy rodzic sam go wybierze: narzędziami i wartościami podanymi przy \
 tym planie.
-- W teście planu daty zdarzeń są przykładowe: mów „gdyby…”, bez straszenia. O zdarzeniach \
+- W teście planu daty zdarzeń są przykładowe: mów „gdyby…” albo „na przykład”, bez straszenia \
+i bez słów „test” czy „z testu”. O zdarzeniach \
 dotyczących zdrowia albo śmierci mamy mów tylko wtedy, gdy rodzic sam o nie zapyta.
 - Po stracie dziecka albo śmierci mamy nie proponuj planów ani testu planu i nie podsuwaj, jak \
 coś zoptymalizować.
@@ -336,11 +339,11 @@ liczenie i nie ma źródła.
 o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część urlopu”).
 - Gdy tłumaczysz element osi, wywołaj `explain_timeline_element`: podświetli go i zwróci \
 zasadę z cytatem.
-- Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, „(Kodeks pracy, art. 180 \
-§ 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, Okres uwzględniany \
-w podstawie wymiaru zasiłku)” albo „(Rozporządzenie w sprawie wniosków urlopowych, § 15 \
-ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej \
-ani z internetu.
+- Cytaty krótkie: najwyżej kilkanaście słów, tylko to, co potwierdza zdanie; zwykle wystarczy \
+samo źródło w nawiasie. Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, \
+„(Kodeks pracy, art. 180 § 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, \
+Okres uwzględniany w podstawie wymiaru zasiłku)” albo „(Rozporządzenie w sprawie wniosków \
+urlopowych, § 15 ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej ani z internetu.
 - Wnioski i to, kto wypłaca zasiłek, bierz z dokumentów na osi i z wyjaśnienia sytuacji \
 (punkty o wypłacie zasiłku i „Co złożyć i do kiedy”). Co wniosek zawiera i co do niego dołączyć, \
 mówi `explain_timeline_element` dla tego wniosku.
@@ -382,9 +385,28 @@ PATCH_NOTE = "Rodzic zmienił w aplikacji, bez czatu:"
 # App events: the assistant reacts to a timeline that changed outside the chat. The user does
 # not see the prompt, and the transcript hides it (see transcript.py).
 EVENT_MARKER = "⟦Zdarzenie z aplikacji⟧"
+HINT_MARKER = "⟦Wskazówka aplikacji⟧"
 
 
-def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
+def grief_hint(scenario: Scenario) -> str | None:
+    """A reminder sent with the parent's message after the loss of a child or the mother's death
+    (hidden in the chat, kept in the model's history). Eval 22.11.2026: with the rule only in the
+    instructions, every other follow-up answer after a stillbirth started with the rules."""
+    if scenario.losses:
+        who = "Rodzina straciła dziecko"
+    elif scenario.mother_event is not None and scenario.mother_event.kind == "death":
+        who = "Mama dziecka zmarła"
+    else:
+        return None
+    return (
+        f"{HINT_MARKER} {who}: zacznij odpowiedź od jednego krótkiego, ludzkiego zdania "
+        "współczucia, dopiero potem odpowiedz. Bez wykrzykników."
+    )
+
+
+def timeline_ready_prompt(
+    next_question: str | None, points: list[str], facts: list[str] | None = None
+) -> str:
     """The onboarding built the timeline (or a saved one nobody has talked about was resumed):
     the assistant says only the opening points of the explanation (`points`, their titles, see
     `describe.opening_notes`) and asks `next_question`, computed from the interview state. The
@@ -395,6 +417,12 @@ def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
         else "Na końcu zapytaj, o który element osi chce się dowiedzieć więcej."
     )
     listed = " ".join(f"{i}. „{title}”." for i, title in enumerate(points, 1))
+    dates = (
+        " Powiedz też, z liczbami i datami dokładnie tak: " + "; ".join(facts) + ". Bez cytatów: "
+        "źródło najwyżej w nawiasie."
+        if facts
+        else ""
+    )
     return (
         f"{EVENT_MARKER} Oś czasu właśnie powstała z odpowiedzi z wywiadu. Użytkownik widzi ją "
         "razem z „Twoją sytuacją” nad osią i całym wyjaśnieniem w „Dlaczego tak?”. W tej turze "
@@ -402,7 +430,8 @@ def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
         f"Z „Wyjaśnienia sytuacji” powiedz tylko te punkty, w tej kolejności: {listed} Najwyżej "
         "trzy krótkie zdania; punkt „Uwaga” albo o stracie powiedz spokojnie i w całości. Daty "
         "bierz z punktów. Pozostałych punktów nie omawiaj. Podświetl na osi element, o którym "
-        "mówisz (`explain_timeline_element` z id elementu osi podanym w nawiasach, jeden raz). "
+        "mówisz (`explain_timeline_element` z id elementu osi podanym w nawiasach, jeden raz)."
+        f"{dates} "
         f"{ending}"
     )
 

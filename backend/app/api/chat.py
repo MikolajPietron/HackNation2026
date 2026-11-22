@@ -53,8 +53,8 @@ from app.assistant.agent import (
     TimelineUpdated,
     assistant,
 )
-from app.assistant.describe import interview_questions, next_question, opening_notes
-from app.assistant.prompts import timeline_ready_prompt
+from app.assistant.describe import interview_questions, next_question, opening_facts, opening_notes
+from app.assistant.prompts import grief_hint, timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore, session_lock
 
@@ -112,14 +112,17 @@ async def _locked_turn(
                 # Saved under older rules: keep the conversation, ask for the facts again.
                 deps.scenario = Scenario()
         turn = _Turn(request.session_id, session, store)
+        prompt: str | list[str]
         if request.message is not None:
-            prompt = request.message
+            hint = grief_hint(deps.scenario)
+            prompt = request.message if hint is None else [request.message, hint]
         else:  # the only event: "timeline_ready"
             deps.answers_allowed = False
             questions = interview_questions(deps.scenario)
             notes = opening_notes(deps.timeline.notes) if deps.timeline else []
             points = [note.title for note in notes]
-            prompt = timeline_ready_prompt(questions[0].text if questions else None, points)
+            facts = opening_facts(deps.timeline) if deps.timeline else []
+            prompt = timeline_ready_prompt(questions[0].text if questions else None, points, facts)
         async for line in _stream(prompt, load_history(session), deps, model, turn):
             yield line
 
@@ -140,7 +143,11 @@ class _Turn:
 
 
 async def _stream(
-    message: str, history: list[ModelMessage], deps: AssistantDeps, model: Model, turn: _Turn
+    message: str | list[str],
+    history: list[ModelMessage],
+    deps: AssistantDeps,
+    model: Model,
+    turn: _Turn,
 ) -> AsyncIterator[str]:
     to_payload = _Translator()
     try:
@@ -287,12 +294,25 @@ def _turn_logger() -> logging.Logger:
 turn_log = _turn_logger()
 
 
+QUOTA_WORDS = ("limit exceeded", "spend cap", "spending cap", "credits", "quota", "insufficient")
+"""Words of a provider's error that mean the account or key ran out of money, whatever status it
+came with: OpenRouter's key limit is a 403, Google's monthly spend cap a 429 (eval, 22.11.2026)."""
+
+QUOTA_MESSAGE = (
+    "Asystent AI jest chwilowo niedostępny: wyczerpał się limit konta albo klucza modelu."
+)
+
+
 def _error_message(exc: Exception) -> str:
+    if isinstance(exc, ModelAuthenticationError | ModelRateLimitError) and any(
+        word in str(exc).lower() for word in QUOTA_WORDS
+    ):
+        return QUOTA_MESSAGE
     match exc:
         case ModelAuthenticationError():
             return "Klucz API modelu jest nieprawidłowy."
         case ModelQuotaExceededError():
-            return "Asystent AI jest chwilowo niedostępny: wyczerpał się limit konta modelu."
+            return QUOTA_MESSAGE
         case ModelRateLimitError() | ModelUnavailableError() | ModelServerError():
             return "Model AI jest teraz przeciążony. Spróbuj za chwilę."
         case ModelConnectionError():
