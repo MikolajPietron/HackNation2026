@@ -198,25 +198,27 @@ function Picker({
           Sprawdź na przykładowej sprawie
         </h2>
         <p className="mt-1 text-pretty text-navy-500">
-          Wybierz sprawę z zestawu ZUS albo wgraj jej PDF. AI przepisze dane z dokumentów,
-          kalkulator sprawdzi ubezpieczenie i policzy zasiłek, a na końcu porównamy wynik z
-          decyzją ZUS.
+          {cases.length > 0
+            ? 'Wybierz sprawę z zestawu ZUS albo wgraj jej PDF.'
+            : 'Wybierz przykładową rodzinę albo wgraj PDF sprawy z zestawu ZUS.'}{' '}
+          AI przepisze dane z dokumentów, kalkulator sprawdzi ubezpieczenie i policzy zasiłek, a na
+          końcu porównamy wynik z decyzją ZUS.
         </p>
       </header>
 
       <SampleFamilies onLoaded={onSample} className="mt-5" />
 
+      {/* On the demo the ZUS scans are not on the server (they are confidential): the case is
+          uploaded, so the section says that is the way, not that something is missing. */}
       <h3 className="mt-7 font-bold text-navy-900">Sprawy z zestawu ZUS</h3>
+      <p className="mt-0.5 text-sm text-navy-500">
+        {cases.length > 0
+          ? 'Wybierz sprawę z listy poniżej albo wgraj jej PDF.'
+          : 'Wgraj PDF albo zdjęcie sprawy z zestawu, a wynik zobaczysz obok decyzji ZUS.'}
+      </p>
       <UploadZone onFile={onUpload} />
 
       {error && <p className="mt-4 rounded-2xl bg-alert-50 px-4 py-3 text-sm text-alert-600">{error}</p>}
-
-      {list && !list.configured && (
-        <p className="mt-3 text-sm leading-relaxed text-navy-500">
-          Skanów spraw ZUS nie publikujemy w demo, bo to dokumenty poufne. Wgraj PDF albo zdjęcie sprawy
-          z zestawu, a aplikacja ją przeczyta, sprawdzi ubezpieczenie i porówna wynik z decyzją ZUS.
-        </p>
-      )}
 
       {cases.length > 0 && (
         <>
