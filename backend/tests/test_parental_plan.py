@@ -353,3 +353,37 @@ def test_no_work_during_leave_after_the_job_ended_in_pregnancy() -> None:
     )
     with pytest.raises(ScenarioError, match="Zatrudnienie mamy ustało w ciąży"):
         build_timeline(scenario, PARAMS, dt.date(2026, 11, 21))
+
+
+# No day of the mother's parental leave in the child's first year (ustawa art. 31 ust. 3g-4).
+
+
+def test_mother_without_parental_leave_in_the_first_year_starts_her_parts_at_the_birthday() -> None:
+    """Due 15.03.2027, maternity leave until 01.08.2027. The mother takes none of her parental
+    leave in the child's first year: her 10 weeks without a date start on the first birthday,
+    15.03.2028 + 70 days − 1 = 23.05.2028. The father's 9 weeks, not planned, stay right after
+    maternity leave: 02.08.2027 + 63 days − 1 = 03.10.2027."""
+    t = expecting({"parent": "mother", "weeks": 10}, mother_parental_after_first_year=True)
+    assert span(t, "parental-mother-1") == (dt.date(2028, 3, 15), dt.date(2028, 5, 23), 70)
+    assert span(t, "parental-father") == (dt.date(2027, 8, 2), dt.date(2027, 10, 3), 63)
+
+
+def test_father_alone_in_the_first_year_starts_right_after_maternity_leave() -> None:
+    """The father's 16 weeks without a date start right after maternity leave: 02.08.2027 +
+    112 days − 1 = 21.11.2027. The mother's share, still an option, is what is left of the 41
+    weeks (25), from the first birthday: 15.03.2028 + 175 days − 1 = 05.09.2028."""
+    t = expecting({"parent": "father", "weeks": 16}, mother_parental_after_first_year=True)
+    assert span(t, "parental-father-1") == (dt.date(2027, 8, 2), dt.date(2027, 11, 21), 112)
+    assert span(t, "parental") == (dt.date(2028, 3, 15), dt.date(2028, 9, 5), 175)
+    assert segment(t, "parental").summary.startswith(
+        "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka; może go wziąć od "
+        "pierwszych urodzin, 15.03.2028."
+    )
+
+
+def test_a_dated_part_of_the_mother_in_the_first_year_is_refused() -> None:
+    with pytest.raises(ScenarioError, match="nie bierze urlopu rodzicielskiego w pierwszym roku"):
+        expecting(
+            {"parent": "mother", "weeks": 10, "start": "2027-09-01"},
+            mother_parental_after_first_year=True,
+        )

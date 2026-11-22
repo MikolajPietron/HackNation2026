@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from app.assistant.describe import source_label
 from app.engine.amounts import dec, pln
-from app.engine.models import SourceRef
+from app.engine.models import Scenario, SourceRef
 from app.engine.plans import GOAL_LABEL, ParentFigures, Plan, PlansResult
 from app.engine.stress import StressReport
 from app.engine.wording import fmt
@@ -18,7 +18,7 @@ VERDICT = {
 }
 
 
-def describe_plans(result: PlansResult) -> str:
+def describe_plans(result: PlansResult, scenario: Scenario) -> str:
     goal = GOAL_LABEL[result.goal]
     if not result.plans:
         return f"Brak planów dla celu „{goal}”: {result.reason}"
@@ -28,13 +28,13 @@ def describe_plans(result: PlansResult) -> str:
         "gdy rodzic go wybierze: narzędziami podanymi przy planie, dokładnie z tymi wartościami.",
     ]
     for plan in result.plans:
-        lines += ["", *_plan(plan)]
+        lines += ["", *_plan(plan, scenario)]
     if result.notes:
         lines += ["", "Założenia porównania:", *(f"- {n}" for n in result.notes)]
     return "\n".join(lines)
 
 
-def _plan(plan: Plan) -> list[str]:
+def _plan(plan: Plan, scenario: Scenario) -> list[str]:
     f = plan.figures
     lines = [
         f"{plan.rank}. {plan.title}" + (" (to Wasz obecny plan)" if plan.current else ""),
@@ -46,7 +46,7 @@ def _plan(plan: Plan) -> list[str]:
     if f.total is not None:
         lines.append(f"   Zasiłki za urlopy w planie razem: {pln(dec(f.total))}.")
     lines += [f"   Z czego rezygnujecie albo co zostaje na później: {g}" for g in plan.given_up]
-    lines.append(f"   Jak zapisać: {_tools(plan)}")
+    lines.append(f"   Jak zapisać: {_tools(plan, scenario)}")
     lines.append(f"   Źródła: {_sources(plan.sources)}")
     return lines
 
@@ -70,7 +70,7 @@ def _weeks(days: int) -> str:
     return f"{shown} tyg."
 
 
-def _tools(plan: Plan) -> str:
+def _tools(plan: Plan, scenario: Scenario) -> str:
     patch = plan.patch
     parts = [
         {k: v for k, v in part.items() if v not in (None, False)}
@@ -85,6 +85,12 @@ def _tools(plan: Plan) -> str:
             "set_father_takeover(takes_over=true"
             + (f", mother_weeks={weeks}" if weeks else "")
             + ")"
+        )
+    later = patch.get("mother_parental_after_first_year")
+    if later != scenario.mother_parental_after_first_year:
+        # First: while it is set, a part of the mother's in the first year is refused.
+        calls.insert(
+            0, f"set_mother_parental_after_first_year(after_first_year={json.dumps(later)})"
         )
     return "; ".join(calls)
 

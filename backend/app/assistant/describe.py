@@ -145,6 +145,12 @@ def describe_person(scenario: Scenario) -> str:
         )
     if scenario.parental_parts:
         lines.append(describe_parental_plan(scenario))
+    if scenario.mother_parental_after_first_year:
+        lines.append(
+            "Zapisane: mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka "
+            "(`set_mother_parental_after_first_year`); jej część jest na osi od pierwszych "
+            "urodzin."
+        )
     if scenario.earnings:
         who = "tata" if scenario.role == "father" else "mama"
         lines.append(

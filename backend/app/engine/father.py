@@ -740,6 +740,7 @@ def _parental(
     exclusive = p.exclusive_weeks.value
     deadline = parental_deadline(birth, params)
     mothers = draft.segment("parental")
+    later = scenario.mother_parental_after_first_year is True and not mother_left
     table = parental_table(scenario, params)
     used = 0  # days of parental leave the mother used before her lane ended
     his = [s.end + DAY for s in draft.segments if s.lane == "father"]
@@ -764,6 +765,11 @@ def _parental(
     elif mothers is not None:
         length = exclusive * 7
         start = mothers.end + DAY
+        if later:
+            # The mother's share waits for the first birthday: his weeks right after maternity
+            # (and supplementary) leave, not after her share.
+            ids = (*MATERNITY_PARTS, "supplementary")
+            start = max((s.end for s in draft.segments if s.id in ids), default=birth - DAY) + DAY
     else:
         return
     if born:
@@ -791,11 +797,18 @@ def _parental(
         summary = f"{rule} Pokazujemy {shown}: od {fmt(start)} do {fmt(end)}."
         sources = [f.parental_uninsured_mother.sources, table.sources, p.exclusive_weeks.sources]
     elif not mother_left:
+        where = (
+            "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka, więc urlop "
+            f"taty pokazujemy zaraz po urlopie macierzyńskim: {shown}, od {fmt(start)} do "
+            f"{fmt(end)}."
+            if later
+            else "Rodzice mogą korzystać z urlopu jednocześnie albo naprzemiennie, a tata może "
+            f"też wziąć go po mamie — tak go tu pokazujemy: {shown}, od {fmt(start)} do "
+            f"{fmt(end)}."
+        )
         summary = (
             f"Tata ma {exclusive} tyg. urlopu rodzicielskiego wyłącznie dla siebie: nie można "
-            f"ich przenieść na mamę. Pozostała część z {total} tyg. jest wspólna. Rodzice mogą "
-            "korzystać z urlopu jednocześnie albo naprzemiennie, a tata może też wziąć go po "
-            f"mamie — tak go tu pokazujemy: {shown}, od {fmt(start)} do {fmt(end)}."
+            f"ich przenieść na mamę. Pozostała część z {total} tyg. jest wspólna. {where}"
         )
         sources = [
             f.parental_together.sources,

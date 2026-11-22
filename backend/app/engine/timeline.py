@@ -43,7 +43,7 @@ from app.engine.after_insurance import (
     without_leave_before,
 )
 from app.engine.applications import add_applications
-from app.engine.draft import DAY, WEEK, Draft, merge_sources
+from app.engine.draft import DAY, WEEK, Draft, merge_sources, one_year_later
 from app.engine.explain import case_notes
 from app.engine.father import father_rules
 from app.engine.forms import add_forms
@@ -60,7 +60,13 @@ from app.engine.models import (
     Timeline,
     TimelineElement,
 )
-from app.engine.money import add_rate_request, money_assumptions, money_rules, taken_in_money
+from app.engine.money import (
+    add_rate_request,
+    add_top_up_request,
+    money_assumptions,
+    money_rules,
+    taken_in_money,
+)
 from app.engine.monthly import add_monthly
 from app.engine.params import Params
 from app.engine.parental import (
@@ -175,6 +181,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
     add_rate_request(timeline, scenario, params)  # the request for 81,5%, once chosen
+    add_top_up_request(timeline, scenario, params)  # and for the top-up to 100% (art. 31 ust. 4)
     add_forms(timeline, scenario, params)  # every request as a form to fill in (forms.py)
     # F9, F10 (leftover.py): points of no return, what the family would leave unused.
     add_leftovers(timeline, scenario, params)
@@ -752,6 +759,10 @@ def _parental(
         return
 
     start = after + DAY
+    later = scenario.mother_parental_after_first_year is True
+    if later:
+        # No day of it in the child's first year: her share from the first birthday on.
+        start = max(start, one_year_later(birth))
     end = start + mothers * WEEK - DAY
     count = scenario.children_count
     table = parental_table(scenario, params)
@@ -803,10 +814,17 @@ def _parental(
             end=end,
             days=mothers * 7,
             summary=(
-                f"Po urlopie macierzyńskim mama może wziąć urlop rodzicielski. Rodzice mają razem "
-                f"do {total} tyg.; każde z nich ma {exclusive} tyg. wyłącznie dla siebie, których "
-                f"nie można przenieść, więc mama może wykorzystać najwięcej {mothers} tyg. Wzięte "
-                f"w całości od razu, trwałyby do {fmt(end)}."
+                (
+                    "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka, więc "
+                    f"pokazujemy go od pierwszych urodzin, {fmt(start)}. "
+                    if later
+                    else "Po urlopie macierzyńskim mama może wziąć urlop rodzicielski. "
+                )
+                + f"Rodzice mają razem do {total} tyg.; każde z nich ma {exclusive} tyg. "
+                "wyłącznie dla siebie, których nie można przenieść, więc mama może wykorzystać "
+                f"najwięcej {mothers} tyg. Wzięte w całości "
+                + ("od tego dnia" if later else "od razu")
+                + f", trwałyby do {fmt(end)}."
             ),
             details=details,
             sources=merge_sources(*sources),
@@ -856,10 +874,24 @@ def _assumptions(
         his = draft.segment("parental-father")
         after_her = his is not None and his.start == parental.end + DAY
         weeks = params.parental.exclusive_weeks.value
+        if scenario.mother_parental_after_first_year:
+            first = (
+                "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka, więc jej "
+                "część pokazujemy w całości od pierwszych urodzin"
+                + (
+                    f", a {weeks} tygodni taty zaraz po urlopie macierzyńskim"
+                    if his is not None and his.start < parental.start
+                    else ""
+                )
+            )
+        else:
+            first = (
+                "Urlop rodzicielski pokazujemy tak, jakby mama wzięła całą swoją część od razu po "
+                "urlopie macierzyńskim"
+                + (f", a tata swoje {weeks} tygodni zaraz po niej" if after_her else "")
+            )
         assumptions.append(
-            "Urlop rodzicielski pokazujemy tak, jakby mama wzięła całą swoją część od razu po "
-            "urlopie macierzyńskim"
-            + (f", a tata swoje {weeks} tygodni zaraz po niej" if after_her else "")
+            first
             + ". Rodzice mogą też korzystać z niego jednocześnie albo naprzemiennie i dzielić go "
             "na części."
         )

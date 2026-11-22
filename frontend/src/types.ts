@@ -147,6 +147,9 @@ export interface Scenario {
   // Parental leave with work (guide section E)
   /** How the parents split parental leave and where they work part-time; [] = no plan. */
   parental_parts: ParentalPart[]
+  /** No day of the mother's parental leave in the child's first year: her share from the first
+   * birthday, and at 81,5% the one-off top-up to 100% (ustawa art. 31 ust. 3g-4). */
+  mother_parental_after_first_year: boolean | null
   // Adoption and foster care (guide section D).
   /** The child was taken in for upbringing: `birth_date` is then the child's date of birth. */
   taken_in: TakenIn | null
@@ -1098,7 +1101,11 @@ export type PlanGoal = 'most-money' | 'longest-home' | 'equal-split' | 'quick-re
 /** The Scenario fields a plan sets; send them as they are to PATCH /api/session/{id}/scenario. */
 export type PlanPatch = Pick<
   Scenario,
-  'parental_parts' | 'rate_815' | 'father_takes_over' | 'mother_weeks_before_takeover'
+  | 'parental_parts'
+  | 'rate_815'
+  | 'father_takes_over'
+  | 'mother_weeks_before_takeover'
+  | 'mother_parental_after_first_year'
 >
 
 /**

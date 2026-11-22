@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from app.engine.after_insurance import after_job_loss
-from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources
+from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources, one_year_later
 from app.engine.father import MATERNITY_PARTS, _insurance_lines
 from app.engine.insurance import NOT_INSURED, Coverage, father_coverage
 from app.engine.loss import Loss
@@ -277,8 +277,12 @@ def plan(
     # father's after the mother's share (what his parts leave of it).
     mothers_option = draft.segment("parental")
     fathers_option = draft.segment("parental-father")
+    # The mother takes no day of it in the child's first year: her parts not before the first
+    # birthday, and a plan without her starts right after maternity leave.
+    later = scenario.mother_parental_after_first_year is True
+    first_birthday = one_year_later(birth)
     base = earliest
-    if "mother" not in parents and mothers_option is not None:
+    if "mother" not in parents and mothers_option is not None and not later:
         fathers = sum(part.weeks for part in parts)
         base = mothers_option.start + min(one_parent, total - fathers) * WEEK
     elif "mother" not in parents and fathers_option is not None:
@@ -295,6 +299,15 @@ def plan(
             start = previous.start
         else:
             start = previous.end + DAY
+        if later and part.parent == "mother" and start < first_birthday:
+            if part.start is not None or part.with_previous:
+                raise ScenarioError(
+                    "Zapisaliśmy, że mama nie bierze urlopu rodzicielskiego w pierwszym roku "
+                    f"życia dziecka (do {fmt(first_birthday - DAY)}), a część {number} planu "
+                    f"zaczynałaby się {fmt(start)}. Zacznij ją najwcześniej {fmt(first_birthday)} "
+                    "albo najpierw zmień tę informację."
+                )
+            start = first_birthday
         if start < earliest:
             raise ScenarioError(
                 f"Urlop rodzicielski może się zacząć najwcześniej {fmt(earliest)}: po urlopie "
@@ -397,7 +410,12 @@ def _replace(
             draft.replace(default_id, *segments[parent])
         else:
             draft.segments += segments[parent]
-    if "mother" in parents and "father" not in parents:
+    if (
+        "mother" in parents
+        and "father" not in parents
+        and not scenario.mother_parental_after_first_year
+    ):
+        # (With the mother's share after the first birthday his weeks stay after maternity.)
         _move_fathers_option(draft, scenario, params, birth, planned)
     if "father" in parents and "mother" not in parents:
         _shrink_mothers_option(draft, scenario, params, planned)
@@ -556,10 +574,16 @@ def _shrink_mothers_option(
                 "end": end,
                 "days": weeks * 7,
                 "summary": (
-                    f"Po urlopie macierzyńskim mama może wziąć urlop rodzicielski. Rodzice mają "
-                    f"razem do {total} tyg., a w planie taty jest {fathers} tyg., więc mamie "
-                    f"zostaje najwięcej {weeks} tyg. Wzięte w całości od razu, trwałyby do "
-                    f"{fmt(end)}."
+                    (
+                        "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka; "
+                        f"może go wziąć od pierwszych urodzin, {fmt(option.start)}. "
+                        if scenario.mother_parental_after_first_year
+                        else "Po urlopie macierzyńskim mama może wziąć urlop rodzicielski. "
+                    )
+                    + f"Rodzice mają razem do {total} tyg., a w planie taty jest {fathers} tyg., "
+                    f"więc mamie zostaje najwięcej {weeks} tyg. Wzięte w całości "
+                    + ("od tego dnia" if scenario.mother_parental_after_first_year else "od razu")
+                    + f", trwałyby do {fmt(end)}."
                 ),
             }
         ),

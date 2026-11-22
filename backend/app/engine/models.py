@@ -364,6 +364,12 @@ class Scenario(BaseModel):
     """How the parents split parental leave, in the order they take it, and where they combine
     it with part-time work. Recorded only when the parent says so. Empty = no plan: the timeline
     shows each parent's share as an option."""
+    mother_parental_after_first_year: bool | None = None
+    """The mother takes no day of parental leave in the child's first year: she is back at work
+    after maternity leave (or after the father took it over) and leaves her share for later, or
+    unused. Her share is then drawn from the first birthday, and after the request for 81,5%
+    the benefit for maternity leave is topped up once to 100% (ustawa art. 31 ust. 3g-4).
+    Recorded only when the parent says so; None = not said."""
     # Adoption and foster care (guide section D)
     taken_in: TakenIn | None = None
     """The child was taken in for upbringing. Then `birth_date` is the child's date of birth

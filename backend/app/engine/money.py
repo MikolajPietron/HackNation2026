@@ -457,6 +457,49 @@ def add_rate_request(timeline: Timeline, scenario: Scenario, params: Params) -> 
     )
 
 
+TOP_UP_REQUEST = "maternity-top-up-request"
+
+
+def add_top_up_request(timeline: Timeline, scenario: Scenario, params: Params) -> None:
+    """The one-off top-up to 100% (art. 31 ust. 4) is paid only on request: the request on the
+    documents' lane, on the day the top-up is shown (the first birthday). The materials give
+    no deadline, form or place for it; the place shown is where the request for maternity
+    leave and the benefit goes (guide page 6), and the rule says so."""
+    extra = next((p for p in timeline.payments if p.one_off and p.lane == "mother"), None)
+    if extra is None:
+        return
+    m = params.money
+    rf, _, rs = rates(params)
+    text = (
+        f"W pierwszym roku życia dziecka (do {fmt(extra.start - DAY)}) mama nie wykorzysta ani "
+        f"jednego dnia zasiłku za urlop rodzicielski, więc zasiłek pobrany za urlop macierzyński "
+        f"w wysokości {rs} wyrównuje się jednorazowo do {rf} podstawy: "
+        f"{pln(_dec(extra.total))}. Wyrównanie następuje tylko na jej wniosek. Terminu ani wzoru "
+        "tego wniosku materiały nie podają; pokazujemy go w dniu pierwszych urodzin dziecka: od "
+        "tego dnia wiadomo, że w pierwszym roku życia nie było dnia zasiłku za urlop rodzicielski."
+    )
+    sources = [m.top_up.sources, m.first_year.sources]
+    place = request_place(scenario, params, "mother")
+    if place is not None:
+        text += (
+            " Gdzie go złożyć, materiały też nie mówią. Wniosek o urlop i zasiłek macierzyński "
+            f"składa się {place[0]}."
+        )
+        sources.append(place[1])
+    timeline.documents.append(
+        Document(
+            id=TOP_UP_REQUEST,
+            label=f"Wniosek o wyrównanie do {rf}",
+            title=f"Wniosek o jednorazowe wyrównanie zasiłku za urlop macierzyński do {rf}",
+            needed_by=extra.start,
+            done=False,
+            rule=text,
+            segment_id="maternity" if any(s.id == "maternity" for s in timeline.segments) else None,
+            sources=merge_sources(*sources),
+        )
+    )
+
+
 def requester_cover(scenario: Scenario) -> Coverage:
     """The sickness insurance of the parent who may ask for 81,5%."""
     if scenario.taken_in is not None:
@@ -775,25 +818,6 @@ def top_up(found: list[tuple[Segment, Paid, Piece, Base]], ctx: Context) -> TopU
         monthly=monthly(base, full) - monthly(base, single),
         day=one_year_later(ctx.anchor),
     )
-
-
-def top_up_without_parental(timeline: Timeline, params: Params, parent: Parent) -> Decimal:
-    """The one-off top-up (art. 31 ust. 4) of the parent's maternity leave paid at 81,5% on the
-    timeline, as if no day of the benefit for parental leave fell in the child's first year:
-    what a plan that leaves parental leave for later counts (plans.py, F8). 0 without such
-    payments (no request, or no amounts)."""
-    m = params.money
-    full, single = _dec(m.rate_full.value), _dec(m.rate_single.value)
-    total = Decimal(0)
-    for p in timeline.payments:
-        rule = paid_for(p.segment_id)
-        if p.lane != parent or p.one_off or rule is None or rule.kind != "maternity":
-            continue
-        if _dec(p.rate) != single:
-            continue
-        at_full = cents(_dec(p.base) * full / 100 / m.days_in_month.value)
-        total += (at_full - _dec(p.daily)) * p.days
-    return total
 
 
 def _top_up_payment(extra: TopUp, ctx: Context) -> Payment:

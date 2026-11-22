@@ -3,7 +3,8 @@
 For one of four goals the engine proposes 2-3 plans of parental leave and compares them. A plan
 is a set of `Scenario` changes the rules already know: the parts of parental leave
 (`parental_parts`: who, how many weeks, in which order, with part-time work), the rate
-(`rate_815`) and the father taking over maternity leave (`father_takes_over`). Every plan is
+(`rate_815`), the father taking over maternity leave (`father_takes_over`) and no parental leave
+of the mother's in the child's first year (`mother_parental_after_first_year`). Every plan is
 built by `build_timeline`, so the engine validates it (guide B.3 and E; Labour Code art. 180
 § 4-5, 182¹ᵃ, 182¹ᶜ, 182¹ᵉ, 182¹ᶠ; ustawa art. 30a): the pool for both parents, 9 weeks that
 belong to each, at most 5 parts, the last day of the year the child turns 6, work only for an
@@ -27,9 +28,10 @@ How the figures count (the same for the current timeline and every plan):
   the timeline draws them, and parental leave only where a plan decides it: a parent's share
   still drawn as an option ("do wyboru") is left out, since the plan does not take it now;
 - the money: the payments for those periods (money.py); benefits in pregnancy are the same in
-  every plan and are left out. After the request for 81,5%, when the mother's parental leave in
-  the plan has no day in the child's first year (also: none in the plan, "Mama wraca po urlopie
-  macierzyńskim"), the one-off top-up of her benefit for maternity leave to 100% counts too
+  every plan and are left out. A plan without the mother's parental leave ("Mama wraca po
+  urlopie macierzyńskim", the father taking over) also says she takes no day of it in the
+  child's first year (`mother_parental_after_first_year`): after the request for 81,5% the
+  timeline then has the one-off top-up of her benefit for maternity leave to 100%, and it counts
   (ustawa art. 31 ust. 4: on her request; a later parental leave is then paid 70%, ust. 3g);
 - "longest-home" with part-time work: longer in the calendar for the same pool of weeks, since
   in the weeks of work the leave covers the rest of full time (KP art. 182¹ᵉ § 1), and only if
@@ -59,7 +61,7 @@ from app.engine.models import (
     SourceRef,
     Timeline,
 )
-from app.engine.money import rates, request_deadline, top_up_without_parental
+from app.engine.money import rates, request_deadline
 from app.engine.params import Params
 from app.engine.parental import parental_deadline, parental_table, parental_weeks
 from app.engine.parental_plan import extension_days, fraction, part_ids, work_weeks
@@ -118,7 +120,8 @@ class Plan(BaseModel):
     """What the plan is, with the dates of its timeline."""
     patch: dict[str, Any]
     """The Scenario fields to set (JSON values): `parental_parts`, `rate_815`,
-    `father_takes_over`, `mother_weeks_before_takeover`. Applied, they give this plan."""
+    `father_takes_over`, `mother_weeks_before_takeover`, `mother_parental_after_first_year`.
+    Applied, they give this plan."""
     figures: PlanFigures
     given_up: list[str]
     """What the family gives up or leaves for later with this plan."""
@@ -150,6 +153,8 @@ class Candidate:
     rate_815: bool | None
     takes_over: bool | None
     mother_weeks: int | None
+    mother_later: bool | None
+    """No day of the mother's parental leave in the child's first year: a plan without her."""
 
 
 @dataclass(frozen=True)
@@ -330,6 +335,7 @@ def _candidate(
         scenario.father_takes_over,
         scenario.mother_weeks_before_takeover,
     )
+    without_her = frame.mother and all(part.parent != "mother" for part in parts)
     return Candidate(
         id=id_,
         title=title,
@@ -337,6 +343,7 @@ def _candidate(
         rate_815=scenario.rate_815 if rate == "kept" else rate,
         takes_over=takes_over,
         mother_weeks=weeks,
+        mother_later=True if without_her else None,
     )
 
 
@@ -528,7 +535,13 @@ CANDIDATES = {
     "equal-split": _equal_split,
     "quick-return": _quick_return,
 }
-PATCH_FIELDS = ("parental_parts", "rate_815", "father_takes_over", "mother_weeks_before_takeover")
+PATCH_FIELDS = (
+    "parental_parts",
+    "rate_815",
+    "father_takes_over",
+    "mother_weeks_before_takeover",
+    "mother_parental_after_first_year",
+)
 
 
 def _fields(scenario: Scenario) -> dict[str, Any]:
@@ -545,6 +558,7 @@ def _patch_values(candidate: Candidate) -> dict[str, Any]:
         "rate_815": candidate.rate_815,
         "father_takes_over": candidate.takes_over,
         "mother_weeks_before_takeover": candidate.mother_weeks if candidate.takes_over else None,
+        "mother_parental_after_first_year": candidate.mother_later,
     }
 
 
@@ -582,12 +596,7 @@ def figures(scenario: Scenario, timeline: Timeline, params: Params) -> PlanFigur
                 for p in timeline.payments
                 if p.lane == parent and (p.segment_id in ids or p.one_off)
             ]
-            amount = sum((dec(p.total) for p in paid), Decimal(0))
-            if not any(p.one_off for p in paid) and not first_year_parental(
-                segments, parent, timeline.birth_date
-            ):
-                amount += top_up_without_parental(timeline, params, parent)
-            money = float(amount)
+            money = float(sum((dec(p.total) for p in paid), Decimal(0)))
         parents[parent] = ParentFigures(
             leave_days=sum(s.days for s in mine),
             work_days=work_days,
@@ -680,8 +689,7 @@ def _plan(
     if candidate.rate_815 is not None and frame.rate_open:
         sources += [m.rate_full.sources, m.rate_parental.sources, m.rate_single.sources]
         sources += [m.request_days.sources]
-    mother_now = first_year_parental(counted(timeline), "mother", timeline.birth_date)
-    if candidate.rate_815 is True and _top_up_counted(timeline, params, mother_now):
+    if candidate.rate_815 is True and _top_up_counted(timeline):
         sources += [m.top_up.sources, m.first_year.sources]
     if candidate.takes_over and not frame.scenario.father_takes_over:
         sources += [params.father.takeover_after_weeks.sources]
@@ -796,7 +804,7 @@ def _given_up(frame: Frame, candidate: Candidate, timeline: Timeline, f: PlanFig
         )
     elif frame.rate_open and candidate.rate_815 is False:
         lines.append(f"Bez wniosku o {rs}: za urlop rodzicielski zasiłek wynosi {rp}.")
-    if candidate.rate_815 is True and _top_up_counted(timeline, params, mother_now):
+    if candidate.rate_815 is True and _top_up_counted(timeline):
         first_year_end = one_year_later(timeline.birth_date) - DAY
         lines.append(
             f"Przy {rs}: jeśli w pierwszym roku życia dziecka (do {fmt(first_year_end)}) mama nie "
@@ -812,13 +820,10 @@ def _given_up(frame: Frame, candidate: Candidate, timeline: Timeline, f: PlanFig
     return lines
 
 
-def _top_up_counted(timeline: Timeline, params: Params, mother_now: bool) -> bool:
-    """The plan's money has the one-off top-up of the mother's maternity leave to 100%: from the
-    engine (her parental leave starts after the first birthday) or counted by `figures` (no
-    parental leave of hers in the plan's first year)."""
-    if any(p.one_off and p.lane == "mother" for p in timeline.payments):
-        return True
-    return not mother_now and top_up_without_parental(timeline, params, "mother") > 0
+def _top_up_counted(timeline: Timeline) -> bool:
+    """The plan's money has the one-off top-up of the mother's maternity leave to 100%: her
+    parental leave starts after the first birthday (money.py)."""
+    return any(p.one_off and p.lane == "mother" for p in timeline.payments)
 
 
 def _notes(goal: Goal, frame: Frame, shown: list[PlanFigures]) -> list[str]:

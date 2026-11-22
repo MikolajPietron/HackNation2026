@@ -191,7 +191,9 @@ def test_equal_split_makes_the_time_at_home_equal() -> None:
 def test_quick_return_puts_the_earliest_return_first() -> None:
     """The father takes over after 14 weeks: the mother back on 10.11.2026 + 98 days =
     16.02.2027; her 98 × 230,11 = 22 550,78 zł, his part 42 × 172,58 = 7248,36 + 2416,12.
-    After maternity leave: back on 30.03.2027, nothing to plan (the family's current plan).
+    After maternity leave: back on 30.03.2027; the plan says the mother takes no parental leave
+    in the child's first year, so her share moves to the first birthday (10.11.2027) and the
+    father's 9 weeks to right after maternity leave (30.03.2027).
     Half-time after maternity leave: back (half-time) on 30.03.2027 too, on leave until
     28.02.2028, so it comes last."""
     result = plans_for("quick-return")
@@ -205,7 +207,10 @@ def test_quick_return_puts_the_earliest_return_first() -> None:
     assert takeover.figures.mother.total == 22550.78
     assert takeover.figures.father.total == 9664.48  # 7248,36 + 2416,12
     assert takeover.patch["parental_parts"] == []
-    assert after.current and after.changed == []
+    assert takeover.patch["mother_parental_after_first_year"] is True
+    assert after.patch["mother_parental_after_first_year"] is True
+    assert part_time.patch["mother_parental_after_first_year"] is None
+    assert not after.current and {"parental", "parental-father"} <= set(after.changed)
     assert after.figures.mother.back_to_work == d("2027-03-30")
     assert any("najpóźniej do 31.12.2032" in g for g in after.given_up)
     assert part_time.figures.mother.back_to_work == d("2027-03-30")
@@ -274,7 +279,7 @@ def test_an_invalid_plan_is_never_returned(monkeypatch: pytest.MonkeyPatch) -> N
 
     def candidates(frame: plans_module.Frame) -> list[Candidate]:
         def make(id_: str, *made: ParentalPart) -> Candidate:
-            return Candidate(id_, id_, tuple(made), None, None, None)
+            return Candidate(id_, id_, tuple(made), None, None, None, None)
 
         return [
             make("too-long", ParentalPart(parent="mother", weeks=33)),
@@ -388,6 +393,7 @@ def test_api_returns_plans_with_patches_to_apply(client: TestClient) -> None:
         "rate_815": False,
         "father_takes_over": None,
         "mother_weeks_before_takeover": None,
+        "mother_parental_after_first_year": None,
     }
     assert first["figures"]["total"] == 78322.23
     bad = client.post(
@@ -443,7 +449,32 @@ def test_the_assistant_gets_the_plans_as_text_and_nothing_changes(client: TestCl
     assert text.startswith("Plany dla celu „szybki powrót do pracy”")
     assert "1. Tata przejmuje urlop macierzyński po 14 tyg." in text
     assert "Mama: 14 tyg. urlopu, powrót do pracy 16.02.2027, zasiłki 22 550,78 zł." in text
-    assert "set_father_takeover(takes_over=true)" in text
-    assert "(to Wasz obecny plan)" in text
+    assert (
+        "Jak zapisać: set_mother_parental_after_first_year(after_first_year=true); "
+        "set_parental_plan(parts=[]); set_father_takeover(takes_over=true)" in text
+    )
     saved = asyncio.run(store.load(UUID(SESSION)))
     assert saved is not None and saved.scenario == Scenario.model_validate(scenario)
+
+
+def test_the_assistant_records_no_parental_leave_in_the_first_year(client: TestClient) -> None:
+    """ "Mama rezygnuje z rodzicielskiego, wraca po macierzyńskim": the tool records it, the
+    timeline moves her share to the first birthday and, at 81,5%, adds the one-off top-up."""
+    store = app.dependency_overrides[get_session_store]()
+    scenario = scenario_json(rate_815=True)
+    asyncio.run(store.save(UUID(SESSION), Session.model_validate({"scenario": scenario})))
+    returned: list[str] = []
+    app.dependency_overrides[get_chat_model] = lambda: scripted(
+        "set_mother_parental_after_first_year", {"after_first_year": True}, returned
+    )
+    out = client.post(
+        "/api/chat",
+        json={"session_id": SESSION, "message": "Wracam do pracy po macierzyńskim"},
+    )
+    assert out.status_code == 200, out.text
+    events = [json.loads(line) for line in out.text.splitlines() if line]
+    timeline = next(e for e in events if e["type"] == "timeline")["timeline"]
+    assert any(p["id"] == "pay-maternity-top-up" for p in timeline["payments"])
+    assert any(d["id"] == "maternity-top-up-request" for d in timeline["documents"])
+    saved = asyncio.run(store.load(UUID(SESSION)))
+    assert saved is not None and saved.scenario.mother_parental_after_first_year is True

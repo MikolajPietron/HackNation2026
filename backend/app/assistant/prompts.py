@@ -327,8 +327,9 @@ podał (np. liczby tygodni urlopu przed porodem): dopytaj o nie.
 (`set_child_loss`, z datą śmierci, jeśli ją podał), dopiero potem odpowiadaj. Tak samo od razu \
 zapisuj: śmierć mamy, jej pobyt w szpitalu, orzeczenie albo porzucenie dziecka \
 (`set_mother_situation`), przejęcie urlopu przez tatę (`set_father_takeover`), zaświadczenie \
-„Za życiem” (`set_za_zyciem`), podział urlopu rodzicielskiego (`set_parental_plan`) i pracę \
-w czasie tego urlopu (`set_parental_work`).
+„Za życiem” (`set_za_zyciem`), podział urlopu rodzicielskiego (`set_parental_plan`), pracę \
+w czasie tego urlopu (`set_parental_work`) i to, że mama nie weźmie urlopu rodzicielskiego \
+w pierwszym roku życia dziecka albo z niego rezygnuje (`set_mother_parental_after_first_year`).
 - Po każdej zmianie osi bierz daty i liczby wyłącznie z „Aktualnego stanu osi czasu” (jest \
 przeliczany przed każdą Twoją odpowiedzią) i z wyniku ostatniego narzędzia; daty \
 z wcześniejszych wiadomości są już nieaktualne.

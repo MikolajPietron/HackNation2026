@@ -800,6 +800,38 @@ async def set_parental_plan(ctx: RunContext[AssistantDeps], parts: list[Parental
 
 
 @assistant.tool(sequential=True)
+async def set_mother_parental_after_first_year(
+    ctx: RunContext[AssistantDeps], after_first_year: bool | None
+) -> str:
+    """Record that the mother takes no day of parental leave in the child's first year: she
+    goes back to work after maternity leave (or after the father took it over) and leaves her
+    parental leave for later, or does not take it at all ("rezygnuje z rodzicielskiego"). The
+    calculator draws her share from the first birthday and, after the request for 81,5%, adds
+    the one-off top-up of her benefit for maternity leave to 100% (ustawa art. 31 ust. 4) with
+    its request. Call it only when the user says so; never ask about it.
+
+    Args:
+        after_first_year: True = no day of her parental leave before the first birthday;
+            null = a correction (she may take it right after maternity leave).
+    """
+    scenario = ctx.deps.scenario
+    if scenario.taken_in is not None:
+        raise ModelRetry(
+            "Przy dziecku przyjętym na wychowanie tej zasady nie liczymy: zapisz tylko plan "
+            "urlopu rodzicielskiego (set_parental_plan)."
+        )
+    if scenario.children_count is None:
+        raise ModelRetry(
+            "Najpierw ustal liczbę dzieci (set_children_count): od niej zależy wymiar urlopu "
+            "rodzicielskiego."
+        )
+    scenario = _with(ctx, mother_parental_after_first_year=after_first_year)
+    return await _apply(
+        ctx, scenario, "pay-maternity-top-up", "parental", "parental-mother-1", "pay-maternity"
+    )
+
+
+@assistant.tool(sequential=True)
 async def set_parental_work(
     ctx: RunContext[AssistantDeps],
     parent: Role,
@@ -1214,7 +1246,7 @@ async def propose_plans(ctx: RunContext[AssistantDeps], goal: Goal) -> str:
         result = plans_for_goal(ctx.deps.scenario, ctx.deps.params, ctx.deps.today, goal)
     except ScenarioError as exc:
         raise ModelRetry(f"Nie da się ułożyć planów: {exc}") from exc
-    return describe_plans(result)
+    return describe_plans(result, ctx.deps.scenario)
 
 
 @assistant.tool

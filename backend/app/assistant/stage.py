@@ -256,6 +256,7 @@ BIRTH_ONLY = frozenset(
         "set_child_loss",
         "set_father_takeover",
         "set_mother_situation",
+        "set_mother_parental_after_first_year",
         # Losing the job, a raised contribution base and sick leave: in this pregnancy.
         "set_job_loss",
         "set_contribution_base_raised",
@@ -268,7 +269,13 @@ AFTER_BIRTH_ONLY = frozenset({"set_child_loss", "set_mother_situation", "set_hos
 """They need the date of birth (each asks for `set_birth_date` first)."""
 PLANS = frozenset({"propose_plans", "stress_test"})
 AFTER_TOTAL_LOSS = frozenset(
-    {"set_hospital_care", "set_za_zyciem", "set_parental_plan", "set_parental_work"}
+    {
+        "set_hospital_care",
+        "set_za_zyciem",
+        "set_parental_plan",
+        "set_parental_work",
+        "set_mother_parental_after_first_year",
+    }
 )
 """No child to look after: no parental leave, no supplementary leave to count."""
 

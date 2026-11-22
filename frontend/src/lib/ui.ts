@@ -325,6 +325,10 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return Array.isArray(args.parts) && args.parts.length === 0
         ? 'Bez planu urlopu rodzicielskiego'
         : 'Plan urlopu rodzicielskiego'
+    case 'set_mother_parental_after_first_year':
+      return args.after_first_year
+        ? 'Mama bez urlopu rodzicielskiego w 1. roku'
+        : 'Urlop rodzicielski mamy od razu po macierzyńskim'
     case 'set_parental_work': {
       const who = args.parent === 'father' ? 'taty' : 'mamy'
       return typeof args.work_fraction === 'string'

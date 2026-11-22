@@ -487,6 +487,79 @@ def test_the_one_off_top_up_is_a_payment_of_its_own() -> None:
     assert left.amount == 0
 
 
+def test_no_parental_leave_in_the_first_year_puts_the_top_up_on_the_timeline() -> None:
+    """81,5% chosen, and the mother takes no day of parental leave in the child's first year
+    (she goes back to work after maternity leave, ustawa art. 31 ust. 3g-4). Her share is drawn
+    from the first birthday: 10.11.2027 + 224 days − 1 = 20.06.2028, at 70%: 224 × 161,07 =
+    36 079,68 zł. The father's 9 weeks right after maternity leave: 30.03-31.05.2027 (63 days).
+    The benefit for maternity leave, paid at 81,5% (140 × 187,54 = 26 255,60), is topped up on
+    her request by 140 × 42,57 = 5959,80 zł, shown on 10.11.2027, with its request on the
+    documents' lane (no deadline in the materials). Together 68 295,08 zł, as at 100% and 70%."""
+    t = born(mother_pay=8000, rate_815=True, mother_parental_after_first_year=True)
+    parental = next(s for s in t.segments if s.id == "parental")
+    assert (parental.start, parental.end) == (dt.date(2027, 11, 10), dt.date(2028, 6, 20))
+    assert parental.summary.startswith(
+        "Mama nie bierze urlopu rodzicielskiego w pierwszym roku życia dziecka, więc pokazujemy "
+        "go od pierwszych urodzin, 10.11.2027."
+    )
+    his = next(s for s in t.segments if s.id == "parental-father")
+    assert (his.start, his.end) == (dt.date(2027, 3, 30), dt.date(2027, 5, 31))
+    assert "zaraz po urlopie macierzyńskim" in his.summary
+    assert amounts(pay(t, "parental")) == (70, 4832.24, 161.07, 36079.68, 224)
+    assert pay(t, "maternity").total == 26255.6
+    top_up = next(p for p in t.payments if p.one_off)
+    assert (top_up.start, top_up.total) == (dt.date(2027, 11, 10), 5959.8)
+    assert t.money_total is not None and t.money_total.mother == Decimal("68295.08")
+    request = next(d for d in t.documents if d.id == "maternity-top-up-request")
+    assert (request.needed_by, request.deadline) == (dt.date(2027, 11, 10), None)
+    assert request.label == "Wniosek o wyrównanie do 100%"
+    assert "tylko na jej wniosek" in request.rule and "5 959,80 zł" in request.rule
+    assert "Terminu ani wzoru tego wniosku materiały nie podają" in request.rule
+    assert "art. 31 ust. 4" in articles(request)
+    assert any("od pierwszych urodzin" in a for a in t.assumptions)
+
+
+def test_no_parental_leave_in_the_first_year_at_100_and_70_percent() -> None:
+    """Without the request for 81,5% nothing is topped up: 100% for maternity leave (140 ×
+    230,11 = 32 215,40) and 70% for her share from the first birthday; no request to file."""
+    t = born(mother_pay=8000, mother_parental_after_first_year=True)
+    assert amounts(pay(t, "maternity")) == (100, 6903.2, 230.11, 32215.4, 140)
+    assert pay(t, "parental").start == dt.date(2027, 11, 10)
+    assert not any(p.one_off for p in t.payments)
+    assert not any(d.id == "maternity-top-up-request" for d in t.documents)
+
+
+def test_one_day_of_parental_leave_in_the_first_year_means_no_top_up() -> None:
+    """81,5% chosen; the mother takes one week of parental leave from 31.03.2027 and then goes
+    back to work. A day of the benefit for parental leave fell in the first year, so art. 31
+    ust. 4 does not apply: maternity leave stays at 81,5% (26 255,60) and her week is 81,5% too:
+    7 × 187,54 = 1312,78 zł."""
+    t = born(
+        mother_pay=8000,
+        rate_815=True,
+        parental_parts=[{"parent": "mother", "weeks": 1, "start": "2027-03-31"}],
+    )
+    assert pay(t, "maternity").total == 26255.6
+    assert amounts(pay(t, "parental-mother-1")) == (81.5, 5626.11, 187.54, 1312.78, 7)
+    assert not any(p.one_off for p in t.payments)
+    assert not any(d.id == "maternity-top-up-request" for d in t.documents)
+
+
+def test_father_taking_over_and_no_parental_leave_in_the_first_year() -> None:
+    """81,5%, the father takes over after 14 weeks, the mother takes no parental leave in the
+    first year: her 98 days at 81,5% (98 × 187,54 = 18 378,92) are topped up by 98 × 42,57 =
+    4171,86 zł."""
+    t = born(
+        mother_pay=8000,
+        rate_815=True,
+        father_takes_over=True,
+        mother_parental_after_first_year=True,
+    )
+    assert pay(t, "maternity").total == 18378.92
+    top_up = next(p for p in t.payments if p.one_off)
+    assert (top_up.days, top_up.total) == (98, 4171.86)
+
+
 def test_81_5_percent_does_not_survive_a_stillbirth() -> None:
     """81,5% was chosen in pregnancy, then the child was stillborn on 10.11.2026: maternity leave
     8 weeks, 10.11.2026-04.01.2027 (56 days), at 100%: 56 × 230,11 = 12 886,16 zł, not 56 ×
