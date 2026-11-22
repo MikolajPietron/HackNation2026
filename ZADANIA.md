@@ -13,6 +13,8 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 
 ## Komputer B — logika
 
+Kolejność: **0** (błąd czatu) → **7** (endpoint, odblokowuje front) → **1** i **11** (podstawa wymiaru w sprawach, doczytanie spraw) → **2** (zgodność) → **3** i **10** (dane wniosków i organizacji dla frontu) → **4** → **5** i **6** (wymogi formalne) → **8**, **9** (funkcje wyróżniające).
+
 ### 0. PILNE: czat zadaje złe pytanie wywiadu (błąd zgłoszony 22.11.2026)
 - Objaw: dziecko w drodze, termin porodu zapisany (23.01.2027). Rodzic klika chip „Wcześniak”, który wysyła „Co się zmieni, jeśli dziecko urodzi się przedwcześnie?”. Asystent kończy odpowiedź pytaniem „Kiedy jest przewidywany poród albo kiedy urodziło się dziecko? Podaj dzień, miesiąc i rok.”, czyli pyta o datę, którą już zna.
 - Przyczyna: stan jest dobry. `next_question` zwraca `leave-before-birth`, a front pokazuje do niego poprawne szybkie odpowiedzi. Ostatnie zdanie odpowiedzi pisze jednak model: `prompts.py` (linie ~60, ~144, ~170) i `describe.py` (`Następne pytanie wywiadu (zadaj je dokładnie tak)`) tylko go o to proszą. Gemini Flash (`LLM_MODEL=gemini-flash-latest` na komputerze A) czasem uznaje, że do wcześniaka potrzebna jest data urodzenia, i sam układa pytanie. W 4 powtórzeniach na czystej sesji się nie pojawiło, czyli błąd jest losowy, ale prawdziwy.
@@ -58,6 +60,30 @@ README jest nieaktualny („zrobiona jest faza 1”, „Claude przez OpenRouter�
 - Funkcje AI: czat-wywiad i wyjaśnienia (Gemini Flash albo Claude) oraz odczyt spraw ze skanów (Gemini Pro albo Claude).
 - Bez AI: silnik dat i kwot, sprawdzenie ubezpieczenia, porównanie z ZUS.
 
+### 7. Endpoint do zmiany scenariusza z interfejsu (front na to czeka)
+- `PATCH /api/session/{id}/scenario` z wybranymi polami (`parental_parts`, `rate_815`, `job_loss`, `mother_pay_history` itd.), walidowany przez silnik. Zwraca `SessionStart` (oś, scenariusz, następne pytanie). Ma też zapisać w historii czatu krótką notatkę, co zmieniono, żeby asystent wiedział.
+- FUNKCJE (agent): „Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny”. Bez tego front nie zrobi suwaka etatu (F6), kafelków tygodni (F13) ani przełącznika 81,5% bez czatu.
+- Gotowe, gdy: test API (zmiana `parental_parts` przelicza oś, złe dane dają 422 z polskim komunikatem) i typy w `frontend/src/types.ts`.
+
+### 8. Silnik: funkcje wyróżniające (FUNKCJE 4.2, P1)
+Każda jako czysta funkcja silnika z testem; front je narysuje.
+- **F9 „Zostawiacie na stole”:** niewykorzystane tygodnie i złotówki (np. 9 tygodni taty, ojcowski przed końcem okna, wariant 81,5% po terminie), z dniem, do którego jeszcze można.
+- **F10 Punkty bez powrotu:** oznacz znaczniki decyzji nieodwracalnych (np. pole `irreversible` przy `Marker`): wniosek o 81,5% do 21 dni po porodzie, koniec okna na ojcowski, koniec rodzicielskiego w roku 6. urodzin.
+- **F11 Stress-test planu:** przelicz bieżący plan przez zdarzenia z F7 (wcześniak, szpital, utrata pracy, choroba mamy) i zwróć, gdzie grozi utrata prawa albo zmiana kwoty.
+- **F14 „Nie przysługuje” z dalszą drogą:** przy braku prawa punkt wyjaśnienia „co zamiast” i „co zrobić, żeby przysługiwało”. Tylko to, co jest w materiałach (np. zasiłek po ustaniu ubezpieczenia, dobrowolne chorobowe).
+- **F8 Planowanie od celu:** 2–3 plany dla celu („najwięcej pieniędzy”, „najdłużej w domu”, „równy podział”, „szybki powrót”) z `parental_parts` i `rate_815`, porównane silnikiem. Łączy się z drzewem decyzyjnym kolegi (front: „Plany dla Was”).
+
+### 9. „Przetłumacz pismo z ZUS” i sprawdzanie wniosku (F24, F23; P1, funkcje AI)
+- F24: endpoint, który z obrazu pisma ZUS (zdjęcie albo PDF) zwraca prostym językiem: co to jest, czy trzeba coś zrobić i do kiedy. Tak jak przy sprawach: czytnik `app/cases/pages.py` + model z `CASES_MODEL` (tylko Claude albo Gemini), daty i terminy przepisane, nie liczone.
+- F23: sprawdzenie wypełnionego wniosku: brakujące pola, niezgodne daty, brak załącznika, nieaktualny formularz (ZUR, ZAO i Z-3b zlikwidowane 24.10.2026). Na danych z punktu 3.
+
+### 10. Organizacje wsparcia: źródło danych (wymóg i zadania, F28)
+Sprawdź, czy materiały (Poradnik ZUS 2026, wyciągi) wymieniają organizacje wsparcia przy śmierci dziecka, wcześniaku, poronieniu i ciężko chorym dziecku. Jeśli tak, wpisz je z cytatem i stroną (np. do `params/2026.json` albo osobnego JSON-a) i wystaw w API. Jeśli nie, napisz to tutaj: front (A) zrobi listę ze sprawdzonych stron organizacji, z odnośnikami.
+
+### 11. Domknąć odczyt spraw
+- Gdy limit Google zostanie podniesiony: `uv run python -m app.cases.batch --jobs 1` doczyta pozostałe 56 spraw (wsad czeka i ponawia po 429). Albo skopiuj `.cases_cache` z komputera A.
+- Odczyt ma też wypełniać pola, których potrzebuje `base.py` (punkt 1) i scenariusz: utrata pracy (`JobLoss`), zadłużenie (dla S04, S10), części rodzicielskiego, przejęcie urlopu przez tatę.
+
 ## Komputer A — front
 Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko część. Kolejność według priorytetów z FUNKCJE.md:
 
@@ -72,7 +98,7 @@ Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko czę
 9. „Zostawiacie na stole” (F9), punkty bez powrotu (F10), „Plany dla Was” (F8, drzewo decyzyjne).
 
 ### Potrzebne od B dla frontu
-- `PATCH /api/session/{id}/scenario`: zmiana wybranych pól scenariusza (np. `parental_parts`, `rate_815`) bez czatu, z walidacją silnika. Zwraca oś i następne pytanie jak `SessionStart`. FUNKCJE: „Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny”.
+- Punkty B.7 (endpoint zmiany scenariusza), B.3 (dane wniosków), B.10 (źródło organizacji wsparcia), B.8 (funkcje silnika do narysowania).
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
