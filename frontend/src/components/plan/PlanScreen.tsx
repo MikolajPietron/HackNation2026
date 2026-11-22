@@ -324,7 +324,18 @@ export function PlanScreen({
 
                   {timeline.left_on_table.length > 0 && (
                     <motion.div variants={ITEM} className="mt-5">
-                      <LeftOnTable timeline={timeline} onSelect={onSelect} />
+                      <LeftOnTable
+                        timeline={timeline}
+                        scenario={scenario}
+                        onSelect={onSelect}
+                        onFill={openFill}
+                        onApply={apply}
+                        onCompare={() =>
+                          document
+                            .getElementById('rate-choice')
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }
+                      />
                     </motion.div>
                   )}
 
@@ -352,7 +363,7 @@ export function PlanScreen({
 
                   <GoalPlans scenario={scenario} onApply={apply} />
                   <StressTest scenario={scenario} focus={stressFocus} />
-                  <RiskRadar scenario={scenario} onCheckZus={checkZus} />
+                  <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={(focus) => setWhy({ focus })} />
                   <Footer onSupport={() => setSupportOpen(true)} />
                 </>
               ) : (
