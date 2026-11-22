@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
@@ -18,8 +18,7 @@ import serce from '@/assets/onboarding/serce.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
-import { MockModal, SimBadge } from '@/components/mocks/MockModal'
-import { SampleFamilies } from '@/components/cases/SampleFamilies'
+import { SimBadge } from '@/components/mocks/MockModal'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import type { Persona } from '@/lib/mockData'
@@ -38,6 +37,12 @@ import type {
 import { CALENDAR_CELL, CALENDAR_WIDTH, Calendar } from './Calendar'
 import { ImageChoice, PrimaryButton, TextChoice } from './ChoiceCard'
 import { ITEM, POP, STEP } from './motion'
+
+// The jury's test (brief, section 6): upload or pick one of ZUS's example cases. Loaded on the
+// first click, so the start screen stays light.
+const CasesDialog = lazy(() =>
+  import('@/components/cases/CasesDialog').then((m) => ({ default: m.CasesDialog })),
+)
 
 /** "Nie wiem": an answer, unlike null (not answered yet). The chat asks it again later. */
 type Unknown = 'unknown'
@@ -331,7 +336,8 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
   const [answers, setAnswers] = useState<Answers>(EMPTY)
   const [leaving, setLeaving] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
-  const [examplesOpen, setExamplesOpen] = useState(false)
+  /** null = never opened (the dialog's code is not loaded yet). */
+  const [casesOpen, setCasesOpen] = useState<boolean | null>(null)
   const timer = useRef(0)
   const step = path[path.length - 1]
 
@@ -412,7 +418,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
   let screen: ReactNode
   switch (step) {
     case 'intro':
-      screen = <Intro onStart={() => go('role')} onSkip={onSkip} onExample={() => setExamplesOpen(true)} saved={saved} />
+      screen = <Intro onStart={() => go('role')} onSkip={onSkip} onCases={() => setCasesOpen(true)} saved={saved} />
       break
     case 'role':
       screen = (
@@ -1004,19 +1010,12 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
       </div>
 
       <MObywatelLogin open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={fromZus} />
-      <MockModal open={examplesOpen} label="Przykładowe rodziny" onClose={() => setExamplesOpen(false)} className="max-w-4xl">
-        <h2 className="pr-10 text-2xl leading-tight font-bold tracking-tight text-navy-900">Zobacz na przykładzie</h2>
-        <p className="mt-1 text-navy-500">
-          Wybierz rodzinę, a pokażemy jej cały plan. Swój policzysz potem, odpowiadając na pytania.
-        </p>
-        <SampleFamilies
-          className="mt-5"
-          onLoaded={(start) => {
-            setExamplesOpen(false)
-            onDone(start)
-          }}
-        />
-      </MockModal>
+      {casesOpen !== null && (
+        <Suspense fallback={null}>
+          {/* Example families, ZUS's example cases S01–S86 and the upload of a case's PDF. */}
+          <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onDone} />
+        </Suspense>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.main
@@ -1183,13 +1182,13 @@ function UnknownLink({
 function Intro({
   onStart,
   onSkip,
-  onExample,
+  onCases,
   saved,
 }: {
   onStart: () => void
   onSkip: () => void
-  /** Open a ready example family instead of answering (no AI). */
-  onExample: () => void
+  /** Upload or pick a case (AI reads its documents), or open a ready example family (no AI). */
+  onCases: () => void
   saved: SavedSession | null
 }) {
   return (
@@ -1250,10 +1249,15 @@ function Intro({
         )}
         <button
           type="button"
-          onClick={onExample}
-          className="text-sm font-bold text-zus-700 underline-offset-4 transition-colors hover:text-zus-900 hover:underline"
+          onClick={onCases}
+          className="rounded-2xl border border-line bg-white px-6 py-3 shadow-card transition-[border-color,transform] duration-150 hover:border-zus-300 active:scale-[0.98]"
         >
-          Zobacz na przykładowej rodzinie
+          <span className="block text-sm font-bold text-navy-900">
+            Wgraj dokumenty sprawy albo wybierz przykład
+          </span>
+          <span className="block text-xs text-navy-500">
+            Sprawdzimy ubezpieczenie i policzymy zasiłek
+          </span>
         </button>
       </motion.div>
     </div>
