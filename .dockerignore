@@ -1,0 +1,15 @@
+# Never in the image: ZUS documents and what was read from them, secrets, local state.
+docs/
+backend/.env
+backend/.cases_cache/
+backend/app/assistant/zalacznik.json
+backend/app/assistant/poradnik.json
+frontend/.env.local
+.git/
+.claude/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+frontend/dist/
+tools/
+supabase/

@@ -20,6 +20,7 @@ from app.api.deps import get_param_store, get_session_store
 from app.config import get_settings
 from app.services.param_versions import ParamStore
 from app.services.sessions import SessionStore
+from app.static import mount_frontend
 
 app = FastAPI(title="Zasiłkowy Przewodnik API", version="0.1.0")
 
@@ -48,3 +49,7 @@ async def health(
 ) -> dict[str, str]:
     """Where conversations and parameter versions are stored: "supabase" or "memory"."""
     return {"status": "ok", "sessions": store.name, "params": params.name}
+
+
+# Last, after every API route: the built frontend, when there is one (the online demo).
+mount_frontend(app)
