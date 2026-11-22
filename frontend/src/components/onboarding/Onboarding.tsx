@@ -23,6 +23,7 @@ import { SampleFamilies } from '@/components/cases/SampleFamilies'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import type { Persona } from '@/lib/mockData'
+import { formatPln } from '@/lib/money'
 import { plural } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type {
@@ -670,7 +671,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
               <Fact label="Kto wypłaca zasiłek" value={persona.payer} />
               <Fact label="Podstawa składek" value={`${persona.contributionBase} miesięcznie`} />
               <Fact label="Zwolnienia e-ZLA" value={sick || 'brak'} />
-              <Fact label="Zadłużenie składkowe" value={persona.debt} />
+              <Fact label="Zadłużenie składkowe" value={formatPln(persona.debt)} />
             </dl>
           </motion.div>
           <motion.div variants={ITEM} className="mt-8 flex justify-center">

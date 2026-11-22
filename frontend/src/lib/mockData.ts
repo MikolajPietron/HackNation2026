@@ -27,7 +27,8 @@ export interface Persona {
   payer: string
   sickness: string
   contributionBase: string
-  debt: string
+  /** Contribution debt for social insurance, in PLN (shown on the simulated certificate). */
+  debt: number
   ezla: { from: string; to: string; code: string; reason: string }[]
   facts: PersonaFacts
 }
@@ -42,7 +43,7 @@ export const PERSONAS: Persona[] = [
     payer: 'Przykładowa Spółka sp. z o.o. — ponad 20 osób, zasiłek wypłaca pracodawca',
     sickness: 'Obowiązkowe, od 1 marca 2023',
     contributionBase: '6 480,00 zł',
-    debt: '0,00 zł',
+    debt: 0,
     ezla: [{ from: '2 wrz 2026', to: '15 wrz 2026', code: 'B', reason: 'Niezdolność w okresie ciąży' }],
     facts: {
       work: 'employment',
@@ -62,7 +63,7 @@ export const PERSONAS: Persona[] = [
     payer: 'Sama za siebie — zasiłek wypłaca ZUS',
     sickness: 'Dobrowolne, od 1 czerwca 2025',
     contributionBase: '5 400,00 zł',
-    debt: '312,45 zł',
+    debt: 312.45,
     ezla: [],
     facts: {
       work: 'business',
@@ -82,7 +83,7 @@ export const PERSONAS: Persona[] = [
     payer: 'Przykładowe Biuro s.c. — do 20 osób, zasiłek wypłaca ZUS',
     sickness: 'Dobrowolne, od 1 lutego 2026',
     contributionBase: '4 200,00 zł',
-    debt: '0,00 zł',
+    debt: 0,
     ezla: [{ from: '10 paź 2026', to: '23 paź 2026', code: 'B', reason: 'Niezdolność w okresie ciąży' }],
     facts: {
       work: 'contract',

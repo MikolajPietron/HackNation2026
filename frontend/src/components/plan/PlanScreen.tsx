@@ -553,7 +553,19 @@ export function PlanScreen({
           setZusOpen(true)
         }}
       />
-      <ZusDataDialog persona={persona} open={zusOpen} onClose={() => setZusOpen(false)} onMock={showMock} />
+      <ZusDataDialog
+        persona={persona}
+        open={zusOpen}
+        onClose={() => setZusOpen(false)}
+        onMock={showMock}
+        timeline={timeline}
+        scenario={scenario}
+        onApply={apply}
+        onWhy={(focus) => {
+          setZusOpen(false)
+          setWhy({ focus })
+        }}
+      />
       <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
       <BirthCertificate open={certOpen} onClose={() => setCertOpen(false)} />
       <LetterDialog open={letterOpen} onClose={() => setLetterOpen(false)} timeline={timeline} onSelect={onSelect} />
