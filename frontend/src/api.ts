@@ -5,11 +5,14 @@ import type {
   CaseResult,
   ChatEvent,
   ChatRequest,
+  LetterExplanation,
   OnboardingAnswers,
   ParamPreview,
   ParamValues,
   PlanGoal,
   PlansResult,
+  RequestCheckRequest,
+  RequestCheckResult,
   Scenario,
   ScenarioChanges,
   SessionStart,
@@ -204,5 +207,35 @@ export const stressTest = (scenario: Scenario, timelines = false, signal?: Abort
   requestJson<StressReport>('/api/stress', {
     method: 'POST',
     body: JSON.stringify({ scenario, timelines }),
+    signal,
+  })
+
+// Letters from ZUS (F24, AI) and the request check (F23)
+
+/** "Przetłumacz pismo z ZUS": a photo or PDF of a letter in plain Polish (AI; nothing stored). */
+export async function explainLetter(
+  file: File,
+  sessionId?: string | null,
+  signal?: AbortSignal,
+): Promise<LetterExplanation> {
+  const body = new FormData()
+  body.append('file', file)
+  if (sessionId) body.append('session_id', sessionId)
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}/api/letters/explain`, { method: 'POST', body, signal })
+  } catch (error) {
+    if (signal?.aborted) throw error
+    throw new Error(OFFLINE)
+  }
+  if (!response.ok) throw new Error(await errorDetail(response))
+  return (await response.json()) as LetterExplanation
+}
+
+/** Check a filled request before filing it: no AI, unless `phrase` asks AI to reword. */
+export const checkRequest = (body: RequestCheckRequest, signal?: AbortSignal) =>
+  requestJson<RequestCheckResult>('/api/requests/check', {
+    method: 'POST',
+    body: JSON.stringify(body),
     signal,
   })

@@ -1127,3 +1127,206 @@ export interface StressReport {
   /** Why there are no events. */
   reason: string | null
 }
+
+// Letters from ZUS (F24, AI) and the request check (F23): backend/app/letters,
+// app/request_check, api/letters.py, api/request_check.py
+
+/** A ZUS form the guide names (pages 3, 6, 12). ZUR, ZAO and Z-3b are abolished since 24.10.2026. */
+export interface KnownForm {
+  code: string
+  name: string
+  abolished: boolean
+  /** The form it was merged into (ZUR and ZAO: ZAM). */
+  merged_into: string | null
+  sources: SourceRef[]
+}
+
+/** decision = decyzja, summons = wezwanie, notice = zawiadomienie, information = informacja. */
+export type LetterKind = 'decision' | 'summons' | 'notice' | 'information' | 'other'
+export type LetterOutcome = 'granted' | 'refused' | 'partial' | 'changed' | 'none'
+/** job_loss = zasiłek w wysokości zasiłku macierzyńskiego; rate_815 = zasiłek 81,5%. */
+export type LetterBenefit =
+  | 'maternity'
+  | 'parental'
+  | 'paternity'
+  | 'supplementary'
+  | 'sickness'
+  | 'rehabilitation'
+  | 'job_loss'
+  | 'rate_815'
+  | 'other'
+
+/** A literal fragment of the letter (personal data replaced with "[…]"). */
+export interface LetterQuote {
+  text: string
+  page: number
+}
+
+export interface LetterItem {
+  text: string
+  quote: LetterQuote
+}
+
+export interface LetterAction {
+  what: string
+  /** The deadline in the letter's words, e.g. "w terminie 7 dni od dnia doręczenia pisma". */
+  deadline_text: string | null
+  /** Only a date written in the letter (checked against its quote); never computed. */
+  deadline_date: string | null
+  quote: LetterQuote
+}
+
+export interface LetterPeriod {
+  benefit: LetterBenefit
+  start: string | null
+  end: string | null
+  quote: LetterQuote
+}
+
+/** A letter from ZUS in plain Polish. Always AI: label it in the UI with `ai_label`. */
+export interface LetterExplanation {
+  ai: true
+  ai_label: string
+  /** The model that read the letter (Claude or Gemini). */
+  model: string
+  is_zus_letter: boolean
+  kind: LetterKind
+  kind_label: string
+  heading: string
+  subject: string
+  outcome: LetterOutcome
+  outcome_label: string | null
+  summary: string
+  reason: LetterItem | null
+  /** The letter asks the parent to do something (`actions` not empty). */
+  action_needed: boolean
+  actions: LetterAction[]
+  prepare: LetterItem[]
+  periods: LetterPeriod[]
+  /** How and by when to appeal, when the letter says so: a right, not a duty. */
+  appeal: LetterAction | null
+  forms: KnownForm[]
+  /** Form codes in the letter that the guide does not describe. */
+  other_forms: string[]
+  /** Timeline element ids the letter is about (with a session: only those on its timeline). */
+  timeline_elements: string[]
+  quotes: LetterQuote[]
+  pages: number
+  pages_read: number
+  personal_data_removed: boolean
+  warnings: string[]
+  unreadable: string[]
+}
+
+/** What a request field means for the check; inferred from the label when not given. */
+export type RequestFieldKey =
+  | 'start'
+  | 'end'
+  | 'period'
+  | 'weeks'
+  | 'return_to_work'
+  | 'maternity_end'
+  | 'birth_date'
+  | 'filed_on'
+  | 'rate_815'
+
+/** One labelled field of a filled request (the request form's shape: label, value, source). */
+export interface RequestField {
+  label: string
+  value: string | null
+  source?: string | null
+  key?: RequestFieldKey | null
+  /** An empty required field is a problem; default true. */
+  required?: boolean
+}
+
+export interface FilledRequest {
+  title: string
+  addressee?: string | null
+  fields: RequestField[]
+  attachments?: string[]
+  /** The timeline document the request is for, e.g. "parental-request". */
+  form_id?: string | null
+  parent?: Role | null
+  /** Default: a "data złożenia" field, else today. */
+  filed_on?: string | null
+}
+
+export interface RequestCheckRequest {
+  request: FilledRequest
+  /** The session whose timeline the dates are checked against. */
+  session_id?: string | null
+  /** Instead of a session (e.g. an example case). */
+  scenario?: Scenario | null
+  /** Ask the AI to reword the problems (it finds none and adds no rules). */
+  phrase?: boolean
+}
+
+export type RequestKind =
+  | 'maternity-request'
+  | 'maternity-father-request'
+  | 'maternity-resignation'
+  | 'supplementary-request'
+  | 'parental-request'
+  | 'parental-father-request'
+  | 'paternity-request'
+  | 'zam'
+  | 'rate-815'
+  | 'zas-53'
+  | 'unknown'
+
+/**
+ * form-abolished = ZUR, ZAO, Z-3b after 24.10.2026; field-empty; dates-order = ends before it
+ * starts; weeks-mismatch; deadline-passed = Labour Code days before the leave; leave-order =
+ * parental before maternity ends, supplementary not right after it; after-limit = after the last
+ * possible day; rate-815-late; differs-from-plan; attachment-missing (A.4); wrong-addressee;
+ * unknown-form and no-timeline = what could not be checked.
+ */
+export type RequestCheckKind =
+  | 'form-abolished'
+  | 'field-empty'
+  | 'dates-order'
+  | 'weeks-mismatch'
+  | 'deadline-passed'
+  | 'leave-order'
+  | 'after-limit'
+  | 'rate-815-late'
+  | 'differs-from-plan'
+  | 'attachment-missing'
+  | 'wrong-addressee'
+  | 'unknown-form'
+  | 'no-timeline'
+
+export type RequestSeverity = 'error' | 'warning' | 'info'
+
+export interface RequestProblem {
+  id: string
+  check: RequestCheckKind
+  severity: RequestSeverity
+  /** The label of the field it is about. */
+  field: string | null
+  /** Found and worded by the app, without AI. */
+  message: string
+  sources: SourceRef[]
+  /** The timeline element it is about, to highlight. */
+  element_id: string | null
+  /** The same problem reworded by AI (only with `phrase`): label it as AI. */
+  phrased: string | null
+}
+
+export interface RequestCheckResult {
+  kind: RequestKind
+  kind_label: string
+  recognized: boolean
+  /** No errors. */
+  ok: boolean
+  problems: RequestProblem[]
+  /** The checks that ran. */
+  checks: RequestCheckKind[]
+  timeline_used: boolean
+  /** True only when AI reworded the problems. */
+  ai: boolean
+  ai_model: string | null
+  ai_note: string | null
+  filed_on: string
+}

@@ -1378,6 +1378,169 @@
         }
       ]
     },
+    "forms": [
+      {
+        "code": "ZAM",
+        "name": "wniosek o zasiłek macierzyński",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "ZAM – wniosek o zasiłek macierzyński za okres urlopu macierzyńskiego, urlopu rodzicielskiego"
+          }
+        ]
+      },
+      {
+        "code": "ZUR",
+        "name": "wniosek o zasiłek macierzyński za okres urlopu rodzicielskiego",
+        "abolished": true,
+        "merged_into": "ZAM",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "wniosek o zasiłek macierzyński za okres urlopu rodzicielskiego"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "Formularz ZUR od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+          }
+        ]
+      },
+      {
+        "code": "ZAO",
+        "name": "wniosek o zasiłek macierzyński za okres urlopu ojcowskiego",
+        "abolished": true,
+        "merged_into": "ZAM",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "wniosek o zasiłek macierzyński za okres urlopu ojcowskiego"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "Formularz ZAO od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+          }
+        ]
+      },
+      {
+        "code": "Z-3",
+        "name": "zaświadczenie płatnika składek",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "zaświadczenie płatnika składek, które zawiera dane niezbędne do ustalenia zasiłków"
+          }
+        ]
+      },
+      {
+        "code": "Z-3a",
+        "name": "zaświadczenie płatnika składek (umowa zlecenia)",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "zaświadczenie płatnika składek, które zawiera dane niezbędne do ustalenia zasiłków"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "A.4",
+            "page": 6,
+            "quote": "kobiecie, która wykonuje pracę na podstawie umowy zlecenia ustali odpowiednio uprawniony do wypłaty zasiłku płatnik składek albo ZUS (w tym celu powinna złożyć dokument ZAM, a do ZUS płatnik składek przesyła Zaświadczenie płatnika składek Z-3a)"
+          }
+        ]
+      },
+      {
+        "code": "Z-3b",
+        "name": "zaświadczenie płatnika składek",
+        "abolished": true,
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "zaświadczenie płatnika składek, które zawiera dane niezbędne do ustalenia zasiłków"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "Formularz Z-3b od 24 października 2026 r. zlikwidowany"
+          }
+        ]
+      },
+      {
+        "code": "ZAS-12",
+        "name": "zaświadczenie płatnika składek na dalszy okres zasiłku chorobowego",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "ZC",
+            "page": 3,
+            "quote": "przekazuje wniosek o wypłatę zasiłku chorobowego, w tym przypadku Zaświadczenie płatnika składek Z-3 lub ZAS-12 (na dalszy okres) do ZUS"
+          }
+        ]
+      },
+      {
+        "code": "ZAS-53",
+        "name": "wniosek o zasiłek chorobowy",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "ZC",
+            "page": 3,
+            "quote": "powinny złożyć odpowiednie dokumenty do ZUS (wniosek o zasiłek chorobowy ZAS-53)"
+          }
+        ]
+      },
+      {
+        "code": "e-ZLA",
+        "name": "zaświadczenie lekarskie (zwolnienie lekarskie)",
+        "sources": [
+          {
+            "doc": "przewodnik",
+            "section": "ZC",
+            "page": 3,
+            "quote": "Zaświadczenie lekarskie e-ZLA wystawiane jest w formie elektronicznej i trafia bezpośrednio do ZUS oraz na profil pracodawcy na PUE/eZUS."
+          }
+        ]
+      }
+    ],
+    "forms_abolished_on": {
+      "value": "2026-10-24",
+      "note": "Od tego dnia formularze ZUR i ZAO są połączone z ZAM, a Z-3b jest zlikwidowany.",
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Formularz ZUR od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+        },
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Formularz ZAO od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+        },
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Formularz Z-3b od 24 października 2026 r. zlikwidowany"
+        }
+      ]
+    },
     "parental_days_before": {
       "value": 21,
       "note": "Wniosek o urlop rodzicielski: najpóźniej tyle dni przed jego rozpoczęciem.",
