@@ -18,10 +18,10 @@ export const STRESS_ICON: Record<StressEventId, string> = {
   'za-zyciem': ICONS.serce,
 }
 
-export const VERDICT: Record<StressVerdict, { label: string; chip: string; bar: string }> = {
-  kept: { label: 'prawa zostają', chip: 'bg-zus-50 text-zus-700', bar: 'bg-zus-600' },
-  risk: { label: 'ryzyko', chip: 'bg-sun-100 text-sun-700', bar: 'bg-sun-400' },
-  loss: { label: 'coś przepada', chip: 'bg-sun-100 text-sun-700 ring-1 ring-sun-300', bar: 'bg-sun-700' },
+export const VERDICT: Record<StressVerdict, { label: string; chip: string }> = {
+  kept: { label: 'prawa zostają', chip: 'bg-zus-50 text-zus-700' },
+  risk: { label: 'ryzyko', chip: 'bg-sun-100 text-sun-700' },
+  loss: { label: 'coś przepada', chip: 'bg-sun-100 text-sun-700 ring-1 ring-sun-300' },
 }
 
 /** What the assistant is told when the event really happened; it then asks for the details. */

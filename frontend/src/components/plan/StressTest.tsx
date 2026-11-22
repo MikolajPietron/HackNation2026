@@ -1,13 +1,14 @@
 // "Co, jeśli coś pójdzie inaczej?" (FUNKCJE F11): the plan tested against every event that can
-// still happen (POST /api/stress, no AI), as tiles to scan at a glance: the event, the engine's
-// verdict (the rights stay, a new risk, something is lost) and one figure of the engine — the
-// money on the plan after the event, or its first line. A tile shows the event on the real axis
+// still happen (POST /api/stress, no AI), as quiet tiles to scan at a glance: the event, the
+// engine's verdict (the rights stay, a new risk, something is lost) and one figure of the engine —
+// how the benefits on the plan change, or its first line. The job loss is one tile: its reasons
+// differ only in law, and the preview switches between them. A tile shows the event on the axis
 // (hooks/usePlanSpotlight): the plan as a shadow, the engine's lines in the banner over it,
 // nothing saved. The mother's illness, stay in hospital or death are behind their own toggle and
 // worded gently (the engine marks them `sensitive`).
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowRight, ChevronDown, Eye, LoaderCircle } from 'lucide-react'
+import { ChevronDown, Eye, LoaderCircle } from 'lucide-react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Illustration } from '@/components/ui/illustration'
 import { EASE_OUT, SPRING_PRESS } from '@/lib/ease'
@@ -15,7 +16,7 @@ import { ICONS } from '@/lib/icons'
 import { STRESS_ICON, VERDICT } from '@/lib/stress'
 import { formatPln } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import type { StressEvent, StressEventId, StressReport, StressVerdict } from '@/types'
+import type { StressEvent, StressEventId, StressReport } from '@/types'
 
 
 export function StressTest({
@@ -38,7 +39,6 @@ export function StressTest({
   const events = report?.events ?? []
   const plain = events.filter((e) => !e.sensitive)
   const gentle = events.filter((e) => e.sensitive)
-  const count = (verdict: StressVerdict) => plain.filter((e) => e.verdict === verdict).length
 
   return (
     <motion.section
@@ -54,7 +54,7 @@ export function StressTest({
           </h2>
           <p className="mt-0.5 text-sm text-navy-500">
             {report && plain.length > 0
-              ? summary(count('kept'), count('risk'), count('loss'))
+              ? 'Kliknij zdarzenie, a pokażemy je na Waszej osi. Kwota to zmiana wszystkich zasiłków na osi.'
               : 'Sprawdzamy Wasz plan na zdarzeniach, które jeszcze mogą się zdarzyć.'}
           </p>
         </div>
@@ -76,15 +76,15 @@ export function StressTest({
 
       {plain.length > 0 && (
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {plain.map((event, index) => (
+          {groups(plain).map((group, index) => (
             <Tile
-              key={event.id}
-              event={event}
+              key={group[0].id}
+              events={group}
               index={index}
-              active={active === event.id}
-              loading={loading === event.id}
+              active={active !== null && group.some((e) => e.id === active)}
+              loading={loading !== null && group.some((e) => e.id === loading)}
               disabled={loading !== null}
-              onPreview={() => onPreview(event.id)}
+              onPreview={() => onPreview(group[0].id)}
             />
           ))}
         </ul>
@@ -118,7 +118,7 @@ export function StressTest({
                   {gentle.map((event, index) => (
                     <Tile
                       key={event.id}
-                      event={event}
+                      events={[event]}
                       index={index}
                       active={active === event.id}
                       loading={loading === event.id}
@@ -137,22 +137,21 @@ export function StressTest({
   )
 }
 
-/** "8 zdarzeń nic Wam nie zabiera, 1 niesie ryzyko, 1 coś zabiera." */
-function summary(kept: number, risk: number, loss: number): string {
-  // 2-4 take the plural verb; 1 and 5+ the singular ("5 zdarzeń niesie").
-  const few = (n: number) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
-  const parts = []
-  if (kept) {
-    const noun = kept === 1 ? 'zdarzenie' : few(kept) ? 'zdarzenia' : 'zdarzeń'
-    parts.push(`${kept} ${noun} nic Wam nie ${few(kept) ? 'zabierają' : 'zabiera'}`)
+/** The events as tiles: the job loss for every reason the work allows is one tile. */
+function groups(events: StressEvent[]): StressEvent[][] {
+  const jobLoss = events.filter((e) => e.id.startsWith('job-loss-'))
+  const result: StressEvent[][] = []
+  for (const event of events) {
+    if (!event.id.startsWith('job-loss-')) result.push([event])
+    else if (event === jobLoss[0]) result.push(jobLoss)
   }
-  if (risk) parts.push(`${risk} ${few(risk) ? 'niosą' : 'niesie'} ryzyko`)
-  if (loss) parts.push(`${loss} coś ${few(loss) ? 'zabierają' : 'zabiera'}`)
-  return `${parts.join(', ')}. Kliknij zdarzenie, a pokażemy je na Waszej osi.`
+  return result
 }
 
+const signed = (amount: number) => `${amount > 0 ? '+' : '−'}${formatPln(Math.abs(amount))}`
+
 function Tile({
-  event,
+  events,
   index,
   active,
   loading,
@@ -160,7 +159,8 @@ function Tile({
   onPreview,
   gentle = false,
 }: {
-  event: StressEvent
+  /** One event, or the variants of the job loss. */
+  events: StressEvent[]
   index: number
   active: boolean
   loading: boolean
@@ -168,9 +168,12 @@ function Tile({
   onPreview: () => void
   gentle?: boolean
 }) {
+  const event = events[0]
+  const many = events.length > 1
   const verdict = VERDICT[event.verdict]
-  const diff = event.money?.diff ?? null
-  const figure = !gentle && diff !== null && diff !== 0
+  const diffs = events.map((e) => e.money?.diff ?? null).filter((d): d is number => d !== null && d !== 0)
+  const low = diffs.length > 0 ? Math.min(...diffs) : null
+  const high = diffs.length > 0 ? Math.max(...diffs) : null
   return (
     <motion.li
       initial={{ opacity: 0, y: 8 }}
@@ -184,48 +187,49 @@ function Tile({
         aria-pressed={active}
         whileTap={{ scale: 0.98, transition: SPRING_PRESS }}
         className={cn(
-          'group relative flex h-full min-h-40 w-full flex-col overflow-hidden rounded-3xl border bg-white p-4 text-left',
+          'flex h-full w-full items-start gap-3 rounded-3xl border bg-white p-4 text-left',
           'transition-[border-color,box-shadow,background-color] duration-200 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
           active
             ? 'border-navy-900 bg-navy-50/60 shadow-[0_0_0_1px_var(--color-navy-900)]'
             : 'border-line hover:border-navy-200 hover:shadow-[0_16px_40px_-28px_rgb(26_36_56/0.45)]',
         )}
       >
-        {!gentle && <span aria-hidden className={cn('absolute inset-x-0 top-0 h-1', verdict.bar)} />}
-        <span className="flex items-start justify-between gap-2">
-          <Illustration src={STRESS_ICON[event.id]} size="event" className="bg-navy-50/60" />
-          {!gentle && <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', verdict.chip)}>{verdict.label}</span>}
-        </span>
-        <span className="mt-3 leading-tight font-bold text-navy-900">{event.title}</span>
-        {figure ? (
-          <span className="mt-1.5">
-            <span className={cn('block text-xl font-bold tabular-nums', diff > 0 ? 'text-zus-700' : 'text-sun-700')}>
-              {diff > 0 ? '+' : '−'}
-              {formatPln(Math.abs(diff))}
-            </span>
-            <span className="block text-xs font-bold text-navy-400">zasiłki razem na osi</span>
+        <Illustration src={STRESS_ICON[event.id]} size="event" className="bg-navy-50/60" />
+        <span className="min-w-0 flex-1">
+          <span className="block leading-tight font-bold text-navy-900">
+            {many ? 'Utrata pracy w ciąży' : event.title}
           </span>
-        ) : (
-          event.lines[0] && <span className="mt-1.5 text-sm text-pretty text-navy-500">{event.lines[0]}</span>
-        )}
-        <span
-          className={cn(
-            'mt-auto flex items-center gap-1.5 pt-3 text-sm font-bold',
-            active ? 'text-navy-900' : 'text-zus-700',
+          {!gentle && (
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              {many ? (
+                <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs font-bold text-navy-700">
+                  zależy od powodu
+                </span>
+              ) : (
+                <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', verdict.chip)}>{verdict.label}</span>
+              )}
+              {low !== null && high !== null && (
+                <span className="font-bold text-navy-700 tabular-nums">
+                  {low === high ? signed(low) : `od ${signed(low)} do ${signed(high)}`}
+                </span>
+              )}
+            </span>
           )}
-        >
-          {loading ? (
-            <>
-              <LoaderCircle className="size-4 animate-spin" /> Liczę…
-            </>
-          ) : active ? (
-            <>
-              <Eye className="size-4" /> Na osi teraz
-            </>
-          ) : (
-            <>
-              Pokaż na osi <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-            </>
+          {(gentle || low === null) && event.lines[0] && (
+            <span className="mt-1 block text-sm text-pretty text-navy-500">{event.lines[0]}</span>
+          )}
+          {(loading || active) && (
+            <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-navy-900">
+              {loading ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" /> Liczę…
+                </>
+              ) : (
+                <>
+                  <Eye className="size-4" /> Na osi teraz
+                </>
+              )}
+            </span>
           )}
         </span>
       </motion.button>
