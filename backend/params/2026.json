@@ -2643,5 +2643,59 @@
         }
       ]
     }
+  },
+  "contribution_debt": {
+    "rule": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 2a ust. 1",
+          "quote": "nie przysługują osobom prowadzącym pozarolniczą działalność i osobom z nimi współpracującym"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 2a ust. 1",
+          "quote": "w razie wystąpienia w dniu powstania prawa do świadczenia zadłużenia z tytułu składek na ubezpieczenia społeczne na kwotę przekraczającą 1 % minimalnego wynagrodzenia za pracę ustalonego na podstawie odrębnych przepisów, do czasu spłaty całości zadłużenia"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 2",
+          "quote": "5) zasiłek macierzyński;"
+        }
+      ]
+    },
+    "limit_percent": {
+      "value": 1,
+      "note": "Próg zadłużenia: procent minimalnego wynagrodzenia (benefit_base.minimum_wage).",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 2a ust. 1",
+          "quote": "w razie wystąpienia w dniu powstania prawa do świadczenia zadłużenia z tytułu składek na ubezpieczenia społeczne na kwotę przekraczającą 1 % minimalnego wynagrodzenia za pracę ustalonego na podstawie odrębnych przepisów, do czasu spłaty całości zadłużenia"
+        }
+      ]
+    },
+    "expiry_months": {
+      "value": 6,
+      "note": "Bez spłaty w tym czasie od dnia powstania prawa prawo do świadczeń przedawnia się.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 2a ust. 2",
+          "quote": "Prawo do świadczeń, o których mowa w art. 2 pkt 1, 2, 5 i 6, przedawnia się, jeżeli zadłużenie, o którym mowa w ust. 1, nie zostanie uregulowane w ciągu 6 miesięcy od dnia powstania prawa do świadczenia."
+        }
+      ]
+    },
+    "paid_within_days": {
+      "value": 60,
+      "note": "Po spłacie całości zadłużenia zasiłek wypłaca się najpóźniej w tym terminie.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 64 ust. 3",
+          "quote": "zasiłek wypłaca się w terminie określonym w ust. 1, nie później niż w terminie 60 dni od dnia spłaty całości zadłużenia"
+        }
+      ]
+    }
   }
 }

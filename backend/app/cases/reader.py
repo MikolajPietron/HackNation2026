@@ -27,12 +27,34 @@ wiedzą ogólną. Daty w formacie RRRR-MM-DD, kwoty w złotych dokładnie jak w 
 - Wynagrodzenia: z Z-3 przepisz przychód za każdy miesiąc z tabeli (zwykle 12 miesięcy przed \
 miesiącem powstania prawa); przy zleceniu lub własnej działalności przepisz podstawę wymiaru \
 składki na ubezpieczenie chorobowe z poświadczenia lub zrzutu. Zaznacz miesiące niepełne.
+- Z-3 w szczegółach (z tego kalkulator sam liczy podstawę wymiaru): przy miesiącu niepełnym \
+przepisz liczbę dni obowiązujących do przepracowania i dni przepracowanych (days_required, \
+days_worked); wynagrodzenie stałe z umowy i zmienne (fixed, variable) oraz składniki \
+nieuzupełniane, np. nadgodziny (not_topped), tylko gdy Z-3 podaje je osobno. Premie kwartalne \
+i składniki roczne (np. trzynastkę) przepisz do bonuses, każdą osobno z okresem i kwotą, bez \
+sumowania. Do pay_details przepisz wymiar czasu pracy (full_time), datę, od której osoba \
+podlega ubezpieczeniu u tego płatnika (insured_from), i wynagrodzenie albo przychód określony \
+w umowie (contract_pay), jeśli dokument je podaje.
 - Ubezpieczenie: przepisz okresy z poświadczeń, zrzutów i Z-3 dla każdej osoby, z rodzajem \
-ubezpieczenia chorobowego (obowiązkowe przy umowie o pracę, dobrowolne przy zleceniu i JDG). \
+ubezpieczenia chorobowego. Umowa o pracę daje obowiązkowe. Przy zleceniu i JDG wpisz \
+„voluntary” tylko wtedy, gdy dokument potwierdza zgłoszenie do dobrowolnego ubezpieczenia \
+chorobowego; „none”, gdy dokument mówi, że go nie było albo ustało; inaczej „unknown”. \
 Ustalenie ZUS ma pierwszeństwo przed deklaracją płatnika: gdy ZUS stwierdził w decyzji lub \
 piśmie, że osoba nie podlega ubezpieczeniu (np. umowa zawarta dla pozoru) albo że \
-ubezpieczenie ustało, zapisz ten okres z sickness „none” i dopisz to w label (np. „umowa o \
-pracę — wg ZUS nie podlega od 2025-10-01”).
+ubezpieczenie ustało, zapisz ten okres z sickness „none”, z zus_finding („sham” przy umowie \
+lub działalności dla pozoru, „not-subject” przy innym powodzie) i dopisz to w label (np. \
+„umowa o pracę — wg ZUS nie podlega od 2025-10-01”).
+- Koniec pracy mamy w ciąży (job_loss): dzień ustania zatrudnienia i przyczyna z dokumentu \
+(upadłość, likwidacja albo śmierć pracodawcy, rozwiązanie umowy z naruszeniem prawa — z \
+informacją, czy stwierdził to prawomocny wyrok sądu — albo inna przyczyna).
+- Rodzina zastępcza albo przysposobienie: taken_in, dzień przyjęcia dziecka na wychowanie \
+(taken_in_on) i data urodzenia dziecka (birth_date).
+- Zadłużenie składkowe osoby prowadzącej działalność (contribution_debt): kwota z pisma, \
+zaświadczenia albo decyzji ZUS, dzień, na który podano stan, i dzień spłaty, jeśli jest.
+- Urlopy: każdą część urlopu rodzicielskiego zapisz osobno, z datami i osobą. Gdy tata przejmuje \
+urlop macierzyński, zapisz jego urlop jako leave „maternity” taty; gdy powodem jest sytuacja \
+mamy (szpital, orzeczenie o niezdolności do samodzielnej egzystencji, zgon, porzucenie \
+dziecka), zapisz ją w mother_event z datami.
 - Zwolnienie lekarskie w ciąży (e-ZLA, ZAS-53, Z-3 przy chorobowym) zapisz jako leave „sick”.
 - Decyzja: szukaj rozstrzygnięcia ZUS (decyzja, pismo, zrzut wypłat). „Przyznano” tylko gdy \
 dokument mówi o przyznaniu albo wypłacie, „odmowa” gdy ZUS odmawia. Wezwanie do uzupełnienia \

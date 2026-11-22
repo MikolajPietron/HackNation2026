@@ -11,6 +11,7 @@ import datetime as dt
 from app.engine.after_insurance import after_job_loss, insurance_note, leave_before_cut
 from app.engine.applications import application_notes
 from app.engine.base import add_base_notes
+from app.engine.debt import add_debt_notes
 from app.engine.draft import DAY, days_between
 from app.engine.explain_adoption import taken_in_notes
 from app.engine.father import MATERNITY_PARTS
@@ -31,6 +32,11 @@ WORK_LOCATIVE = {"contract": "umowie zlecenia", "business": "własnej działalno
 
 
 def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
+    # Contribution debt of a parent with a business (debt.py), after that parent's right.
+    return add_debt_notes(_all_notes(scenario, timeline, params), scenario, timeline, params)
+
+
+def _all_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:
     if scenario.taken_in is not None:
         # Section G for the leave of a child taken in, too.
         return add_money_notes(

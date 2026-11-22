@@ -401,6 +401,14 @@ class Scenario(BaseModel):
     `mother_pay`."""
     father_pay_history: PayHistory | None = None
     """The same for the father."""
+    # --- Contribution debt (engine/debt.py; ustawa zasiłkowa art. 2a) ---
+    mother_contribution_debt: float | None = Field(default=None, ge=0)
+    """The mother runs a business: her debt of social insurance contributions on the day the
+    right to the benefit arises, in PLN, as a ZUS document states it. None = not known (not
+    asked in the interview; read from an example case)."""
+    father_contribution_debt: float | None = Field(default=None, ge=0)
+    """The same for the father."""
+    # --- end contribution debt ---
 
     @property
     def anchor_date(self) -> dt.date | None:

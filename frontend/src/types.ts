@@ -178,6 +178,12 @@ export interface Scenario {
   /** Months given win over `mother_pay`; the other fields apply either way. */
   mother_pay_history: PayHistory | null
   father_pay_history: PayHistory | null
+  // --- Contribution debt (engine/debt.py; ustawa zasiłkowa art. 2a) ---
+  /** A parent with a business: social insurance contribution debt on the day the right arises,
+   *  in PLN, from a ZUS document (example cases only; the interview does not ask). */
+  mother_contribution_debt: number | null
+  father_contribution_debt: number | null
+  // --- end contribution debt ---
 }
 
 /** Applied for (no decision yet), granted or refused. */
@@ -564,6 +570,15 @@ export type InsuranceTitle = 'employment' | 'contract' | 'business' | 'other'
 export type SicknessInsurance = 'mandatory' | 'voluntary' | 'none' | 'unknown'
 export type LeaveKind = 'maternity' | 'parental' | 'paternity' | 'supplementary' | 'sick' | 'other'
 export type CaseOutcome = 'granted' | 'refused' | 'partial' | 'unknown'
+/**
+ * Why the calculator and ZUS differ: reading = the facts as read lack or contradict what the
+ * decision rests on (read the case again); missing-rule = the calculator has no rule for it;
+ * other-refusal = ZUS refused for a reason the calculator does not check (documents, deadlines).
+ */
+export type DifferenceReason = 'reading' | 'missing-rule' | 'other-refusal'
+/** What ZUS established about an insurance period: a sham contract or business, or no sickness
+ *  insurance for another reason. */
+export type ZusFinding = 'sham' | 'not-subject'
 
 export interface CaseDocument {
   kind: string
@@ -577,6 +592,8 @@ export interface InsurancePeriod {
   start: string | null
   end: string | null
   sickness: SicknessInsurance
+  /** A finding of ZUS wins over what the payer declared: the period gives no sickness insurance. */
+  zus_finding: ZusFinding | null
   pages: number[]
 }
 
@@ -588,13 +605,65 @@ export interface LeavePeriod {
   pages: number[]
 }
 
-export interface PayMonth {
+/** A month of pay as read from the case (Z-3, Z-3a); not the engine's `PayMonth`. */
+export interface CasePayMonth {
   month: string
   amount: number
   kind: 'salary' | 'contribution_base'
   person: Role
   full_month: boolean | null
+  /** A month not worked in full: days required and days worked, as in Z-3. */
+  days_required: number | null
+  days_worked: number | null
+  /** Only when Z-3 gives them apart: fixed pay from the contract, variable pay, overtime etc. */
+  fixed: number | null
+  variable: number | null
+  not_topped: number | null
   note: string
+  pages: number[]
+}
+
+/** A quarterly or annual bonus from Z-3, as listed there (the calculator sums them). */
+export interface CaseBonus {
+  person: Role
+  kind: 'quarterly' | 'annual'
+  period: string
+  amount: number
+  pages: number[]
+}
+
+/** What else the benefit base depends on: full time, the start of insurance, the contract pay. */
+export interface CasePayDetails {
+  person: Role
+  full_time: boolean | null
+  insured_from: string | null
+  contract_pay: number | null
+  pages: number[]
+}
+
+/** The mother's work ended in pregnancy (becomes `Scenario.job_loss`). */
+export interface CaseJobLoss {
+  ended_on: string
+  reason: JobLossReason
+  court_confirmed: boolean | null
+  pages: number[]
+}
+
+/** A special situation of the mother (becomes `Scenario.mother_event`). */
+export interface CaseMotherEvent {
+  kind: MotherEventKind
+  start: string
+  end: string | null
+  pages: number[]
+}
+
+/** Contribution debt of a person with a business, from a ZUS document (ustawa art. 2a). */
+export interface CaseContributionDebt {
+  person: Role
+  amount: number
+  /** The day the document gives the debt for. */
+  on: string | null
+  repaid_on: string | null
   pages: number[]
 }
 
@@ -634,7 +703,12 @@ export interface CaseFacts {
   documents: CaseDocument[]
   insurance: InsurancePeriod[]
   leaves: LeavePeriod[]
-  pay: PayMonth[]
+  pay: CasePayMonth[]
+  bonuses: CaseBonus[]
+  pay_details: CasePayDetails[]
+  job_loss: CaseJobLoss | null
+  mother_event: CaseMotherEvent | null
+  contribution_debt: CaseContributionDebt | null
   decision: CaseDecision | null
   unreadable: string[]
 }
@@ -666,6 +740,45 @@ export interface CaseComparison {
   zus: CaseOutcome
   match: boolean | null
   text: string
+  /** Set when `match` is false. */
+  reason: DifferenceReason | null
+  /** The difference in a sentence or two, for the agreement report. */
+  reason_text: string
+}
+
+/** One catalogue case in the agreement report (GET /api/cases/agreement, cache only). */
+export interface CaseAgreementRow {
+  id: string
+  category: string
+  /** Read already (in the cache); the other fields are empty until then. */
+  read: boolean
+  title: string
+  zus: CaseOutcome | null
+  ours: CaseOutcome | null
+  match: boolean | null
+  reason: DifferenceReason | null
+  reason_text: string
+  covered: boolean | null
+  timeline: boolean
+  payments: number
+  problem: string | null
+}
+
+/** "Zgodność z decyzjami ZUS: agree/decided", from the cases already read; nothing is read. */
+export interface CaseAgreement {
+  configured: boolean
+  total: number
+  read: number
+  /** Cases where both the calculator and ZUS have an answer. */
+  decided: number
+  agree: number
+  /** The decisions of ZUS among the cases read. */
+  zus: Partial<Record<CaseOutcome, number>>
+  /** The differences by reason. */
+  reasons: Partial<Record<DifferenceReason, number>>
+  with_timeline: number
+  with_amounts: number
+  rows: CaseAgreementRow[]
 }
 
 export interface CaseResult {
