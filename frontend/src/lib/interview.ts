@@ -80,7 +80,7 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
           : ['Tak, mama ma zaświadczenie', 'Mama jeszcze go nie ma'],
       )
     case 'hospital':
-      return ask(['Nie, urodziło się o czasie i nie było w szpitalu', 'Tak, było w szpitalu'])
+      return ask(['Nie, urodziło się o czasie i wyszło do domu jak zwykle', 'Tak, zostało dłużej w szpitalu'])
     case 'leave-before-birth':
       return leaveBeforeBirth(scenario, asked.text)
     case 'mother-payer':

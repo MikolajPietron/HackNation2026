@@ -1,15 +1,27 @@
-Przygotuj prezentację po polsku dla jury hackathonu HackNation 2026 (wyzwanie ZUS). Opieraj się wyłącznie na źródle. Nie dodawaj liczb, funkcji ani obietnic, których w nim nie ma.
+Przygotuj prezentację po polsku dla jury HackNation 2026, wyzwanie ZUS „Zasiłkowy Przewodnik Przyszłego Rodzica”. Jury to eksperci ZUS i techniczni. Opieraj się wyłącznie na źródle „zrodlo-notebooklm.md” i na dołączonych zrzutach ekranu. Nie dodawaj liczb, funkcji ani obietnic, których tam nie ma.
 
-Najwyżej 10 slajdów, w tej kolejności:
-1. Tytuł: „Zasiłkowy Przewodnik Przyszłego Rodzica” i jedno zdanie o tym, co robi.
-2. Problem rodzica i to, czego chce ZUS (jeden zintegrowany kalkulator).
-3. Rozwiązanie: osobista oś czasu. Ścieżki Dziecko, Mama, Tata, Pieniądze, Dokumenty.
-4. Co liczy silnik reguł: ciąża, mama, tata, strata dziecka, przyjęcie dziecka, kto płaci, ochrona.
-5. Pieniądze: stawki, przykład z 8 000 zł brutto, kalendarz wypłat, „Dlaczego tyle?”.
-6. Wyróżniki: plany dla celu, test odporności, „nie zostawiajcie tego na stole”, punkty bez powrotu.
-7. Wnioski i dokumenty: wypełnianie na dokumencie, PDF, sprawdzanie, terminy, pismo z ZUS.
-8. Gdzie jest AI, a gdzie go nie ma. Zdanie przewodnie: „Liczy silnik reguł, nie AI”.
-9. Przykładowe sprawy ZUS, raport zgodności i panel administracyjny.
-10. Dlaczego można temu ufać i co dalej.
+Najwyżej 10 slajdów. Każdy slajd: krótki nagłówek, który jest tezą (nie tematem), 2–4 krótkie punkty i jeden albo dwa zrzuty ekranu jako główny element. Zrzuty są ważniejsze niż tekst: mają pokazać, że to działająca aplikacja.
 
-Styl: jasny, nowoczesny, dużo pustej przestrzeni. Białe tło, zieleń #007834 jako kolor główny, granat #283754 do nagłówków, bursztyn #fab856 tylko jako akcent przy terminach. Zaokrąglone karty, miękkie cienie. Mało tekstu na slajdzie: nagłówek i 3–5 krótkich punktów. Oś czasu rysuj jako poziome pasy z zaokrąglonymi klipami. Nie używaj logo ZUS i nie udawaj strony ZUS.
+Co jest najważniejsze dla ZUS (podkreślaj to na każdym slajdzie, gdzie pasuje):
+- Uprawnienia ustalone konkretnie dla tej rodziny, z jej dat i sytuacji, także wtedy, gdy zasiłek NIE przysługuje, i co wtedy zrobić.
+- Mniej sporów i odmów dzięki dobrej informacji wcześniej: terminy, punkty bez powrotu, ryzyka utraty prawa.
+- Jeden zintegrowany kalkulator zamiast osobnych (wymagania a–j): u nas to oś czasu.
+- Gdzie złożyć dokumenty: płatnik składek (pracodawca) czy ZUS.
+- Wiarygodność: liczy deterministyczny silnik reguł, nie AI; każda zasada z dosłownym cytatem z przepisu albo materiałów ZUS; sprawdzone na przykładowych sprawach ZUS.
+- Zmiana przepisów bez programisty (panel administracyjny) i potencjał wdrożenia (REST API, React, Python, telefon i komputer).
+
+Kryteria oceny, pod które układasz treść: związek z wyzwaniem 25%, kompletność i UX 25%, pomysł 20%, oryginalność 15%, potencjał wdrożeniowy 15%.
+
+Slajdy, w tej kolejności (nazwy plików zrzutów w nawiasach):
+1. Tytuł „Zasiłkowy Przewodnik Przyszłego Rodzica” i jedno zdanie: osobista oś czasu od ciąży do powrotu do pracy, która mówi rodzicom, co im się należy, ile, kto płaci i co złożyć do kiedy. (00-grafika-tytulowa-desktop-i-telefon)
+2. Problem i cel ZUS: przepisy rozproszone, wynik zależy od wielu rzeczy naraz, część decyzji nieodwracalna (81,5% tylko do 21 dni po porodzie); ZUS chce jednego kalkulatora i mniej spraw spornych. (01-start-ekran-powitalny, t02-telefon-pytanie-onboarding)
+3. Rozwiązanie: jedna oś czasu ze ścieżkami Dziecko, Mama, Tata, Dokumenty i Pieniądze, na komputerze i na telefonie; kilka pytań zamiast formularza. (02-plan-twoja-sytuacja-i-os, t05-telefon-os-czasu)
+4. Konkretnie dla tej rodziny, także „nie przysługuje”: odpowiedź, dlaczego, co zamiast i co zrobić; każdy element osi ze źródłem. (16-nie-przysluguje-zlecenie-bez-chorobowego, 04-szczegoly-okresu-ze-zrodlem)
+5. Pieniądze: stawki 100/70/81,5%, podstawa wymiaru krok po kroku z przepisem przy każdym kroku, wypłaty miesiąc po miesiącu i kto wypłaca. Przykład z 8 000 zł brutto ze źródła. (06-pieniadze-kalendarz-wyplat, 07-dlaczego-tyle-podstawa-krok-po-kroku)
+6. Wnioski: co, komu i do kiedy; pracodawca czy ZUS; terminy z Kodeksu pracy; wniosek wypełniony danymi z planu, sprawdzany regułami, do pobrania w PDF. (08-wnioski-i-dokumenty, 09-wniosek-wypelniony-z-planu)
+7. Zanim coś się wydarzy: test odporności planu (wcześniak, bliźnięta, utrata pracy w ciąży), podgląd zmiany na prawdziwej osi, ryzyka i punkty bez powrotu z kłódką. To jest nasz główny wyróżnik i odpowiedź na „unikać sporów”. (10-co-jesli-test-odpornosci-planu, 11-podglad-zdarzenia-na-osi, 15-na-co-uwazac-ryzyka)
+8. Decyzje rodziny: podział urlopu rodzicielskiego między mamę i tatę, plany pod cel (najwięcej pieniędzy, najdłużej w domu), praca na pół etatu, adopcja i rodzina zastępcza, wcześniaki. (13-plany-dla-celu, 12-podzial-urlopu-rodzicielskiego, 05-blizneta-wczesniaki-urlop-uzupelniajacy)
+9. Sprawdzone na sprawach ZUS i gotowe na zmiany przepisów: wybór albo wgranie sprawy, ubezpieczenie i wyliczenia obok decyzji ZUS (53 z 59 spraw z jednoznacznym rozstrzygnięciem zgodnych, ponad 2 500 testów automatycznych); panel administracyjny z wersjami od daty obowiązywania i podglądem skutków. (22-przykladowe-sprawy-zus, 21-panel-administracyjny-parametry)
+10. AI tam, gdzie pomaga, i co dalej: „Liczy silnik reguł, nie AI”. AI prowadzi rozmowę, czyta skany spraw i tłumaczy pisma z ZUS; każda funkcja AI oznaczona. Symulacje mObywatel, danych z ZUS, e-ZLA, PUE/eZUS. Architektura gotowa do wdrożenia, demo online. (20-logowanie-mobywatel-symulacja, t04-telefon-plan)
+
+Styl: jasny, nowoczesny, dużo pustej przestrzeni. Białe tło albo bardzo jasna szarozieleń, zieleń #007834 jako kolor główny, granat #283754 do nagłówków, bursztyn #fab856 tylko jako akcent przy terminach i ryzykach. Zaokrąglone karty, miękkie cienie, font bezszeryfowy. Zrzuty z telefonu pokazuj w ramce telefonu, zrzuty z komputera w ramce okna przeglądarki. Bez logo ZUS i bez udawania strony ZUS. Język prosty i konkretny, bez żargonu i bez wykrzykników.

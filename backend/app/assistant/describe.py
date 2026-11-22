@@ -371,10 +371,10 @@ def _hospital_questions(scenario: Scenario) -> list[Question]:
         return [
             Question(
                 "Czy dzieci urodziły się przed ukończeniem 37. tygodnia ciąży albo któreś "
-                "z nich było po porodzie w szpitalu?"
+                "z nich zostało po porodzie dłużej w szpitalu?"
                 if several
-                else "Czy dziecko urodziło się przed ukończeniem 37. tygodnia ciąży albo było "
-                "po porodzie w szpitalu?",
+                else "Czy dziecko urodziło się przed ukończeniem 37. tygodnia ciąży albo zostało "
+                "po porodzie dłużej w szpitalu?",
                 "`set_hospital_care` (applies: tak albo nie)",
                 "hospital",
             )

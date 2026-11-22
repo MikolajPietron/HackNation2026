@@ -38,9 +38,9 @@ Aplikacja z sytuacji rodziny buduje osobistą oś czasu od ciąży do powrotu do
 - **Ważne dni:** termin porodu albo narodziny, koniec 14 tygodni mamy, terminy wniosków, ostatni dzień na 81,5%, ostatni dzień urlopu ojcowskiego, ostatni dzień urlopu rodzicielskiego, koniec ochrony przed zwolnieniem.
 - **Kolor mówi, czym jest okres:** zielony to mama, granatowy to tata, jasny przerywany to „do wyboru”, szaroniebieski to praca.
 - **Kliknięcie w element** otwiera szczegóły: od kiedy, do kiedy, ile, stawka, kwota, kto płaci, jaki wniosek, podstawa prawna z cytatem.
-- **Głowica** przeciągana po linijce mówi, co dzieje się danego dnia i ile wtedy wpływa.
+- **Głowica** przeciągana po linijce, strzałki skaczą między zdarzeniami, zoom jak w programie do montażu.
 - **Widok kalendarza:** miesiące z dniami w kolorze tego, kto jest w domu, karta dnia po kliknięciu.
-- **Na telefonie:** pionowa lista z miesiącami i linią „Dziś”, szczegóły w arkuszach wysuwanych od dołu.
+- **Na telefonie:** ta sama oś ze ścieżkami, ułożona pionowo: czas biegnie w dół, kolumny Mama i Tata z okresami w skali, przy każdym okresie długość, daty i kwota miesięczna, ważne dni jako ikony z kłódką przy decyzjach bez powrotu. Szczegóły w arkuszach wysuwanych od dołu.
 - **„Dlaczego tak?”:** całe wyjaśnienie przypadku w stałej kolejności: sytuacja, możliwości i ułatwienia, co policzyliśmy, co przygotować. Każdy punkt ze źródłem.
 - **„Co przed Wami”:** kroki miesiąc po miesiącu z odliczaniem dni.
 
@@ -121,16 +121,15 @@ Aplikacja z sytuacji rodziny buduje osobistą oś czasu od ciąży do powrotu do
 - Aplikacja nigdy nie pyta o stratę dziecka. Zapisuje ją, gdy rodzic sam o niej powie.
 - **Tryb łagodny:** bez kafelków i propozycji optymalizacji, słowa współczucia, w całości tylko to, co przysługuje.
 - Asystent zaczyna każdą odpowiedź po stracie od zdania współczucia.
-- **Organizacje wsparcia** dla rodziców po stracie, rodziców wcześniaków i dzieci ciężko chorych, z potwierdzonymi adresami stron.
 
-## 11. Przykładowe sprawy ZUS i raport zgodności
+## 11. Przykładowe sprawy ZUS i zgodność z decyzjami
 
 - **Wybór albo wgranie sprawy:** katalog 86 spraw pod numerami S01–S86 albo własny plik PDF lub zdjęcie.
 - **Odczyt przez AI:** model przepisuje fakty ze skanów razem z numerami stron. Nie przepisuje imion, nazwisk, numerów PESEL ani adresów. Niczego nie liczy.
 - **Potwierdzenie przez człowieka:** odczytane dane można poprawić i przeliczyć.
 - **Ocena bez AI:** silnik sprawdza ubezpieczenie chorobowe w dniu powstania prawa, liczy podstawę z miesięcy z Z-3 krok po kroku i zestawia wynik z decyzją ZUS.
 - **„Pokaż na osi”:** sprawa staje się planem.
-- **Raport zgodności:** wyniki silnika obok rozstrzygnięć ZUS, każda różnica z opisaną przyczyną.
+- **Zgodność z decyzjami ZUS:** 53 z 59 spraw z jednoznacznym rozstrzygnięciem (77 z 86 spraw przeczytanych), policzone bez AI.
 - **9 przykładowych rodzin** działa bez AI i bez skanów: jedno kliknięcie na ekranie startowym.
 
 ## 12. Asystent AI
@@ -149,7 +148,7 @@ Aplikacja z sytuacji rodziny buduje osobistą oś czasu od ciąży do powrotu do
 | Daty, wymiary urlopów, kwoty, prawo do zasiłku | nie | silnik reguł |
 | Plany dla celu, test odporności, kalendarz wypłat | nie | silnik reguł |
 | Sprawdzanie wniosku | nie | reguły; AI tylko przeredagowuje komunikaty na życzenie |
-| Ocena przykładowej sprawy i raport zgodności | nie | silnik reguł |
+| Ocena przykładowej sprawy i zgodność z decyzjami ZUS | nie | silnik reguł |
 | Asystent w czacie | tak | wywiad i wyjaśnienia, liczby z narzędzi |
 | Odczyt sprawy ze skanu | tak | przepisanie faktów ze stronami, z potwierdzeniem człowieka |
 | „Pismo z ZUS” | tak | wyjaśnienie prostym językiem z cytatami |
@@ -194,18 +193,17 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 | f) indywidualna podstawa wymiaru | podstawa z Z-3 krok po kroku, przykładowe sprawy |
 | g) dokumenty, terminy, gdzie złożyć | wnioski na osi, PDF, sprawdzanie, kalendarz |
 | h) zagrożenia i ryzyka | „Na co uważać”, test odporności, punkty bez powrotu |
-| i) podmioty charytatywne | organizacje wsparcia |
 | symulacje integracji | mObywatel, dane ZUS, zadłużenie, e-ZLA, PUE/eZUS, wysyłka, akt urodzenia |
 | zmiana parametrów | panel administracyjny z wersjami od daty |
-| wgranie albo wybór wniosków | przykładowe sprawy i raport zgodności |
+| wgranie albo wybór wniosków | przykładowe sprawy: ubezpieczenie i wyliczenia obok decyzji ZUS |
 
 ## 18. Dlaczego można temu ufać
 
-- Ponad 2 400 testów automatycznych. Oczekiwane daty i kwoty są w nich policzone ręcznie.
+- Ponad 2 500 testów automatycznych. Oczekiwane daty i kwoty są w nich policzone ręcznie.
 - Każdy cytat jest sprawdzany co do znaku i co do strony.
 - Niezależna weryfikacja reguł z dokumentami ZUS, sekcja po sekcji.
 - Asystent sprawdzany na prawdziwym modelu na scenariuszach z ręcznie policzonym wynikiem.
-- Tam, gdzie materiały nie rozstrzygają, aplikacja pokazuje przyjęte założenie, a zespół prowadzi listę pytań do ZUS.
+- Zgodność z decyzjami ZUS na przykładowych sprawach: 53 z 59 spraw z jednoznacznym rozstrzygnięciem.
 
 ## 19. Technologia
 
@@ -219,7 +217,7 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 
 ## 20. Co dalej
 
-- Pełny przebieg raportu zgodności na wszystkich 86 sprawach.
+- Zgodność na wszystkich 86 sprawach.
 - Wersje językowe: angielska i ukraińska.
 - Głos: czytanie wyniku na głos i pytania głosem.
 - Zanonimizowana informacja zwrotna dla ZUS: na którym pytaniu rodzice kończą, co ich zaskakuje.

@@ -584,23 +584,23 @@ export function Onboarding({ submit, onDone, onSkip, saved, begin = false }: Pro
         <Question
           title={
             several
-              ? 'Czy któreś z dzieci było po porodzie w szpitalu?'
-              : 'Czy dziecko było po porodzie w szpitalu?'
+              ? 'Czy któreś z dzieci urodziło się przed czasem albo zostało dłużej w szpitalu?'
+              : 'Czy dziecko urodziło się przed czasem albo zostało dłużej w szpitalu?'
           }
-          subtitle={`Albo ${several ? 'dzieci urodziły się' : 'urodziło się'} przed ukończeniem 37. tygodnia ciąży. Szczegóły dopytamy w rozmowie.`}
+          subtitle="Wtedy może przysługiwać dodatkowy urlop: uzupełniający urlop macierzyński. Chodzi o poród przed ukończeniem 37. tygodnia ciąży albo pobyt w szpitalu dłuższy niż zwykle po porodzie. Szczegóły dopytamy w rozmowie."
         >
-          <Cards label="Pobyt w szpitalu po porodzie">
+          <Cards label="Wcześniak albo dłuższy pobyt w szpitalu">
             <ImageChoice
               image={inkubator}
               label="Tak"
-              hint="wcześniak albo szpital"
+              hint="wcześniak albo dłuższy pobyt"
               {...state('hospital', true)}
               onSelect={() => choose({ hospital: true })}
             />
             <ImageChoice
               image={noworodek}
               label="Nie"
-              hint="w terminie, bez szpitala"
+              hint="w terminie, do domu jak zwykle"
               {...state('hospital', false)}
               onSelect={() => choose({ hospital: false })}
             />

@@ -70,8 +70,8 @@ const EVENTS: Event[] = [
     on: (s) => s.hospital_care === true,
     prompt: (s) =>
       born(s)
-        ? 'Dziecko było po porodzie w szpitalu'
-        : 'Co się zmieni, jeśli dziecko będzie po porodzie w szpitalu?',
+        ? 'Dziecko zostało po porodzie dłużej w szpitalu'
+        : 'Co się zmieni, jeśli dziecko zostanie po porodzie dłużej w szpitalu?',
     undo: 'Dziecko urodziło się o czasie i nie było w szpitalu',
   },
   {
