@@ -22,10 +22,11 @@ export type TakenIn = 'adoption' | 'foster'
  * ustawa zasiłkowa ('ustawa'; both: article), or from the ZUS Załącznik ('zalacznik': section).
  * The request forms also quote two regulations (article: "§ 15 ust. 1", "zał. 6"):
  * 'rozp_wnioski' (11.03.2025, the leave requests) and 'rozp_zasilki' (27.09.2026, the documents
- * for the benefits).
+ * for the benefits). 'poradnik': the ZUS Poradnik for parents 2026, `page` = the number printed
+ * on the page.
  */
 export interface SourceRef {
-  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik' | 'rozp_wnioski' | 'rozp_zasilki'
+  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik' | 'rozp_wnioski' | 'rozp_zasilki' | 'poradnik'
   quote: string
   section: string | null
   page: number | null
@@ -564,6 +565,13 @@ export interface Payment {
   /** The calculation, step by step. */
   details: string[]
   sources: SourceRef[]
+  /**
+   * A single payment, not a period: the one-off top-up of the benefit for maternity leave to
+   * 100% (ustawa art. 31 ust. 4). `start` = `end` = the day it is shown on (the first birthday),
+   * `rate` the difference of the rates (18.5), `daily`/`monthly` the difference per day and per
+   * month, `total` all of it in the month of `start` — not "per month".
+   */
+  one_off: boolean
 }
 
 /** One step of computing a benefit base ("Dlaczego tyle?"), with the rules it applies. */
@@ -1181,6 +1189,8 @@ export type RightKind =
   | 'parental'
   | 'job-loss'
   | 'sick'
+  /** The weeks of parental leave for both parents together (41/43, 65/67 with "Za życiem"). */
+  | 'parental-pool'
 
 /** An entitlement gained (days_before 0), lost (days_after 0), longer or shorter: both lanes. */
 export interface RightChange {

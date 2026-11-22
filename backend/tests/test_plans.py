@@ -85,7 +85,11 @@ def test_most_money_compares_100_and_70_with_81_5_percent_for_the_whole_pool() -
     assert (first.figures.pool_used, first.figures.pool_total) == (41, 41)
     assert (first.figures.mother.leave_days, first.figures.father.leave_days) == (364, 77)
     assert "wniosek najpóźniej 01.12.2026" in second.summary
-    assert "Za urlop macierzyński zasiłek wynosi 81,5% zamiast 100%." in second.given_up
+    assert (
+        "Za urlop macierzyński zasiłek wynosi 81,5% zamiast 100%, za urlop rodzicielski mamy "
+        "81,5% zamiast 70%." in second.given_up
+    )
+    assert not any("wyrówna się" in g for g in second.given_up)  # parental in the first year
     assert "parental-mother-1" in first.changed and not first.current
     assert {s.article for s in second.sources if s.doc == "ustawa"} >= {"art. 30a ust. 1"}
     # The current timeline: the parental shares are still options, so not counted.
@@ -146,6 +150,14 @@ def test_longest_home_lengthens_the_leave_with_part_time_work() -> None:
     assert mother.figures.mother.back_to_work == d("2027-03-30")  # half-time from the start
     assert "urlop wydłuża się o 16 tyg." in mother.summary
     assert any("pracuje na 1/2 etatu" in g for g in mother.given_up)
+    # The employer may refuse (KP art. 182¹ᵉ § 2); "longest" = longer in the calendar for the
+    # same pool of weeks (§ 1).
+    assert any("pracodawca może go nie uwzględnić" in g for g in mother.given_up)
+    assert any("Pula tygodni urlopu się nie zmienia" in g for g in mother.given_up)
+    quotes = [s.quote for s in mother.sources]
+    assert any(q.startswith("Pracodawca jest obowiązany uwzględnić wniosek") for q in quotes)
+    assert any("udziela się na pozostałą część wymiaru czasu pracy" in q for q in quotes)
+    assert not any("Pracodawca" in g for g in plain.given_up)
     assert plain.patch["rate_815"] is None  # the goal is time: the rate stays the family's
 
 
@@ -198,6 +210,42 @@ def test_quick_return_puts_the_earliest_return_first() -> None:
     assert any("najpóźniej do 31.12.2032" in g for g in after.given_up)
     assert part_time.figures.mother.back_to_work == d("2027-03-30")
     assert part_time.figures.mother.last_day == d("2028-02-28")
+
+
+def test_quick_return_at_81_5_percent_counts_the_one_off_top_up() -> None:
+    """81,5% chosen. "Mama wraca po urlopie macierzyńskim": no day of the benefit for parental
+    leave in the child's first year, so the benefit for maternity leave paid at 81,5% is topped
+    up once to 100% on her request (ustawa art. 31 ust. 4): 140 × 187,54 = 26 255,60 and 140 ×
+    (230,11 − 187,54 = 42,57) = 5959,80, together 32 215,40 zł, not 26 255,60.
+    The father taking over after 14 weeks: her 98 × 187,54 = 18 378,92 + 98 × 42,57 = 4171,86
+    → 22 550,78; his part at 100% of his base 42 × 172,58 = 7248,36 + paternity 2416,12.
+    Half-time after maternity leave: her parental leave starts 30.03.2027, in the first year, so
+    no top-up: 26 255,60 + 224 × 93,77 (5626,108 × 1/2 / 30 = 93,7685) = 21 004,48 + 112 ×
+    187,54 = 21 004,48 → 68 264,56."""
+    result = plans_for("quick-return", rate_815=True)
+    takeover, after, part_time = result.plans
+    assert [p.id for p in result.plans] == [
+        "takeover",
+        "after-maternity",
+        "part-time-after-maternity",
+    ]
+    assert after.figures.mother.total == 32215.4
+    assert after.figures.total == 34631.52  # with paternity leave 2416,12
+    assert takeover.figures.mother.total == 22550.78
+    assert takeover.figures.father.total == 9664.48
+    assert part_time.figures.mother.total == 68264.56
+    top_up = (
+        "Przy 81,5%: jeśli w pierwszym roku życia dziecka (do 09.11.2027) mama nie wykorzysta ani "
+        "jednego dnia zasiłku za urlop rodzicielski, zasiłek za urlop macierzyński wyrówna się "
+        "jednorazowo do 100%, ale tylko na jej wniosek (kwota planu to uwzględnia). Za urlop "
+        "rodzicielski wzięty później zasiłek wynosi wtedy 70%."
+    )
+    assert top_up in after.given_up and top_up in takeover.given_up
+    assert not any("81,5% zamiast 100%" in g for g in after.given_up)
+    assert top_up not in part_time.given_up
+    assert any("81,5% zamiast 100%" in g for g in part_time.given_up)
+    articles = {s.article for s in after.sources}
+    assert {"art. 31 ust. 4", "art. 31 ust. 3g"} <= articles
 
 
 def test_amounts_unknown_compare_weeks_only() -> None:

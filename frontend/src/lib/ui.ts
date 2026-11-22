@@ -122,21 +122,27 @@ const LAW_NAME: Record<LawDoc, string> = {
 }
 const LAW_DOCS: LawDoc[] = ['kp', 'ustawa', 'rozp_wnioski', 'rozp_zasilki']
 
+const pagesOf = (source: SourceRef) => `s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
+
 export const sourceLabel = (source: SourceRef) =>
   source.doc === 'przewodnik'
-    ? `Przewodnik ZUS, s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
-    : source.doc === 'zalacznik'
-      ? `Załącznik ZUS, ${source.section}`
-      : `${LAW_NAME[source.doc]}, ${source.article}`
+    ? `Przewodnik ZUS, ${pagesOf(source)}`
+    : source.doc === 'poradnik'
+      ? `Poradnik ZUS 2026, ${pagesOf(source)}`
+      : source.doc === 'zalacznik'
+        ? `Załącznik ZUS, ${source.section}`
+        : `${LAW_NAME[source.doc]}, ${source.article}`
 
 /**
  * Where a set of quotes comes from, in one short line: the guide's pages and the articles of
  * the Labour Code and the ustawa zasiłkowa (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 ·
  * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31", the paragraphs of the two
- * regulations ("Rozporządzenie w sprawie wniosków urlopowych, § 15") and the ZUS Załącznik.
+ * regulations ("Rozporządzenie w sprawie wniosków urlopowych, § 15"), the ZUS Załącznik and the
+ * pages of the ZUS Poradnik ("Poradnik ZUS 2026, s. 34").
  */
 export function sourcesSummary(sources: SourceRef[]): string {
   const pages = new Set<number>()
+  const poradnik = new Set<number>()
   const articles: Record<LawDoc, Set<string>> = {
     kp: new Set(),
     ustawa: new Set(),
@@ -147,6 +153,10 @@ export function sourcesSummary(sources: SourceRef[]): string {
   for (const source of sources) {
     if (source.doc === 'zalacznik') {
       zalacznik = true
+    } else if (source.doc === 'poradnik') {
+      if (source.page !== null) {
+        for (let page = source.page; page <= (source.page_to ?? source.page); page++) poradnik.add(page)
+      }
     } else if (source.doc !== 'przewodnik') {
       if (source.article) {
         articles[source.doc].add(
@@ -165,6 +175,7 @@ export function sourcesSummary(sources: SourceRef[]): string {
     parts.push(`${LAW_NAME[doc]}, ${kind}${[...articles[doc]].join(', ')}`)
   }
   if (zalacznik) parts.push('Załącznik ZUS')
+  if (poradnik.size > 0) parts.push(`Poradnik ZUS 2026, s. ${pageRanges([...poradnik])}`)
   return parts.join(' · ')
 }
 

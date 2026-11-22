@@ -24,6 +24,12 @@ Rules (a broken one raises ScenarioError in Polish):
   that part only (§ 3, § 5); the whole leave so extended stays within 82/86 weeks (130/134 with
   "Za życiem"; § 1, § 1¹).
 
+A deliberate limit: work during the extension itself (art. 182¹ᶠ § 7; the request of the
+regulation of 11.03.2025, § 16 pkt 4) is not modelled: the extension is drawn without work. So
+the 82/86 (130/134) weeks are never reached (the pool worked at 1/2 time all through gives at
+most 1.5 times the pool) and the check of that limit stays only as a guard; the explanation does
+not promise the limit either.
+
 Our readings, not settled by the materials (CLAUDE.md, open questions):
 - the weeks of work are the first weeks of the part (the employee may choose otherwise; how the
   extension is used is set in the request, art. 182¹ᶠ § 6);
@@ -161,6 +167,12 @@ def _parts_word(count: int) -> str:
     return "część" if count == 1 else "części"
 
 
+def _is_are(count: int) -> str:
+    """The verb before a number: "jest 1 część", "są 2 części", "jest 5 części"."""
+    few = count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14)
+    return "są" if few else "jest"
+
+
 # The rules.
 
 
@@ -193,7 +205,8 @@ def parental_plan_rules(
         assumptions.append(
             "Tygodnie pracy w czasie urlopu rodzicielskiego liczymy od pierwszego dnia części "
             "urlopu, a wydłużenie dodajemy na końcu tej części. Jak wykorzystać wydłużenie, "
-            "pracownik określa we wniosku o podjęcie pracy."
+            "pracownik określa we wniosku o podjęcie pracy. Pracy w czasie samego wydłużenia "
+            "(art. 182¹ᶠ § 7 Kodeksu pracy) nie liczymy: wydłużenie pokazujemy bez pracy."
         )
     return assumptions
 
@@ -247,7 +260,7 @@ def plan(
     if len(parts) > p.max_parts.value:
         raise ScenarioError(
             f"Urlop rodzicielski można podzielić najwyżej na {p.max_parts.value} części (liczymy "
-            f"części obojga rodziców razem). W planie jest {len(parts)}."
+            f"części obojga rodziców razem). W planie {_is_are(len(parts))} {len(parts)}."
         )
     for number, part in enumerate(parts, 1):
         _check_work(scenario, params, number, part)
@@ -598,7 +611,8 @@ def _split_note(
     text = (
         "Rodzice mogą korzystać z urlopu rodzicielskiego jednocześnie albo naprzemiennie, "
         f"a okres urlopu mogą podzielić najwyżej na {p.max_parts.value} części, do "
-        f"{long_date(deadline)}. W Waszym planie jest {count} {_parts_word(count)}: {who}; "
+        f"{long_date(deadline)}. W Waszym planie {_is_are(count)} {count} {_parts_word(count)}: "
+        f"{who}; "
         f"razem {used} z {total} tyg."
     )
     if used < total:
@@ -634,9 +648,9 @@ def _work_note(
         return None
     who = " i ".join(WHO[r] for r in working).capitalize()
     can = "mogą" if len(working) > 1 else "może"
-    table = pp.max_weeks_with_work_za_zyciem if scenario.za_zyciem else pp.max_weeks_with_work
-    cap = for_children(table, scenario.children_count)
     request = pp.work_request_days.value
+    # Not the 82/86-week limit of art. 182¹ᶠ § 1: it is reached only with work during the
+    # extension itself, which the engine does not model (module docstring).
     return CaseNote(
         id="parental-work",
         kind="relief",
@@ -644,16 +658,14 @@ def _work_note(
         text=(
             f"{who} {can} łączyć urlop rodzicielski z pracą u pracodawcy, który udziela urlopu, "
             f"najwyżej na {fraction(pp.max_work_fraction.value)} etatu; urlop obejmuje wtedy "
-            "pozostałą część etatu. Urlop wydłuża się proporcjonalnie do wymiaru pracy — "
-            f"łącznie najwyżej do {cap} tyg. — a za wydłużony okres też przysługuje zasiłek "
-            f"macierzyński. Pracę podejmuje się na wniosek złożony co najmniej {request} dni "
-            "przed jej rozpoczęciem."
+            "pozostałą część etatu. Urlop wydłuża się o liczbę tygodni pracy razy wymiar pracy, "
+            "a za wydłużony okres też przysługuje zasiłek macierzyński. Pracę podejmuje się na "
+            f"wniosek złożony co najmniej {request} dni przed jej rozpoczęciem."
         ),
         sources=merge_sources(
             pp.max_work_fraction.sources,
             pp.rest_of_time.sources,
             pp.extension.sources,
-            table.sources,
             pp.extension_paid.sources,
             pp.work_request_days.sources,
         ),

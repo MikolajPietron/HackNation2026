@@ -63,8 +63,12 @@ def test_employee_gets_100_percent_for_maternity_and_70_for_parental_leave() -> 
     assert (parental.start, parental.end) == (dt.date(2027, 3, 30), dt.date(2027, 11, 8))
     assert amounts(parental) == (70, 4832.24, 161.07, 36079.68, 224)
     assert maternity.summary == (
-        "100% podstawy: 6 903,20 zł miesięcznie. Za 140 dni razem 32 215,40 zł."
+        "100% podstawy: 6 903,20 zł miesięcznie. Za 140 dni razem 32 215,40 zł. To kwota przed "
+        "zaliczką na podatek dochodowy (PIT)."
     )
+    # The ZUS Poradnik: the benefit is still reduced by the income tax advance.
+    assert any(s.doc == "poradnik" and s.page == 24 for s in maternity.sources)
+    assert "przed zaliczką na podatek dochodowy (PIT)" in note(t, "money")
     assert maternity.details[0] == (
         "Podstawa wymiaru zasiłku: 8 000,00 zł wynagrodzenia brutto pomniejszone o 13,71%, "
         "czyli 6 903,20 zł miesięcznie."
@@ -111,7 +115,10 @@ def test_the_choice_of_81_5_percent_has_a_deadline_21_days_after_the_birth() -> 
         "art. 31 ust. 3",
         "art. 31 ust. 3f",
         "art. 31 ust. 3g",
+        "art. 31 ust. 4",
     }
+    # Not "przez cały czas": the father's 9 weeks stay 70%, supplementary leave 100% (ust. 3).
+    assert choice.title == "Zasiłek: 100% i 70% albo 81,5% za urlop macierzyński i rodzicielski"
     assert any("ostatni dzień na wniosek o 81,5% to 01.12.2026" in a for a in t.assumptions)
 
 
@@ -430,6 +437,121 @@ def test_no_day_of_parental_benefit_in_the_first_year_means_70_percent() -> None
     assert "art. 31 ust. 3g" in articles(parental)
     assert maternity.rate == 81.5
     assert "wyrówna się jednorazowo do 100%" in maternity.details[-1]
+
+
+def test_the_one_off_top_up_is_a_payment_of_its_own() -> None:
+    """The same family (81,5%, the mother's parental leave from 15.11.2027): the one-off top-up
+    (art. 31 ust. 4) per day 230,11 − 187,54 = 42,57 zł, for the 140 days of maternity leave
+    140 × 42,57 = 5959,80 zł; per month 6903,20 − 5626,11 = 1277,09. Shown on the first
+    birthday, 10.11.2027.
+    81,5%: 140 × 187,54 = 26 255,60 + 224 × 161,07 = 36 079,68 + 5959,80 = 68 295,08 zł, the
+    same as at 100% and 70% (32 215,40 + 36 079,68), not 62 335,28.
+    November 2027: the top-up and 16 days of parental leave (15-30.11), 16 × 161,07 = 2577,12,
+    so 8536,92 zł."""
+    t = born(
+        mother_pay=8000,
+        rate_815=True,
+        parental_parts=[{"parent": "mother", "weeks": 32, "start": "2027-11-15"}],
+    )
+    top_up = next(p for p in t.payments if p.one_off)
+    assert (top_up.id, top_up.segment_id, top_up.lane) == (
+        "pay-maternity-top-up",
+        "maternity-top-up",
+        "mother",
+    )
+    assert (top_up.start, top_up.end) == (dt.date(2027, 11, 10), dt.date(2027, 11, 10))
+    assert amounts(top_up) == (18.5, 1277.09, 42.57, 5959.8, 140)
+    assert top_up.title == "Jednorazowe wyrównanie zasiłku mamy do 100%"
+    assert top_up.summary == (
+        "Na wniosek, jednorazowo: 140 dni × 42,57 zł = 5 959,80 zł. To kwota przed zaliczką na "
+        "podatek dochodowy (PIT)."
+    )
+    assert "230,11 zł przy 100% − 187,54 zł przy 81,5% = 42,57 zł" in top_up.details[2]
+    assert "art. 31 ust. 4" in articles(top_up)
+    assert pay(t, "maternity").total == 26255.6
+    # F4 and the totals: the top-up in the month of the first birthday.
+    assert t.money_total is not None and t.money_total.mother == Decimal("68295.08")
+    november = next(m for m in t.monthly if m.month == "2027-11")
+    assert november.mother == Decimal("8536.92")
+    assert sum((m.total for m in t.monthly), Decimal(0)) == t.money_total.total
+    assert any("w dniu pierwszych urodzin dziecka" in a for a in t.assumptions)
+    # The comparison of the choice counts it: no false loss at 81,5%.
+    choice = note(t, "rate-815")
+    assert (
+        "razem 68 295,08 zł przy 100% i 70% albo 68 295,08 zł przy 81,5% (z jednorazowym "
+        "wyrównaniem za urlop macierzyński do 100%: 5 959,80 zł)." in choice
+    )
+    assert "jednorazowe wyrównanie do 100% na wniosek: 5 959,80 zł" in note(t, "money")
+    # F9: nothing is left on the table by asking for 81,5% here.
+    left = next(item for item in t.left_on_table if item.id == "left-rate-815")
+    assert left.amount == 0
+
+
+def test_81_5_percent_does_not_survive_a_stillbirth() -> None:
+    """81,5% was chosen in pregnancy, then the child was stillborn on 10.11.2026: maternity leave
+    8 weeks, 10.11.2026-04.01.2027 (56 days), at 100%: 56 × 230,11 = 12 886,16 zł, not 56 ×
+    187,54 = 10 502,24. The request covers maternity and parental leave in full (art. 30a ust.
+    1); the ZUS Poradnik: 100% when the child is stillborn."""
+    t = born(mother_pay=8000, rate_815=True, losses=[{"stillborn": True}])
+    maternity = pay(t, "maternity")
+    assert amounts(maternity) == (100, 6903.2, 230.11, 12886.16, 56)
+    line = (
+        "Gdy dziecko urodzi się martwe, zasiłek macierzyński wynosi 100% podstawy: wniosek "
+        "o 81,5% dotyczy urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze."
+    )
+    assert maternity.details[-1] == line
+    assert any(s.doc == "poradnik" and s.page == 34 for s in maternity.sources)
+    assert "art. 30a ust. 1" in articles(maternity)
+    assert line in note(t, "money")
+    assert not any(p.one_off for p in t.payments)
+    assert "rate-815" not in [n.id for n in t.notes]
+    assert t.element("rate-815-deadline") is None
+    texts = [n.text for n in t.notes] + [d for p in t.payments for d in p.details]
+    assert not any("wybiera 81,5%" in text for text in texts)
+
+
+def test_81_5_percent_does_not_survive_the_death_of_the_child() -> None:
+    """Born 10.11.2026, the request for 81,5% filed, the child died on 20.02.2027 (after 8 weeks
+    of life): maternity leave until 7 days from the death, 10.11.2026-27.02.2027 (110 days), at
+    100%: 110 × 230,11 = 25 312,10 zł, not 110 × 187,54. No parental leave follows, so what was
+    paid at 81,5% is topped up to 100% on her request (art. 31 ust. 4)."""
+    scenario = Scenario.model_validate(
+        {**MOTHER, "child_born": True, "birth_date": BORN, "leave_before_birth_weeks": 0}
+        | {"mother_pay": 8000, "rate_815": True, "losses": [{"died_on": "2027-02-20"}]}
+    )
+    t = build_timeline(scenario, PARAMS, dt.date(2027, 3, 1))
+    maternity = pay(t, "maternity")
+    assert (maternity.start, maternity.end) == (BORN, dt.date(2027, 2, 27))
+    assert amounts(maternity) == (100, 6903.2, 230.11, 25312.1, 110)
+    assert maternity.details[-1] == (
+        "Zasiłek za urlop macierzyński wynosi 100% podstawy: wniosek o 81,5% dotyczy urlopu "
+        "macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze, a urlopu rodzicielskiego nie "
+        "będzie. Jeśli mama złożyła już ten wniosek i dostała zasiłek w wysokości 81,5%, "
+        "przysługuje jej jednorazowe wyrównanie do 100%, na jej wniosek."
+    )
+    assert {"art. 30a ust. 1", "art. 31 ust. 4"} <= articles(maternity)
+    assert not any("wybiera 81,5%" in n.text for n in t.notes)
+
+
+def test_one_twin_lives_and_81_5_percent_stays() -> None:
+    """Twins, one stillborn: a child lives and the mother has parental leave, so the 81,5% she
+    chose applies: 187,54 zł a day for maternity leave."""
+    t = born(mother_pay=8000, rate_815=True, children_count=2, losses=[{"stillborn": True}])
+    assert pay(t, "maternity").rate == 81.5
+
+
+def test_leave_before_the_birth_at_81_5_percent_is_an_open_question() -> None:
+    """The ZUS Poradnik says 100% for leave before the birth; the guide (page 9), art. 31 ust. 3
+    and the Załącznik 81,5% for all of it: we count 81,5% and say so."""
+    scenario = Scenario.model_validate(
+        {**MOTHER, "child_born": False, "due_date": "2027-03-15", "leave_before_birth_weeks": 2}
+        | {"mother_pay": 8000, "rate_815": True}
+    )
+    t = build_timeline(scenario, PARAMS, TODAY)
+    assert pay(t, "maternity-prenatal").rate == 81.5
+    assert any("Poradnik ZUS 2026 podaje za ten czas 100% podstawy" in a for a in t.assumptions)
+    plain = born(mother_pay=8000)
+    assert not any("Poradnik ZUS 2026 podaje" in a for a in plain.assumptions)
 
 
 def test_with_a_plan_the_choice_of_rate_stays() -> None:

@@ -11,6 +11,9 @@ from app.assistant.law import (
     ROZPORZADZENIA,
     kp_articles,
     kp_contains,
+    poradnik_available,
+    poradnik_contains,
+    poradnik_pages,
     rozporzadzenie_contains,
     rozporzadzenie_provisions,
     ustawa_articles,
@@ -44,6 +47,14 @@ def is_literal(source: SourceRef) -> bool:
     if source.doc in ROZPORZADZENIA:
         return source.article is not None and rozporzadzenie_contains(
             source.doc, source.article, source.quote
+        )
+    if source.doc == "poradnik":
+        # Like the Załącznik, a ZUS document not in git: checked where it was built. The page is
+        # the number printed on it (tools/przewodnik/extract_poradnik.py).
+        if not poradnik_available():
+            return source.page is not None
+        return source.page is not None and poradnik_contains(
+            source.page, source.page_to, source.quote
         )
     assert source.section is not None
     pages = SECTIONS[source.section].pages_of(source.quote)
@@ -84,6 +95,7 @@ def test_labour_code_provisions() -> None:
         "art. 177 § 1¹",
         "art. 177 § 3",
         "art. 177 § 3¹",
+        "art. 177 § 4",
         "art. 92 § 1",
         "art. 92 § 2",
         "art. 92 § 3",
@@ -218,6 +230,9 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 29 ust. 6",
         "art. 29 ust. 7",
         "art. 29 ust. 9",
+        # Who has the right: a child born or taken in, the age limits (section D).
+        "art. 29 ust. 1",
+        "art. 29 ust. 2",
         "art. 29a ust. 1",
         "art. 30 ust. 1",
         "art. 30 ust. 3",
@@ -240,6 +255,7 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 48 ust. 1",
         "art. 52",
         "art. 61 ust. 1",
+        "art. 61b ust. 2",
         # The benefit base in detail (engine/base.py).
         "art. 36 ust. 2",
         "art. 36 ust. 4",
@@ -248,6 +264,7 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 38 ust. 1",
         "art. 38 ust. 2",
         "art. 38 ust. 3",
+        "art. 40",
         "art. 42 ust. 1",
         "art. 42 ust. 2",
         "art. 42 ust. 3",
@@ -272,6 +289,9 @@ def test_ustawa_zasilkowa_provisions() -> None:
         in (texts["art. 4 ust. 1"])
     )
     assert texts["art. 12 ust. 1"].endswith("Okresy te wlicza się do okresu zasiłkowego.")
+    # The age limits of a child taken in (section D); the page header inside is left out.
+    assert "2) przyjęła na wychowanie dziecko w wieku do 14 roku życia" in texts["art. 29 ust. 1"]
+    assert texts["art. 29 ust. 1"].endswith("- do 10 roku życia.")
     assert "art. 182¹ᵃ § 4 Kodeksu pracy" in texts["art. 31 ust. 3f"]
     assert texts["art. 3 pkt 3"].startswith("wynagrodzenie - przychód pracownika")
     assert "13,71%" in texts["art. 3 pkt 4"]
@@ -286,6 +306,10 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert "3) kwota zmiennych składników" in texts["art. 37 ust. 2"]
     assert texts["art. 38 ust. 2"].endswith("co najmniej połowę obowiązującego go czasu pracy.")
     assert texts["art. 43"].endswith("krótsza niż miesiąc kalendarzowy.")
+    # A footnote's number glued to the paragraph's ("2.7") is not part of it.
+    assert texts["art. 61b ust. 2"].startswith("Postępowanie w sprawie przyznania i wypłaty")
+    assert texts["art. 40"].startswith("W razie zmiany umowy o pracę lub innego aktu")
+    assert texts["art. 40"].endswith("lub w miesiącach, o których mowa w art. 36.")
     assert texts["art. 49 ust. 1"].endswith(
         "na rzecz danego płatnika składek za miesiąc, w którym "
         "powstało prawo do zasiłku - dla osób wykonujących "
@@ -307,6 +331,10 @@ def test_the_two_regulations_on_requests() -> None:
         ),
         "§ 16",
         "§ 22",
+        # A child taken in for upbringing.
+        *(f"§ {n} ust. {u}" for n in (14, 15) for u in (3, 4)),
+        "§ 18 ust. 1",
+        "§ 18 ust. 2",
     }
     assert set(zasilki) == {
         "§ 2",
@@ -321,12 +349,17 @@ def test_the_two_regulations_on_requests() -> None:
         "§ 13 ust. 1",
         "§ 13 ust. 2",
         "§ 13 ust. 3",
+        "§ 18 ust. 1",
+        "§ 16 ust. 1",
+        "§ 16 ust. 2",
         "§ 20 ust. 1",
         "§ 20 ust. 3",
         "§ 20 ust. 4",
+        "§ 21",
         "§ 22 ust. 1",
         "§ 22 ust. 2",
         "§ 23 ust. 1",
+        "§ 24 ust. 1",
         "§ 26",
         "§ 29",
         "§ 30 ust. 1",
@@ -360,6 +393,13 @@ def test_the_two_regulations_on_requests() -> None:
     assert zasilki["§ 11 ust. 1"].startswith("Dokumentami niezbędnymi do przyznania i wypłaty")
     assert zasilki["§ 17"].endswith("że nie zapewniono jej innego zatrudnienia.")
     assert "art. 180² § 5 Kodeksu pracy" in zasilki["§ 26"]
+    # § 18 and § 24 start after a page header: it is left out.
+    assert zasilki["§ 18 ust. 1"].startswith("Dokumentami niezbędnymi do zaniechania wypłaty")
+    assert zasilki["§ 24 ust. 1"].endswith("której zasiłek macierzyński wypłaca Zakład.")
+    # A child taken in: the paragraphs of art. 183 carry their superscripts again.
+    assert "art. 183 § 3¹ Kodeksu pracy" in wnioski["§ 14 ust. 3"]
+    assert "art. 183 § 4–4² Kodeksu pracy" in wnioski["§ 15 ust. 3"]
+    assert wnioski["§ 18 ust. 1"].startswith("Wniosek, o którym mowa w art. 183 § 6 Kodeksu pracy")
 
 
 def test_the_forms_quote_only_what_the_regulations_and_the_guide_say() -> None:
@@ -396,6 +436,27 @@ def test_zalacznik_sections() -> None:
     # The original's typo stays.
     components = sections["Składniki wynagrodzenia w podstawie wymiaru zasiłku"]
     assert "(gdy przysługuje w czasie zawonienia)" in components
+
+
+@pytest.mark.skipif(
+    not poradnik_available(), reason="poradnik.json is built locally from the ZUS materials"
+)
+def test_poradnik_pages_are_the_printed_pages() -> None:
+    """The ZUS Poradnik, page by page under the number printed on the page (the PDF's page minus
+    one), without running headers, page numbers and the pictograms of the "WAŻNE!" boxes."""
+    pages = poradnik_pages()
+    assert set(pages) == set(range(1, 42))
+    assert pages[1].startswith("ZAKŁAD UBEZPIECZEŃ SPOŁECZNYCH Poradnik dla rodziców")
+    stillborn = "Zasiłek macierzyński, gdy dziecko urodzi się martwe – 100% podstawy wymiaru"
+    assert stillborn in pages[34] and stillborn not in pages[35]
+    assert pages[24].startswith("WAŻNE! Osoby, które same opłacają")
+    assert not any("PORADNIK DLA RODZICÓW I OPIEKUNÓW DZIECI" in t for t in pages.values())
+    assert poradnik_contains(34, None, stillborn)
+    assert not poradnik_contains(35, None, stillborn)
+    # A sentence over a page break: the last words of page 24 run on into page 25.
+    end, start = pages[24][-40:], pages[25][:40]
+    assert poradnik_contains(24, 25, f"{end} {start}")
+    assert not poradnik_contains(24, None, f"{end} {start}")
 
 
 def test_every_quote_in_params_is_literal() -> None:

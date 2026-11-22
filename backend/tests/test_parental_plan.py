@@ -144,7 +144,14 @@ def test_the_case_explanation_shows_the_formula() -> None:
     )
     assert "Z puli zostaje 9 tyg." in explained["parental-plan"]
     assert "najwyżej na 1/2 etatu" in explained["parental-work"]
-    assert "łącznie najwyżej do 82 tyg." in explained["parental-work"]
+    # Not the 82-week limit: it needs work during the extension, which the engine does not count
+    # (art. 182¹ᶠ § 7; parental_plan.py docstring).
+    assert "82 tyg." not in explained["parental-work"]
+    assert "o liczbę tygodni pracy razy wymiar pracy" in explained["parental-work"]
+    assert not any(
+        s.article == "art. 182¹ᶠ § 1" for s in t.notes[ids.index("parental-work")].sources
+    )
+    assert any("Pracy w czasie samego wydłużenia" in a for a in t.assumptions)
     assert (
         "Część 1, mama: 32 tyg., z czego 20 tyg. z pracą na 1/2 etatu. Wydłużenie: 20 tyg. × "
         "1/2 = 10 tyg., więc ta część trwa 294 dni: od 2 sierpnia 2027 do 21 maja 2028."
@@ -155,10 +162,14 @@ def test_the_case_explanation_shows_the_formula() -> None:
 
 
 def test_twins_and_za_zyciem_raise_the_limits() -> None:
+    """34 weeks (twins) and 56 ("Za życiem") fit the mother's share; the explanation states no
+    86- or 130-week limit the engine never reaches."""
     t = expecting({"parent": "mother", "weeks": 34, "work_fraction": "1/2"}, children_count=2)
-    assert "łącznie najwyżej do 86 tyg." in notes(t)["parental-work"]
+    assert "86 tyg." not in notes(t)["parental-work"]
+    assert span(t, "parental-mother-1")[2] == 34 * 7 + 17 * 7  # 34 weeks + 34 × 1/2
     t = expecting({"parent": "mother", "weeks": 56, "work_fraction": "1/2"}, za_zyciem=True)
-    assert "łącznie najwyżej do 130 tyg." in notes(t)["parental-work"]
+    assert "130 tyg." not in notes(t)["parental-work"]
+    assert span(t, "parental-mother-1")[2] == 56 * 7 + 28 * 7
 
 
 # Splitting parental leave between the parents and into parts (guide B.3; art. 182¹ᵃ § 6, 182¹ᶜ).
@@ -190,7 +201,7 @@ def test_parents_at_the_same_time_and_one_after_the_other() -> None:
     assert "art. 182¹ᵃ § 6" in {s.article for s in first.sources}
     assert not any(d.startswith("W tym czasie") for d in segment(t, "parental-mother-2").details)
     plan = notes(t)["parental-plan"]
-    assert "W Waszym planie jest 3 części: mama 32 tyg., tata 9 tyg.; razem 41 z 41 tyg." in plan
+    assert "W Waszym planie są 3 części: mama 32 tyg., tata 9 tyg.; razem 41 z 41 tyg." in plan
     assert "Z puli zostaje" not in plan
     assert "Część urlopu bierzecie jednocześnie" in plan
     assert t.element("parental-deadline").date == dt.date(2033, 12, 31)  # type: ignore[union-attr]

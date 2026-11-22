@@ -4,6 +4,7 @@ for the model: the engine's results, word for word, so the model explains and ne
 import json
 from decimal import Decimal
 
+from app.assistant.describe import source_label
 from app.engine.amounts import dec, pln
 from app.engine.models import SourceRef
 from app.engine.plans import GOAL_LABEL, ParentFigures, Plan, PlansResult
@@ -91,13 +92,7 @@ def _tools(plan: Plan) -> str:
 def _sources(sources: list[SourceRef]) -> str:
     named = []
     for s in sources:
-        label = (
-            f"Przewodnik ZUS, s. {s.page}"
-            if s.doc == "przewodnik"
-            else f"{'Kodeks pracy' if s.doc == 'kp' else 'Ustawa zasiłkowa'}, {s.article}"
-            if s.doc in ("kp", "ustawa")
-            else f"Załącznik ZUS, {s.section}"
-        )
+        label = source_label(s)
         if label not in named:
             named.append(label)
     return "; ".join(named)

@@ -37,9 +37,13 @@ class SourceRef(BaseModel):
     ("zalacznik": section, as named in zalacznik.json). The request forms also quote two
     regulations (article: "§ 15 ust. 1", "zał. 6"): "rozp_wnioski", of 11 March 2025, on the
     leave requests and their attachments, and "rozp_zasilki", of 27 September 2026, on the
-    documents for the benefits (assistant/rozporzadzenia.json)."""
+    documents for the benefits (assistant/rozporzadzenia.json). "poradnik": the ZUS Poradnik for
+    parents (2026), source no. 4, only where the others are silent; `page` (and `page_to`) is the
+    number printed on the page (assistant/poradnik.json)."""
 
-    doc: Literal["przewodnik", "kp", "ustawa", "zalacznik", "rozp_wnioski", "rozp_zasilki"]
+    doc: Literal[
+        "przewodnik", "kp", "ustawa", "zalacznik", "rozp_wnioski", "rozp_zasilki", "poradnik"
+    ]
     quote: str
     section: str | None = None
     page: int | None = None
@@ -747,6 +751,12 @@ class Payment(BaseModel):
     details: list[str] = []
     """The calculation, step by step."""
     sources: list[SourceRef]
+    one_off: bool = False
+    """A single payment, not a period: the one-off top-up of the benefit for maternity leave to
+    100% (ustawa art. 31 ust. 4; money.py). Then `start` = `end` = the day it is shown on (the
+    child's first birthday), `segment_id` is the maternity leave it tops up, `days` its days,
+    `rate` the difference of the rates (100 − 81,5), `daily` and `monthly` the difference per
+    day and per month, and `total` = `daily` × `days`, all of it in the month of `start`."""
 
 
 Amount = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]

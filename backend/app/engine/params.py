@@ -39,6 +39,9 @@ class BenefitRules(BaseModel):
     without_insurance: Rule
     non_employees: Rule
     same_rules_for_non_employees: Rule
+    instead_of_benefit: Rule
+    """No maternity benefit because of the work situation: the parental allowance or the maternity
+    pay instead (ZUS Poradnik; their amounts and conditions are not in the materials)."""
 
 
 class ParentalParams(BaseModel):
@@ -270,6 +273,9 @@ class TakenInKindParams(BaseModel):
     parental_age: Param[int] | None
     """Adoption: parental leave at most until the child reaches this age. None = the rule for a
     born child (the end of the calendar year in which the child turns `parental.deadline_age`)."""
+    benefit_age: Rule
+    """The maternity benefit only for a child taken in under the age limit (ustawa art. 29
+    ust. 1 pkt 2 or 3, ust. 2)."""
 
 
 class TakenInParams(BaseModel):
@@ -301,6 +307,14 @@ class TakenInParams(BaseModel):
     """§ 8: the same for parental leave."""
     foster: TakenInKindParams
     adoption: TakenInKindParams
+    # Requests, who pays and the protection (engine/adoption_applications.py).
+    protection: Rule
+    """Art. 177 § 1: the protection from the request for the leave on the terms of maternity
+    leave until it ends."""
+    forms: dict[str, "TakenInForm"]
+    """The request forms: "taken-in" (rozp_wnioski § 18), "taken-in-supplementary" (§ 14
+    ust. 3-4), "taken-in-parental" (§ 15 ust. 3-4), "taken-in-paternity" (§ 17 ust. 2 pkt 2),
+    "taken-in-zam" (rozp_zasilki § 16, § 30 ust. 1, § 33 ust. 1)."""
 
 
 class MoneyParams(BaseModel):
@@ -318,7 +332,14 @@ class MoneyParams(BaseModel):
     other_parent_parental: Rule
     """The other parent's own weeks of parental leave stay at `rate_parental`."""
     first_year: Rule
-    """With the request: no day of parental benefit in the first year -> 70%, and a top-up."""
+    """With the request: no day of parental benefit in the first year -> 70% for it (ust. 3g)."""
+    top_up: Rule
+    """...and the benefit for maternity leave is topped up once to `rate_full`, on request
+    (ust. 4)."""
+    request_covers: Rule
+    """The request covers maternity and parental leave in full (art. 30a ust. 1)."""
+    stillborn_full: Rule
+    """A stillborn child: the maternity benefit is 100% (ZUS Poradnik)."""
     contributions_percent: Param[float]
     """Deducted from the gross pay (employee) or the contribution base (non-employee)."""
     base_employee: Rule
@@ -346,6 +367,9 @@ class MoneyParams(BaseModel):
     request_days_taken_in: Param[int]
     """A child taken in: the request for `rate_single` within this many days (art. 30a
     ust. 2)."""
+    before_tax: Rule
+    """The benefit is further reduced by the income tax advance (PIT): the amounts shown are
+    before it (ZUS Poradnik)."""
 
 
 class BaseParams(BaseModel):
@@ -413,6 +437,23 @@ class KnownForm(BaseModel):
     sources: list[SourceRef] = Field(min_length=1)
 
 
+class StopDocuments(BaseModel):
+    """The documents that stop the mother's maternity benefit when the father takes it on: the
+    father takes over (regulation of 27.09.2026 § 18 ust. 1), her ruling of incapacity (§ 21),
+    her stay in hospital (§ 24 ust. 1)."""
+
+    basis: Rule
+    """The provision's opening words."""
+    father_from: Rule
+    """The mother's statement of the day from which the father has the benefit."""
+    request: Rule | None = None
+    """The request of a mother who is not an employee, with the day she stops (§ 18, § 21)."""
+    employer_certificate: Rule
+    """An employee whose benefit ZUS pays: the employer's certificate of the end of her leave."""
+    attachment: Rule | None = None
+    """The ruling of incapacity (§ 21 pkt 4), the hospital's admission certificate (§ 24)."""
+
+
 class ApplicationParams(BaseModel):
     """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
     page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
@@ -426,6 +467,8 @@ class ApplicationParams(BaseModel):
     one_request: Rule
     employer_pays_or_z3: Rule
     non_employee_zam: Rule
+    business_paid_by_zus: Rule
+    """ZUS pays the benefits of the insured with their own business (ustawa art. 61 ust. 1)."""
     contract_zam: Rule
     attachments: Rule
     zam_form: Rule
@@ -443,6 +486,9 @@ class ApplicationParams(BaseModel):
     """The mother in hospital, dead or gone: a request with no deadline (art. 180 § 16)."""
     resignation_days_before: Param[int]
     protection: Rule
+    protection_bankruptcy: Rule
+    """Notice in the protected time only on the employer's bankruptcy or liquidation (art. 177
+    § 4)."""
     protection_early_request_days: Param[list[int]]
     """An early request: the ban starts this many days before a part of maternity leave,
     supplementary or parental leave, paternity leave."""
@@ -457,6 +503,9 @@ class ApplicationParams(BaseModel):
     """The authorized payer pays on the basis of e-ZLA, otherwise sends Z-3 or ZAS-12 to ZUS."""
     sick_contract: Rule
     """A contract of mandate: documents to ZUS or the payer; Z-3a."""
+    sick_e_zla_enough: Rule
+    """A payer that pays the sickness benefit itself does so on the basis of e-ZLA; the documents
+    of annex 1 are for ZUS (ustawa art. 61b ust. 2, regulation of 27.09.2026 § 2)."""
     sick_business: Rule
     """A business: ZAS-53 to ZUS."""
     # When a non-employee files ZAM for the later periods (regulation of 27.09.2026).
@@ -470,6 +519,8 @@ class ApplicationParams(BaseModel):
     """§ 32 ust. 1 pkt 3: the same, for the father when the mother has no insurance title."""
     zam_paternity_before: Rule
     """§ 33 ust. 1 pkt 3: before the benefit for paternity leave starts."""
+    stop_benefit: dict[str, StopDocuments]
+    """By situation: "takeover", "incapacity", "hospital"."""
 
 
 # Request forms (engine/forms.py): what each request contains, as the regulations name it.
@@ -494,13 +545,28 @@ class FormTemplate(BaseModel):
     attachments: dict[str, FormItem] = {}
 
 
+class TakenInForm(BaseModel):
+    """A request for a child taken in for upbringing (engine/adoption_applications.py): a
+    template of its own, or one that `extends` a template of `FormParams.templates` with more
+    provisions, fields (the same id: in place of the base field) and attachments."""
+
+    extends: str | None = None
+    basis: list[SourceRef] = []
+    fields: dict[str, FormItem] = {}
+    attachments: dict[str, FormItem] = {}
+
+
+TakenInParams.model_rebuild()
+
+
 class FormParams(BaseModel):
     templates: dict[str, FormTemplate]
     """By kind of request: "prenatal", "maternity", "resignation", "resignation-incapacity",
     "father-takeover", "father-hospital-employee", "father-hospital-insured", "father-death",
     "father-abandonment", "father-uninsured-death", "father-uninsured-abandonment",
     "father-uninsured-incapacity", "supplementary", "parental", "parental-work", "paternity",
-    "zam", "sick", "job-loss"."""
+    "zam", "sick", "job-loss", and the mother who is not an employee stopping her benefit:
+    "mother-stop-takeover", "mother-stop-incapacity", "mother-stop-hospital"."""
     personal_files: Rule
     """An employee attaches nothing the employer keeps in the personal files."""
     zus_forms: Rule

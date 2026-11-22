@@ -23,6 +23,7 @@ letter out on an A4 page and renders the PDF in the browser.
 
 import datetime as dt
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.engine.after_insurance import after_job_loss
@@ -291,6 +292,10 @@ class Letters:
             )
         return fields
 
+    def more_drafts(self) -> dict[str, Callable[[], Draft]]:
+        """Letters of other kinds of request: a child taken in (adoption_applications.py)."""
+        return {}
+
     # The letter.
 
     def build(self) -> tuple[Letter, HrMessage]:
@@ -311,6 +316,7 @@ class Letters:
             "parental": self.parental,
             "parental-work": self.parental_work,
             "paternity": self.paternity,
+            **self.more_drafts(),
         }
         draft = drafts[self.kind]()
         mother = self.form.applicant == "mother"
@@ -364,7 +370,13 @@ class Letters:
                 " Przewidywana data porodu, określona w zaświadczeniu lekarskim, którego kopię "
                 f"załączam, to {date_r(due)}."
             )
-        text += " Pozostałą część urlopu macierzyńskiego wykorzystam po porodzie."
+        rest = self.father_takes_the_rest()
+        maternity = self.segment("maternity")
+        if rest and maternity is not None:
+            text += f" Po porodzie wykorzystam {duration(maternity.days)} urlopu macierzyńskiego."
+            text += rest
+        else:
+            text += " Pozostałą część urlopu macierzyńskiego wykorzystam po porodzie."
         body = [request(text)]
         if not self.timeline.child_born and any(
             a.id == "birth-certificate" for a in self.form.attachments
@@ -389,6 +401,7 @@ class Letters:
                 "Na podstawie art. 180 § 1 i art. 183¹ § 2 Kodeksu pracy wnoszę o udzielenie mi "
                 f"urlopu macierzyńskiego w wymiarze {duration(days)} od dnia porodu."
             )
+            text += self.father_takes_the_rest()
             if self.scenario.due_date is not None:
                 text += f" Przewidywana data porodu to {date_r(self.scenario.due_date)}."
             body = [request(text)]
@@ -407,7 +420,31 @@ class Letters:
             f"Na podstawie {article} Kodeksu pracy wnoszę o udzielenie mi urlopu macierzyńskiego "
             f"w wymiarze {duration(days)}, w okresie {period(start, end)}, {reason}."
         )
+        text += self.father_takes_the_rest()
         return Draft(title, [request(text)], [article], period(start, end))
+
+    def father_takes_the_rest(self) -> str:
+        """Guide B.1: the mother may ask for 14 weeks right away, provided the father takes the
+        rest; the letter says so, in the words of art. 180 § 4 pkt 1-2 (as the resignation)."""
+        s = self.scenario
+        if not s.father_takes_over or s.mother_event is not None:
+            return ""
+        if self.segment("maternity-father") is None:
+            return ""
+        match s.fathers_work:
+            case "employment":
+                return (
+                    " Pozostałą część urlopu macierzyńskiego wykorzysta ojciec wychowujący "
+                    "dziecko, który jest pracownikiem."
+                )
+            case "contract" | "business":
+                return (
+                    " Przez okres, który pozostał do końca urlopu macierzyńskiego, osobistą opiekę "
+                    "nad dzieckiem będzie sprawował ojciec dziecka, który w tym celu przerwie "
+                    "działalność zarobkową."
+                )
+            case _:
+                return " Pozostałą część urlopu macierzyńskiego wykorzysta ojciec dziecka."
 
     def resignation(self) -> Draft:
         """§ 3: the day of return to work; the copy of the father's request (an employee) or of
@@ -670,8 +707,12 @@ class Letters:
         and the number of parts (ust. 1 pkt 2), the other parent's leave in this period (ust. 2
         pkt 2); a part combined with work is longer (art. 182¹ᶠ § 1)."""
         assert self.document.segment_id is not None
-        leave = self.segment(self.document.segment_id)
-        assert leave is not None
+        axis = self.segment(self.document.segment_id)
+        assert axis is not None
+        # The period the form asks for: a request moved to today asks for a later start.
+        start, end = self.field_dates("leave-period")
+        assert end is not None
+        leave = axis.model_copy(update={"start": start, "end": end, "days": (end - start).days + 1})
         article = "art. 182¹ᵃ § 2" if self.scenario.za_zyciem else "art. 182¹ᵃ § 1"
         part = self.document.id.startswith(PLAN_REQUESTS)
         what = "części urlopu rodzicielskiego" if part else "urlopu rodzicielskiego"
@@ -696,7 +737,8 @@ class Letters:
             "Wniosek o udzielenie części urlopu rodzicielskiego"
             if part
             else "Wniosek o udzielenie urlopu rodzicielskiego",
-            [request(text), self.used_so_far(leave), self.other_parent(leave)],
+            # What either parent used or uses: against the timeline's period, as in the form.
+            [request(text), self.used_so_far(axis), self.other_parent(axis)],
             articles,
             period(leave.start, leave.end),
         )

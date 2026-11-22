@@ -35,6 +35,7 @@ import datetime as dt
 from collections.abc import Callable
 
 from app.engine.adoption import taken_in_timeline
+from app.engine.adoption_applications import add_taken_in_applications
 from app.engine.after_insurance import (
     after_insurance_assumptions,
     after_insurance_lines,
@@ -85,6 +86,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         taken_in_money(timeline, scenario, params)  # section G for the leave of a child taken in
         add_rate_request(timeline, scenario, params)
         add_monthly(timeline, scenario)  # F4: the money month by month (monthly.py)
+        add_taken_in_applications(timeline, scenario, params)  # requests, who pays, protection
         add_leftovers(timeline, scenario, params)  # F9, F10 (leftover.py)
         timeline.notes = case_notes(scenario, timeline, params)
         return timeline

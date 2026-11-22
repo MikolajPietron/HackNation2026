@@ -14,6 +14,7 @@ GUIDE_JSON = ROOT / "backend/app/assistant/przewodnik_pages.json"
 KP_JSON = ROOT / "backend/app/assistant/kodeks_pracy.json"
 USTAWA_JSON = ROOT / "backend/app/assistant/ustawa_zasilkowa.json"
 ZALACZNIK_JSON = ROOT / "backend/app/assistant/zalacznik.json"
+PORADNIK_JSON = ROOT / "backend/app/assistant/poradnik.json"
 
 MONTHS = {
     "stycznia": 1,
@@ -96,7 +97,8 @@ def _norm(text: str) -> str:
 
 def load_sources() -> dict[str, str]:
     """Normalized source texts: 'p<N>' for guide pages, 'kp:<article>' for the Labour Code,
-    'ustawa:<article>' for the ustawa zasiłkowa, 'zal:<section>' for the ZUS Załącznik."""
+    'ustawa:<article>' for the ustawa zasiłkowa, 'zal:<section>' for the ZUS Załącznik, 'por<N>'
+    for the printed pages of the ZUS Poradnik."""
     guide = json.loads(GUIDE_JSON.read_text(encoding="utf-8"))["pages"]
     kp = json.loads(KP_JSON.read_text(encoding="utf-8"))["articles"]
     ustawa = json.loads(USTAWA_JSON.read_text(encoding="utf-8"))["articles"]
@@ -106,10 +108,17 @@ def load_sources() -> dict[str, str]:
         if ZALACZNIK_JSON.exists()
         else {}
     )
+    # Not in git either: tools/przewodnik/extract_poradnik.py.
+    poradnik = (
+        json.loads(PORADNIK_JSON.read_text(encoding="utf-8"))["pages"]
+        if PORADNIK_JSON.exists()
+        else {}
+    )
     out = {f"p{n}": _norm(text) for n, text in guide.items()}
     out.update({f"kp:{art}": _norm(text) for art, text in kp.items()})
     out.update({f"ustawa:{art}": _norm(text) for art, text in ustawa.items()})
     out.update({f"zal:{name}": _norm(text) for name, text in zalacznik.items()})
+    out.update({f"por{n}": _norm(text) for n, text in poradnik.items()})
     return out
 
 
@@ -127,7 +136,7 @@ def find_quote(quote: str, sources: dict[str, str]) -> list[str]:
     hits = [k for k, text in sources.items() if q in text]
     if hits:
         return hits
-    pages = sorted(int(k[1:]) for k in sources if k.startswith("p"))
+    pages = sorted(int(k[1:]) for k in sources if k.startswith("p") and k[1:].isdigit())
     for a, b in zip(pages, pages[1:], strict=False):
         if q in sources[f"p{a}"] + " " + sources[f"p{b}"]:
             return [f"p{a}", f"p{b}"]
