@@ -55,6 +55,7 @@ from app.engine.compare import (
     money_line,
     period_changes,
     period_line,
+    pool_change,
     right_changes,
     right_line,
 )
@@ -70,6 +71,7 @@ from app.engine.models import (
     Timeline,
 )
 from app.engine.params import Params
+from app.engine.parental import parental_table
 from app.engine.timeline import build_timeline, changed_element_ids
 from app.engine.wording import fmt
 
@@ -482,6 +484,7 @@ def _run(
 ) -> StressEvent:
     """The reference as the family sees it today, the event's timeline as of its day."""
     reference = build_timeline(trial.reference, params, today)
+    reference_scenario = trial.reference
     variant = trial.variant
     breaks = None
     try:
@@ -494,11 +497,19 @@ def _run(
         breaks = str(exc)
         variant = variant.model_copy(update={"parental_parts": []})
         after = build_timeline(variant, params, trial.as_of)
-        without = trial.reference.model_copy(update={"parental_parts": []})
-        reference = build_timeline(without, params, today)
+        reference_scenario = trial.reference.model_copy(update={"parental_parts": []})
+        reference = build_timeline(reference_scenario, params, today)
     changed = changed_element_ids(reference, after)
     changed_notes = changed_note_ids(reference, after)
     rights = right_changes(reference, after)
+    # The pool of parental leave ("Za życiem", twins) grows even when a plan of parts keeps every
+    # period where it was (KP art. 182¹ᵃ § 1-2).
+    pool = pool_change(reference_scenario, variant, params, (reference, after))
+    same = (pool.days_before, pool.days_after) if pool is not None else None
+    if any(r.kind == "parental" and (r.days_before, r.days_after) == same for r in rights):
+        pool = None  # the options drawn on the timeline already say it
+    if pool is not None:
+        rights.append(pool)
     periods = period_changes(reference, after)
     money = money_change(reference, after)
     risks = [n for n in after.notes if n.kind == "risk" and n.id in changed_notes]
@@ -509,6 +520,7 @@ def _run(
     sources = merge_sources(
         *(n.sources for n in after.notes if n.id in changed_notes),
         *(s.sources for s in after.segments if s.id in added),
+        parental_table(variant, params).sources if pool is not None else [],
     )
     return StressEvent(
         id=trial.id,

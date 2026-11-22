@@ -232,6 +232,40 @@ def test_the_cap_of_a_non_employees_contribution_base() -> None:
     # The amount alone, too.
     simple = base(timeline(work="contract", mother_insured=True, mother_pay=30000))
     assert simple.base == Decimal("20321.3")
+    # The cap is the 2026 one, applied to November and December 2025 as well: an assumption.
+    assert any(
+        "najwyżej 23 550,00 zł miesięcznie (Załącznik ZUS). To granica na 2026 rok; stosujemy "
+        "ją do każdego miesiąca, z którego liczy się podstawa, także z 2025 roku" in a
+        for a in t.assumptions
+    )
+
+
+def test_the_assumptions_take_their_numbers_from_the_parameters() -> None:
+    """13,71% and the cap come from params/2026.json: changed there (a version from the admin
+    panel), the assumptions say the new numbers."""
+    changed = PARAMS.model_copy(deep=True)
+    changed.money.contributions_percent.value = 14.0
+    changed.benefit_base.voluntary_cap.value = 24000
+    for answers, text in (
+        ({"mother_pay": 8000}, "Od wynagrodzenia brutto pracownika odejmujemy 14%"),
+        (
+            {"work": "contract", "mother_insured": True, "mother_pay": 8000},
+            "najwyżej 24 000,00 zł miesięcznie",
+        ),
+    ):
+        t = build_timeline(Scenario.model_validate(BORN | answers), changed, TODAY)
+        assert any(text in a for a in t.assumptions), text
+
+
+def test_a_change_of_working_time_is_an_assumption_of_the_months_given() -> None:
+    """Art. 40 (through art. 47) and the ZUS Poradnik's exception to art. 43: not counted, said
+    only with the months of pay (an employee)."""
+    detailed = timeline(mother_pay_history={"months": months("2025-11", 12, 8000)})
+    assumption = next(a for a in detailed.assumptions if "wymiar czasu pracy" in a)
+    assert "art. 40 ustawy zasiłkowej, przez art. 47" in assumption
+    assert "Poradnik ZUS 2026" in assumption
+    simple = timeline(mother_pay=8000)
+    assert not any("wymiar czasu pracy się nie zmieniał" in a for a in simple.assumptions)
 
 
 def test_a_non_employees_month_of_activity_in_part() -> None:

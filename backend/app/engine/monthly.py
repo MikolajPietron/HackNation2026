@@ -7,7 +7,9 @@ Applied on the finished timeline after money.py, for a birth and for a child tak
   leave, a break between parts of parental leave);
 - a payment's amount in a month is its daily amount, already rounded to the grosz by money.py,
   times its days in that month. So the months of a payment add up to its `total` exactly, and
-  all the months to the sum of the payments (`Timeline.money_total`): nothing is rounded here;
+  all the months to the sum of the payments (`Timeline.money_total`): nothing is rounded here.
+  The one-off top-up of the benefit for maternity leave to 100% (ustawa art. 31 ust. 4) is all
+  in the month of its day, the child's first birthday (money.py; our reading);
 - who pays, by the rules the periods already state (applications.py, pregnancy.py): the employer
   pays its own sick pay in pregnancy; the sickness benefit for the days the mother still works
   and every benefit after the birth are paid by the payer of contributions that reports more
@@ -104,12 +106,20 @@ def days_in(payment: Payment, start: dt.date, end: dt.date) -> int:
     return max(0, (min(payment.end, end) - max(payment.start, start)).days + 1)
 
 
+def amount_in(payment: Payment, start: dt.date, end: dt.date) -> Decimal:
+    """The payment's money for the days from `start` to `end`; a one-off payment (the top-up to
+    100%) all of it in the month of its day."""
+    if payment.one_off:
+        return dec(payment.total) if start <= payment.start <= end else Decimal("0.00")
+    return dec(payment.daily) * days_in(payment, start, end)
+
+
 def _month(
     start: dt.date, end: dt.date, ordered: list[Payment], scenario: Scenario
 ) -> MonthlyPayment:
     here = [(p, days) for p in ordered if (days := days_in(p, start, end)) > 0]
     lines: dict[tuple[Role, PaidBy | None], MonthlyLine] = {}
-    for payment, days in sorted(here, key=lambda found: PARENTS.index(found[0].lane)):
+    for payment, _ in sorted(here, key=lambda found: PARENTS.index(found[0].lane)):
         payer = payer_of(payment, scenario)
         line = lines.setdefault(
             (payment.lane, payer),
@@ -121,7 +131,7 @@ def _month(
                 payment_ids=[],
             ),
         )
-        line.amount += dec(payment.daily) * days
+        line.amount += amount_in(payment, start, end)
         line.payment_ids.append(payment.id)
     found = list(lines.values())
     mother, father = (

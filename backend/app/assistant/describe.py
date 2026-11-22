@@ -68,6 +68,8 @@ def source_label(source: SourceRef) -> str:
         return f"Załącznik ZUS, {source.section}"
     if source.doc in ROZPORZADZENIE_NAME:
         return f"{ROZPORZADZENIE_NAME[source.doc]}, {source.article}"
+    if source.doc == "poradnik":
+        return f"Poradnik ZUS 2026, {page_label(source.page, source.page_to)}"
     return f"Przewodnik ZUS, {page_label(source.page, source.page_to)}"
 
 
@@ -691,6 +693,8 @@ def element_line(element: TimelineElement, today: dt.date) -> str:
             return f"- [{element.id}] {fmt(element.date)}: {element.title}"
         case Payment():
             period = f"{fmt(element.start)}–{fmt(element.end)}"
+            if element.one_off:
+                period = f"jednorazowo, pokazane {fmt(element.start)}"
             return f"- [{element.id}] {element.title}: {period}. {element.summary}"
         case Document():
             return f"- [{element.id}] {element.title}: {document_when(element, today)}"
@@ -872,9 +876,14 @@ def describe_element(element: TimelineElement, today: dt.date | None = None) -> 
             if element.form is not None:
                 lines += describe_form(element.form)
         case Payment():
-            period = f"{fmt(element.start)}–{fmt(element.end)}"
+            period = f"{fmt(element.start)}–{fmt(element.end)}, {element.days} dni"
+            if element.one_off:
+                period = (
+                    f"jednorazowo, pokazane {fmt(element.start)}, za {element.days} dni urlopu "
+                    "macierzyńskiego"
+                )
             lines = [
-                f"{element.title}: {period}, {element.days} dni.",
+                f"{element.title}: {period}.",
                 element.summary,
                 *element.details,
             ]

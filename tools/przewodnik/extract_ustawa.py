@@ -80,6 +80,8 @@ PROVISIONS = {
     "art. 38 ust. 1": ("Art. 38 [", "ust", "1"),
     "art. 38 ust. 2": ("Art. 38 [", "ust", "2"),
     "art. 38 ust. 3": ("Art. 38 [", "ust", "3"),
+    # A change of working time: the pay for the new working time (an assumption in base.py).
+    "art. 40": ("Art. 40 [", None, None),
     "art. 42 ust. 1": ("Art. 42 [", "ust", "1"),
     "art. 42 ust. 2": ("Art. 42 [", "ust", "2"),
     "art. 42 ust. 3": ("Art. 42 [", "ust", "3"),

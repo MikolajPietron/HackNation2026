@@ -153,6 +153,21 @@
           "quote": "Zasiłek macierzyński przysługuje zarówno ubezpieczonym pracownikom jak i ubezpieczonym, którzy nie są pracownikami na tych samych zasadach co do wymiaru i wysokości."
         }
       ]
+    },
+    "instead_of_benefit": {
+      "note": "Poradnik ZUS 2026 (źródło nr 4): kto z powodu sytuacji zawodowej nie może skorzystać z zasiłku macierzyńskiego, ma świadczenie rodzicielskie albo uposażenie macierzyńskie; kwot i warunków nie ma w naszych materiałach.",
+      "sources": [
+        {
+          "doc": "poradnik",
+          "page": 35,
+          "quote": "Osobom sprawującym opiekę nad dzieckiem, które z powodu swojej sytuacji zawodowej nie mogą skorzystać z zasiłku macierzyńskiego, przysługuje świadczenie rodzicielskie lub uposażenie macierzyńskie. Ze wsparcia tego mogą skorzystać np. osoby bezrobotne, studenci czy pracujący na umowę o dzieło."
+        },
+        {
+          "doc": "poradnik",
+          "page": 35,
+          "quote": "Więcej informacji można uzyskać na stronie: Świadczenie rodzicielskie – Ministerstwo Rodziny, Pracy i Polityki Społecznej – Portal Gov.pl."
+        }
+      ]
     }
   },
   "supplementary": {
@@ -2429,16 +2444,47 @@
       ]
     },
     "first_year": {
+      "note": "Po wniosku o 81,5%: bez ani jednego dnia zasiłku za urlop rodzicielski w pierwszym roku życia dziecka zasiłek za ten urlop wynosi 70%.",
       "sources": [
         {
           "doc": "ustawa",
           "article": "art. 31 ust. 3g",
           "quote": "W przypadku niewykorzystania ani jednego dnia zasiłku macierzyńskiego za okres urlopu rodzicielskiego w pierwszym roku życia dziecka zasiłek macierzyński za okres urlopu rodzicielskiego przysługuje w wysokości 70% podstawy wymiaru zasiłku."
-        },
+        }
+      ]
+    },
+    "top_up": {
+      "note": "Jednorazowe wyrównanie zasiłku za urlop macierzyński do 100% podstawy, na wniosek, gdy po wniosku o 81,5% w pierwszym roku życia dziecka nie ma ani jednego dnia zasiłku za urlop rodzicielski.",
+      "sources": [
         {
           "doc": "ustawa",
           "article": "art. 31 ust. 4",
           "quote": "W przypadku niewykorzystania w pierwszym roku życia dziecka ani jednego dnia zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego w wysokości, o której mowa w art. 31 ust. 3, przysługuje jednorazowe wyrównanie pobranego zasiłku macierzyńskiego za okres urlopu macierzyńskiego do wysokości 100% podstawy wymiaru zasiłku. Jednorazowe wyrównanie zasiłku macierzyńskiego następuje na wniosek ubezpieczonego."
+        }
+      ]
+    },
+    "request_covers": {
+      "note": "Wniosek o 81,5% dotyczy urlopu macierzyńskiego i rodzicielskiego w pełnym wymiarze: gdy na osi nie ma urlopu rodzicielskiego (np. po stracie dziecka), liczymy 100% za urlop macierzyński.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 30a ust. 1",
+          "quote": "za okres odpowiadający okresowi urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 30a ust. 2",
+          "quote": "za okres odpowiadający okresowi urlopu na warunkach urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze"
+        }
+      ]
+    },
+    "stillborn_full": {
+      "note": "Poradnik ZUS 2026 (źródło nr 4): zasiłek macierzyński, gdy dziecko urodzi się martwe, wynosi 100% podstawy.",
+      "sources": [
+        {
+          "doc": "poradnik",
+          "page": 34,
+          "quote": "Zasiłek macierzyński, gdy dziecko urodzi się martwe – 100% podstawy wymiaru zasiłku."
         }
       ]
     },
@@ -2575,6 +2621,21 @@
           "doc": "ustawa",
           "article": "art. 30a ust. 2",
           "quote": "Ubezpieczony, nie później niż 21 dni po przyjęciu dziecka na wychowanie i wystąpieniu do sądu opiekuńczego z wnioskiem o wszczęcie postępowania w sprawie przysposobienia dziecka albo po przyjęciu dziecka na wychowanie jako rodzina zastępcza, z wyjątkiem rodziny zastępczej zawodowej, może złożyć pisemny wniosek o wypłacenie mu zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu na warunkach urlopu macierzyńskiego i urlopu rodzicielskiego w pełnym wymiarze, z wyłączeniem okresu, o którym mowa w art. 182¹ᵃ § 4 Kodeksu pracy, przysługującego drugiemu rodzicowi dziecka."
+        }
+      ]
+    },
+    "before_tax": {
+      "note": "Poradnik ZUS 2026 (źródło nr 4): zasiłek pomniejsza się jeszcze o zaliczkę na podatek dochodowy (PIT); kwoty silnika są przed tą zaliczką (zasiłek w kwocie brutto).",
+      "sources": [
+        {
+          "doc": "poradnik",
+          "page": 24,
+          "quote": "Tak uzyskaną kwotę pomniejsza się o należne składki na ubezpieczenia społeczne (13,71%) oraz o zaliczkę na podatek dochodowy (PIT)."
+        },
+        {
+          "doc": "poradnik",
+          "page": 19,
+          "quote": "jako zasiłek w kwocie brutto, łącznie z zaliczką na podatek dochodowy od osób fizycznych"
         }
       ]
     }

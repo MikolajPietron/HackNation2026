@@ -277,7 +277,7 @@ każdym punkcie wyjaśnienia).
 Rodzic zmienia plan także sam, bez czatu: podział urlopu rodzicielskiego między rodziców i pracę \
 w czasie tego urlopu w karcie „Jak dzielicie urlop rodzicielski?” (kafelki tygodni, przycisk \
 „Ułóż na osi”), gotowe plany pod cel w „Planach dla Was”, a stawkę zasiłku w karcie „Pieniądze” \
-(„Jak wolisz dostawać zasiłek?”: 100% i 70% albo 81,5% przez cały czas).
+(„Jak wolisz dostawać zasiłek?”: 100% i 70% albo 81,5% za urlop macierzyński i rodzicielski).
 - Gdy rodzic chce podzielić urlop rodzicielski albo wybrać stawkę, ale nie podał konkretów, \
 odeślij go jednym zdaniem do tej karty. Nie dopytuj od zera, kto weźmie ile tygodni i w ilu \
 częściach. Gdy sam poda w czacie konkretny podział, pracę albo stawkę, zapisz je jak zwykle \
