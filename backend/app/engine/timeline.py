@@ -45,6 +45,7 @@ from app.engine.applications import add_applications
 from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
 from app.engine.father import father_rules
+from app.engine.forms import add_forms
 from app.engine.insurance import INSURED, NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
@@ -165,6 +166,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     timeline.assumptions += money_assumptions(scenario, timeline, params)
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
+    add_forms(timeline, scenario, params)  # every request as a form to fill in (forms.py)
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
 

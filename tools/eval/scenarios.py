@@ -981,4 +981,48 @@ SCENARIOS = [
             },
         ],
     },
+    {
+        # ZADANIA B.4: on Gemini the assistant wrote that the request for maternity leave must be
+        # filed with the employer "najpóźniej" by a date. The materials give no deadline for it
+        # (CLAUDE.md, open questions): the timeline shows it on the first day of the leave,
+        # 2 weeks before 15.03.2027 = 01.03.2027, and only the Labour Code requests have one:
+        # parental leave from 19.07.2027 (20 - 2 = 18 weeks after the birth end 18.07.2027),
+        # 21 days before = 28.06.2027 (KP art. 182¹ᵈ § 1).
+        "id": "no-deadline-maternity-request",
+        "about": "asked by when to file the request for maternity leave, the assistant says the "
+        "materials give no deadline and never turns the first day of the leave into one",
+        "runs": 2,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                "say": "Chcę zacząć urlop macierzyński 2 tygodnie przed porodem.",
+                "tools": [{"name": "set_leave_before_birth", "args": {"weeks": 2}}],
+                "timeline": {
+                    "segments": {
+                        "maternity-prenatal": ["2027-03-01", "2027-03-14"],
+                        "maternity": ["2027-03-15", "2027-07-18"],
+                        "parental": ["2027-07-19", "2028-02-27"],
+                    },
+                    "documents": {
+                        "maternity-request": "2027-03-01",
+                        "parental-request": "2027-06-28",
+                    },
+                },
+                "question": "certificate",
+            },
+            {
+                "say": "Do kiedy najpóźniej muszę złożyć pracodawcy wniosek o urlop macierzyński?",
+                "no_tools": ["set_leave_before_birth", "set_due_date", "set_birth_date"],
+                "require": [r"nie podaj|nie określaj|nie ma (w nich )?terminu|bez terminu"],
+                "forbid": [
+                    r"najpóźniej[^.\n]{0,40}(1 marca|01\.03\.2027|2027-03-01|lutego)",
+                    r"(musisz|trzeba|należy) (go )?złożyć[^.\n]{0,40}(do|przed) "
+                    r"(1 marca|01\.03\.2027|2027-03-01|\d{1,2} lutego)",
+                    r"21 lutego 2027",
+                ],
+                "question": "certificate",
+            },
+        ],
+    },
 ]

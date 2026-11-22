@@ -7,8 +7,11 @@ import pytest
 
 from app.assistant.guide import guide_sections
 from app.assistant.law import (
+    ROZPORZADZENIA,
     kp_articles,
     kp_contains,
+    rozporzadzenie_contains,
+    rozporzadzenie_provisions,
     ustawa_articles,
     ustawa_contains,
     zalacznik_available,
@@ -36,6 +39,10 @@ def is_literal(source: SourceRef) -> bool:
         if not zalacznik_available():
             return source.section is not None
         return source.section is not None and zalacznik_contains(source.section, source.quote)
+    if source.doc in ROZPORZADZENIA:
+        return source.article is not None and rozporzadzenie_contains(
+            source.doc, source.article, source.quote
+        )
     assert source.section is not None
     pages = SECTIONS[source.section].pages_of(source.quote)
     return pages == (source.page, source.page_to or source.page)
@@ -257,6 +264,59 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "powstało prawo do zasiłku - dla osób wykonujących "
         "pracę nakładczą."
     )
+
+
+def test_the_two_regulations_on_requests() -> None:
+    """The request forms quote the regulation on the leave requests (11 March 2025) and the one
+    on the benefit documents (27 September 2026): their own text, page headers and footnotes
+    left out, superscripts in article numbers restored."""
+    wnioski = rozporzadzenie_provisions("rozp_wnioski")
+    zasilki = rozporzadzenie_provisions("rozp_zasilki")
+    assert set(wnioski) == {
+        *(f"§ {n} ust. {u}" for n in (2, 3, 5, 6, 7, 8, 9, 14, 15, 17) for u in (1, 2)),
+        "§ 22",
+    }
+    assert set(zasilki) == {
+        "§ 2",
+        "§ 12",
+        "§ 13 ust. 1",
+        "§ 13 ust. 2",
+        "§ 13 ust. 3",
+        "§ 20 ust. 1",
+        "§ 20 ust. 3",
+        "§ 22 ust. 1",
+        "§ 23 ust. 1",
+        "§ 26",
+        "§ 32 ust. 1",
+        "§ 33 ust. 1",
+        "zał. 1",
+        "zał. 6",
+    }
+    assert wnioski["§ 2 ust. 1"].endswith(
+        "1) imię i nazwisko pracownicy; 2) wskazanie daty, od której ma być udzielona część "
+        "urlopu macierzyńskiego."
+    )
+    # The footnote printed at the bottom of page 1 is not part of § 3.
+    assert wnioski["§ 3 ust. 2"].endswith("który pozostał do końca urlopu macierzyńskiego.")
+    assert wnioski["§ 14 ust. 1"].startswith("Wniosek, o którym mowa w art. 180² § 4 Kodeksu pracy")
+    assert "art. 182¹ᵈ § 1" in wnioski["§ 15 ust. 1"]
+    assert "art. 182¹ᵃ § 2 Kodeksu pracy" in wnioski["§ 15 ust. 2"]
+    assert all("Legalis" not in t for t in (*wnioski.values(), *zasilki.values()))
+    assert zasilki["zał. 6"].startswith("1) NIP i REGON płatnika składek")
+    assert zasilki["zał. 6"].endswith("19) pouczenie dotyczące zasiłku macierzyńskiego.")
+    assert zasilki["zał. 1"].endswith("10) pouczenie dotyczące zasiłku chorobowego.")
+    assert "art. 180² § 5 Kodeksu pracy" in zasilki["§ 26"]
+
+
+def test_the_forms_quote_only_what_the_regulations_and_the_guide_say() -> None:
+    templates = PARAMS.forms.templates
+    for template in templates.values():
+        for source in template.basis:
+            assert is_literal(source), source.quote
+        for item in (*template.fields.values(), *template.attachments.values()):
+            for source in item.sources:
+                assert is_literal(source), (item.label, source.quote)
+    assert "Wzory formularzy, Zasiłki)." in SECTIONS["F"].text
 
 
 @pytest.mark.skipif(
@@ -878,6 +938,21 @@ def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) ->
             assert step.sources, (base.parent, step.text)
             for source in step.sources:
                 assert is_literal(source), (base.parent, source.quote)
+    # The request forms (engine/forms.py): every field and attachment quotes the words that
+    # name it; personal data is never filled in.
+    for document in timeline.documents:
+        form = document.form
+        if form is None:
+            continue
+        assert form.legal_basis, document.id
+        for source in form.legal_basis:
+            assert is_literal(source), (document.id, source.quote)
+        for part in (*form.fields, *form.attachments, *form.notes):
+            for source in part.sources:
+                assert is_literal(source), (document.id, source.quote)
+        for field in form.fields:
+            assert field.sources, (document.id, field.id)
+            assert not (field.personal and field.value), (document.id, field.id)
 
 
 def test_the_model_always_has_the_source_text() -> None:

@@ -527,7 +527,7 @@ async def explain_timeline_element(ctx: RunContext[AssistantDeps], element_id: s
         ids = ", ".join(e.id for e in timeline.elements())
         raise ModelRetry(f"Nie ma elementu „{element_id}”. Dostępne: {ids}.")
     await ctx.emit(ElementFocused(element_id=element_id))
-    return describe_element(element)
+    return describe_element(element, timeline.today)
 
 
 # Applications and protection (guide A.4, I).
