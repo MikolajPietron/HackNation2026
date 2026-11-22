@@ -15,6 +15,8 @@ import time
 from collections import Counter
 from pathlib import Path
 
+from pydantic_ai.exceptions import ModelRateLimitError
+
 from app.api.cases import get_case_cache, get_cases_folder, get_reader_factory
 from app.cases.assess import assess
 from app.cases.cache import CachedRead, file_digest
@@ -23,6 +25,10 @@ from app.cases.pages import render_pages
 from app.clock import today_in_warsaw
 from app.config import get_settings
 from app.services.params import load_params
+
+# A provider's 429 means "slow down": wait this long and try the same case again.
+RATE_LIMIT_WAIT = 90
+RATE_LIMIT_TRIES = 4
 
 
 async def main() -> None:
@@ -51,13 +57,22 @@ async def main() -> None:
             return
         async with limit:
             started = time.monotonic()
-            try:
-                pages = await asyncio.to_thread(render_pages, case.path.read_bytes())
-                to_read = [page for page in pages if not page.blank]
-                facts = await make_reader().read(to_read)
-            except Exception as error:  # noqa: BLE001 — report and go on with the next case
-                print(f"{case.id} BŁĄD {type(error).__name__}: {str(error)[:400]}", flush=True)
-                return
+            pages = await asyncio.to_thread(render_pages, case.path.read_bytes())
+            to_read = [page for page in pages if not page.blank]
+            for attempt in range(1, RATE_LIMIT_TRIES + 1):
+                try:
+                    facts = await make_reader().read(to_read)
+                    break
+                except ModelRateLimitError as error:
+                    # The provider asks to slow down (429): wait and try the same case again.
+                    if attempt == RATE_LIMIT_TRIES:
+                        print(f"{case.id} BŁĄD limit: {str(error)[:400]}", flush=True)
+                        return
+                    print(f"{case.id} limit (429), czekam {RATE_LIMIT_WAIT} s…", flush=True)
+                    await asyncio.sleep(RATE_LIMIT_WAIT)
+                except Exception as error:  # noqa: BLE001 — report and go on with the next case
+                    print(f"{case.id} BŁĄD {type(error).__name__}: {str(error)[:400]}", flush=True)
+                    return
             cache.put(key, CachedRead(facts=facts, pages=len(pages), pages_read=len(to_read)))
             print(
                 f"{case.id} ok · {len(to_read)} str. · {time.monotonic() - started:.0f} s",
