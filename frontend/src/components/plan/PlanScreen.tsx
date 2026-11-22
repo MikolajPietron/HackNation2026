@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ExternalLink, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
+import { CalendarRange, ChevronUp, ExternalLink, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
 import etat from '@/assets/onboarding/etat.webp'
 import mama from '@/assets/onboarding/mama.webp'
 import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
@@ -56,10 +56,10 @@ import { NextSteps } from './NextSteps'
 import { ParentalEditor } from './ParentalEditor'
 import { Overview } from './Overview'
 import { RiskRadar } from './RiskRadar'
+import { SectionTabs } from './SectionTabs'
 import { StressTest } from './StressTest'
 import { TimelineCard } from './TimelineCard'
 import { ViewSwitch } from './ViewSwitch'
-import { WhatIf } from './WhatIf'
 import { YearCalendar } from './YearCalendar'
 
 /** The chat column grows with the screen: roomy on a big monitor, never squeezing the plan on
@@ -122,6 +122,8 @@ export function PlanScreen({
   /** The explanation window, opened at one point of it or at the top. */
   const [why, setWhy] = useState<{ focus?: string } | null>(null)
   const [view, setView] = usePlanView()
+  /** Phones: the whole plan (list or calendar) under what lies ahead, on demand. */
+  const [fullPlan, setFullPlan] = useState(false)
   const [moneyOpen, setMoneyOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   // A premature baby or a child in hospital: the support that fits, on the plan itself.
@@ -176,6 +178,8 @@ export function PlanScreen({
     plan.wait('Chwileczkę', 'Asystent jeszcze odpowiada. Zmień plan, gdy skończy.')
     return Promise.resolve(false)
   }
+  // After a loss the plan speaks gently and only of what is owed: no planning tools.
+  const loss = timeline?.notes.some((n) => n.id === 'loss' || n.text.startsWith('Bardzo nam przykro')) ?? false
   const items = useMemo(() => (shown ? timelineItems(shown) : []), [shown])
   const selected = items.find((item) => item.id === selectedId) ?? null
   const next = scenario && timeline ? nextQuestion(scenario, question) : null
@@ -305,19 +309,6 @@ export function PlanScreen({
                     )}
                   </AnimatePresence>
 
-                  <motion.div variants={ITEM} className="mt-5">
-                    <WhatIf
-                      scenario={scenario}
-                      busy={busy}
-                      onSend={choose}
-                      onMock={showMock}
-                      available={stressReport ? new Set(stressReport.events.map((e) => e.id)) : null}
-                      previewing={previewing?.id ?? null}
-                      loading={eventLoading}
-                      onPreview={(id) => void showEvent(id)}
-                    />
-                  </motion.div>
-
                   <motion.section ref={axisAnchor} variants={ITEM} aria-label="Oś czasu" className="mt-4 scroll-mt-4">
                     <ChangeBanner
                       banner={banner}
@@ -352,59 +343,47 @@ export function PlanScreen({
                           onHover={() => undefined}
                           onSelect={onSelect}
                         />
-                        <div className="mt-8 flex items-center justify-between gap-3">
-                          <h3 className="text-lg font-bold text-navy-900">Cały plan</h3>
-                          <ViewSwitch view={view} onChange={setView} axisLabel="Lista" />
-                        </div>
-                        {view === 'axis' ? (
-                          <MobileTimeline
-                            timeline={shown ?? timeline}
-                            changedIds={axisChanged}
-                            changeVersion={axisVersion}
-                            selectedId={selectedId}
-                            onSelect={onSelect}
-                          />
+                        {/* The whole plan is long on a phone: what lies ahead is above, the rest on demand
+                            (opened by itself while an event is previewed on it). */}
+                        {fullPlan || previewing !== null ? (
+                          <>
+                            <div className="mt-8 flex items-center justify-between gap-3">
+                              <h3 className="text-lg font-bold text-navy-900">Cały plan</h3>
+                              <ViewSwitch view={view} onChange={setView} axisLabel="Lista" />
+                            </div>
+                            {view === 'axis' ? (
+                              <MobileTimeline
+                                timeline={shown ?? timeline}
+                                changedIds={axisChanged}
+                                changeVersion={axisVersion}
+                                selectedId={selectedId}
+                                onSelect={onSelect}
+                              />
+                            ) : (
+                              <div className="mt-4">
+                                <YearCalendar timeline={shown ?? timeline} onSelect={onSelect} />
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setFullPlan(false)}
+                              className="mt-4 flex h-11 w-full items-center justify-center gap-1.5 rounded-full border border-line text-sm font-bold text-navy-700 transition-colors hover:bg-navy-50"
+                            >
+                              <ChevronUp className="size-4" /> Zwiń cały plan
+                            </button>
+                          </>
                         ) : (
-                          <div className="mt-4">
-                            <YearCalendar timeline={shown ?? timeline} onSelect={onSelect} />
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setFullPlan(true)}
+                            className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full border border-line bg-white text-sm font-bold text-navy-900 transition-colors hover:bg-navy-50"
+                          >
+                            <CalendarRange className="size-4 text-zus-700" /> Pokaż cały plan: oś i kalendarz
+                          </button>
                         )}
                       </>
                     )}
                   </motion.section>
-
-                  <motion.div variants={ITEM} className="mt-5">
-                    <DocumentsCard
-                      timeline={timeline}
-                      scenario={scenario}
-                      onFill={openFill}
-                      onSelect={onSelect}
-                      onPersonal={() => setPersonalOpen(true)}
-                    />
-                  </motion.div>
-
-                  {scenario && !timeline.taken_in && (
-                    <div className="mt-5">
-                      <ParentalEditor scenario={scenario} onApply={apply} />
-                    </div>
-                  )}
-
-                  {timeline.left_on_table.length > 0 && (
-                    <motion.div variants={ITEM} className="mt-5">
-                      <LeftOnTable
-                        timeline={timeline}
-                        scenario={scenario}
-                        onSelect={onSelect}
-                        onFill={openFill}
-                        onApply={apply}
-                        onCompare={() =>
-                          document
-                            .getElementById('rate-choice')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                        }
-                      />
-                    </motion.div>
-                  )}
 
                   <motion.div variants={ITEM} className="mt-5">
                     <MoneyCard
@@ -418,6 +397,16 @@ export function PlanScreen({
                     />
                   </motion.div>
 
+                  <motion.div variants={ITEM} className="mt-5">
+                    <DocumentsCard
+                      timeline={timeline}
+                      scenario={scenario}
+                      onFill={openFill}
+                      onSelect={onSelect}
+                      onPersonal={() => setPersonalOpen(true)}
+                    />
+                  </motion.div>
+
                   {supportTopics && (
                     <motion.section variants={ITEM} className="mt-5 rounded-4xl border border-line px-4 py-5 sm:px-5">
                       <h2 className="flex items-center gap-3 text-lg font-bold text-navy-900">
@@ -428,15 +417,68 @@ export function PlanScreen({
                     </motion.section>
                   )}
 
-                  <GoalPlans scenario={scenario} onApply={apply} />
-                  <StressTest
-                    report={stressReport}
-                    error={stressError}
-                    active={previewing?.id ?? null}
-                    loading={eventLoading}
-                    onPreview={(id) => void showEvent(id)}
-                  />
-                  <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={(focus) => setWhy({ focus })} />
+                  {!loss && (
+                    <SectionTabs
+                      title="Dopasujcie plan"
+                      subtitle="Podzielcie urlop, wybierzcie plan pod swój cel i sprawdźcie, czego jeszcze nie wykorzystujecie."
+                      tabs={[
+                        ...(scenario && !timeline.taken_in && timeline.segments.some((s) => s.lane === 'father' && s.id.startsWith('parental'))
+                          ? [{ id: 'split', label: 'Podział urlopu', icon: ICONS.wozek, content: <ParentalEditor scenario={scenario} onApply={apply} /> }]
+                          : []),
+                        { id: 'plans', label: 'Plany dla celu', icon: ICONS.skarbonka, content: <GoalPlans scenario={scenario} onApply={apply} /> },
+                        ...(timeline.left_on_table.length > 0
+                          ? [
+                              {
+                                id: 'left',
+                                label: 'Do wykorzystania',
+                                icon: ICONS.kalendarz,
+                                content: (
+                                  <LeftOnTable
+                                    timeline={timeline}
+                                    scenario={scenario}
+                                    onSelect={onSelect}
+                                    onFill={openFill}
+                                    onApply={apply}
+                                    onCompare={() =>
+                                      document.getElementById('rate-choice')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                    }
+                                  />
+                                ),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  )}
+
+                  {!loss && (
+                    <SectionTabs
+                      title="Co może się zmienić"
+                      subtitle="Co zmieni się w planie, gdy coś się wydarzy, i na co uważać, żeby nie stracić zasiłku."
+                      tabs={[
+                        {
+                          id: 'whatif',
+                          label: 'Co jeśli…',
+                          icon: ICONS.parasol,
+                          content: (
+                            <StressTest
+                              report={stressReport}
+                              error={stressError}
+                              active={previewing?.id ?? null}
+                              loading={eventLoading}
+                              onPreview={(id) => void showEvent(id)}
+                            />
+                          ),
+                        },
+                        {
+                          id: 'risks',
+                          label: 'Na co uważać',
+                          icon: ICONS.zlecenie,
+                          content: <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={(focus) => setWhy({ focus })} />,
+                        },
+                      ]}
+                    />
+                  )}
                   <Footer onSupport={() => setSupportOpen(true)} />
                 </>
               ) : (

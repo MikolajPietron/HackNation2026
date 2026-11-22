@@ -4,7 +4,7 @@
 // number is the engine's.
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { calculateTimeline } from '@/api'
 import { MonthChart } from '@/components/money/MonthChart'
 import { Emphasis } from '@/components/ui/emphasis'
@@ -51,6 +51,7 @@ export function MoneyCard({
     [timeline.payments],
   )
   const payer = moneyNote(timeline, 'payer')
+  const [periodsOpen, setPeriodsOpen] = useState(false)
   const tone = (p: Payment) =>
     timeline.segments.find((s) => s.id === p.segment_id)?.tone === 'option' ? 'option' : 'leave'
 
@@ -76,7 +77,17 @@ export function MoneyCard({
 
       <MonthChart timeline={timeline} hoveredId={hoveredId} onSelect={onSelect} />
 
-      <ul className="mt-4 divide-y divide-line">
+      {/* On a phone the periods repeat what the chart shows: they open on demand. */}
+      <button
+        type="button"
+        onClick={() => setPeriodsOpen((o) => !o)}
+        aria-expanded={periodsOpen}
+        className="mt-4 flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-sm font-bold text-navy-900 lg:hidden"
+      >
+        Okresy i kwoty ({payments.length})
+        <ChevronDown className={cn('size-4 text-navy-500 transition-transform duration-200', periodsOpen && 'rotate-180')} />
+      </button>
+      <ul className={cn('mt-4 divide-y divide-line', !periodsOpen && 'hidden lg:block')}>
         {payments.map((payment) => {
           const segment = timeline.segments.find((s) => s.id === payment.segment_id)
           const option = tone(payment) === 'option'
