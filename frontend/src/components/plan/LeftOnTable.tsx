@@ -222,9 +222,7 @@ function Card({
         </p>
       )}
 
-      <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-navy-500" title={item.text}>
-        {item.text}
-      </p>
+      <p className="mt-3 text-sm leading-relaxed text-pretty text-navy-500">{item.text}</p>
 
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
         {item.kind === 'choice' && item.id === 'left-rate-815' ? (

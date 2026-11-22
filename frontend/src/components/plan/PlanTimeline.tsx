@@ -12,7 +12,7 @@
 //
 // Motion follows Emil Kowalski's rules: springs for anything interruptible, no animation on what
 // repeats constantly (scrubbing follows the pointer 1:1), reduced motion respected.
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent, ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { AnimationPlaybackControls } from 'motion/react'
@@ -214,6 +214,8 @@ interface Props {
   onToggleExpanded?: () => void
   /** Put first in the toolbar (the switch between the axis and the calendar). */
   toolbarStart?: ReactNode
+  /** After a change of the plan: the playhead goes to this day (a new key moves it again). */
+  focus?: { day: number; key: number } | null
 }
 
 export function PlanTimeline({
@@ -228,6 +230,7 @@ export function PlanTimeline({
   expanded = false,
   onToggleExpanded,
   toolbarStart,
+  focus = null,
 }: Props) {
   const reduceMotion = useReducedMotion()
   const scroller = useRef<HTMLDivElement>(null)
@@ -435,6 +438,23 @@ export function PlanTimeline({
     setPlayhead(day)
     reveal(day)
   }
+
+  // A change of the plan puts the playhead on what changed, so the readout says what it is; the
+  // axis scrolls to it when zoomed in. An axis that opens later does not jump to an old change.
+  const focusKey = focus?.key ?? null
+  const focusDay = focus?.day ?? null
+  const [focusSeen, setFocusSeen] = useState(focusKey)
+  if (focusKey !== focusSeen) {
+    setFocusSeen(focusKey)
+    if (focusDay !== null) setPlayhead(focusDay)
+  }
+  const revealed = useRef(focusKey)
+  const revealOn = useEffectEvent((day: number) => reveal(day))
+  useEffect(() => {
+    if (focusKey === revealed.current || focusDay === null) return
+    revealed.current = focusKey
+    revealOn(focusDay)
+  }, [focusKey, focusDay])
 
   /** The day under the pointer; the break in the scale counts as its last day. */
   const dayAt = (clientX: number) => {
@@ -794,6 +814,16 @@ export function PlanTimeline({
                       const left = x(dayNumber(segment.start))
                       const right = x(dayNumber(deadline.date) + 1)
                       const px = ((right - left) / 100) * width
+                      // The words sit at the window's end; another period there (the father's
+                      // parental leave inside his paternity window) would run over them.
+                      const end = dayNumber(deadline.date)
+                      const covered = timeline.segments.some(
+                        (o) =>
+                          o.lane === lane &&
+                          o.id !== segment.id &&
+                          dayNumber(o.start) <= end &&
+                          dayNumber(o.end) >= end - 220 / pxPerDay,
+                      )
                       return (
                         <button
                           key={`window-${segment.id}`}
@@ -808,7 +838,7 @@ export function PlanTimeline({
                           )}
                           style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${left}%`, width: `${right - left}%` }}
                         >
-                          {px > 420 && <>w dowolnym czasie do {formatShortDate(deadline.date)}</>}
+                          {px > 420 && !covered && <>w dowolnym czasie do {formatShortDate(deadline.date)}</>}
                         </button>
                       )
                     })}

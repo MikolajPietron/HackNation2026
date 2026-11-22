@@ -23,9 +23,13 @@ interface Props {
   /** Layer over the plan column for the expanded axis (sections below have filters, which
    * would trap an absolutely positioned overlay inside them). */
   overlayRoot: HTMLElement | null
+  /** After a change of the plan: the playhead goes to this day. */
+  focus?: { day: number; key: number } | null
+  /** A what-if is shown instead of the plan: the card says so with a dashed amber edge. */
+  preview?: boolean
 }
 
-export function TimelineCard({ overlayRoot, ...props }: Props) {
+export function TimelineCard({ overlayRoot, preview = false, ...props }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = usePlanView()
@@ -93,7 +97,12 @@ export function TimelineCard({ overlayRoot, ...props }: Props) {
 
   return (
     <>
-      <div className="rounded-4xl border border-line px-5 pt-4 pb-5">
+      <div
+        className={cn(
+          'rounded-4xl border px-5 pt-4 pb-5 transition-[border-color,background-color] duration-300',
+          preview ? 'border-2 border-dashed border-sun-400 bg-sun-100/15' : 'border-line',
+        )}
+      >
         {view === 'axis' ? (
           axis(1, false)
         ) : (

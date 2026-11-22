@@ -28,6 +28,7 @@ import { timelineItems } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanChange } from '@/hooks/usePlanChange'
+import { usePlanSpotlight } from '@/hooks/usePlanSpotlight'
 import type { PlanApply } from '@/hooks/usePlanChange'
 import { usePlanView } from '@/hooks/usePlanView'
 import { EASE_OUT, SPRING_PANEL, SPRING_PRESS } from '@/lib/ease'
@@ -35,13 +36,14 @@ import { nextQuestion } from '@/lib/interview'
 import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
-import type { InterviewQuestion, Scenario, SessionStart, StressEventId, Timeline } from '@/types'
+import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
 import { ApplicationForm } from '@/components/applications/ApplicationForm'
 import { MoneyCard } from '@/components/money/MoneyCard'
 import { SupportList, SupportWindow } from '@/components/support/SupportList'
 import { Illustration } from '@/components/ui/illustration'
 import { ICONS } from '@/lib/icons'
 import { MoneyExplanation } from '@/components/money/MoneyExplanation'
+import { ChangeBanner } from './ChangeBanner'
 import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
@@ -133,8 +135,6 @@ export function PlanScreen({
     setFill(null)
     onSelect(id)
   }
-  /** Events of the stress test to open (from the "Co jeśli…" chips). */
-  const [stressFocus, setStressFocus] = useState<{ ids: StressEventId[]; n: number } | null>(null)
   const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -146,6 +146,23 @@ export function PlanScreen({
   const [letterOpen, setLetterOpen] = useState(false)
   const [certOpen, setCertOpen] = useState(false)
   const plan = usePlanChange(scenario, onUpdate)
+  /** Every change of the plan is brought into view on the axis; a what-if is shown there too. */
+  const {
+    anchor: axisAnchor,
+    banner,
+    dismiss: dismissBanner,
+    shown,
+    previewing,
+    changedIds: axisChanged,
+    changeVersion: axisVersion,
+    focus: axisFocus,
+    show: showEvent,
+    endPreview,
+    loading: eventLoading,
+    error: eventError,
+    report: stressReport,
+    reportError: stressError,
+  } = usePlanSpotlight({ timeline, scenario, changed })
   /** Changes from the interface wait while the assistant is writing (it may be changing the
    *  same plan). */
   const apply: PlanApply = (changes, title, detail) => {
@@ -153,8 +170,7 @@ export function PlanScreen({
     plan.wait('Chwileczkę', 'Asystent jeszcze odpowiada. Zmień plan, gdy skończy.')
     return Promise.resolve(false)
   }
-  const items = useMemo(() => (timeline ? timelineItems(timeline) : []), [timeline])
-  const changedIds = useMemo(() => new Set(changed.ids), [changed])
+  const items = useMemo(() => (shown ? timelineItems(shown) : []), [shown])
   const selected = items.find((item) => item.id === selectedId) ?? null
   const next = scenario && timeline ? nextQuestion(scenario, question) : null
 
@@ -274,26 +290,43 @@ export function PlanScreen({
                       busy={busy}
                       onSend={choose}
                       onMock={showMock}
-                      onPreview={(ids) => setStressFocus((f) => ({ ids, n: (f?.n ?? 0) + 1 }))}
+                      available={stressReport ? new Set(stressReport.events.map((e) => e.id)) : null}
+                      previewing={previewing?.id ?? null}
+                      loading={eventLoading}
+                      onPreview={(id) => void showEvent(id)}
                     />
                   </motion.div>
 
-                  <motion.section variants={ITEM} aria-label="Oś czasu" className="mt-4">
+                  <motion.section ref={axisAnchor} variants={ITEM} aria-label="Oś czasu" className="mt-4 scroll-mt-4">
+                    <ChangeBanner
+                      banner={banner}
+                      loading={eventLoading}
+                      error={eventError}
+                      onSelect={onSelect}
+                      onDismiss={dismissBanner}
+                      onSwitch={(id) => void showEvent(id)}
+                      onHappened={(prompt) => {
+                        endPreview()
+                        choose(prompt)
+                      }}
+                    />
                     {wide ? (
                       <TimelineCard
-                        timeline={timeline}
-                        changedIds={changedIds}
-                        changeVersion={changed.version}
+                        timeline={shown ?? timeline}
+                        changedIds={axisChanged}
+                        changeVersion={axisVersion}
                         selectedId={selectedId}
                         onSelect={onSelect}
                         overlayRoot={overlayRoot}
+                        focus={axisFocus}
+                        preview={previewing !== null}
                       />
                     ) : (
                       <>
                         <NextSteps
-                          timeline={timeline}
-                          changedIds={changedIds}
-                          changeVersion={changed.version}
+                          timeline={shown ?? timeline}
+                          changedIds={axisChanged}
+                          changeVersion={axisVersion}
                           hoveredId={null}
                           onHover={() => undefined}
                           onSelect={onSelect}
@@ -304,15 +337,15 @@ export function PlanScreen({
                         </div>
                         {view === 'axis' ? (
                           <MobileTimeline
-                            timeline={timeline}
-                            changedIds={changedIds}
-                            changeVersion={changed.version}
+                            timeline={shown ?? timeline}
+                            changedIds={axisChanged}
+                            changeVersion={axisVersion}
                             selectedId={selectedId}
                             onSelect={onSelect}
                           />
                         ) : (
                           <div className="mt-4">
-                            <YearCalendar timeline={timeline} onSelect={onSelect} />
+                            <YearCalendar timeline={shown ?? timeline} onSelect={onSelect} />
                           </div>
                         )}
                       </>
@@ -365,7 +398,13 @@ export function PlanScreen({
                   )}
 
                   <GoalPlans scenario={scenario} onApply={apply} />
-                  <StressTest scenario={scenario} focus={stressFocus} />
+                  <StressTest
+                    report={stressReport}
+                    error={stressError}
+                    active={previewing?.id ?? null}
+                    loading={eventLoading}
+                    onPreview={(id) => void showEvent(id)}
+                  />
                   <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={(focus) => setWhy({ focus })} />
                   <Footer onSupport={() => setSupportOpen(true)} />
                 </>
@@ -381,7 +420,7 @@ export function PlanScreen({
             <AnimatePresence>
               {selected && timeline && (
                 <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
-                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} onCertificate={() => setCertOpen(true)} />
+                  <ElementDetails key={selected.id} item={selected} timeline={shown ?? timeline} onSelect={onSelect} onFill={previewing ? undefined : openFill} onCertificate={() => setCertOpen(true)} />
                 </Dialog>
               )}
               {fillDocument && timeline && (
@@ -469,7 +508,7 @@ export function PlanScreen({
             title={selected?.title ?? 'Szczegóły'}
           >
             {selected && timeline && (
-              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} onCertificate={() => setCertOpen(true)} />
+              <ElementDetails key={selected.id} item={selected} timeline={shown ?? timeline} onSelect={onSelect} onFill={previewing ? undefined : openFill} onCertificate={() => setCertOpen(true)} />
             )}
           </Sheet>
           <Sheet
