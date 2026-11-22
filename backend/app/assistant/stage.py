@@ -117,6 +117,7 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "18": ("sick",),
     "19": ("sick",),
     "22": ("sick",),
+    "29": ("taken-in",),  # the age limits of a child taken in (pkt 2-3); pkt 1 the guide says
     "29a": ("core",),
     "30": ("job-loss",),  # ust. 1 and 4: USTAWA_EXCEPTIONS below
     "30a": ("money",),

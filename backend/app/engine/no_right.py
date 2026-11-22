@@ -41,7 +41,8 @@ def add_way_notes(
     for anchors, note in (
         (("job-loss", "insurance"), _mother_way(scenario, timeline, params)),
         (("father",), _father_way(scenario, timeline, params)),
-        (("taken-in-leave",), _taken_in_way(scenario, params)),
+        # A child past the age limit: the "insurance" point says so (explain_adoption.py).
+        (("taken-in-leave", "insurance"), _taken_in_way(scenario, params)),
     ):
         if note is not None:
             at = _after(notes, anchors)

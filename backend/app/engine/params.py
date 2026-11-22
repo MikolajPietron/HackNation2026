@@ -232,6 +232,9 @@ class TakenInKindParams(BaseModel):
     parental_age: Param[int] | None
     """Adoption: parental leave at most until the child reaches this age. None = the rule for a
     born child (the end of the calendar year in which the child turns `parental.deadline_age`)."""
+    benefit_age: Rule
+    """The maternity benefit only for a child taken in under the age limit (ustawa art. 29
+    ust. 1 pkt 2 or 3, ust. 2)."""
 
 
 class TakenInParams(BaseModel):
@@ -263,6 +266,14 @@ class TakenInParams(BaseModel):
     """§ 8: the same for parental leave."""
     foster: TakenInKindParams
     adoption: TakenInKindParams
+    # Requests, who pays and the protection (engine/adoption_applications.py).
+    protection: Rule
+    """Art. 177 § 1: the protection from the request for the leave on the terms of maternity
+    leave until it ends."""
+    forms: dict[str, "TakenInForm"]
+    """The request forms: "taken-in" (rozp_wnioski § 18), "taken-in-supplementary" (§ 14
+    ust. 3-4), "taken-in-parental" (§ 15 ust. 3-4), "taken-in-paternity" (§ 17 ust. 2 pkt 2),
+    "taken-in-zam" (rozp_zasilki § 16, § 30 ust. 1, § 33 ust. 1)."""
 
 
 class MoneyParams(BaseModel):
@@ -452,6 +463,20 @@ class FormTemplate(BaseModel):
     basis: list[SourceRef] = Field(min_length=1)
     fields: dict[str, FormItem] = {}
     attachments: dict[str, FormItem] = {}
+
+
+class TakenInForm(BaseModel):
+    """A request for a child taken in for upbringing (engine/adoption_applications.py): a
+    template of its own, or one that `extends` a template of `FormParams.templates` with more
+    provisions, fields (the same id: in place of the base field) and attachments."""
+
+    extends: str | None = None
+    basis: list[SourceRef] = []
+    fields: dict[str, FormItem] = {}
+    attachments: dict[str, FormItem] = {}
+
+
+TakenInParams.model_rebuild()
 
 
 class FormParams(BaseModel):

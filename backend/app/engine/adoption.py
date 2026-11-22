@@ -54,6 +54,7 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
 """
 
 import datetime as dt
+import re
 from dataclasses import dataclass
 
 from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources
@@ -165,6 +166,18 @@ def age_limit(scenario: Scenario, params: Params) -> AgeLimit:
     return AgeLimit(kind.age.value, kind.age.sources)
 
 
+def limit_reached(scenario: Scenario, params: Params) -> dt.date | None:
+    """The child's birthday at the age limit, when it came on or before the day of taking in:
+    then neither the leave (art. 183 § 1, § 1¹) nor the benefit (ustawa art. 29 ust. 1 pkt 2-3)
+    is due, nor paternity leave after adoption (the same 14 years, art. 182³ § 1 pkt 2). None
+    while the dates are not known, or the child was younger."""
+    birth, taken = scenario.birth_date, scenario.taken_in_on
+    if scenario.taken_in is None or birth is None or taken is None:
+        return None
+    limit = birthday(birth, age_limit(scenario, params).age)
+    return limit if taken >= limit else None
+
+
 @dataclass(frozen=True)
 class TakenInLeave:
     """Leave on the terms of maternity leave, computed (dates inclusive)."""
@@ -248,11 +261,17 @@ class ParentalDeadline:
     sources: list[SourceRef]
 
 
-def parental_deadline(scenario: Scenario, params: Params) -> ParentalDeadline | None:
-    """Adoption: the day before the child turns 14. Foster family: as for a born child, the end
-    of the calendar year in which the child turns 6. None without the date of birth."""
+def parental_deadline(
+    scenario: Scenario, params: Params, leave: TakenInLeave | None
+) -> ParentalDeadline | None:
+    """Adoption: the day before the child turns 14 (§ 4¹, § 4⁴). Foster family: as for a born
+    child, the end of the calendar year in which the child turns 6 (art. 182¹ᶜ via § 5). None
+    without the date of birth, and after the 9-week leave of § 3 (`leave.minimum`): § 4² and
+    § 4⁵ give 38 (62) weeks with no age limit, and in a foster family the end of the year of the
+    6th birthday would leave nothing of the 38 weeks of § 4 pkt 3 (the child is then at least
+    7 years less 9 weeks old), so the materials give no last day (CLAUDE.md, open questions)."""
     birth = scenario.birth_date
-    if birth is None or scenario.taken_in is None:
+    if birth is None or scenario.taken_in is None or (leave is not None and leave.minimum):
         return None
     kind = kind_params(scenario.taken_in, params)
     if kind.parental_age is not None:
@@ -290,7 +309,26 @@ def taken_in_supplementary(
     )
 
 
-def paternity_deadline(scenario: Scenario, params: Params) -> dt.date | None:
+@dataclass(frozen=True)
+class PaternityDeadline:
+    date: dt.date
+    """The last day of paternity leave after adoption."""
+    by_age: bool
+    """The child's 14th birthday comes before the 12 months from the final ruling end."""
+
+
+def paternity_barred(scenario: Scenario, params: Params) -> dt.date | None:
+    """Adoption: the child's 14th birthday when it came on or before the day of taking in.
+    Paternity leave lasts "nie dłużej niż do ukończenia przez dziecko 14 roku życia" (art. 182³
+    § 1 pkt 2), so it is not due at all."""
+    birth, taken = scenario.birth_date, scenario.taken_in_on
+    if scenario.taken_in != "adoption" or birth is None or taken is None:
+        return None
+    limit = birthday(birth, params.taken_in.paternity_age.value)
+    return limit if taken >= limit else None
+
+
+def paternity_deadline(scenario: Scenario, params: Params) -> PaternityDeadline | None:
     """Adoption, the ruling final: 12 months from it, not after the child turns 14."""
     t = params.taken_in
     final = scenario.adoption_final_on
@@ -298,8 +336,10 @@ def paternity_deadline(scenario: Scenario, params: Params) -> dt.date | None:
         return None
     last = months_later(final, t.paternity_months.value) - DAY
     if scenario.birth_date is not None:
-        last = min(last, birthday(scenario.birth_date, t.paternity_age.value) - DAY)
-    return last
+        before_14 = birthday(scenario.birth_date, t.paternity_age.value) - DAY
+        if before_14 < last:
+            return PaternityDeadline(before_14, by_age=True)
+    return PaternityDeadline(last, by_age=False)
 
 
 def check(scenario: Scenario, today: dt.date) -> None:
@@ -353,17 +393,20 @@ def taken_in_timeline(scenario: Scenario, params: Params, today: dt.date) -> Tim
     insured = cover_of(scenario, role) not in NOT_INSURED
     leave = taken_in_leave(scenario, params)
     no_leave = leave is not None and (leave.too_old or leave.used_up)
-    if insured and work_of(scenario, role) in ("employment", None) and not no_leave:
-        _request_markers(draft, params, taken)
-    if insured and leave is not None:
-        if leave.too_old:
-            assert leave.limit is not None
-            draft.warnings.append(
-                f"Dziecko skończyło {age_limit(scenario, params).age} lat {fmt(leave.limit)}, "
-                "zanim zostało przyjęte: urlop na warunkach urlopu macierzyńskiego przysługuje "
-                "tylko do tego wieku."
-            )
-        elif leave.used_up:
+    work = work_of(scenario, role)
+    if insured and work in ("employment", None) and not no_leave:
+        # An employee's request is a document with its deadline (adoption_applications.py);
+        # while nobody said how the person works, a marker says when it is due.
+        _request_markers(draft, params, taken, request=work is None)
+    if leave is not None and leave.too_old:
+        assert leave.limit is not None
+        draft.warnings.append(
+            f"Dziecko skończyło {age_limit(scenario, params).age} lat {fmt(leave.limit)}, "
+            "zanim zostało przyjęte: urlop na warunkach urlopu macierzyńskiego i zasiłek "
+            "macierzyński przysługują tylko przy przyjęciu dziecka przed tym wiekiem."
+        )
+    elif insured and leave is not None:
+        if leave.used_up:
             # § 7: the whole leave was used as a foster family; parental leave can follow from
             # the day of the court application.
             _parental(draft, scenario, params, leave, today, after=taken - DAY)
@@ -412,24 +455,27 @@ def _taken_in_marker(scenario: Scenario, params: Params, taken: dt.date) -> Mark
     )
 
 
-def _request_markers(draft: Draft, params: Params, taken: dt.date) -> None:
-    """Art. 183 § 6: the request within 7 days, the start at the latest after 21 days."""
+def _request_markers(draft: Draft, params: Params, taken: dt.date, *, request: bool) -> None:
+    """Art. 183 § 6: the request within 7 days (`request`: as a marker), the start at the latest
+    after 21 days."""
     t = params.taken_in
-    request = taken + t.request_days.value * DAY
     latest = taken + t.latest_start_days.value * DAY
+    if request:
+        draft.markers.append(
+            Marker(
+                id="leave-request-deadline",
+                lane="child",
+                label="Wniosek o urlop",
+                title="Wniosek o urlop na warunkach urlopu macierzyńskiego",
+                date=taken + t.request_days.value * DAY,
+                summary=(
+                    f"Pracownik składa wniosek o ten urlop w terminie {t.request_days.value} dni "
+                    "od dnia przyjęcia dziecka."
+                ),
+                sources=t.request_days.sources,
+            )
+        )
     draft.markers += [
-        Marker(
-            id="leave-request-deadline",
-            lane="child",
-            label="Wniosek o urlop",
-            title="Wniosek o urlop na warunkach urlopu macierzyńskiego",
-            date=request,
-            summary=(
-                f"Pracownik składa wniosek o ten urlop w terminie {t.request_days.value} dni od "
-                "dnia przyjęcia dziecka."
-            ),
-            sources=t.request_days.sources,
-        ),
         Marker(
             id="start-limit",
             lane="child",
@@ -497,8 +543,13 @@ def _leave(
             end=leave.end,
             days=leave.days,
             summary=(
-                f"{who} ma urlop na warunkach urlopu macierzyńskiego — odpowiednik urlopu "
-                f"macierzyńskiego przy przyjęciu dziecka na wychowanie: "
+                f"{who} ma prawo do zasiłku macierzyńskiego za okres odpowiadający urlopowi na "
+                "warunkach urlopu macierzyńskiego — odpowiednikowi urlopu macierzyńskiego przy "
+                f"przyjęciu dziecka na wychowanie: {weeks_or_days(leave.days)}, od "
+                f"{fmt(leave.start)} do {fmt(leave.end)}."
+                if work_of(scenario, role) in ("contract", "business")
+                else f"{who} ma urlop na warunkach urlopu macierzyńskiego — odpowiednik urlopu "
+                "macierzyńskiego przy przyjęciu dziecka na wychowanie: "
                 f"{weeks_or_days(leave.days)}, od {fmt(leave.start)} do {fmt(leave.end)}."
             ),
             details=details,
@@ -674,9 +725,12 @@ def _parental(
     after: dt.date,
 ) -> None:
     """Parental leave from the day after `after` (the leave, or supplementary leave after it):
-    the taker's whole share first, the other parent's 9 weeks after it (both are options).
-    After foster care (§ 8) the pool is smaller by the foster parental weeks."""
-    deadline = parental_deadline(scenario, params)
+    the taker's whole share first, the other parent's 9 weeks after it (both are options). When
+    the last day of parental leave leaves no room for the other parent's weeks after the taker's
+    share, they are drawn at the same time, from the first day: both parents may be on parental
+    leave at once (art. 182¹ᵃ § 6 via art. 183 § 5). After foster care (§ 8) the pool is smaller
+    by the foster parental weeks."""
+    deadline = parental_deadline(scenario, params, leave)
     p = params.parental
     t = params.taken_in
     total = parental_total(scenario, params, leave)
@@ -719,6 +773,13 @@ def _parental(
     ]
     if deadline is not None:
         common.insert(1, f"Trzeba go wykorzystać najpóźniej do {fmt(deadline.date)}.")
+    elif leave.minimum:
+        common.insert(
+            1,
+            f"Materiały nie podają, do kiedy trzeba wykorzystać te {total.value} tyg. urlopu "
+            f"rodzicielskiego po {t.minimum_weeks.value}-tygodniowym urlopie na warunkach urlopu "
+            "macierzyńskiego.",
+        )
     used = foster_parental_used(scenario)
     pool = total.value - used
     if used:
@@ -728,29 +789,50 @@ def _parental(
             f"zastępczej, więc zostaje do {max(pool, 0)} tyg.",
         )
         sources.append(t.after_foster_parental.sources)
+    first = start
     shares = [(role, pool - exclusive), (other(role), min(exclusive, pool))]
     for person, weeks in shares:
         if weeks <= 0 or person != role and cover_of(scenario, person) in NOT_INSURED:
             continue
-        if deadline is not None and start > deadline.date:
-            break
+        together = (
+            person != role
+            and deadline is not None
+            and start != first
+            and start + weeks * WEEK - DAY > deadline.date
+        )
+        if together:
+            start = first  # no room after the taker's share: at the same time
         full_end = start + weeks * WEEK - DAY
         end = full_end if deadline is None else min(full_end, deadline.date)
-        shown = f"{weeks} tyg." if end == full_end else f"{days_between(start, end)} dni"
+        shown = weeks_or_days(days_between(start, end))
+        until = fmt(deadline.date) if deadline is not None else ""
+        whose = "mamy" if role == "mother" else "taty"
         if person == role:
             summary = (
                 f"Po urlopie na warunkach urlopu macierzyńskiego rodzice mają razem do "
                 f"{pool} tyg. urlopu rodzicielskiego, a każde z nich {exclusive} tyg. "
                 f"wyłącznie dla siebie. {PERSON[person].capitalize()} może więc wykorzystać "
-                f"najwięcej {weeks} tyg.; wzięte w całości od razu: {shown}, "
-                f"od {fmt(start)} do {fmt(end)}."
+                + (
+                    f"najwięcej {weeks} tyg.; wzięte w całości od razu: {shown}, "
+                    f"od {fmt(start)} do {fmt(end)}."
+                    if end == full_end
+                    else f"najwięcej {weeks} tyg., ale urlop trzeba wykorzystać do {until}: "
+                    f"wzięty od razu trwa {shown}, od {fmt(start)} do {fmt(end)}."
+                )
+            )
+        elif together:
+            summary = (
+                f"{PERSON[person].capitalize()} ma {exclusive} tyg. urlopu rodzicielskiego "
+                "wyłącznie dla siebie: nie można ich przenieść na drugiego rodzica. Urlop trzeba "
+                f"wykorzystać do {until}, a po urlopie {whose} by się nie zmieścił. Rodzice mogą "
+                "korzystać z urlopu rodzicielskiego jednocześnie, więc pokazujemy go w tym samym "
+                f"czasie: {shown}, od {fmt(start)} do {fmt(end)}."
             )
         else:
             summary = (
                 f"{PERSON[person].capitalize()} ma {exclusive} tyg. urlopu rodzicielskiego "
                 "wyłącznie dla siebie: nie można ich przenieść na drugiego rodzica. Pokazujemy "
-                f"je po urlopie {'mamy' if role == 'mother' else 'taty'}: {shown}, od "
-                f"{fmt(start)} do {fmt(end)}."
+                f"je po urlopie {whose}: {shown}, od {fmt(start)} do {fmt(end)}."
                 + (f" Z łącznej puli zostało tylko {weeks} tyg." if weeks < exclusive else "")
             )
         details = list(common)
@@ -769,7 +851,11 @@ def _parental(
                 days=days_between(start, end),
                 summary=summary,
                 details=details,
-                sources=merge_sources(*sources, params.rules.week_is_7_days.sources),
+                sources=merge_sources(
+                    *sources,
+                    params.parental_plan.both_at_once.sources if together else [],
+                    params.rules.week_is_7_days.sources,
+                ),
             )
         )
         start = end + DAY
@@ -779,9 +865,11 @@ def _paternity(draft: Draft, scenario: Scenario, params: Params, today: dt.date)
     """Guide B.4, adoption: 14 days within 12 months of the final ruling, before the child
     turns 14. Drawn from the ruling (from today when it was earlier), after the father's own
     leave on the terms of maternity leave when they would meet."""
-    deadline = paternity_deadline(scenario, params)
-    if deadline is None or father_coverage(scenario) in NOT_INSURED:
+    limit = paternity_deadline(scenario, params)
+    if limit is None or father_coverage(scenario) in NOT_INSURED:
         return
+    if paternity_barred(scenario, params) is not None:
+        return  # the child was 14 when taken in: the case notes say why
     f = params.father
     t = params.taken_in
     final = scenario.adoption_final_on
@@ -794,11 +882,16 @@ def _paternity(draft: Draft, scenario: Scenario, params: Params, today: dt.date)
         t.paternity_age.sources,
         f.paternity_expires.sources,
     )
+    deadline = limit.date
     if deadline < today:
-        draft.warnings.append(
-            f"Czas na urlop ojcowski minął {fmt(deadline)}: można go wykorzystać w ciągu "
-            f"{t.paternity_months.value} miesięcy od uprawomocnienia się przysposobienia."
+        why = (
+            f"przysługuje nie dłużej niż do ukończenia przez dziecko {t.paternity_age.value} "
+            f"lat, a dziecko skończyło {t.paternity_age.value} lat {fmt(deadline + DAY)}"
+            if limit.by_age
+            else f"można go wykorzystać w ciągu {t.paternity_months.value} miesięcy od "
+            f"uprawomocnienia się przysposobienia ({fmt(final)})"
         )
+        draft.warnings.append(f"Czas na urlop ojcowski minął {fmt(deadline)}: {why}.")
         return
     draft.markers.append(
         Marker(
@@ -905,6 +998,14 @@ def _person_lines(draft: Draft, scenario: Scenario, params: Params) -> None:
         ]
 
 
+def provision(param: Param[int]) -> str:
+    """The provision a parameter quotes: "art. 183 § 4²", "art. 183 § 4 pkt 3" (a point of a
+    paragraph, from the quote's own number)."""
+    source = param.sources[0]
+    point = re.match(r"(\d+)\) ", source.quote)
+    return f"{source.article} pkt {point.group(1)}" if point else str(source.article)
+
+
 def children_taken_in(count: int) -> str:
     """After "przy przyjęciu": the Labour Code's wording (art. 183 § 1)."""
     words = {1: "jednego dziecka", 2: "dwojga dzieci", 3: "trojga dzieci", 4: "czworga dzieci"}
@@ -925,7 +1026,7 @@ def _assumptions(
         "Pokazujemy to, co wynika z części D Przewodnika ZUS (przyjęcie dziecka na wychowanie) "
         "i z Kodeksu pracy: urlop na warunkach urlopu macierzyńskiego, uzupełniający urlop "
         "macierzyński, urlop rodzicielski i przy adopcji urlop ojcowski, z kwotą zasiłku, gdy "
-        "jest podana kwota miesięczna. Wnioski o zasiłek dodamy w kolejnych etapach.",
+        "jest podana kwota miesięczna, wnioskami i ochroną przed zwolnieniem.",
         f"Urlop na warunkach urlopu macierzyńskiego pokazujemy u osoby, która wypełnia wywiad "
         f"({who}).",
     ]
@@ -974,19 +1075,33 @@ def _assumptions(
                 "z nich."
             )
         if leave.minimum:
+            total = parental_total(scenario, params, leave)
             assumptions.append(
                 f"{params.taken_in.minimum_weeks.value} tygodni z art. 183 § 3 Kodeksu pracy "
                 "czytamy jako najkrótszy urlop: gdy granica wieku zostawiłaby mniej, urlop trwa "
-                "tyle. Wtedy urlop rodzicielski jest krótszy (art. 183 § 4 pkt 3)."
+                f"tyle. Wtedy urlop rodzicielski trwa {total.value} tyg. ({provision(total)})."
+            )
+            assumptions.append(
+                f"Przepis o {total.value} tygodniach urlopu rodzicielskiego po urlopie trwającym "
+                f"{params.taken_in.minimum_weeks.value} tygodni nie ogranicza go wiekiem dziecka, "
+                "a materiały nie podają, do kiedy trzeba go wykorzystać. Pokazujemy go po urlopie, "
+                "bez granicy wieku"
+                + (
+                    ": koniec roku, w którym dziecko kończy 6 lat (art. 182¹ᶜ), już by minął."
+                    if scenario.taken_in == "foster"
+                    else "."
+                )
             )
     if "parental" in shown or "parental-father" in shown:
         assumptions.append(
             "Urlop rodzicielski pokazujemy tak, jakby osoba, która brała urlop na warunkach urlopu "
             "macierzyńskiego, wzięła całą swoją część od razu, a drugi rodzic swoje tygodnie "
-            "zaraz potem. Rodzice mogą też korzystać "
+            "zaraz potem; gdy po jej części do końca czasu na ten urlop nie zostaje na nie "
+            "miejsca, pokazujemy je w tym samym czasie. Rodzice mogą też korzystać "
             "z niego jednocześnie albo naprzemiennie i dzielić go na części."
         )
-    if scenario.taken_in == "foster" and "adoption-leave" in shown:
+    minimum = leave is not None and leave.minimum
+    if scenario.taken_in == "foster" and "adoption-leave" in shown and not minimum:
         assumptions.append(
             "W rodzinie zastępczej termin urlopu rodzicielskiego liczymy jak przy urodzeniu "
             "dziecka (koniec roku, w którym dziecko kończy 6 lat), bo Kodeks pracy odsyła do "

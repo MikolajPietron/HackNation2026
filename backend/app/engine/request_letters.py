@@ -23,6 +23,7 @@ letter out on an A4 page and renders the PDF in the browser.
 
 import datetime as dt
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.engine.after_insurance import after_job_loss
@@ -291,6 +292,10 @@ class Letters:
             )
         return fields
 
+    def more_drafts(self) -> dict[str, Callable[[], Draft]]:
+        """Letters of other kinds of request: a child taken in (adoption_applications.py)."""
+        return {}
+
     # The letter.
 
     def build(self) -> tuple[Letter, HrMessage]:
@@ -307,6 +312,7 @@ class Letters:
             "parental": self.parental,
             "parental-work": self.parental_work,
             "paternity": self.paternity,
+            **self.more_drafts(),
         }
         draft = drafts[self.kind]()
         mother = self.form.applicant == "mother"

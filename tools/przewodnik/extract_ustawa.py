@@ -50,6 +50,9 @@ PROVISIONS = {
     "art. 19 ust. 1": ("Art. 19 [", "ust", "1"),
     "art. 22": ("Art. 22 [", None, None),
     "art. 13 ust. 1": ("Art. 13 [", "ust", "1"),
+    # Who has the right: a child born or taken in, the age limits (section D).
+    "art. 29 ust. 1": ("Art. 29 [", "ust", "1"),
+    "art. 29 ust. 2": ("Art. 29 [", "ust", "2"),
     "art. 29a ust. 1": ("Art. 29a [", "ust", "1"),
     "art. 30 ust. 1": ("Art. 30 [", "ust", "1"),
     "art. 30 ust. 3": ("Art. 30 [", "ust", "3"),

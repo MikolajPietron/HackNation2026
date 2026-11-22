@@ -11,6 +11,11 @@ from app.engine.params import Params
 from app.services.params import load_params
 
 KIND = {"adoption": "adopcja", "foster": "rodzina zastępcza niezawodowa"}
+SCHOOL = Question(
+    "Czy wobec dziecka podjęto decyzję o odroczeniu obowiązku szkolnego?",
+    "`set_school_postponed`",
+    "school-postponed",
+)
 
 
 def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list[Question]:
@@ -51,16 +56,18 @@ def taken_in_questions(scenario: Scenario, params: Params | None = None) -> list
                 "children",
             )
         )
+    leave = taken_in_leave(scenario, params)
+    if leave is not None and leave.too_old:
+        # Past the age limit on the day of taking in: neither the leave nor the benefit, nor
+        # paternity leave after adoption (ustawa art. 29 ust. 1 pkt 2-3, art. 182³ § 1 pkt 2).
+        # Only postponed schooling could still move the limit of a foster child.
+        if _school_matters(scenario, params):
+            questions.append(SCHOOL)
+        return questions
     questions += _work_questions(scenario, me)
     insured = cover_of(scenario, taker(scenario)) not in NOT_INSURED
     if insured and _school_matters(scenario, params):
-        questions.append(
-            Question(
-                "Czy wobec dziecka podjęto decyzję o odroczeniu obowiązku szkolnego?",
-                "`set_school_postponed`",
-                "school-postponed",
-            )
-        )
+        questions.append(SCHOOL)
     if insured:
         questions += _hospital_questions(scenario, params)
     # The other parent: their 9 weeks of parental leave, after adoption paternity leave, and

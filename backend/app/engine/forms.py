@@ -54,6 +54,8 @@ from app.engine.models import (
     FormField,
     FormFieldKind,
     FormNote,
+    HrMessage,
+    Letter,
     RequestForm,
     Role,
     Scenario,
@@ -283,10 +285,13 @@ class Forms:
         if official_form is not None:
             form.official = official(official_form, self.params)
         if form.addressee == "employer":
-            form.letter, form.hr_message = request_letter(
-                kind, form, self.document, self.timeline, self.scenario, self.params
-            )
+            form.letter, form.hr_message = self.letter(kind, form)
         return form
+
+    def letter(self, kind: str, form: RequestForm) -> tuple[Letter, HrMessage]:
+        """The letter to the employer and the e-mail to HR (request_letters.py); a child taken in
+        has letters of its own (adoption_applications.py)."""
+        return request_letter(kind, form, self.document, self.timeline, self.scenario, self.params)
 
     def employer(self, parent: Role) -> tuple[Addressee, str]:
         return "employer", f"Pracodawca {WHOSE[parent]}"
