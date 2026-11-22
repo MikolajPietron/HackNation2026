@@ -13,7 +13,7 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 
 ## Komputer B — logika: START TUTAJ
 
-**Dla agenta na komputerze B (Mikołaj).** Front (A) ma już na planie wszystko, co B dał wcześniej (F6, F8–F11, F13, F14, F22–F24, B.3, B.4, B.7). Rób punkty po kolei, od 1. Dla każdego punktu:
+**Dla agenta na komputerze B (Mikołaj).** Front (A) ma już na planie wszystko, co B dał wcześniej (F6, F8–F11, F13, F14, F22–F24, B.3, B.4, B.7). Rób punkty po kolei, od 1. Eksportu do kalendarza (F25) nie rób: robi go front. Dla każdego punktu:
 1. `git pull` na `main`; przeczytaj pliki wskazane w punkcie (i CLAUDE.md, jeśli punkt dotyka zasad źródeł).
 2. Zrób punkt z testem (reguła = źródło + test; daty i kwoty w testach liczone ręcznie).
 3. `npm test` i `npm run lint` z katalogu głównego muszą przejść.
@@ -57,12 +57,7 @@ Demo online (B.5) **na razie pomijamy** (decyzja z 22.11.2026 w nocy). Zgodnoś�
 - **Co zrobić:** prompt: odsyłaj do tych miejsc zamiast dopytywać o podział od zera; notatek „Rodzic zmienił w aplikacji…” nie powtarzaj i nie zapisuj drugi raz. README: tłumacz pism (F24) na liście funkcji AI.
 - **Gotowe gdy:** przypadek w `tools/eval` z notatką PATCH w historii przechodzi; razem z punktem 4 jeden przebieg eval.
 
-### 6. Eksport terminów do kalendarza (F25) — B.14
-- **Pliki:** nowy router albo `backend/app/api/session.py`.
-- **Co zrobić:** `GET /api/session/{id}/calendar.ics`: terminy wniosków (`Document.deadline`), punkty bez powrotu (`Marker.irreversible`), pierwsze dni urlopów; w opisie reguła i źródło. Bez danych osobowych. Do `api.ts` dodaj funkcję z adresem pliku.
-- **Gotowe gdy:** test parsuje plik (daty całodniowe, polskie znaki); front doda „Dodaj do kalendarza”.
-
-### 7. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86”) — wymaga płatnego odczytu
+### 6. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86”) — wymaga płatnego odczytu
 - Na komputerze A projekt Gemini jest przy limicie wydatków (429). Odczyt może iść z komputera B na jego kluczu (tylko Claude albo Gemini na płatnym koncie; decyzja z 22.11.2026).
 - Kod gotowy (B.1, B.11 w „Zrobione”): odczyt i przełożenie na scenariusz obsługują utratę pracy, ustalenia ZUS („dla pozoru”, niepodleganie), zadłużenie, części rodzicielskiego, przejęcie urlopu i pełną podstawę z Z-3. Różnice mają kategorię (`reading` / `missing-rule` / `other-refusal`).
 - Stare odczyty z `.cases_cache` nie mają nowych pól. Ponownie: S21 (`job_loss`), S08 i S09 (`zus_finding`), S10 i S04 (`contribution_debt`), sprawy z niepełnymi miesiącami w Z-3, z premiami, z przejęciem urlopu w sytuacji szczególnej (`mother_event`). S19 i S11 mogą działać na starych odczytach.
@@ -82,7 +77,8 @@ Zrobione 22.11.2026 w nocy (szczegóły w „Zrobione”): wszystko, co B dał d
 
 1. **Odpis aktu urodzenia (F35, wymóg zadania).** Atrapa przebiegu gov.pl.
 2. **„Jedna rzecz na dziś” (F15).** Najbliższe zadanie z terminem na górze planu.
-3. Gdy B da: wykres miesiąc po miesiącu (B.12), wniosek o pracę w czasie urlopu (B.13, pokaże się sam), „Dodaj do kalendarza” (B.14), zakładka „Informacja zwrotna” w `/admin` (F38). Po B.15 można zdjąć blokadę zmian w czasie odpowiedzi asystenta (`PlanScreen.apply`).
+3. Gdy B da: wykres miesiąc po miesiącu (B.12), wniosek o pracę w czasie urlopu (B.13, pokaże się sam), zakładka „Informacja zwrotna” w `/admin` (F38).
+- Eksport terminów do kalendarza (F25) robi front sam z dat silnika (`frontend/src/lib/ics.ts`, w toku razem z nowym „Co przed Wami” i kalendarzem rocznym); B tego nie robi. Po B.15 można zdjąć blokadę zmian w czasie odpowiedzi asystenta (`PlanScreen.apply`).
 4. Przegląd całości na telefonie i desktopie, dostępność (F39: WCAG, kontrast, klawiatura).
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
