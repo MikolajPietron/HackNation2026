@@ -1213,7 +1213,7 @@ def test_the_amounts_are_asked_last_and_never_taken_from_the_range(
     assert update["scenario"]["mother_pay"] == 8000
     assert update["focus"] == "pay-maternity"
     assert {"pay-maternity", "pay-parental", "rate-815-deadline"} <= set(update["changed"])
-    assert update["changed_notes"] == ["rate-815", "money"]
+    assert update["changed_notes"] == ["rate-815", "rate-815-how", "money"]
     maternity = update["timeline"]["payments"][0]
     assert (maternity["segment_id"], maternity["monthly"], maternity["total"]) == (
         "maternity",

@@ -705,11 +705,12 @@ class Document(BaseModel):
     sources: list[SourceRef]
     # Deadlines and forms (ZADANIA B.3, B.4).
     deadline: dt.date | None = None
-    """The last day to file it under a Labour Code deadline ("w terminie nie krótszym niż N dni
-    przed"), counted for the day on the timeline; it may have passed (then `needed_by` is today
-    for an option the parents can still move, and `rule` says from when a request filed today is
-    in time). None = the materials give no deadline: `needed_by` is only the day the leave, the
-    benefit or the sick leave it is for starts, never a deadline."""
+    """The last day to file it under a deadline of the Labour Code ("w terminie nie krótszym niż
+    N dni przed") or of the benefit act (the request for 81,5%, art. 30a: "nie później niż 21 dni
+    po porodzie"), counted for the day on the timeline; it may have passed (then `needed_by` is
+    today for an option the parents can still move, and `rule` says from when a request filed
+    today is in time). None = the materials give no deadline: `needed_by` is only the day the
+    leave, the benefit or the sick leave it is for starts, never a deadline."""
     form: RequestForm | None = None
     """The request as a form to fill in; None for documents that are not requests."""
 

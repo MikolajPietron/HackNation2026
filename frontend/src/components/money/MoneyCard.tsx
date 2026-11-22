@@ -148,7 +148,7 @@ export function MoneyCard({
         </p>
       )}
 
-      <RateChoice timeline={timeline} scenario={scenario} onApply={onApply} />
+      <RateChoice timeline={timeline} scenario={scenario} onApply={onApply} onSelect={onSelect} />
     </section>
   )
 }
@@ -180,12 +180,17 @@ function RateChoice({
   timeline,
   scenario,
   onApply,
+  onSelect,
 }: {
   timeline: Timeline
   scenario: Scenario | null
   onApply: PlanApply
+  onSelect: (id: string) => void
 }) {
   const note = moneyNote(timeline, 'rate-815')
+  // How the choice is made for real (the engine's words: the written request, by when, where).
+  const how = timeline.notes.find((n) => n.id === 'rate-815-how')
+  const request = timeline.documents.find((d) => d.id === 'rate-815-request')
   const deadline = timeline.markers.find((m) => m.id === 'rate-815-deadline')
   const chosen815 = scenario?.rate_815 === true
   const [other, setOther] = useState<Timeline | null>(null)
@@ -302,6 +307,29 @@ function RateChoice({
           </motion.div>
         ))}
       </div>
+      {how && (
+        <div className="mt-3 flex gap-3 rounded-2xl bg-navy-50/60 px-4 py-3">
+          <Illustration src={ICONS.koperta} size="hint" className="mt-0.5" />
+          <div className="min-w-0 text-sm leading-relaxed text-navy-700">
+            <p className="font-bold text-navy-900">{how.title}</p>
+            <p className="mt-0.5">
+              <Emphasis text={how.text} className="text-navy-900" />
+            </p>
+            <p className="mt-1 text-xs text-navy-500">
+              „Wybieram to” zmienia tylko Wasz plan w aplikacji. Zasiłek zmienia dopiero ten wniosek.
+            </p>
+            {request && (
+              <button
+                type="button"
+                onClick={() => onSelect(request.id)}
+                className="mt-1.5 flex items-center gap-0.5 font-bold text-zus-700 hover:text-zus-900"
+              >
+                Wniosek na osi <ChevronRight className="size-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <Folded text={note.text} />
     </section>
   )

@@ -145,6 +145,57 @@ def test_100_and_70_percent_chosen_hides_the_deadline() -> None:
     assert pay(t, "maternity").rate == 100
 
 
+def test_how_to_choose_81_5_percent_says_by_when_and_where_the_request_goes() -> None:
+    """The switch in the plan does not file anything: the point after the choice says the
+    written request is due by 01.12.2026 (10.11.2026 + 21) and, for an employee, goes to the
+    employer, where the request for maternity leave goes (guide p. 6)."""
+    t = born(mother_pay=8000)
+    ids = [n.id for n in t.notes]
+    assert ids.index("rate-815") + 1 == ids.index("rate-815-how")
+    how = next(n for n in t.notes if n.id == "rate-815-how")
+    assert (how.kind, how.title) == ("choice", "Jak wybrać 81,5%")
+    assert how.text.startswith(
+        "81,5% nie włącza się samo: mama składa pisemny wniosek najpóźniej 21 dni po porodzie, "
+        "do 1 grudnia 2026. Bez wniosku zostaje 100% za urlop macierzyński i 70% za urlop "
+        "rodzicielski."
+    )
+    assert "Składa go u pracodawcy, tam gdzie wniosek o urlop macierzyński" in how.text
+    assert any(s.doc == "przewodnik" and s.page == 6 for s in how.sources)
+    deadline = t.element("rate-815-deadline")
+    assert any(d.startswith("Gdzie: u pracodawcy") for d in deadline.details)  # type: ignore[union-attr]
+    assert "rate-815-request" not in [d.id for d in t.documents]  # nothing chosen yet
+    assert any(a.startswith("Gdzie złożyć wniosek o 81,5%") for a in t.assumptions)
+
+
+def test_with_her_own_business_the_request_for_81_5_percent_goes_to_zus() -> None:
+    t = born(work="business", mother_insured=True, mother_pay=8000)
+    assert "Składa go w ZUS, tam gdzie wniosek o zasiłek macierzyński (ZAM)." in note(
+        t, "rate-815-how"
+    )
+
+
+def test_81_5_percent_chosen_puts_its_request_on_the_timeline() -> None:
+    """Chosen: the request is a document due on 01.12.2026, 21 days after the birth."""
+    t = born(mother_pay=8000, rate_815=True)
+    request = next(d for d in t.documents if d.id == "rate-815-request")
+    assert (request.needed_by, request.deadline, request.done) == (
+        dt.date(2026, 12, 1),
+        dt.date(2026, 12, 1),
+        False,
+    )
+    assert request.segment_id == "maternity"
+    assert request.rule.startswith("Wybraliście 81,5%: mama składa pisemny wniosek")
+    assert next(n for n in t.notes if n.id == "rate-815-how").title == "Wniosek o 81,5%"
+
+
+def test_no_request_for_81_5_percent_after_no_or_after_the_deadline() -> None:
+    chose_no = born(mother_pay=8000, rate_815=False)
+    late = born(birth_date="2026-10-01", mother_pay=8000, rate_815=True)
+    for t in (chose_no, late):
+        assert "rate-815-how" not in [n.id for n in t.notes]
+        assert "rate-815-request" not in [d.id for d in t.documents]
+
+
 def test_non_employee_base_is_the_contribution_base_less_13_71_percent() -> None:
     """Contract with the voluntary insurance, contribution base 5000: 5000 × 0,8629 = 4314,50 zł.
     Maternity: a day 4314,50 / 30 = 143,8167 → 143,82; 140 × 143,82 = 20 134,80 zł."""

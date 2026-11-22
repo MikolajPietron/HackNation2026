@@ -74,6 +74,7 @@ from app.engine.loss import Loss
 from app.engine.models import BenefitBase as Base
 from app.engine.models import (
     CaseNote,
+    Document,
     Marker,
     Payment,
     Scenario,
@@ -321,6 +322,113 @@ def request(scenario: Scenario, params: Params, anchor: dt.date) -> Request:
         days = m.request_days_taken_in
         return Request(taker(scenario), anchor + days.value * DAY, days, "adoption-leave")
     return Request("mother", request_deadline(anchor, params), m.request_days, "maternity")
+
+
+# Where the request for 81,5% goes. The guide says only that it is a written request (p. 9);
+# where a request for maternity leave and for the maternity benefit goes it says on p. 6, by the
+# kind of work, and we show that place (our reading: CLAUDE.md, "Otwarte pytania"). The switch in
+# the plan only recalculates the plan: the benefit changes with the request.
+
+HOW_ID = "rate-815-how"
+REQUEST_DOCUMENT = "rate-815-request"
+
+
+def request_place(
+    scenario: Scenario, params: Params, who: Parent, taken_in: bool = False
+) -> tuple[str, list[SourceRef]] | None:
+    """Where `who` files the request for 81,5%, with the guide's words behind it; None while it
+    is not known how they work."""
+    a = params.applications
+    if who == "mother" and after_job_loss(scenario) is not None:
+        return (
+            "w ZUS, tam gdzie wniosek o zasiłek macierzyński (ZAM)",
+            merge_sources(a.non_employee_zam.sources, params.pregnancy.zus_after_insurance.sources),
+        )
+    leave = "urlop na warunkach urlopu macierzyńskiego" if taken_in else "urlop macierzyński"
+    match scenario.mothers_work if who == "mother" else scenario.fathers_work:
+        case "employment":
+            return (
+                f"u pracodawcy, tam gdzie wniosek o {leave}: pracodawca wypłaca zasiłek albo "
+                "przekazuje sprawę do ZUS",
+                merge_sources(a.employee_request.sources, a.employer_pays_or_z3.sources),
+            )
+        case "contract":
+            return (
+                "u płatnika składek (zleceniodawcy) albo w ZUS, tam gdzie wniosek o zasiłek "
+                "macierzyński (ZAM)",
+                a.contract_zam.sources,
+            )
+        case "business":
+            return (
+                "w ZUS, tam gdzie wniosek o zasiłek macierzyński (ZAM)",
+                a.non_employee_zam.sources,
+            )
+    return None
+
+
+def _how_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseNote | None:
+    """How 81,5% is chosen for real: the written request, by when and where. None once the
+    parent said no, or the deadline has passed."""
+    req = request(scenario, params, timeline.birth_date)
+    if (
+        scenario.rate_815 is False
+        or requester_cover(scenario) in NOT_INSURED
+        or not _has_both(timeline.segments, req)
+        or req.deadline < timeline.today
+    ):
+        return None
+    m = params.money
+    rf, rp, rs = rates(params)
+    who = WHO[req.who]
+    after = "po przyjęciu dziecka na wychowanie" if req.taken_in else "po porodzie"
+    when = f"najpóźniej {req.days.value} dni {after}, do {long_date(req.deadline)}"
+    sources = [req.days.sources, m.rate_single.sources]
+    if scenario.rate_815:
+        title = f"Wniosek o {rs}"
+        text = f"Wybraliście {rs}: {who} składa pisemny wniosek {when}."
+    else:
+        leave = (
+            "urlop na warunkach urlopu macierzyńskiego" if req.taken_in else "urlop macierzyński"
+        )
+        title = f"Jak wybrać {rs}"
+        text = (
+            f"{rs} nie włącza się samo: {who} składa pisemny wniosek {when}. Bez wniosku zostaje "
+            f"{rf} za {leave} i {rp} za urlop rodzicielski."
+        )
+        sources += [m.rate_full.sources, m.rate_parental.sources]
+    place = request_place(scenario, params, req.who, req.taken_in)
+    if place is not None:
+        text += f" Składa go {place[0]}."
+        sources.append(place[1])
+    else:
+        text += f" Gdzie go złożyć, powiemy, gdy będzie wiadomo, jak {who} pracuje."
+    return CaseNote(
+        id=HOW_ID, kind="choice", title=title, text=text, sources=merge_sources(*sources)
+    )
+
+
+def add_rate_request(timeline: Timeline, scenario: Scenario, params: Params) -> None:
+    """After the choice of 81,5%: its written request on the documents' lane, by its deadline."""
+    if not scenario.rate_815 or not money_active(scenario):
+        return
+    how = _how_note(scenario, timeline, params)
+    if how is None:
+        return
+    req = request(scenario, params, timeline.birth_date)
+    rs = rates(params)[2]
+    timeline.documents.append(
+        Document(
+            id=REQUEST_DOCUMENT,
+            label=f"Wniosek o {rs}",
+            title=f"Pisemny wniosek o zasiłek {rs}",
+            needed_by=req.deadline,
+            done=False,
+            rule=how.text,
+            segment_id=req.leave if any(s.id == req.leave for s in timeline.segments) else None,
+            sources=how.sources,
+            deadline=req.deadline,
+        )
+    )
 
 
 def requester_cover(scenario: Scenario) -> Coverage:
@@ -600,6 +708,9 @@ def _deadline_marker(scenario: Scenario, ctx: Context) -> Marker:
         details.append(
             f"{who.capitalize()} wybiera {rs}: wniosek trzeba złożyć najpóźniej tego dnia."
         )
+    place = request_place(scenario, ctx.params, req.who, req.taken_in)
+    if place is not None:
+        details.append(f"Gdzie: {place[0]}.")
     if not scenario.child_born and not req.taken_in:
         details.append(
             "Liczymy od przewidywanej daty porodu. Po porodzie oś przeliczy się od faktycznej daty."
@@ -625,7 +736,9 @@ def _deadline_marker(scenario: Scenario, ctx: Context) -> Marker:
         date=req.deadline,
         summary=summary,
         details=details,
-        sources=merge_sources(req.days.sources, m.rate_single.sources),
+        sources=merge_sources(
+            req.days.sources, m.rate_single.sources, place[1] if place is not None else []
+        ),
     )
 
 
@@ -840,8 +953,10 @@ def add_money_notes(
         return notes
     choice = _choice_note(scenario, timeline, params)
     if choice is not None:
+        how = _how_note(scenario, timeline, params)
         first_computed = next((i for i, n in enumerate(notes) if n.kind == "computed"), len(notes))
-        notes = [*notes[:first_computed], choice, *notes[first_computed:]]
+        added = [choice, how] if how is not None else [choice]
+        notes = [*notes[:first_computed], *added, *notes[first_computed:]]
     computed = _computed_note(scenario, timeline, params)
     return [*notes, computed] if computed is not None else notes
 
@@ -1065,6 +1180,11 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
         )
     marker = next((mk for mk in timeline.markers if mk.id == DEADLINE_ID), None)
     if marker is not None:
+        assumptions.append(
+            f"Gdzie złożyć wniosek o {rs}, Przewodnik nie mówi osobno (s. 9: „pisemny wniosek”). "
+            "Pokazujemy miejsce, które podaje dla wniosku o urlop macierzyński i o zasiłek "
+            "macierzyński (s. 6)."
+        )
         days = (marker.date - timeline.birth_date).days
         after = "przyjęciu dziecka" if timeline.taken_in else "porodzie"
         assumptions.append(
