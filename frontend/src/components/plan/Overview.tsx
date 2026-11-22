@@ -11,7 +11,6 @@ import { Check, ChevronRight, Lock, RotateCcw, Share2, TriangleAlert } from 'luc
 import type { ReactNode } from 'react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Pulse } from '@/components/timeline/Pulse'
-import { SupportList } from '@/components/support/SupportList'
 import { Emphasis } from '@/components/ui/emphasis'
 import { Illustration } from '@/components/ui/illustration'
 import { TextStates } from '@/components/ui/text-states'
@@ -104,10 +103,6 @@ export function Overview({
         {risks.map((risk) => (
           <Risk key={risk.id} note={risk} changed={changed} onWhy={onWhy} />
         ))}
-        <motion.section variants={ITEM} className="mt-6 rounded-3xl bg-navy-50/50 px-5 py-5">
-          <h2 className="font-bold text-navy-900">Gdzie szukać wsparcia</h2>
-          <SupportList topics={['loss', 'crisis']} className="mt-3" />
-        </motion.section>
       </>
     )
   }

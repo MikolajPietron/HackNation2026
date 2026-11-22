@@ -48,8 +48,6 @@ import { DocumentsCard } from '@/components/folder/DocumentsCard'
 import { PersonalData } from '@/components/folder/PersonalData'
 import { ShareDialog } from '@/components/folder/ShareDialog'
 import { MoneyCard } from '@/components/money/MoneyCard'
-import { SupportList, SupportWindow } from '@/components/support/SupportList'
-import { Illustration } from '@/components/ui/illustration'
 import { ICONS } from '@/lib/icons'
 import { MoneyExplanation } from '@/components/money/MoneyExplanation'
 import { ChangeBanner } from './ChangeBanner'
@@ -163,9 +161,6 @@ export function PlanScreen({
   /** Phones: the whole plan (list or calendar) under what lies ahead, on demand. */
   const [fullPlan, setFullPlan] = useState(false)
   const [moneyOpen, setMoneyOpen] = useState(false)
-  const [supportOpen, setSupportOpen] = useState(false)
-  // A premature baby or a child in hospital: the support that fits, on the plan itself.
-  const supportTopics = scenario?.hospital_care === true ? (['premature', 'crisis'] as const) : null
   /** The request being filled in (a document id). */
   const [fill, setFill] = useState<string | null>(null)
   const fillDocument = timeline?.documents.find((d) => d.id === fill) ?? null
@@ -356,7 +351,6 @@ export function PlanScreen({
           onCases={() => setCasesOpen(true)}
           onLetter={() => setLetterOpen(true)}
           onAbout={() => openWhy()}
-          onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
           onShare={timeline ? () => setShareOpen(true) : undefined}
         />
@@ -572,17 +566,7 @@ export function PlanScreen({
                       ]}
                     />
                   )}
-                  {/* Support last: it matters, but it answers no question about the plan. */}
-                  {supportTopics && (
-                    <motion.section variants={ITEM} className="mt-12 rounded-4xl border border-line px-4 py-5 sm:px-5 lg:mt-14">
-                      <h2 className="flex items-center gap-3 text-lg font-bold text-navy-900">
-                        <Illustration src={ICONS.serce} size="event" className="bg-navy-50/60" />
-                        Gdzie szukać wsparcia
-                      </h2>
-                      <SupportList topics={[...supportTopics]} className="mt-4" />
-                    </motion.section>
-                  )}
-                  <Footer onSupport={() => setSupportOpen(true)} />
+                  <Footer />
                 </>
               ) : (
                 <Empty onStartOver={onStartOver} />
@@ -607,11 +591,6 @@ export function PlanScreen({
               {personalOpen && (
                 <Dialog key="personal" label="Twoje dane do wniosków" onClose={() => setPersonalOpen(false)}>
                   {personalData}
-                </Dialog>
-              )}
-              {supportOpen && (
-                <Dialog key="support" label="Wsparcie dla rodziców" onClose={() => setSupportOpen(false)}>
-                  <SupportWindow />
                 </Dialog>
               )}
             </AnimatePresence>
@@ -675,9 +654,6 @@ export function PlanScreen({
           </Sheet>
           <Sheet open={personalOpen} onOpenChange={setPersonalOpen} title="Twoje dane do wniosków">
             {personalData}
-          </Sheet>
-          <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
-            <SupportWindow />
           </Sheet>
         </>
       )}
@@ -804,8 +780,8 @@ function Decision({
   )
 }
 
-/** Links from the brief and support (the admin panel is in the top bar). */
-function Footer({ onSupport }: { onSupport: () => void }) {
+/** Links from the brief (the admin panel is in the top bar). */
+function Footer() {
   return (
     <motion.footer
       variants={ITEM}
@@ -827,9 +803,6 @@ function Footer({ onSupport }: { onSupport: () => void }) {
           </li>
         ))}
       </ul>
-      <button type="button" onClick={onSupport} className="self-start font-bold text-zus-700 hover:text-zus-900 lg:ml-auto lg:self-auto">
-        Wsparcie dla rodziców
-      </button>
     </motion.footer>
   )
 }

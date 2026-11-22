@@ -9,7 +9,6 @@ import {
   Check,
   Contrast,
   FolderOpen,
-  HeartHandshake,
   LogOut,
   Mail,
   Menu,
@@ -37,7 +36,6 @@ interface Props {
   onCases: () => void
   onLetter: () => void
   onAbout: () => void
-  onSupport: () => void
   onStartOver: () => void
   /** "Udostępnij plan": a read-only link for the partner. */
   onShare?: () => void
@@ -94,7 +92,6 @@ function MenuContent({
   onCases,
   onLetter,
   onAbout,
-  onSupport,
   onStartOver,
   onShare,
   close,
@@ -122,9 +119,6 @@ function MenuContent({
         </Item>
         <Item icon={<Calculator />} onClick={then(onAbout)}>
           Jak to liczymy?
-        </Item>
-        <Item icon={<HeartHandshake />} onClick={then(onSupport)}>
-          Wsparcie dla rodziców
         </Item>
         <Item icon={<RotateCcw />} onClick={then(onStartOver)}>
           Zacznij od nowa
