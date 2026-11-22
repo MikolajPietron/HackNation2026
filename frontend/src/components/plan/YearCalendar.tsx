@@ -396,9 +396,9 @@ function HoverSummary({ timeline, day }: { timeline: Timeline; day: number }) {
       ) : (
         <ul className="mt-1 space-y-0.5">
           {lines.slice(0, 4).map((line) => (
-            <li key={line.key} className="flex items-center gap-1.5">
-              <span className={cn('size-2 shrink-0 rounded-full', DOT[line.tone])} />
-              <span className="truncate">{line.tone === 'event' || line.tone === 'document' ? line.title : `${line.lead} · ${line.title}`}</span>
+            <li key={line.key} className="flex items-start gap-1.5">
+              <span className={cn('mt-1 size-2 shrink-0 rounded-full', DOT[line.tone])} />
+              <span>{line.tone === 'event' || line.tone === 'document' ? line.title : `${line.lead} · ${line.title}`}</span>
             </li>
           ))}
           {lines.length > 4 && <li className="text-white/60">i {lines.length - 4} więcej — kliknij</li>}
@@ -765,13 +765,13 @@ function LargeMonth({
                 }}
                 onMouseEnter={() => onLight(item.day)}
                 onMouseLeave={() => onLight(null)}
-                className="group flex w-full items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-navy-50"
+                className="group flex w-full items-start gap-2.5 rounded-xl px-1.5 py-1 text-left transition-colors hover:bg-navy-50"
               >
                 <span className={cn('w-9 shrink-0 rounded-lg py-0.5 text-center text-xs font-black tabular-nums', CHIP[item.tone])}>
                   {item.day - month.start + 1}
                 </span>
                 <Illustration src={item.icon} size="hint" />
-                <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy-900">{item.title}</span>
+                <span className="min-w-0 flex-1 text-sm leading-snug font-bold text-pretty text-navy-900">{item.title}</span>
                 <ChevronRight className="size-4 shrink-0 text-navy-300 opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             </li>

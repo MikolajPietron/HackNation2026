@@ -238,8 +238,11 @@ function MonthItem({
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-bold text-navy-700">{plural(month.steps.length, 'krok', 'kroki', 'kroków')}</span>
             {!open && (
-              <span className="block truncate text-sm text-navy-500">
-                {month.steps.map((s) => s.title).join(' · ')}
+              <span className="block text-sm text-pretty text-navy-500">
+                {month.steps[0].title}
+                {month.steps.length > 1 && (
+                  <span className="text-navy-400"> · i {month.steps.length - 1} więcej</span>
+                )}
               </span>
             )}
           </span>

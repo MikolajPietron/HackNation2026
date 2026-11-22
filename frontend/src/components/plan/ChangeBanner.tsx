@@ -348,7 +348,7 @@ function PreviewCard({
             className="fixed bottom-20 left-4 z-40 flex items-center gap-3 rounded-full bg-navy-900 py-1.5 pr-1.5 pl-4 text-sm font-bold text-white shadow-[0_18px_40px_-18px_rgb(26_36_56/0.6)] lg:bottom-8 lg:left-8"
           >
             <Eye className="size-4 text-sun-300" />
-            <span className="max-w-48 truncate sm:max-w-72">Podgląd: {event.title}</span>
+            <span>Oglądacie podgląd</span>
             <button
               type="button"
               onClick={() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
