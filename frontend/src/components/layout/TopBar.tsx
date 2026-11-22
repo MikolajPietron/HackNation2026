@@ -42,10 +42,12 @@ interface TopBarProps {
   onCases: () => void
   /** "Przetłumacz pismo z ZUS" (AI). */
   onLetter: () => void
+  /** The logo leads back to the start screen. */
+  onHome?: () => void
   className?: string
 }
 
-export function TopBar({ persona, onLogin, onLogout, onZusData, onCases, onLetter, className }: TopBarProps) {
+export function TopBar({ persona, onLogin, onLogout, onZusData, onCases, onLetter, onHome, className }: TopBarProps) {
   return (
     <header
       className={cn(
@@ -53,7 +55,18 @@ export function TopBar({ persona, onLogin, onLogout, onZusData, onCases, onLette
         className,
       )}
     >
-      <Brand />
+      {onHome ? (
+        <button
+          type="button"
+          onClick={onHome}
+          title="Ekran startowy"
+          className="-ml-2 rounded-2xl px-2 py-1 transition-colors hover:bg-navy-50 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+        >
+          <Brand />
+        </button>
+      ) : (
+        <Brand />
+      )}
       <nav aria-label="Usługi" className="ml-auto flex items-center gap-1">
         <TextButton onClick={onLetter} className="flex gap-1.5">
           <Mail className="size-4" /> <Label short="Pismo">Pismo z ZUS</Label>

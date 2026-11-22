@@ -126,6 +126,8 @@ interface Props {
   onSend: (text: string) => void
   onStop: () => void
   onStartOver: () => void
+  /** The logo: back to the start screen, nothing is lost. */
+  onHome: () => void
   /** An example case became the plan (a new conversation from its facts). */
   onLoadCase: (start: SessionStart) => void
   /** The plan was changed from the interface (no chat): new scenario and timeline. */
@@ -144,6 +146,7 @@ export function PlanScreen({
   onSend,
   onStop,
   onStartOver,
+  onHome,
   onLoadCase,
   onUpdate,
 }: Props) {
@@ -335,6 +338,7 @@ export function PlanScreen({
     <div className="flex h-dvh flex-col bg-white">
       {wide ? (
         <TopBar
+          onHome={onHome}
           persona={persona}
           onLogin={() => setLoginOpen(true)}
           onLogout={() => setPersona(null)}
@@ -344,6 +348,7 @@ export function PlanScreen({
         />
       ) : (
         <MobileBar
+          onHome={onHome}
           persona={persona}
           onLogin={() => setLoginOpen(true)}
           onLogout={() => setPersona(null)}

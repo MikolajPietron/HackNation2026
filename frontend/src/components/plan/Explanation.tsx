@@ -18,13 +18,18 @@ const KIND: Record<CaseNote['kind'], { label: string; className: string }> = {
 
 export function Explanation({ timeline, focusId }: { timeline: Timeline; focusId?: string }) {
   const focused = useRef<HTMLLIElement>(null)
-  // Start at the clicked point: scroll only the dialog's own content, never the page under it.
+  // Start at the clicked point, at its beginning: its label at the top of the window, not the
+  // point in the middle with the end of the one before cut off above it. Only the dialog's own
+  // content scrolls, never the page under it.
   useEffect(() => {
     const point = focused.current
     const box = point?.closest<HTMLElement>('[data-scroll]')
     if (!point || !box) return
-    const offset = point.getBoundingClientRect().top - box.getBoundingClientRect().top
-    box.scrollTop += offset - Math.max(0, (box.clientHeight - point.clientHeight) / 2)
+    // The window is still scaling in: the measured distance is scaled too.
+    const rect = box.getBoundingClientRect()
+    const scale = box.offsetHeight > 0 ? rect.height / box.offsetHeight : 1
+    const offset = (point.getBoundingClientRect().top - rect.top) / scale
+    box.scrollTop += offset - 16
   }, [focusId])
 
   return (

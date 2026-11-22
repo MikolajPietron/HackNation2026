@@ -14,6 +14,24 @@ const PlanScreen = lazy(() => loadPlan().then((m) => ({ default: m.PlanScreen })
 const AdminScreen = lazy(() => import('@/components/admin/AdminScreen').then((m) => ({ default: m.AdminScreen })))
 const SharedPlan = lazy(() => import('@/components/plan/SharedPlan').then((m) => ({ default: m.SharedPlan })))
 
+/** Whether this tab was on the plan: a reload stays there instead of going back to the start. */
+const IN_PLAN = 'przewodnik-in-plan'
+function readInPlan(): boolean {
+  try {
+    return sessionStorage.getItem(IN_PLAN) === '1'
+  } catch {
+    return false
+  }
+}
+function writeInPlan(inPlan: boolean) {
+  try {
+    if (inPlan) sessionStorage.setItem(IN_PLAN, '1')
+    else sessionStorage.removeItem(IN_PLAN)
+  } catch {
+    // Storage blocked: a reload starts on the start screen.
+  }
+}
+
 /** While a part of the app loads: a quiet page, marked busy for screen readers. */
 const Loading = () => <div className="h-dvh bg-white" aria-busy="true" aria-label="Wczytywanie" />
 
@@ -41,9 +59,13 @@ function ParentsApp() {
     const id = window.setTimeout(() => void loadPlan(), 300)
     return () => window.clearTimeout(id)
   }, [])
-  // Every visit starts on the interview's start screen; this turns true once the parent goes on
-  // (finished interview, resumed plan or chat without the interview).
-  const [entered, setEntered] = useState(false)
+  // A new visit starts on the interview's start screen; this turns true once the parent goes on
+  // (finished interview, resumed plan or chat without the interview). A reload of the same tab
+  // stays on the plan: only the logo or "Od nowa" lead back to the start.
+  const [entered, setEntered] = useState(readInPlan)
+  // "Od nowa" opens the interview on its first question instead of the start screen.
+  const [begin, setBegin] = useState(false)
+  useEffect(() => writeInPlan(entered), [entered])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // While the assistant explains a new timeline by itself, the element it points at is not
   // opened: the parent has just arrived at the plan and should see it first.
@@ -61,7 +83,6 @@ function ParentsApp() {
     send,
     explain,
     stop,
-    reset,
     submit,
     load,
     update,
@@ -95,11 +116,16 @@ function ParentsApp() {
         .join(' · ')
     : 'Zapisana rozmowa z asystentem'
 
-  const startOver = () => {
-    const hasWork = messages.length > 0 || timeline !== null
-    if (hasWork && !window.confirm('Zacząć od nowa? Rozmowa i oś czasu znikną.')) return
-    reset()
+  // Leaving the plan loses nothing: a new interview replaces the saved plan only once it is
+  // finished, and the start screen opens the saved one again.
+  const goHome = () => {
     setSelectedId(null)
+    setBegin(false)
+    setEntered(false)
+  }
+  const startOver = () => {
+    setSelectedId(null)
+    setBegin(true)
     setEntered(false)
   }
   const finishOnboarding = (start: SessionStart) => {
@@ -130,6 +156,7 @@ function ParentsApp() {
             onDone={finishOnboarding}
             onSkip={() => setEntered(true)}
             saved={hasSaved ? { summary: savedSummary, onResume: resume } : null}
+            begin={begin}
           />
         </motion.div>
       ) : (
@@ -151,6 +178,7 @@ function ParentsApp() {
             onSend={sendMessage}
             onStop={stop}
             onStartOver={startOver}
+            onHome={goHome}
             onLoadCase={finishOnboarding}
             onUpdate={update}
           />

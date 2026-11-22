@@ -37,6 +37,8 @@ interface Props {
   onLetter: () => void
   onAbout: () => void
   onStartOver: () => void
+  /** The logo leads back to the start screen. */
+  onHome: () => void
   /** "Udostępnij plan": a read-only link for the partner. */
   onShare?: () => void
 }
@@ -46,11 +48,18 @@ export function MobileBar(props: Props) {
   const [menu, setMenu] = useState(false)
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-white pr-2 pl-4">
-      <BrandMark size="sm" />
-      <p className="min-w-0 flex-1 text-[13px] leading-tight font-bold">
-        <span className="block text-navy-900">Zasiłkowy Przewodnik</span>
-        <span className="block text-zus-700">Przyszłego Rodzica</span>
-      </p>
+      <button
+        type="button"
+        onClick={props.onHome}
+        aria-label="Zasiłkowy Przewodnik Przyszłego Rodzica — ekran startowy"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+      >
+        <BrandMark size="sm" />
+        <span className="min-w-0 text-[13px] leading-tight font-bold">
+          <span className="block text-navy-900">Zasiłkowy Przewodnik</span>
+          <span className="block text-zus-700">Przyszłego Rodzica</span>
+        </span>
+      </button>
       {persona ? (
         <button
           type="button"

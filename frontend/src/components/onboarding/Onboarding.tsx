@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, FileUp } from 'lucide-react'
 import blizniaki from '@/assets/onboarding/blizniaki.webp'
 import dom from '@/assets/onboarding/dom.webp'
 import dziecko from '@/assets/onboarding/dziecko.webp'
@@ -328,11 +328,13 @@ interface Props {
   onSkip: () => void
   /** Set when this browser already has a saved conversation. */
   saved: SavedSession | null
+  /** Open on the first question ("Od nowa" in the plan); back still leads to the start screen. */
+  begin?: boolean
 }
 
 /** Full-screen questions, one per screen, then the first timeline. No progress bar on purpose. */
-export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
-  const [path, setPath] = useState<StepId[]>(['intro'])
+export function Onboarding({ submit, onDone, onSkip, saved, begin = false }: Props) {
+  const [path, setPath] = useState<StepId[]>(begin ? ['intro', 'role'] : ['intro'])
   const [answers, setAnswers] = useState<Answers>(EMPTY)
   const [leaving, setLeaving] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -1222,42 +1224,28 @@ function Intro({
       <motion.p variants={ITEM} className="mt-4 max-w-md text-lg text-pretty text-navy-500">
         Urlopy, zasiłki i terminy wniosków na jednej osi czasu. Kilka pytań, bez logowania.
       </motion.p>
-      <motion.div variants={ITEM} className="mt-10 flex flex-col items-center gap-5">
-        <PrimaryButton onClick={onStart}>
-          {saved ? 'Zacznij nowy wywiad' : 'Zaczynamy'} <ArrowRight className="size-5" />
-        </PrimaryButton>
-        {saved ? (
-          // The saved conversation stays until a new interview is finished.
+      {/* Two ways in, side by side and clearly different: the questions (green) and a case from ZUS
+          (the jury's test path, so never hidden). The rest is a quiet link. */}
+      <motion.div variants={ITEM} className="mt-10 flex w-full flex-col items-center">
+        <div className="flex w-full max-w-sm flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center">
+          <PrimaryButton onClick={saved ? saved.onResume : onStart}>
+            {saved ? 'Otwórz swój plan' : 'Zaczynamy'} <ArrowRight className="size-5" />
+          </PrimaryButton>
           <button
             type="button"
-            onClick={saved.onResume}
-            className="rounded-2xl border border-line bg-white px-6 py-3 shadow-card transition-[border-color,transform] duration-150 hover:border-zus-300 active:scale-[0.98]"
+            onClick={onCases}
+            className="inline-flex h-14 items-center justify-center gap-2 rounded-full border-2 border-navy-900 bg-white px-7 text-lg font-bold text-navy-900 transition-[background-color,transform] duration-150 hover:bg-navy-50 active:scale-[0.97]"
           >
-            <span className="block text-sm font-bold text-navy-900">
-              Wróć do zapisanej osi czasu
-            </span>
-            <span className="block text-xs text-navy-500">{saved.summary}</span>
+            <FileUp className="size-5" /> Wgraj sprawę z ZUS
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
-          >
-            Wolę porozmawiać z asystentem AI
-          </button>
-        )}
+        </div>
+        {saved && <p className="mt-3 text-sm text-navy-500">{saved.summary}</p>}
         <button
           type="button"
-          onClick={onCases}
-          className="rounded-2xl border border-line bg-white px-6 py-3 shadow-card transition-[border-color,transform] duration-150 hover:border-zus-300 active:scale-[0.98]"
+          onClick={saved ? onStart : onSkip}
+          className="mt-5 rounded-full px-3 py-2 text-sm font-bold text-navy-500 transition-colors hover:bg-navy-50 hover:text-navy-900"
         >
-          <span className="block text-sm font-bold text-navy-900">
-            Wgraj dokumenty sprawy albo wybierz przykład
-          </span>
-          <span className="block text-xs text-navy-500">
-            Sprawdzimy ubezpieczenie i policzymy zasiłek
-          </span>
+          {saved ? 'Zacznij nowy plan' : 'Wolę zapytać asystenta AI'}
         </button>
       </motion.div>
     </div>
