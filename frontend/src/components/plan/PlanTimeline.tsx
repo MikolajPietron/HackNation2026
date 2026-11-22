@@ -7,13 +7,21 @@
 //
 // The scale is spent on the leave: deadlines years away (the end of parental leave in the year
 // of the 6th birthday) sit behind a break in the scale, "⋯ 5 lat ⋯", so 20 weeks stay a clip you
-// can read. A period still to decide is a light clip with its name beside it when it is too
-// narrow; one that can be taken any time up to a deadline (paternity leave) shows that window.
+// can read. A clip is always as long as its period. A period still to decide is a light dashed
+// clip; one that can be taken any time up to a deadline (paternity leave) gets that window as a
+// thin bracket under it, so the window never reads as a long period.
+//
+// Labels are measured in the real font: a name goes inside a clip in one line or two, else beside
+// it, else the clip shows only its length; a run of pieces of one period (sick leave paid first
+// by the employer, then by ZUS) is named once. Nothing is cut with "…": hovering any clip or
+// amount shows a tooltip with its name, dates and money. The hovered element and the one whose
+// details are open are outlined; what the last recalculation changed pulses amber.
 //
 // Motion follows Emil Kowalski's rules: springs for anything interruptible, no animation on what
 // repeats constantly (scrubbing follows the pointer 1:1), reduced motion respected.
 import { Fragment, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent, ReactNode } from 'react'
+import type { MouseEvent, PointerEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { animate, AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { AnimationPlaybackControls } from 'motion/react'
 import { Check, ChevronLeft, ChevronRight, Lock, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
@@ -30,10 +38,12 @@ import {
   monthCells,
 } from '@/lib/dates'
 import { SPRING_LAYOUT } from '@/lib/ease'
+import { Pulse } from '@/components/timeline/Pulse'
 import { Illustration } from '@/components/ui/illustration'
 import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
-import { formatPlnShort, formatRate } from '@/lib/money'
-import { clipName, length, optionWindow } from '@/lib/plan'
+import { formatPlnShort, formatRate, paymentFor } from '@/lib/money'
+import { clipName, deadlineOf, length, optionWindow, periodName } from '@/lib/plan'
+import { remPx, textWidth, whenFontsReady } from '@/lib/textWidth'
 import { LANE_ORDER } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Lane, Payment, Segment, Timeline } from '@/types'
@@ -67,6 +77,14 @@ const CLIP_HEIGHT = 46
 const CLIP_TOP = (ROW_HEIGHT - CLIP_HEIGHT) / 2
 /** A payment on the money track: two rows (mother, father) fit in one track. */
 const MONEY_CLIP = 30
+/** The bracket of a period's window, under its clip: the track grows by this much. */
+const WINDOW_BAND = 22
+/** Padding inside a clip (px-3) and inside a payment (px-2), and the room an icon takes. */
+const CLIP_PAD = 24
+const MONEY_PAD = 16
+const ICON_ROOM = 34
+/** Space between a clip and the label beside it (pl-2.5 / pr-2.5). */
+const BESIDE = 12
 /** Heights in the tracks follow the text size ("Większy tekst" scales rem), like the chips. */
 const rem = (px: number) => `${px / 16}rem`
 const MIN_ZOOM = 1
@@ -75,8 +93,6 @@ const ZOOM_STEP = 1.6
 const ZOOM_SPRING = { type: 'spring', stiffness: 260, damping: 32, mass: 0.6 } as const
 /** Momentum after a drag: share of the velocity kept per millisecond. */
 const GLIDE_DECAY = 0.995
-/** Rough width of bold 14 px text, per character, for fitting labels. */
-const CHAR_PX = 7.4
 
 const LANES: Record<Lane, { label: string; image: string }> = {
   child: { label: 'Dziecko', image: dziecko },
@@ -100,12 +116,6 @@ const CLIP: Record<'mother' | 'father', Record<Segment['tone'], string>> = {
     option: 'border-2 border-dashed border-navy-300 bg-navy-50 text-navy-900',
     work: 'bg-navy-100 text-navy-700',
   },
-}
-
-/** The window a period can be taken in: lighter than the clip, so the clip stays the answer. */
-const WINDOW: Record<'mother' | 'father', string> = {
-  mother: 'border border-dashed border-zus-200 bg-zus-50/60 text-zus-700',
-  father: 'border border-dashed border-navy-200 bg-navy-50/60 text-navy-500',
 }
 
 const parentOf = (segment: Segment) => (segment.lane === 'father' ? 'father' : 'mother')
@@ -161,41 +171,128 @@ function placeFlags(
   })
 }
 
-/** How a clip is labelled: inside if it fits, else beside it, else just its length. */
+/** How a clip (or a run of pieces of one period) is labelled: inside if it fits, in one line or
+ *  as the name over the length, else beside it, else just its length, else nothing (the
+ *  tooltip names it). Never cut with "…". */
 interface ClipLabel {
-  inside: string | null
+  /** One line, or two: the name over the length. */
+  inside: string[] | null
+  /** The inside text names the period (not just its length). */
+  named: boolean
   icon: boolean
   dates: boolean
   outside: { text: string; side: 'right' | 'left'; width: number } | null
 }
 
-const textPx = (text: string) => text.length * CHAR_PX + 28
+const NO_LABEL: ClipLabel = { inside: null, named: false, icon: false, dates: false, outside: null }
 
-function labelClip(segment: Segment, px: number, roomBefore: number, roomAfter: number): ClipLabel {
-  const weeks = length(segment.days)
-  const name = clipName(segment)
-  const short = name.replace(/\s+(po porodzie|przed porodem)$/, '')
-  const option = segment.tone === 'option'
-  const candidates = [
-    ...(option ? [`${name} · ${weeks} · do wyboru`] : []),
-    `${name} · ${weeks}`,
-    `${short} · ${weeks}`,
-  ]
-  const inside = candidates.find((text) => px >= textPx(text)) ?? null
-  if (inside) {
-    const icon = px >= textPx(inside) + 40
-    return { inside, icon, dates: icon && px >= textPx(inside) + 160, outside: null }
-  }
-  const text = `${name} · ${weeks}${option ? ' · do wyboru' : ''}`
-  const needed = text.length * CHAR_PX + 24
-  const side = roomAfter >= needed ? 'right' : roomBefore >= needed ? 'left' : null
-  return {
-    inside: side ? null : px >= 40 ? weeks : null,
-    icon: false,
-    dates: false,
-    outside: side ? { text, side, width: needed } : null,
-  }
+/** Widths of bold text as the clips draw it: text-sm names, text-xs lengths and amounts. */
+interface Fit {
+  sm: (text: string) => number
+  xs: (text: string) => number
 }
+
+/** The shortest word for a kind of period, for a narrow clip. */
+const TINY: [string, string][] = [
+  ['sick', 'L4'],
+  ['maternity', 'Macierzyński'],
+  ['parental', 'Rodzicielski'],
+  ['paternity', 'Ojcowski'],
+  ['supplementary', 'Uzupełniający'],
+]
+const tinyName = (id: string, fallback: string) =>
+  TINY.find(([prefix]) => id.startsWith(prefix))?.[1] ?? fallback.split(' ')[0]
+
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** "Zwolnienie lekarskie w ciąży: zasiłek chorobowy" → the period and this piece of it. */
+function family(segment: Segment): { kind: string; part: string } | null {
+  const name = clipName(segment)
+  const at = name.indexOf(':')
+  return at > 0 ? { kind: name.slice(0, at).trim(), part: capital(name.slice(at + 1).trim()) } : null
+}
+
+const shortName = (segment: Segment) => clipName(segment).replace(/\s+(po porodzie|przed porodem)$/, '')
+
+/** The names a clip can go by, longest first. */
+function clipNames(segment: Segment): string[] {
+  const f = family(segment)
+  const names = f
+    ? [clipName(segment), f.part, f.kind.replace(/\s+w ciąży$/, '')]
+    : [clipName(segment), shortName(segment)]
+  return [...new Set([...names, tinyName(segment.id, shortName(segment))])]
+}
+
+/** The names of a run of pieces of one period. */
+function runNames(first: Segment): string[] {
+  const kind = family(first)?.kind ?? shortName(first)
+  return [...new Set([kind, kind.replace(/\s+w ciąży$/, ''), tinyName(first.id, kind)])]
+}
+
+function labelClip(
+  names: string[],
+  days: number,
+  option: boolean,
+  px: number,
+  roomBefore: number,
+  roomAfter: number,
+  fit: Fit,
+  dates: string | null,
+): ClipLabel {
+  const weeks = length(days)
+  const tail = option ? `${weeks} · do wyboru` : weeks
+  const oneLine = (text: string) => fit.sm(text) + CLIP_PAD
+  const twoLines = ([name, under]: string[]) => Math.max(fit.sm(name), fit.xs(under)) + CLIP_PAD
+  for (const name of names) {
+    const candidates: string[][] = [
+      ...(option ? [[`${name} · ${weeks} · do wyboru`]] : []),
+      [`${name} · ${weeks}`],
+      [name, tail],
+      ...(option ? [[name, weeks]] : []),
+    ]
+    for (const lines of candidates) {
+      const need = lines.length === 1 ? oneLine(lines[0]) : twoLines(lines)
+      if (need > px) continue
+      const icon = px >= need + ICON_ROOM
+      return {
+        inside: lines,
+        named: true,
+        icon,
+        dates: Boolean(dates) && lines.length === 1 && icon && px >= need + ICON_ROOM + fit.xs(dates ?? '') + 16,
+        outside: null,
+      }
+    }
+  }
+  // Too narrow for a name: beside the clip, where the track has room.
+  for (const name of names) {
+    const text = `${name} · ${weeks}${option ? ' · do wyboru' : ''}`
+    const width = fit.sm(text) + BESIDE
+    const side = roomAfter >= width ? 'right' : roomBefore >= width ? 'left' : null
+    if (side) return { ...NO_LABEL, outside: { text, side, width } }
+  }
+  return { ...NO_LABEL, inside: oneLine(weeks) <= px ? [weeks] : null }
+}
+
+/** One element of a track: a clip, or a run of pieces of one period joined end to end. */
+interface Unit {
+  members: Segment[]
+  /** First day, and the day after the last. */
+  start: number
+  end: number
+}
+
+/** What the tooltip says about an element, and where it was hovered. */
+interface Tip {
+  id: string
+  x: number
+  top: number
+  bottom: number
+  title: string
+  lines: string[]
+}
+
+const dayRange = (start: string, end: string) =>
+  start === end ? formatShortDate(start) : `${formatDayMonthShort(start)} – ${formatShortDate(end)}`
 
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 /** 1970-01-01 was a Thursday, so Mondays are the days with (day + 3) % 7 === 0. */
@@ -279,6 +376,33 @@ export function PlanTimeline({
   const [playhead, setPlayhead] = useState(today)
 
   const width = Math.max(360, (viewport - LABEL_WIDTH) * zoom)
+
+  // Labels are measured in Lato; once it has loaded, measure again.
+  const [, setFontsLoaded] = useState(0)
+  useEffect(() => whenFontsReady(() => setFontsLoaded((n) => n + 1)), [])
+  const scale = remPx() / 16
+  const fit: Fit = { sm: (text) => textWidth(text, 14 * scale), xs: (text) => textWidth(text, 12 * scale) }
+
+  // The tooltip of the hovered clip, window or amount; it goes away as soon as anything scrolls.
+  const [tip, setTip] = useState<Tip | null>(null)
+  useEffect(() => {
+    if (!tip) return
+    const hide = () => setTip(null)
+    window.addEventListener('scroll', hide, true)
+    window.addEventListener('pointerdown', hide, true)
+    return () => {
+      window.removeEventListener('scroll', hide, true)
+      window.removeEventListener('pointerdown', hide, true)
+    }
+  }, [tip])
+  /** Hover in or out of an element: the shared highlight, and its tooltip. */
+  const hoverWith =
+    (id: string, title: string, lines: () => string[]) => (event: MouseEvent<HTMLElement> | null) => {
+      onHover(event ? id : null)
+      if (!event || drag.current || scrubbing) return setTip(null)
+      const rect = event.currentTarget.getBoundingClientRect()
+      setTip({ id, x: event.clientX, top: rect.top, bottom: rect.bottom, title, lines: lines() })
+    }
 
   useEffect(() => {
     const element = scroller.current
@@ -559,6 +683,79 @@ export function PlanTimeline({
   const joins = (a: Segment | undefined, b: Segment | undefined) =>
     Boolean(a && b && a.tone === b.tone && dayNumber(a.end) + 1 === dayNumber(b.start))
 
+  // What the tooltips say: the engine's names, dates and amounts, nothing computed here.
+  const segmentTip = (s: Segment) => () => {
+    const lines = [`${dayRange(s.start, s.end)} · ${length(s.days)}`]
+    if (s.tone === 'option') {
+      const deadline = deadlineOf(timeline, s)
+      lines.push(
+        !deadline
+          ? 'Do wyboru'
+          : optionWindow(timeline, s)
+            ? `Do wyboru: w dowolnym czasie do ${formatShortDate(deadline.date)}`
+            : `Do wyboru, najpóźniej do ${formatShortDate(deadline.date)}`,
+      )
+    }
+    const payment = paymentFor(timeline, s.id)
+    if (payment) lines.push(`${formatPlnShort(payment.monthly)} / mies. · ${formatRate(payment.rate)}`)
+    return lines
+  }
+  const paymentTip = (p: Payment) => () => [
+    `${formatPlnShort(p.monthly)} / mies. · ${formatRate(p.rate)}`,
+    `${dayRange(p.start, p.end)} · ${length(p.days)} · razem ${formatPlnShort(p.total)}`,
+  ]
+
+  // The money track: one row per parent. Pieces paid the same per month, end to end (sick pay,
+  // then the sickness benefit, then maternity benefit), share one amount.
+  const moneyRow = (p: Payment) => Math.max(0, moneyLanes.indexOf(p.lane))
+  const moneyTop = (row: number) =>
+    moneyLanes.length === 1
+      ? (ROW_HEIGHT - MONEY_CLIP) / 2
+      : (ROW_HEIGHT - 2 * MONEY_CLIP - 4) / 2 + row * (MONEY_CLIP + 4)
+  const moneyName = (p: Payment) => {
+    const segment = timeline.segments.find((s) => s.id === p.segment_id)
+    if (!segment) return p.title
+    return family(segment)?.part ?? shortName(segment)
+  }
+  const paidTogether = (a: Payment, b: Payment) =>
+    a.lane === b.lane && a.monthly === b.monthly && dayNumber(a.end) + 1 === dayNumber(b.start)
+  const moneyUnits = moneyLanes.flatMap((lane) => {
+    const row = [...payments.filter((p) => p.lane === lane)].sort((a, b) => a.start.localeCompare(b.start))
+    const units: Payment[][] = []
+    for (const p of row) {
+      const last = units.at(-1)
+      if (last && paidTogether(last[last.length - 1], p)) last.push(p)
+      else units.push([p])
+    }
+    let taken = EDGE
+    return units.map((members, index) => {
+      const first = members[0]
+      const lastMember = members[members.length - 1]
+      const start = xPx(dayNumber(first.start))
+      const end = xPx(dayNumber(lastMember.end) + 1)
+      const nextStart = index < units.length - 1 ? xPx(dayNumber(units[index + 1][0].start)) : EDGE + mainPx
+      const amount = `${formatPlnShort(first.monthly)} / mies.`
+      const name = members.length === 1 ? moneyName(first) : null
+      const inside = [...(name ? [`${name} · ${amount}`] : []), amount, formatPlnShort(first.monthly)].find(
+        (text) => fit.xs(text) + MONEY_PAD <= end - start,
+      )
+      let outside: { text: string; side: 'right' | 'left' } | null = null
+      if (!inside) {
+        for (const text of [...(name ? [`${name} · ${amount}`] : []), amount]) {
+          const need = fit.xs(text) + BESIDE
+          const side = nextStart - end >= need ? 'right' : start - taken >= need ? 'left' : null
+          if (side) {
+            outside = { text, side }
+            taken = side === 'right' ? end + need : end
+            break
+          }
+        }
+      }
+      if (!outside) taken = end
+      return { members, row: moneyRow(first), inside: inside ?? null, outside }
+    })
+  })
+
   // Ruler ticks: weeks when they have room, days when zoomed in far.
   const ticks: { day: number; size: 'day' | 'week' }[] = []
   if (pxPerDay * 7 >= 12) {
@@ -763,21 +960,58 @@ export function PlanTimeline({
             const placed = placeFlags(flags[lane], x, width, chipWidths)
             const rows = Math.max(1, placed.reduce((n, f) => Math.max(n, f.row + 1), 0))
             const sorted = sortedIn(lane)
+            const laneWindows = windows.filter((w) => w.segment.lane === lane)
             // Rows stacked one under another, centred in the track; a chip is centred in its row.
             const stack = rows * FLAG_ROW - FLAG_GAP
-            const trackHeight = Math.max(ROW_HEIGHT, stack + 2 * TRACK_PAD)
+            const trackHeight = Math.max(ROW_HEIGHT + (laneWindows.length > 0 ? WINDOW_BAND : 0), stack + 2 * TRACK_PAD)
             const firstRow = (trackHeight - stack) / 2
             const flagTop = (row: number, key: boolean) =>
               firstRow +
               row * FLAG_ROW +
               (FLAG_EVENT_HEIGHT - (key ? FLAG_EVENT_HEIGHT : FLAG_HINT_HEIGHT)) / 2
+
+            // Pieces of one period end to end (sick leave: the employer's days, then ZUS's) are
+            // one unit for the label.
+            const units: Unit[] = []
+            for (const s of sorted) {
+              const last = units.at(-1)
+              const previous = last?.members.at(-1)
+              const kind = family(s)?.kind
+              if (last && previous && kind && joins(previous, s) && family(previous)?.kind === kind) {
+                last.members.push(s)
+                last.end = dayNumber(s.end) + 1
+              } else units.push({ members: [s], start: dayNumber(s.start), end: dayNumber(s.end) + 1 })
+            }
             // Labels beside clips take the room in order, so two never claim the same gap.
             let taken = EDGE
-            const labels = sorted.map((s, index) => {
-              const start = xPx(dayNumber(s.start))
-              const end = xPx(dayNumber(s.end) + 1)
-              const after = index < sorted.length - 1 ? xPx(dayNumber(sorted[index + 1].start)) : EDGE + mainPx
-              const label = labelClip(s, end - start, start - taken, after - end)
+            const clipLabels = new Map<string, ClipLabel>()
+            const runLabels: { unit: Unit; label: ClipLabel }[] = []
+            const unitLabels = units.map((unit, index) => {
+              const start = xPx(unit.start)
+              const end = xPx(unit.end)
+              const after = index < units.length - 1 ? xPx(units[index + 1].start) : EDGE + mainPx
+              const first = unit.members[0]
+              const option = first.tone === 'option'
+              const dates = (s: Segment) => `${formatDayMonthShort(s.start)} – ${formatDayMonthShort(s.end)}`
+              let label: ClipLabel
+              if (unit.members.length === 1) {
+                label = labelClip(clipNames(first), first.days, option, end - start, start - taken, after - end, fit, dates(first))
+                clipLabels.set(first.id, label)
+              } else {
+                // Each piece by its own name when every one fits; else the period once, over all.
+                const pieces = unit.members.map((s) =>
+                  labelClip([family(s)?.part ?? shortName(s)], s.days, option, xPx(dayNumber(s.end) + 1) - xPx(dayNumber(s.start)), 0, 0, fit, null),
+                )
+                if (pieces.every((p) => p.named)) {
+                  unit.members.forEach((s, i) => clipLabels.set(s.id, pieces[i]))
+                  label = NO_LABEL
+                } else {
+                  const days = unit.members.reduce((sum, s) => sum + s.days, 0)
+                  label = labelClip(runNames(first), days, option, end - start, start - taken, after - end, fit, null)
+                  for (const s of unit.members) clipLabels.set(s.id, NO_LABEL)
+                  runLabels.push({ unit, label: { ...label, icon: false, dates: false } })
+                }
+              }
               taken = label.outside?.side === 'right' ? end + label.outside.width : end
               return label
             })
@@ -801,47 +1035,75 @@ export function PlanTimeline({
                       flag={flag}
                       x={x(flag.day)}
                       top={flagTop(flag.row, flag.key)}
-                      active={selectedId === flag.id || hoveredId === flag.id}
+                      selected={selectedId === flag.id}
+                      hovered={hoveredId === flag.id}
+                      changed={changedIds.has(flag.id)}
+                      changeVersion={changeVersion}
                       onClick={() => onSelect(flag.id)}
                       onHover={(on) => onHover(on ? flag.id : null)}
                     />
                   ))}
 
-                  {/* The window a period can be taken in, under its clip. */}
-                  {windows
-                    .filter((w) => w.segment.lane === lane)
-                    .map(({ segment, deadline }) => {
-                      const left = x(dayNumber(segment.start))
-                      const right = x(dayNumber(deadline.date) + 1)
-                      const px = ((right - left) / 100) * width
-                      // The words sit at the window's end; another period there (the father's
-                      // parental leave inside his paternity window) would run over them.
-                      const end = dayNumber(deadline.date)
-                      const covered = timeline.segments.some(
-                        (o) =>
-                          o.lane === lane &&
-                          o.id !== segment.id &&
-                          dayNumber(o.start) <= end &&
-                          dayNumber(o.end) >= end - 220 / pxPerDay,
-                      )
-                      return (
-                        <button
-                          key={`window-${segment.id}`}
-                          type="button"
-                          onClick={() => onSelect(segment.id)}
-                          onMouseEnter={() => onHover(segment.id)}
-                          onMouseLeave={() => onHover(null)}
-                          aria-label={`Okno: ${clipName(segment)} do ${formatShortDate(deadline.date)}`}
+                  {/* The window a period can be taken in: a thin bracket under its clip, from the
+                      first day it can start to the last day it can be taken. */}
+                  {laneWindows.map(({ segment, deadline }) => {
+                    const left = x(dayNumber(segment.start))
+                    const right = x(dayNumber(deadline.date) + 1)
+                    const px = ((right - left) / 100) * width
+                    const until = `do ${formatShortDate(deadline.date)}`
+                    const text = [`${tinyName(segment.id, shortName(segment))}: w dowolnym czasie ${until}`, `w dowolnym czasie ${until}`, until].find(
+                      (t) => fit.xs(t) + 40 <= px,
+                    )
+                    const on = selectedId === segment.id || hoveredId === segment.id
+                    const father = segment.lane === 'father'
+                    return (
+                      <button
+                        key={`window-${segment.id}`}
+                        type="button"
+                        onClick={() => onSelect(segment.id)}
+                        onMouseEnter={hoverWith(segment.id, periodName(segment), () => [
+                          `${length(segment.days)} do wyboru: w dowolnym czasie ${until}`,
+                          'Na osi stoi od pierwszego możliwego dnia.',
+                        ])}
+                        onMouseLeave={() => hoverWith(segment.id, '', () => [])(null)}
+                        aria-label={`${periodName(segment)}: w dowolnym czasie ${until}`}
+                        className="group absolute flex items-center justify-end focus-visible:outline-none"
+                        style={{ top: rem(CLIP_TOP + CLIP_HEIGHT + 3), height: rem(WINDOW_BAND - 2), left: `${left}%`, width: `${right - left}%` }}
+                      >
+                        <span
+                          aria-hidden
                           className={cn(
-                            'absolute flex items-center justify-end rounded-xl pr-3 text-xs font-bold whitespace-nowrap',
-                            WINDOW[parentOf(segment)],
+                            'absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-dashed transition-colors duration-150',
+                            father ? 'border-navy-300' : 'border-zus-300',
+                            on && (father ? 'border-navy-700' : 'border-zus-700'),
                           )}
-                          style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${left}%`, width: `${right - left}%` }}
-                        >
-                          {px > 420 && !covered && <>w dowolnym czasie do {formatShortDate(deadline.date)}</>}
-                        </button>
-                      )
-                    })}
+                        />
+                        {(['left-0', 'right-0'] as const).map((edge) => (
+                          <span
+                            key={edge}
+                            aria-hidden
+                            className={cn(
+                              'absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded-full transition-colors duration-150',
+                              edge,
+                              father ? 'bg-navy-300' : 'bg-zus-300',
+                              on && (father ? 'bg-navy-700' : 'bg-zus-700'),
+                            )}
+                          />
+                        ))}
+                        {text && (
+                          <span
+                            className={cn(
+                              'relative mr-3 rounded-full bg-white px-2 text-xs leading-5 font-bold whitespace-nowrap transition-colors duration-150 group-focus-visible:ring-2 group-focus-visible:ring-zus-400',
+                              father ? 'text-navy-500' : 'text-zus-700',
+                              on && 'text-navy-900',
+                            )}
+                          >
+                            {text}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
 
                   {sorted.length > 0 && (
                     <>
@@ -869,33 +1131,62 @@ export function PlanTimeline({
                             segment={s}
                             left={x(dayNumber(s.start))}
                             span={x(dayNumber(s.end) + 1) - x(dayNumber(s.start))}
-                            label={labels[index]}
+                            label={clipLabels.get(s.id) ?? NO_LABEL}
                             index={index}
                             joinLeft={joins(sorted[index - 1], s)}
                             joinRight={joins(s, sorted[index + 1])}
+                            inRun={units.some((u) => u.members.length > 1 && u.members.indexOf(s) > 0)}
                             changed={changedIds.has(s.id)}
                             changeVersion={changeVersion}
-                            active={selectedId === s.id || hoveredId === s.id}
+                            selected={selectedId === s.id}
+                            hovered={hoveredId === s.id}
                             onClick={() => onSelect(s.id)}
-                            onHover={(on) => onHover(on ? s.id : null)}
+                            onHover={hoverWith(s.id, periodName(s), segmentTip(s))}
                           />
                         ))}
                       </AnimatePresence>
-                      {sorted.map((s, index) => {
-                        const outside = labels[index].outside
+                      {/* A run of pieces named once, over all of them (the pieces stay clickable). */}
+                      {runLabels.map(({ unit, label }) =>
+                        label.inside ? (
+                          <motion.span
+                            key={`run-${unit.members[0].id}`}
+                            aria-hidden
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.3, delay: 0.6 }}
+                            className={cn(
+                              'pointer-events-none absolute z-11 flex items-center justify-center px-3 text-center',
+                              RUN_TEXT[parentOf(unit.members[0])][unit.members[0].tone],
+                            )}
+                            style={{
+                              top: rem(CLIP_TOP),
+                              height: rem(CLIP_HEIGHT),
+                              left: `${x(unit.start)}%`,
+                              width: `${x(unit.end) - x(unit.start)}%`,
+                            }}
+                          >
+                            <InsideText lines={label.inside} />
+                          </motion.span>
+                        ) : null,
+                      )}
+                      {units.map((unit, index) => {
+                        const outside = unitLabels[index].outside
                         if (!outside) return null
-                        const edge = outside.side === 'right' ? x(dayNumber(s.end) + 1) : x(dayNumber(s.start))
+                        const s = unit.members[0]
+                        const edge = outside.side === 'right' ? x(unit.end) : x(unit.start)
+                        const on = unit.members.some((m) => m.id === selectedId || m.id === hoveredId)
                         return (
                           <button
                             key={`label-${s.id}`}
                             type="button"
                             onClick={() => onSelect(s.id)}
-                            onMouseEnter={() => onHover(s.id)}
-                            onMouseLeave={() => onHover(null)}
+                            onMouseEnter={hoverWith(s.id, periodName(s), segmentTip(s))}
+                            onMouseLeave={() => hoverWith(s.id, '', () => [])(null)}
                             className={cn(
-                              'absolute flex items-center text-sm font-bold whitespace-nowrap transition-colors duration-150',
+                              'absolute flex items-center text-sm font-bold whitespace-nowrap underline-offset-4 transition-colors duration-150',
                               outside.side === 'right' ? 'pl-2.5' : '-translate-x-full pr-2.5',
                               s.lane === 'father' ? 'text-navy-700 hover:text-navy-900' : 'text-zus-700 hover:text-zus-900',
+                              on && 'underline decoration-2',
                             )}
                             style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${edge}%` }}
                           >
@@ -923,28 +1214,68 @@ export function PlanTimeline({
                 className="relative border-b border-line"
                 style={{ gridColumn: 2, gridRow: lanes.length + 2, height: ROW_HEIGHT }}
               >
-                {payments.map((payment) => {
-                  const left = x(dayNumber(payment.start))
-                  const span = x(dayNumber(payment.end) + 1) - left
-                  const row = moneyLanes.indexOf(payment.lane)
-                  const top =
-                    moneyLanes.length === 1
-                      ? (ROW_HEIGHT - MONEY_CLIP) / 2
-                      : (ROW_HEIGHT - 2 * MONEY_CLIP - 4) / 2 + row * (MONEY_CLIP + 4)
-                  const option = timeline.segments.find((s) => s.id === payment.segment_id)?.tone === 'option'
+                {moneyUnits.map(({ members, row, inside, outside }) => {
+                  const top = moneyTop(row)
+                  const unitStart = x(dayNumber(members[0].start))
+                  const unitEnd = x(dayNumber(members[members.length - 1].end) + 1)
+                  const father = members[0].lane === 'father'
+                  const on = members.some((m) => m.id === selectedId || m.id === hoveredId)
                   return (
-                    <MoneyClip
-                      key={payment.id}
-                      payment={payment}
-                      option={option}
-                      left={left}
-                      span={span}
-                      px={(span / 100) * width}
-                      top={top}
-                      active={selectedId === payment.id || hoveredId === payment.id}
-                      onClick={() => onSelect(payment.id)}
-                      onHover={(on) => onHover(on ? payment.id : null)}
-                    />
+                    <Fragment key={members[0].id}>
+                      {members.map((payment, index) => {
+                        const left = x(dayNumber(payment.start))
+                        const span = x(dayNumber(payment.end) + 1) - left
+                        const option = timeline.segments.find((s) => s.id === payment.segment_id)?.tone === 'option'
+                        return (
+                          <MoneyClip
+                            key={payment.id}
+                            payment={payment}
+                            option={option}
+                            text={members.length === 1 ? inside : null}
+                            left={left}
+                            span={span}
+                            top={top}
+                            joinLeft={index > 0}
+                            joinRight={index < members.length - 1}
+                            selected={selectedId === payment.id}
+                            hovered={hoveredId === payment.id}
+                            changed={changedIds.has(payment.id)}
+                            changeVersion={changeVersion}
+                            onClick={() => onSelect(payment.id)}
+                            onHover={hoverWith(payment.id, payment.title, paymentTip(payment))}
+                          />
+                        )
+                      })}
+                      {members.length > 1 && inside && (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            'pointer-events-none absolute z-11 flex items-center px-2 text-xs font-bold whitespace-nowrap tabular-nums',
+                            father ? 'text-navy-900' : 'text-zus-900',
+                          )}
+                          style={{ top, height: MONEY_CLIP, left: `${unitStart}%`, width: `${unitEnd - unitStart}%` }}
+                        >
+                          {inside}
+                        </span>
+                      )}
+                      {outside && (
+                        <button
+                          type="button"
+                          onClick={() => onSelect(members[0].id)}
+                          onMouseEnter={hoverWith(members[0].id, members[0].title, paymentTip(members[0]))}
+                          onMouseLeave={() => hoverWith(members[0].id, '', () => [])(null)}
+                          className={cn(
+                            'absolute flex items-center text-xs font-bold whitespace-nowrap tabular-nums underline-offset-4 transition-colors duration-150',
+                            outside.side === 'right' ? 'pl-2.5' : '-translate-x-full pr-2.5',
+                            father ? 'text-navy-700 hover:text-navy-900' : 'text-zus-700 hover:text-zus-900',
+                            on && 'underline decoration-2',
+                          )}
+                          style={{ top, height: MONEY_CLIP, left: `${outside.side === 'right' ? unitEnd : unitStart}%` }}
+                        >
+                          {outside.text}
+                        </button>
+                      )}
+                    </Fragment>
                   )
                 })}
               </div>
@@ -952,6 +1283,30 @@ export function PlanTimeline({
           )}
         </div>
       </div>
+
+      {tip &&
+        createPortal(
+          <motion.div
+            role="tooltip"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.12 }}
+            className="pointer-events-none fixed z-[70] w-max max-w-72 rounded-2xl bg-navy-900 px-3.5 py-2.5 text-white shadow-[0_12px_28px_-12px_rgb(26_36_56/0.6)]"
+            style={{
+              left: Math.min(Math.max(tip.x, 150), window.innerWidth - 150),
+              top: tip.top < 120 ? tip.bottom + 10 : tip.top - 10,
+              transform: `translate(-50%, ${tip.top < 120 ? '0' : '-100%'})`,
+            }}
+          >
+            <p className="text-sm leading-snug font-bold">{tip.title}</p>
+            {tip.lines.map((line) => (
+              <p key={line} className="mt-0.5 text-xs leading-snug text-white/80 tabular-nums">
+                {line}
+              </p>
+            ))}
+          </motion.div>,
+          document.body,
+        )}
 
       <Readout timeline={timeline} day={head} onSelect={onSelect} onHover={onHover} />
     </div>
@@ -983,11 +1338,19 @@ function ToolButton({
   )
 }
 
+/** The outline of the element whose details are open, and of the one under the pointer. The
+ *  white offset keeps it visible on any colour, and lifts the element over its neighbours. */
+const SELECTED = 'z-10 ring-2 ring-navy-900 ring-offset-2'
+const HOVERED = 'z-10 ring-2 ring-navy-900/30 ring-offset-2'
+
 function FlagChip({
   flag,
   x,
   top,
-  active,
+  selected,
+  hovered,
+  changed,
+  changeVersion,
   onClick,
   onHover,
   measureRef,
@@ -995,7 +1358,10 @@ function FlagChip({
   flag: PlacedFlag
   x: number
   top: number
-  active: boolean
+  selected: boolean
+  hovered: boolean
+  changed: boolean
+  changeVersion: number
   onClick: () => void
   onHover: (on: boolean) => void
   measureRef: (element: HTMLElement | null) => void
@@ -1009,22 +1375,26 @@ function FlagChip({
       onClick={onClick}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
+      aria-pressed={selected}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.5 }}
       className={cn(
         'absolute z-20 flex items-center rounded-full border whitespace-nowrap',
         // A flag that moves to another row (after a recalculation or zoom) slides there.
-        'transition-[top,border-color,background-color] duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
-        flag.side === 'left' ? '-translate-x-full' : '-translate-x-[6px]',
+        'transition-[top,border-color,background-color,box-shadow] duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+        flag.side === 'left' ? '-translate-x-full' : '-translate-x-1.5',
         flag.key
           ? 'h-10 gap-2 border-sun-300 bg-sun-100/70 pr-4 pl-0.5 text-sm font-bold text-navy-900'
           : 'h-7.5 gap-1.5 border-line bg-white pr-3 pl-1 text-xs font-bold text-navy-700',
         document && flag.done && 'border-zus-200 text-zus-700',
-        active && (flag.key ? 'bg-sun-100' : 'border-sun-300 bg-sun-100/60'),
+        (hovered || selected) && (flag.key ? 'border-sun-400 bg-sun-100' : 'border-navy-300 bg-navy-50'),
+        hovered && !selected && 'z-30 ring-2 ring-navy-900/25 ring-offset-2',
+        selected && 'z-30 ring-2 ring-navy-900 ring-offset-2',
       )}
       style={{ top: rem(top), left: `${x}%` }}
     >
+      {changed && <Pulse key={changeVersion} />}
       <Illustration src={flag.icon} size={flag.key ? 'event' : 'hint'} className={flag.key ? 'bg-white' : ''} />
       {flag.text}
       {flag.locked && (
@@ -1035,6 +1405,22 @@ function FlagChip({
   )
 }
 
+/** A label inside a clip: one line, or the name over the length. */
+function InsideText({ lines }: { lines: string[] }) {
+  return (
+    <span className="relative flex min-w-0 flex-col leading-tight">
+      <span className="text-sm font-bold whitespace-nowrap">{lines[0]}</span>
+      {lines[1] && <span className="text-xs font-bold whitespace-nowrap opacity-80">{lines[1]}</span>}
+    </span>
+  )
+}
+
+/** The text colour of a run's label, as on its clips. */
+const RUN_TEXT: Record<'mother' | 'father', Record<Segment['tone'], string>> = {
+  mother: { leave: 'text-white', option: 'text-zus-900', work: 'text-navy-700' },
+  father: { leave: 'text-white', option: 'text-navy-900', work: 'text-navy-700' },
+}
+
 function Clip({
   segment,
   left,
@@ -1043,9 +1429,11 @@ function Clip({
   index,
   joinLeft,
   joinRight,
+  inRun,
   changed,
   changeVersion,
-  active,
+  selected,
+  hovered,
   onClick,
   onHover,
 }: {
@@ -1056,20 +1444,23 @@ function Clip({
   index: number
   joinLeft: boolean
   joinRight: boolean
+  /** A later piece of one period (named once over all its pieces): a faint seam. */
+  inRun: boolean
   changed: boolean
   changeVersion: number
-  active: boolean
+  selected: boolean
+  hovered: boolean
   onClick: () => void
-  onHover: (on: boolean) => void
+  onHover: (event: MouseEvent<HTMLElement> | null) => void
 }) {
   return (
     <motion.button
       type="button"
       onClick={onClick}
-      onMouseEnter={() => onHover(true)}
-      onMouseLeave={() => onHover(false)}
+      onMouseEnter={(event) => onHover(event)}
+      onMouseLeave={() => onHover(null)}
       aria-label={`${segment.title}, ${length(segment.days)}`}
-      title={segment.title}
+      aria-pressed={selected}
       initial={{ opacity: 0, clipPath: 'inset(0% 100% 0% 0%)' }}
       animate={{ opacity: 1, clipPath: 'inset(0% 0% 0% 0%)' }}
       exit={{ opacity: 0 }}
@@ -1078,34 +1469,31 @@ function Clip({
         opacity: { duration: 0.2, delay: 0.15 + index * 0.12 },
       }}
       className={cn(
-        'absolute flex items-center gap-2 overflow-hidden rounded-xl px-3 text-left leading-tight whitespace-nowrap',
+        'absolute flex items-center gap-2 overflow-hidden rounded-xl px-3 text-left whitespace-nowrap',
         // A recalculated plan glides into place (rare, so animating left/width is fine here).
-        'transition-[left,width,filter,box-shadow] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+        'transition-[left,width,filter,box-shadow] duration-[500ms,500ms,150ms,150ms] ease-[cubic-bezier(0.23,1,0.32,1)]',
         'outline-none focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:ring-offset-2',
         CLIP[parentOf(segment)][segment.tone],
         joinLeft && 'rounded-l-none border-l-0',
         joinRight && 'rounded-r-none',
-        active && 'ring-2 ring-navy-900/25 ring-offset-2 brightness-[0.96]',
+        hovered && !selected && cn(HOVERED, 'brightness-[0.97]'),
+        selected && SELECTED,
       )}
       style={{ top: rem(CLIP_TOP), height: rem(CLIP_HEIGHT), left: `${left}%`, width: `${span}%` }}
     >
-      {changed && (
-        <motion.span
-          key={changeVersion}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 1.6, ease: 'easeOut' }}
-          className="absolute inset-0 rounded-[inherit] ring-4 ring-sun-300 ring-inset"
-        />
+      {/* The seam between two pieces joined end to end. */}
+      {joinLeft && segment.tone !== 'option' && (
+        <span aria-hidden className={cn('absolute inset-y-0 left-0 w-0.5', inRun ? 'bg-white/25' : 'bg-white/70')} />
       )}
+      {changed && <Pulse key={changeVersion} className="rounded-[inherit] ring-inset" />}
       {label.icon && <Illustration src={segmentIcon(segment)} size="event" className="relative -ml-1.5" />}
       {label.inside && (
-        <span className={cn('relative truncate text-sm font-bold', !label.icon && !label.dates && 'mx-auto')}>
-          {label.inside}
+        <span className={cn('relative flex', !label.icon && !label.dates && 'mx-auto text-center')}>
+          <InsideText lines={label.inside} />
         </span>
       )}
       {label.dates && (
-        <span className="relative ml-auto truncate text-xs font-bold opacity-70">
+        <span className="relative ml-auto text-xs font-bold whitespace-nowrap opacity-70">
           {formatDayMonthShort(segment.start)} – {formatDayMonthShort(segment.end)}
         </span>
       )}
@@ -1114,42 +1502,51 @@ function Clip({
 }
 
 /** What is paid for a period, on the money track: green the mother's, navy the father's;
- *  dashed while the period is still to decide. */
+ *  dashed while the period is still to decide. Pieces paid the same, end to end, are joined. */
 function MoneyClip({
   payment,
   option,
+  text,
   left,
   span,
-  px,
   top,
-  active,
+  joinLeft,
+  joinRight,
+  selected,
+  hovered,
+  changed,
+  changeVersion,
   onClick,
   onHover,
 }: {
   payment: Payment
   option: boolean
+  /** The amount inside, when it fits and is not said over a run of pieces. */
+  text: string | null
   left: number
   span: number
-  px: number
   top: number
-  active: boolean
+  joinLeft: boolean
+  joinRight: boolean
+  selected: boolean
+  hovered: boolean
+  changed: boolean
+  changeVersion: number
   onClick: () => void
-  onHover: (on: boolean) => void
+  onHover: (event: MouseEvent<HTMLElement> | null) => void
 }) {
   const father = payment.lane === 'father'
-  const text =
-    px >= 116 ? `${formatPlnShort(payment.monthly)} / mies.` : px >= 64 ? formatPlnShort(payment.monthly) : ''
   return (
     <button
       type="button"
       onClick={onClick}
-      onMouseEnter={() => onHover(true)}
-      onMouseLeave={() => onHover(false)}
+      onMouseEnter={(event) => onHover(event)}
+      onMouseLeave={() => onHover(null)}
       aria-label={`${payment.title}: ${formatPlnShort(payment.monthly)} miesięcznie, ${formatRate(payment.rate)}`}
-      title={`${payment.title} · ${formatRate(payment.rate)}`}
+      aria-pressed={selected}
       className={cn(
         'absolute flex items-center overflow-hidden rounded-lg border px-2 text-xs font-bold whitespace-nowrap tabular-nums',
-        'transition-[left,width,box-shadow,background-color] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+        'transition-[left,width,box-shadow,background-color] duration-[500ms,500ms,150ms,150ms] ease-[cubic-bezier(0.23,1,0.32,1)]',
         'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
         father
           ? option
@@ -1158,11 +1555,15 @@ function MoneyClip({
           : option
             ? 'border-dashed border-zus-300 bg-zus-50/70 text-zus-700'
             : 'border-zus-200 bg-zus-100 text-zus-900',
-        active && 'ring-2 ring-navy-900/25 ring-offset-1',
+        joinLeft && 'rounded-l-none',
+        joinRight && 'rounded-r-none border-r-0',
+        hovered && !selected && 'z-10 ring-2 ring-navy-900/30 ring-offset-1',
+        selected && 'z-10 ring-2 ring-navy-900 ring-offset-1',
       )}
       style={{ top, height: MONEY_CLIP, left: `${left}%`, width: `${span}%` }}
     >
-      <span className="truncate">{text}</span>
+      {changed && <Pulse key={changeVersion} className="rounded-[inherit] ring-inset" />}
+      {text && <span className="relative">{text}</span>}
     </button>
   )
 }
