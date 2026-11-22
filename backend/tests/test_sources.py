@@ -18,7 +18,8 @@ from app.assistant.law import (
     zalacznik_contains,
     zalacznik_sections,
 )
-from app.assistant.prompts import STATIC_INSTRUCTIONS
+from app.assistant.prompts import BASE_INSTRUCTIONS, stage_instructions
+from app.assistant.stage import Topic, all_sources, source_topics, sources_for, stage_topics
 from app.engine import Scenario, build_timeline
 from app.engine.models import SourceRef
 from app.services.params import load_params
@@ -974,15 +975,79 @@ def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) ->
             assert not (field.personal and field.value), (document.id, field.id)
 
 
-def test_the_model_always_has_the_source_text() -> None:
+def stage_text(**answers: Any) -> str:
+    """The literal instructions the model gets at this scenario's stage (ZADANIA B.17)."""
+    topics = stage_topics(Scenario.model_validate(answers))
+    return f"{BASE_INSTRUCTIONS}\n{stage_instructions(topics)}"
+
+
+EVERY_TOPIC: frozenset[Topic] = frozenset(t for key in all_sources() for t in source_topics(*key))
+
+
+def test_every_source_belongs_to_a_stage() -> None:
+    """A source nobody placed in a topic would never reach the model (stage.py)."""
+    for kind, key in all_sources():
+        assert source_topics(kind, key), (kind, key)
+    # Together the stages carry every source, word for word.
+    everything = stage_instructions(EVERY_TOPIC)
     for section in SECTIONS.values():
-        assert section.text in STATIC_INSTRUCTIONS
-    for text in kp_articles().values():
-        assert text in STATIC_INSTRUCTIONS
-    for text in ustawa_articles().values():
-        assert text in STATIC_INSTRUCTIONS
-    for text in zalacznik_sections().values():
-        assert text in STATIC_INSTRUCTIONS
+        assert section.text in everything
+    for texts in (kp_articles(), ustawa_articles(), zalacznik_sections()):
+        for text in texts.values():
+            assert text in everything
+
+
+def test_the_model_has_the_source_text_of_its_stage() -> None:
+    kp, ustawa = kp_articles(), ustawa_articles()
+    expecting = stage_text(child_born=False, due_date="2027-03-15", work="employment")
+    for text in (SECTIONS["A.1"].text, SECTIONS["A.2"].text, SECTIONS["ZC"].text):
+        assert text in expecting
+    for article in ("art. 180 § 1", "art. 180 § 4", "art. 182¹ᵃ § 1", "art. 182³ § 1"):
+        assert kp[article] in expecting
+    # Not before it applies: adoption, the loss of a child, the law on amounts.
+    for text in (SECTIONS["D.1"].text, SECTIONS["A.3"].text):
+        assert text not in expecting
+    for text in (kp["art. 183 § 1"], kp["art. 180¹ § 1"], ustawa["art. 31 ust. 1"]):
+        assert text not in expecting
+
+    taken_in = stage_text(
+        taken_in="adoption", taken_in_on="2026-11-02", child_born=True, birth_date="2024-05-10"
+    )
+    assert SECTIONS["D.1"].text in taken_in and kp["art. 183 § 1"] in taken_in
+    assert kp["art. 180² § 1"] in taken_in  # supplementary leave after taking the child in
+    for text in (SECTIONS["A.1"].text, SECTIONS["ZC"].text, kp["art. 180 § 1"]):
+        assert text not in taken_in
+
+    loss = stage_text(child_born=True, birth_date="2026-11-10", losses=[{"stillborn": True}])
+    assert SECTIONS["A.3"].text in loss and kp["art. 180¹ § 1"] in loss
+    assert SECTIONS["ZC"].text not in loss  # the pregnancy chapter: only before the birth
+
+    paid = stage_text(child_born=True, birth_date="2026-11-10", work="employment", mother_pay=8000)
+    assert ustawa["art. 31 ust. 1"] in paid
+    for text in zalacznik_sections().values():  # built locally, not in git
+        assert text in paid
+
+
+@pytest.mark.parametrize("answers", scenarios() + plan_scenarios())
+def test_the_explanation_cites_only_text_the_model_has(answers: dict[str, Any]) -> None:
+    """The model reads the explanation with the labels of its sources: whatever a point cites,
+    the stage's instructions carry word for word (rules quoted by the regulations come with
+    `explain_timeline_element`)."""
+    scenario = Scenario.model_validate(answers)
+    timeline = build_timeline(scenario, PARAMS, TODAY)
+    given = set(sources_for(stage_topics(scenario)))
+    for note in timeline.notes:
+        for source in note.sources:
+            match source.doc:
+                case "przewodnik":
+                    key = ("guide", source.section)
+                case "kp" | "ustawa":
+                    key = (source.doc, source.article)
+                case "zalacznik" if zalacznik_available():  # built locally, not in git
+                    key = ("zalacznik", source.section)
+                case _:
+                    continue
+            assert key in given, (note.id, key)
 
 
 def test_the_sick_benefit_rules_stay_with_the_sick_benefit() -> None:
@@ -990,6 +1055,8 @@ def test_the_sick_benefit_rules_stay_with_the_sick_benefit() -> None:
     days; it is told they are a sick-benefit rule and never reach the maternity benefit."""
     assert SECTIONS["ZC"].contains("prawo do zasiłku co do zasady powstaje po 30 dniach")
     assert (SECTIONS["ZC"].page, SECTIONS["ZC"].last_page) == (2, 4)
-    rule = next(line for line in STATIC_INSTRUCTIONS.splitlines() if "30 albo 90 dni" in line)
+    expecting = stage_text(child_born=False, due_date="2027-03-15")
+    assert SECTIONS["ZC"].text in expecting
+    rule = next(line for line in expecting.splitlines() if "30 albo 90 dni" in line)
     assert rule.startswith("- Zasady zasiłku chorobowego ze s. 2–4")
     assert rule.endswith("Nigdy nie stosuj ich do zasiłku macierzyńskiego.")

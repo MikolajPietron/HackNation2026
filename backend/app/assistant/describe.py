@@ -662,13 +662,10 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
             else ""
         )
     lines = [f"{birth}{count} Dziś: {fmt(timeline.today)}.", "", "Na osi (id w nawiasach):"]
-    for s in timeline.segments:
-        lines.append(f"- [{s.id}] {s.title}: {fmt(s.start)}–{fmt(s.end)} ({s.days} dni)")
-    lines += [f"- [{m.id}] {fmt(m.date)}: {m.title}" for m in timeline.markers]
-    for p in timeline.payments:
-        lines.append(f"- [{p.id}] {p.title}: {fmt(p.start)}–{fmt(p.end)}. {p.summary}")
-    for d in timeline.documents:
-        lines.append(f"- [{d.id}] {d.title}: {document_when(d, timeline.today)}")
+    for kind in (Segment, Marker, Payment, Document):
+        lines += [
+            element_line(e, timeline.today) for e in timeline.elements() if isinstance(e, kind)
+        ]
     if timeline.notes:
         lines += ["", "Wyjaśnienie sytuacji (z kalkulatora, z tego mów):"]
         for n in timeline.notes:
@@ -680,6 +677,43 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
     lines += _no_return_and_left_on_table(timeline)  # F9, F10 (engine/leftover.py)
     if changed:
         lines += ["", f"Zmienione przez tę operację: {', '.join(changed)}"]
+    return "\n".join(lines)
+
+
+def element_line(element: TimelineElement, today: dt.date) -> str:
+    """One element of the timeline as the model reads it, with its id in brackets."""
+    match element:
+        case Segment():
+            period = f"{fmt(element.start)}–{fmt(element.end)}"
+            return f"- [{element.id}] {element.title}: {period} ({element.days} dni)"
+        case Marker():
+            return f"- [{element.id}] {fmt(element.date)}: {element.title}"
+        case Payment():
+            period = f"{fmt(element.start)}–{fmt(element.end)}"
+            return f"- [{element.id}] {element.title}: {period}. {element.summary}"
+        case Document():
+            return f"- [{element.id}] {element.title}: {document_when(element, today)}"
+
+
+def describe_timeline_changes(old: Timeline | None, new: Timeline, changed: list[str]) -> str:
+    """What a tool changed on the timeline (ZADANIA B.17). The whole timeline is in the current
+    state of the instructions, rebuilt before every request, so a tool result does not repeat
+    it: every repetition stayed in the history and was sent again on every later turn."""
+    if old is None:
+        return (
+            "Oś czasu właśnie powstała. Całą oś i wyjaśnienie sytuacji masz w „Aktualnym stanie "
+            "osi czasu” w instrukcjach."
+        )
+    lines = [
+        "Oś przeliczona. Cała aktualna oś i wyjaśnienie sytuacji są w „Aktualnym stanie osi "
+        "czasu” w instrukcjach; daty bierz stamtąd albo stąd."
+    ]
+    shown = [element_line(e, new.today) for e in new.elements() if e.id in changed]
+    lines += ["Zmienione albo nowe na osi:", *shown] if shown else ["Na osi nic się nie zmieniło."]
+    now = {e.id for e in new.elements()}
+    gone = [f"[{e.id}]" for e in old.elements() if e.id not in now]
+    if gone:
+        lines.append(f"Zniknęły z osi: {', '.join(gone)}.")
     return "\n".join(lines)
 
 

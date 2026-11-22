@@ -13,8 +13,9 @@ model's history (so the next turn knows what was asked). The model is told not t
 import datetime as dt
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -22,15 +23,19 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError, model_validator
 from pydantic_ai import (
+    AgentRunResult,
     AgentRunResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelAuthenticationError,
+    ModelConnectionError,
     ModelMessage,
     ModelMessagesTypeAdapter,
-    ModelOverloadedError,
+    ModelQuotaExceededError,
     ModelRateLimitError,
     ModelResponse,
+    ModelServerError,
+    ModelUnavailableError,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -158,18 +163,22 @@ async def _stream(
 
 @dataclass
 class _Translator:
-    """Maps Pydantic AI stream events to our small NDJSON protocol."""
+    """Maps Pydantic AI stream events to our small NDJSON protocol, and measures the turn."""
 
     wrote_text: bool = False
+    started: float = field(default_factory=time.monotonic)
+    first_text: float | None = None
 
     def __call__(self, event: object) -> dict[str, Any] | None:
         match event:
             case PartStartEvent(part=TextPart(content=content)):
                 separator = "\n\n" if self.wrote_text else ""
                 self.wrote_text = True
+                self._text_started()
                 return {"type": "text", "delta": separator + content} if content else None
             case PartDeltaEvent(delta=TextPartDelta(content_delta=delta)) if delta:
                 self.wrote_text = True
+                self._text_started()
                 return {"type": "text", "delta": delta}
             case FunctionToolCallEvent(part=part):
                 return {
@@ -197,9 +206,31 @@ class _Translator:
                 }
             case ElementFocused(element_id=element_id):
                 return {"type": "focus", "element_id": element_id}
-            case AgentRunResultEvent():
-                return {"type": "done"}
+            case AgentRunResultEvent(result=result):
+                return {"type": "done", "usage": self._measure(result)}
         return None
+
+    def _text_started(self) -> None:
+        if self.first_text is None:
+            self.first_text = time.monotonic()
+
+    def _measure(self, result: AgentRunResult[Any]) -> dict[str, Any]:
+        """ZADANIA B.17: time to the first text, the whole turn and the tokens of all its
+        requests, logged as one line (no conversation content) and sent in the `done` event
+        for `tools/eval`. `input_tokens` include the cached ones."""
+        usage = result.usage
+        metrics: dict[str, Any] = {
+            "first_text_s": _seconds(self.first_text, self.started),
+            "total_s": _seconds(time.monotonic(), self.started),
+            "requests": usage.requests,
+            "input_tokens": usage.input_tokens,
+            "cache_read_tokens": usage.cache_read_tokens,
+            "cache_write_tokens": usage.cache_write_tokens,
+            "output_tokens": usage.output_tokens,
+            "cost_usd": _cost(result.new_messages()),
+        }
+        turn_log.info("chat turn %s", json.dumps(metrics))
+        return metrics
 
 
 def _args(part: ToolCallPart) -> dict[str, Any]:
@@ -213,12 +244,46 @@ def _line(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
+def _seconds(moment: float | None, start: float) -> float | None:
+    return None if moment is None else round(moment - start, 2)
+
+
+def _cost(messages: list[ModelMessage]) -> float | None:
+    """The price of the turn's responses from genai-prices; None when a model has no price."""
+    try:
+        return round(
+            sum(float(m.cost().total_price) for m in messages if isinstance(m, ModelResponse)),
+            6,
+        )
+    except Exception:  # unknown model or provider, e.g. the scripted model in tests
+        return None
+
+
+def _turn_logger() -> logging.Logger:
+    """One INFO line per chat turn, shown by `npm run dev` without configuring logging."""
+    log = logging.getLogger("app.chat.turns")
+    if not log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+        log.propagate = False
+    return log
+
+
+turn_log = _turn_logger()
+
+
 def _error_message(exc: Exception) -> str:
     match exc:
         case ModelAuthenticationError():
             return "Klucz API modelu jest nieprawidłowy."
-        case ModelRateLimitError() | ModelOverloadedError():
+        case ModelQuotaExceededError():
+            return "Asystent AI jest chwilowo niedostępny: wyczerpał się limit konta modelu."
+        case ModelRateLimitError() | ModelUnavailableError() | ModelServerError():
             return "Model AI jest teraz przeciążony. Spróbuj za chwilę."
+        case ModelConnectionError():
+            return "Nie udało się połączyć z modelem AI. Sprawdź internet i spróbuj za chwilę."
         case UsageLimitExceeded():
             return "Asystent potrzebował zbyt wielu kroków. Spróbuj zapytać prościej."
         case _:
