@@ -25,9 +25,10 @@ NOT_ALLOWED = (
 
 
 def allowed(name: str) -> bool:
-    """Claude (directly or through OpenRouter) or Gemini; nothing else gets the documents."""
+    """Claude or Gemini, directly or through OpenRouter ("google/gemini-…", decision of
+    22.11.2026 for the online demo); nothing else gets the documents."""
     lowered = name.lower()
-    return lowered.startswith("gemini") or "claude" in lowered
+    return lowered.startswith(("gemini", "google/gemini")) or "claude" in lowered
 
 
 def get_document_model_factory(
