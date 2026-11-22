@@ -654,7 +654,7 @@ function Decision({
   )
 }
 
-/** Links from the brief, and the way into the admin panel. */
+/** Links from the brief, support and the agreement report (the admin panel is in the top bar). */
 function Footer({ onSupport }: { onSupport: () => void }) {
   return (
     <motion.footer
@@ -683,9 +683,6 @@ function Footer({ onSupport }: { onSupport: () => void }) {
         </button>
         <a href="/raport" className="font-bold text-navy-500 hover:text-navy-900">
           Raport zgodności
-        </a>
-        <a href="/admin" className="font-bold text-navy-500 hover:text-navy-900">
-          Panel administracyjny (demo)
         </a>
       </span>
     </motion.footer>

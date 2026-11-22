@@ -19,6 +19,7 @@ import {
   LogOut,
   Mail,
   Search,
+  Settings2,
   UserRound,
   Type,
   Volume2,
@@ -55,11 +56,18 @@ export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases,
       <Brand />
       <nav aria-label="Usługi" className="ml-auto flex items-center gap-1">
         <TextButton onClick={onLetter} className="flex gap-1.5">
-          <Mail className="size-4" /> Pismo z ZUS
+          <Mail className="size-4" /> <Label short="Pismo">Pismo z ZUS</Label>
         </TextButton>
         <TextButton onClick={onCases} className="flex gap-1.5">
-          <FolderOpen className="size-4" /> Przykładowe sprawy
+          <FolderOpen className="size-4" /> <Label short="Sprawy">Przykładowe sprawy</Label>
         </TextButton>
+        {/* The parameters panel (the brief requires it): numbers of the law in versions by date. */}
+        <a
+          href="/admin"
+          className="flex h-10 items-center gap-1.5 rounded-full px-3 text-sm font-bold whitespace-nowrap text-navy-700 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+        >
+          <Settings2 className="size-4" /> <Label short="Admin">Panel admina</Label>
+        </a>
         <TextButton
           className="hidden 2xl:flex"
           onClick={() => onMock('Kontakt i pomoc pojawią się w wersji demo.')}
@@ -346,6 +354,19 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
   )
 }
 
+/** A label that is shorter on a narrow laptop (below 1280 px); the full words for screen readers. */
+function Label({ short, children }: { short: string; children: string }) {
+  return (
+    <>
+      <span className="hidden xl:inline">{children}</span>
+      <span className="xl:hidden" aria-hidden>
+        {short}
+      </span>
+      <span className="sr-only xl:hidden">{children}</span>
+    </>
+  )
+}
+
 function TextButton({
   onClick,
   className,
@@ -360,7 +381,7 @@ function TextButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'h-10 items-center rounded-full px-3 text-sm font-bold text-navy-700 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+        'h-10 items-center rounded-full px-3 text-sm font-bold whitespace-nowrap text-navy-700 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
         className,
       )}
     >
