@@ -96,21 +96,17 @@ export function workOf(scenario: Scenario | null | undefined, parent: 'mother' |
  *  benefit for the period corresponding to it (guide page 4). */
 const notEmployee = (work: Work | null) => work === 'contract' || work === 'business'
 
-const listJoin = (items: string[]) =>
-  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} i ${items.at(-1)}`
-
 const lower = (text: string) => text.charAt(0).toLowerCase() + text.slice(1)
 
 /**
- * The plan in one line, and a second line with what is still to decide. Today's leave comes
- * first ("Mama jest na urlopie macierzyńskim do 23 marca 2027"; on a contract or with her own
+ * The plan in one line. Today's leave comes first ("Mama jest na urlopie macierzyńskim do 23 marca 2027"; on a contract or with her own
  * firm "Mama pobiera zasiłek macierzyński (za okres urlopu macierzyńskiego) do …"); before the
  * birth, the due date.
  */
 export function headline(
   timeline: Timeline,
   scenario?: Scenario | null,
-): { title: string; text: string } {
+): string {
   const today = dayNumber(timeline.today)
   const sorted = [...timeline.segments].sort((a, b) => a.start.localeCompare(b.start))
   const active = sorted.filter(
@@ -132,35 +128,11 @@ export function headline(
       ? `${who} pobiera zasiłek macierzyński (za okres ${PERIOD_OF[words]}) do ${formatLongDate(end)}`
       : `${who} jest na ${words} do ${formatLongDate(end)}`.trim()
   })
-  const title =
-    titles.length > 0
-      ? titles.join(' · ')
-      : timeline.child_born
-        ? `Dziecko urodziło się ${formatLongDate(timeline.birth_date)}`
-        : `Termin porodu: ${formatLongDate(timeline.birth_date)}`
-
-  const parts: string[] = []
-  // Before the birth (or before the leave starts) the length of the maternity leave is the news.
-  if (active.length === 0) {
-    // Only maternity leave: sick leave in pregnancy is the mother's too, but another period.
-    const maternity = sorted.filter(
-      (s) => s.lane === 'mother' && s.tone === 'leave' && s.id.startsWith('maternity'),
-    )
-    if (maternity.length > 0) {
-      const days = maternity.reduce((sum, s) => sum + s.days, 0)
-      parts.push(
-        `${periodName(maternity[0]).replace(/ (przed|po) porodzie$/, '')}: ${length(days)}, ` +
-          `od ${formatLongDate(maternity[0].start)} do ${formatLongDate(maternity.at(-1)!.end)}.`,
-      )
-    }
-  }
-  const options = sorted.filter((s) => s.tone === 'option' && dayNumber(s.end) >= today)
-  if (options.length > 0) {
-    parts.push(
-      `Do wyboru: ${listJoin(options.map((s) => `${lower(periodName(s))} (${length(s.days)})`))}.`,
-    )
-  }
-  return { title, text: parts.join(' ') }
+  return titles.length > 0
+    ? titles.join(' · ')
+    : timeline.child_born
+      ? `Dziecko urodziło się ${formatLongDate(timeline.birth_date)}`
+      : `Termin porodu: ${formatLongDate(timeline.birth_date)}`
 }
 
 // ---------------------------------------------------------------------------------------------

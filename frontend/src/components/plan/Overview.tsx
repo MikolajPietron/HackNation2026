@@ -63,7 +63,7 @@ export function Overview({
   /** "Udostępnij plan": a read-only link for the partner. */
   onShare?: () => void
 }) {
-  const { title, text } = headline(timeline, scenario)
+  const title = headline(timeline, scenario)
   const right = entitlement(timeline.notes)
   const budget = leaveBudget(timeline)
   const steps = nextSteps(timeline)
@@ -139,22 +139,6 @@ export function Overview({
           <h1 data-read-aloud className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-balance text-navy-900 lg:text-[34px]">
             <TextStates text={title} />
           </h1>
-          <p className="mt-2 max-w-4xl text-[17px] leading-relaxed text-pretty text-navy-500">
-            {text && (
-              <>
-                <span data-read-aloud>
-                  <Emphasis text={text} className="text-navy-900" />
-                </span>{' '}
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => onWhy()}
-              className="inline-flex items-center gap-0.5 font-bold whitespace-nowrap text-zus-700 underline-offset-4 hover:underline"
-            >
-              Dlaczego tak? <ChevronRight className="size-4" />
-            </button>
-          </p>
         </div>
         {wide && (
           <div className="mt-6 flex shrink-0 items-center gap-1">
