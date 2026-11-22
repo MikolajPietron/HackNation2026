@@ -1,6 +1,7 @@
 """What the timeline shows must come from the documents, word for word."""
 
 import datetime as dt
+import re
 from typing import Any
 
 import pytest
@@ -20,7 +21,7 @@ from app.assistant.law import (
 )
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.engine import Scenario, build_timeline
-from app.engine.models import SourceRef
+from app.engine.models import Letter, SourceRef
 from app.services.params import load_params
 
 PARAMS = load_params()
@@ -978,6 +979,28 @@ def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) ->
         for field in form.fields:
             assert field.sources, (document.id, field.id)
             assert not (field.personal and field.value), (document.id, field.id)
+        # The letter to the employer (request_letters.py) cites only Labour Code provisions we
+        # quote; a ZUS form is where the guide's own words say it is.
+        if form.letter is not None:
+            for article in cited_articles(form.letter):
+                assert article in kp_articles(), (document.id, article)
+        if form.official is not None:
+            for source in form.official.sources:
+                assert is_literal(source), (document.id, source.quote)
+            assert any(form.official.where in s.quote for s in form.official.sources)
+
+
+CITED = re.compile(r"art\. (\d+[¹²³⁴⁵⁶⁷⁸⁹⁰ᵃᵇᶜᵈᵉᶠᵍ]*)(?: § (\d+[¹²³⁴⁵⁶⁷⁸⁹⁰]*))?")
+
+
+def cited_articles(letter: Letter) -> list[str]:
+    """The provisions a letter names ("art. 182¹ᵃ § 1"), as the keys of kodeks_pracy.json."""
+    texts = [p.text for p in letter.body] + [letter.legal_basis]
+    return [
+        f"art. {number} § {paragraph}" if paragraph else f"art. {number}"
+        for text in texts
+        for number, paragraph in CITED.findall(text)
+    ]
 
 
 def test_the_model_always_has_the_source_text() -> None:

@@ -573,6 +573,97 @@ class FormNote(BaseModel):
     sources: list[SourceRef] = []
 
 
+# The request as a letter (engine/request_letters.py): what an employee hands the employer,
+# laid out by the front on an A4 page. Personal data never reaches the server, so every piece of
+# it is a placeholder: `{{field-id}}` in any string of the letter (and of `HrMessage`), where
+# `field-id` is one of `Letter.fields` — the form's own field id when the form has that field
+# ("employee-name", "father-name", "child-name", "child-birth-date"), otherwise a letter field
+# ("letter-place", "letter-date", "applicant-address", "employer"). The front replaces each token
+# with what the parent typed, or with a dotted line to fill in by hand.
+
+LetterMeaning = Literal[
+    "applicant-name",
+    "applicant-address",
+    "employer",
+    "child-name",
+    "child-birth-date",
+    "place",
+    "date",
+]
+"""What a placeholder stands for, so values typed once fill every letter: the applicant is
+`RequestForm.applicant` (the mother or the father), "employer" is the applicant's employer."""
+
+
+class LetterField(BaseModel):
+    """A placeholder of the letter: `{{id}}` in its text."""
+
+    id: str
+    label: str
+    """In Polish: "Imię i nazwisko pracownicy", "Nazwa i adres pracodawcy"."""
+    meaning: LetterMeaning
+    personal: bool
+    """Names, addresses, the employer, the place: typed in the browser, never sent anywhere."""
+
+
+class LetterParagraph(BaseModel):
+    """One paragraph of the letter's body, in the order printed."""
+
+    kind: Literal["request", "statement", "choice"]
+    """request = the operative paragraph ("Na podstawie … wnoszę o …"); statement = a
+    declaration the regulation requires, filled from the timeline; choice = a declaration the
+    parent decides: `text` is the lead-in, `options` the answers to tick one of."""
+    text: str
+    options: list[str] = []
+
+
+class Letter(BaseModel):
+    """The request as an employee writes it to the employer. Our wording of what the sources
+    require (the quotes stay in the form); the dates come from the timeline."""
+
+    place_date: str
+    """Top right: "{{letter-place}}, dnia {{letter-date}}"."""
+    applicant: list[str]
+    """Top left, one line each: the applicant's name and address (placeholders)."""
+    addressee: list[str]
+    """Right, below: "Pracodawca" and the employer's name and address (a placeholder)."""
+    title: str
+    body: list[LetterParagraph]
+    attachments: list[str]
+    """"Załączniki:", numbered; empty = no list."""
+    signature: str
+    """Under the signature line: "(czytelny podpis pracownicy)"."""
+    legal_basis: str
+    """Small print at the bottom: "Podstawa prawna: art. … Kodeksu pracy; § … rozporządzenia …"."""
+    fields: list[LetterField]
+    """Every placeholder used in the letter and in `RequestForm.hr_message`, in order."""
+
+
+class HrMessage(BaseModel):
+    """A short e-mail to the employer's HR with the request attached; placeholders as in the
+    letter."""
+
+    subject: str
+    body: str
+    """Lines separated by "\\n"."""
+
+
+class OfficialForm(BaseModel):
+    """A ZUS form the parent fills in on www.zus.pl: our materials give its data (the form's
+    `fields`, printed as `sheet_title`), not the form itself."""
+
+    code: str
+    """ "ZAM", "ZAS-53"."""
+    name: str
+    """ "wniosek o zasiłek macierzyński" — as the guide names it."""
+    where: str
+    """The guide's own words: "www.zus.pl (w zakładce Wzory formularzy, Zasiłki)"."""
+    url: str
+    """ "https://www.zus.pl" — the guide gives no deeper address."""
+    sheet_title: str
+    """ "Dane do wpisania do formularza ZAM"."""
+    sources: list[SourceRef]
+
+
 class RequestForm(BaseModel):
     """A request on the timeline as a form: who files it, with whom, on what legal basis, what
     it contains and what goes with it."""
@@ -593,6 +684,12 @@ class RequestForm(BaseModel):
     fields: list[FormField] = []
     attachments: list[FormAttachment] = []
     notes: list[FormNote] = []
+    letter: Letter | None = None
+    """The request as a letter to the employer; only for requests filed with the employer."""
+    hr_message: HrMessage | None = None
+    """An e-mail to HR with the letter attached; only with `letter`."""
+    official: OfficialForm | None = None
+    """Where the ZUS form is (with `official_form`); the fields are the data to copy into it."""
 
 
 class Document(BaseModel):
