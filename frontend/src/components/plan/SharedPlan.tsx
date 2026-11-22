@@ -6,6 +6,7 @@ import { Eye, LoaderCircle, Printer } from 'lucide-react'
 import { fetchShared } from '@/api'
 import { Brand } from '@/components/layout/Brand'
 import { Dialog } from '@/components/plan/Dialog'
+import { MobilePipeline } from '@/components/plan/MobilePipeline'
 import { MobileTimeline } from '@/components/plan/MobileTimeline'
 import { TimelineCard } from '@/components/plan/TimelineCard'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
@@ -127,13 +128,22 @@ export function SharedPlan({ token }: { token: string }) {
               overlayRoot={overlayRoot}
             />
           ) : (
-            <MobileTimeline
-              timeline={timeline}
-              changedIds={NO_CHANGES}
-              changeVersion={0}
-              selectedId={selectedId}
-              onSelect={open}
-            />
+            <>
+              <MobilePipeline
+                timeline={timeline}
+                changedIds={NO_CHANGES}
+                changeVersion={0}
+                selectedId={selectedId}
+                onSelect={open}
+              />
+              <MobileTimeline
+                timeline={timeline}
+                changedIds={NO_CHANGES}
+                changeVersion={0}
+                selectedId={selectedId}
+                onSelect={open}
+              />
+            </>
           )}
         </section>
 

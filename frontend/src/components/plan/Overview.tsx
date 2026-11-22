@@ -6,8 +6,9 @@
 // After a loss (a stillbirth, a child's or the mother's death) there are no tiles and no ticks:
 // the engine's words of sympathy and what the family is entitled to, in full and calmly
 // (CLAUDE.md, phase 3).
-import { motion } from 'motion/react'
-import { Check, ChevronRight, Lock, RotateCcw, Share2, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { Check, ChevronDown, ChevronRight, Lock, RotateCcw, Share2, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { ITEM } from '@/components/onboarding/motion'
 import { Pulse } from '@/components/timeline/Pulse'
@@ -15,7 +16,7 @@ import { Emphasis } from '@/components/ui/emphasis'
 import { Illustration } from '@/components/ui/illustration'
 import { TextStates } from '@/components/ui/text-states'
 import type { ChangeSet } from '@/hooks/useAssistant'
-import { SPRING_LAYOUT, SPRING_PRESS } from '@/lib/ease'
+import { EASE_OUT, SPRING_LAYOUT, SPRING_PRESS } from '@/lib/ease'
 import { formatPlnShort, formatRate, headlinePayment } from '@/lib/money'
 import { COUNTDOWN_DAYS, daysLeftLabel, entitlement, headline, leaveBudget, length, nextSteps, periodName, workOf } from '@/lib/plan'
 import type { Step } from '@/lib/plan'
@@ -100,9 +101,7 @@ export function Overview({
         {featured.map((note) => (
           <Featured key={note.id} note={note} changed={changed} onWhy={onWhy} />
         ))}
-        {risks.map((risk) => (
-          <Risk key={risk.id} note={risk} changed={changed} onWhy={onWhy} />
-        ))}
+        <Attention risks={risks} warnings={timeline.warnings} changed={changed} onWhy={onWhy} />
       </>
     )
   }
@@ -234,9 +233,7 @@ export function Overview({
       {featured.map((note) => (
         <Featured key={note.id} note={note} changed={changed} onWhy={onWhy} />
       ))}
-      {risks.map((risk) => (
-        <Risk key={risk.id} note={risk} changed={changed} onWhy={onWhy} />
-      ))}
+      <Attention risks={risks} warnings={timeline.warnings} changed={changed} onWhy={onWhy} />
     </>
   )
 }
@@ -300,32 +297,121 @@ function Featured({
   )
 }
 
-/** What stands in the way of an entitlement: amber, in full, never cut short. */
-function Risk({
-  note,
+/** Words of a text, for comparing two texts about the same fact. */
+const words = (text: string) => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []
+
+/** A warning repeats a risk point when both state the same fact with the same number ("dziecko
+ *  skończyło 7 lat"): four words in a row, one of them a number. The risk point has the source. */
+function repeats(warning: string, risks: CaseNote[]): boolean {
+  const w = words(warning)
+  const facts = new Set<string>()
+  for (let i = 0; i + 4 <= w.length; i++) {
+    const run = w.slice(i, i + 4)
+    if (run.some((word) => /\d/.test(word))) facts.add(run.join(' '))
+  }
+  return risks.some((risk) => {
+    const r = words(`${risk.title} ${risk.text}`)
+    for (let i = 0; i + 4 <= r.length; i++) if (facts.has(r.slice(i, i + 4).join(' '))) return true
+    return false
+  })
+}
+
+/** What stands in the way, in one calm card: each risk by its title, the rule and the family's
+ *  dates under "Dlaczego?", the source one tap further; the engine's short warnings as plain
+ *  lines under them (not the ones a risk already says). */
+function Attention({
+  risks,
+  warnings,
   changed,
   onWhy,
 }: {
-  note: CaseNote
+  risks: CaseNote[]
+  warnings: string[]
   changed: ChangeSet
   onWhy: (noteId?: string) => void
 }) {
+  const lines = warnings.filter((warning) => !repeats(warning, risks))
+  if (risks.length === 0 && lines.length === 0) return null
   return (
-    <motion.section variants={ITEM} className="relative mt-3 flex gap-3 rounded-3xl bg-sun-100 px-5 py-4 text-sun-700">
-      {changed.notes.includes(note.id) && <Pulse key={changed.version} className="rounded-3xl" />}
-      <TriangleAlert className="mt-0.5 size-5 shrink-0" />
-      <div className="min-w-0">
-        <p className="font-bold text-navy-900">{note.title}</p>
-        <p className="mt-0.5 leading-relaxed text-navy-700">{note.text}</p>
-        <button
-          type="button"
-          onClick={() => onWhy(note.id)}
-          className="mt-1 text-sm font-bold text-sun-700 underline-offset-4 hover:underline"
-        >
-          Źródło i szczegóły
-        </button>
-      </div>
+    <motion.section variants={ITEM} aria-label="Uwaga" className="mt-4 rounded-3xl border border-sun-300 bg-white">
+      <ul className="divide-y divide-line">
+        {risks.map((risk) => (
+          <RiskRow key={risk.id} note={risk} pulse={changed.notes.includes(risk.id) ? changed.version : null} onWhy={onWhy} />
+        ))}
+        {lines.map((warning) => (
+          <li key={warning} className="flex gap-3 px-4 py-3 lg:px-5">
+            <AlertDot />
+            <p className="min-w-0 pt-0.5 text-[15px] leading-relaxed text-pretty text-navy-700">
+              <Emphasis text={warning} className="text-navy-900" />
+            </p>
+          </li>
+        ))}
+      </ul>
     </motion.section>
+  )
+}
+
+function AlertDot() {
+  return (
+    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-sun-100 text-sun-700">
+      <TriangleAlert className="size-3.5" strokeWidth={2.5} />
+    </span>
+  )
+}
+
+function RiskRow({ note, pulse, onWhy }: { note: CaseNote; pulse: number | null; onWhy: (noteId?: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <li className="relative flex gap-3 px-4 py-3.5 lg:px-5">
+      {pulse !== null && <Pulse key={pulse} className="rounded-3xl" />}
+      <AlertDot />
+      <div className="min-w-0 flex-1">
+        <p className="pt-0.5 leading-snug font-bold text-pretty text-navy-900">{note.title}</p>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              key="why"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: EASE_OUT }}
+              className="overflow-hidden"
+            >
+              <p className="max-w-3xl pt-1.5 text-[15px] leading-relaxed text-pretty text-navy-700">
+                <Emphasis text={note.text} className="text-navy-900" />
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="-ml-2 mt-1 flex items-center gap-1">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="flex h-8 items-center gap-1 rounded-full px-2 text-sm font-bold text-navy-500 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+          >
+            {open ? 'Zwiń' : 'Dlaczego?'}
+            <ChevronDown className={cn('size-4 transition-transform duration-200', open && 'rotate-180')} />
+          </button>
+          <AnimatePresence initial={false}>
+            {open && (
+              <motion.button
+                key="source"
+                type="button"
+                onClick={() => onWhy(note.id)}
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -4, transition: { duration: 0.1 } }}
+                transition={{ duration: 0.2, ease: EASE_OUT }}
+                className="flex h-8 items-center rounded-full px-2 text-sm font-bold text-zus-700 transition-colors hover:bg-zus-50 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+              >
+                Źródło
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </li>
   )
 }
 

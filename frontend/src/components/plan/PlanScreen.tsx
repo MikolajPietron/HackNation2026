@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { CalendarRange, ChevronUp, ExternalLink, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react'
+import { CalendarRange, ChevronUp, ExternalLink, RotateCcw, Sparkles } from 'lucide-react'
 import etat from '@/assets/onboarding/etat.webp'
 import mama from '@/assets/onboarding/mama.webp'
 import odpoczynek from '@/assets/onboarding/odpoczynek.webp'
@@ -55,6 +55,7 @@ import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
 import { LeftOnTable } from './LeftOnTable'
+import { MobilePipeline } from './MobilePipeline'
 import { MobileTimeline } from './MobileTimeline'
 import { NextSteps } from './NextSteps'
 import { ParentalEditor } from './ParentalEditor'
@@ -387,17 +388,6 @@ export function PlanScreen({
                     onShare={() => setShareOpen(true)}
                   />
 
-                  {timeline.warnings.map((warning) => (
-                    <motion.p
-                      key={warning}
-                      variants={ITEM}
-                      className="mt-4 flex gap-3 rounded-2xl bg-sun-100 px-4 py-3 text-sun-700 lg:px-5"
-                    >
-                      <TriangleAlert className="mt-0.5 size-5 shrink-0" />
-                      {warning}
-                    </motion.p>
-                  ))}
-
                   <AnimatePresence initial={false}>
                     {next?.title && (
                       <Decision
@@ -437,6 +427,16 @@ export function PlanScreen({
                       />
                     ) : (
                       <>
+                        {/* The timeline as tracks, upright: the phone's version of the wide axis. A
+                            what-if is previewed on it too. */}
+                        <MobilePipeline
+                          timeline={shown ?? timeline}
+                          changedIds={axisChanged}
+                          changeVersion={axisVersion}
+                          selectedId={selectedId}
+                          onSelect={select}
+                          preview={previewing !== null}
+                        />
                         <NextSteps
                           timeline={shown ?? timeline}
                           changedIds={axisChanged}
@@ -445,9 +445,8 @@ export function PlanScreen({
                           onHover={() => undefined}
                           onSelect={select}
                         />
-                        {/* The whole plan is long on a phone: what lies ahead is above, the rest on demand
-                            (opened by itself while an event is previewed on it). */}
-                        {fullPlan || previewing !== null ? (
+                        {/* Every element as a list, or the wall calendar, on demand. */}
+                        {fullPlan ? (
                           <>
                             <div className="mt-8 flex items-center justify-between gap-3">
                               <h3 className="text-lg font-bold text-navy-900">Cały plan</h3>
@@ -480,7 +479,7 @@ export function PlanScreen({
                             onClick={() => setFullPlan(true)}
                             className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full border border-line bg-white text-sm font-bold text-navy-900 transition-colors hover:bg-navy-50"
                           >
-                            <CalendarRange className="size-4 text-zus-700" /> Pokaż cały plan: oś i kalendarz
+                            <CalendarRange className="size-4 text-zus-700" /> Pokaż cały plan: lista i kalendarz
                           </button>
                         )}
                       </>

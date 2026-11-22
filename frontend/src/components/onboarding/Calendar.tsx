@@ -82,7 +82,7 @@ export const CALENDAR_WIDTH = 'calc(var(--cell) * 7 + 2.5rem)'
 export function Calendar({ value, min, max, today, label, onChange, className }: Props) {
   const clamp = (iso: string) => (iso < min ? min : iso > max ? max : iso)
   const [view, setView] = useState<Month>(() => monthOf(value || clamp(today)))
-  const [mode, setMode] = useState<'days' | 'months'>('days')
+  const [mode, setMode] = useState<'days' | 'months' | 'years'>('days')
   const [direction, setDirection] = useState(1)
   const [focus, setFocus] = useState(() => value || clamp(today))
   const grid = useRef<HTMLDivElement>(null)
@@ -92,21 +92,28 @@ export function Calendar({ value, min, max, today, label, onChange, className }:
   const last = monthOf(max)
   const minKey = key(first)
   const maxKey = key(last)
-  // Days view pages by month, months view by year.
+  /** A range over a few years (a child born years ago): the year is picked from a grid first,
+   *  then the month, then the day. A short range pages its years with the arrows. */
+  const manyYears = last.year - first.year >= 2
+  const years = Array.from({ length: last.year - first.year + 1 }, (_, i) => last.year - i)
+  // Days view pages by month, months view by year; the years grid shows them all.
   const step = mode === 'days' ? 1 : 12
   const canPrev = mode === 'days' ? key(view) > minKey : view.year > first.year
   const canNext = mode === 'days' ? key(view) < maxKey : view.year < last.year
 
+  /** Paging by year can land on a month outside the range. */
+  const inRange = (m: Month) => (key(m) < minKey ? first : key(m) > maxKey ? last : m)
   const goTo = (next: Month) => {
     setDirection(key(next) >= key(view) ? 1 : -1)
     setView(next)
   }
   const toggleMode = () => {
-    if (mode === 'months') {
-      // Paging by year can land on a month outside the range.
-      setView((v) => (key(v) < minKey ? first : key(v) > maxKey ? last : v))
+    if (mode === 'days') setMode(manyYears ? 'years' : 'months')
+    else if (mode === 'months' && manyYears) setMode('years')
+    else {
+      setView(inRange)
       setMode('days')
-    } else setMode('months')
+    }
   }
 
   // Keyboard moves focus between days, also into the next month once it has rendered.
@@ -154,31 +161,36 @@ export function Calendar({ value, min, max, today, label, onChange, className }:
         <button
           type="button"
           onClick={toggleMode}
-          aria-expanded={mode === 'months'}
+          aria-expanded={mode !== 'days'}
+          aria-label={mode === 'days' ? (manyYears ? 'Wybierz rok i miesiąc' : 'Wybierz miesiąc') : undefined}
           className="flex h-11 items-center gap-1.5 rounded-full px-3 text-lg font-bold text-navy-900 transition-colors hover:bg-navy-50 focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
         >
           <TextStates
             text={
               mode === 'days'
                 ? `${capitalize(monthLong.format(utc(toIso(view.year, view.month, 1))))} ${view.year}`
-                : String(view.year)
+                : mode === 'months'
+                  ? String(view.year)
+                  : 'Wybierz rok'
             }
           />
           <ChevronDown
             className={cn(
               'size-4 text-navy-500 transition-transform duration-300',
-              mode === 'months' && 'rotate-180',
+              mode !== 'days' && 'rotate-180',
             )}
           />
         </button>
-        <div className="flex gap-1">
-          <NavButton label="Wcześniej" disabled={!canPrev} onClick={() => goTo(shift(view, -step))}>
-            <ChevronLeft className="size-5" />
-          </NavButton>
-          <NavButton label="Później" disabled={!canNext} onClick={() => goTo(shift(view, step))}>
-            <ChevronRight className="size-5" />
-          </NavButton>
-        </div>
+        {mode !== 'years' && (
+          <div className="flex gap-1">
+            <NavButton label="Wcześniej" disabled={!canPrev} onClick={() => goTo(shift(view, -step))}>
+              <ChevronLeft className="size-5" />
+            </NavButton>
+            <NavButton label="Później" disabled={!canNext} onClick={() => goTo(shift(view, step))}>
+              <ChevronRight className="size-5" />
+            </NavButton>
+          </div>
+        )}
       </div>
 
       <div className="relative overflow-hidden" style={{ height: 'calc(var(--cell) * 6 + 3.5rem + 4px)' }}>
@@ -227,6 +239,39 @@ export function Calendar({ value, min, max, today, label, onChange, className }:
                   ),
                 )}
               </div>
+            </motion.div>
+          ) : mode === 'years' ? (
+            <motion.div
+              key="years"
+              custom={-1}
+              variants={SLIDE}
+              initial="from"
+              animate="in"
+              exit="out"
+              transition={{ duration: 0.35, ease: EASE_OUT }}
+              className="scrollbar-soft grid h-full auto-rows-12 grid-cols-4 content-center gap-2 overflow-y-auto"
+            >
+              {years.map((year) => {
+                const chosen = value !== '' && monthOf(value).year === year
+                return (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() => {
+                      goTo(inRange({ year, month: view.month }))
+                      setMode('months')
+                    }}
+                    className={cn(
+                      'rounded-2xl text-base font-bold tabular-nums transition-[background-color,color,transform] duration-150 active:scale-[0.96]',
+                      'focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none',
+                      chosen ? 'bg-zus-600 text-white' : 'text-navy-900 hover:bg-navy-50',
+                      year === view.year && !chosen && 'ring-1 ring-line ring-inset',
+                    )}
+                  >
+                    {year}
+                  </button>
+                )
+              })}
             </motion.div>
           ) : (
             <motion.div
