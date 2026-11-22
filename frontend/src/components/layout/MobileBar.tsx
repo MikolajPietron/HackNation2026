@@ -13,6 +13,7 @@ import {
   HeartHandshake,
   Languages,
   LogOut,
+  Mail,
   Menu,
   RotateCcw,
   Search,
@@ -33,6 +34,7 @@ interface Props {
   onLogout: () => void
   onZusData: () => void
   onCases: () => void
+  onLetter: () => void
   onAbout: () => void
   onSupport: () => void
   onStartOver: () => void
@@ -88,6 +90,7 @@ function MenuContent({
   onLogout,
   onZusData,
   onCases,
+  onLetter,
   onAbout,
   onSupport,
   onStartOver,
@@ -102,6 +105,9 @@ function MenuContent({
   return (
     <nav aria-label="Menu" className="space-y-5">
       <Group>
+        <Item icon={<Mail />} onClick={then(onLetter)} meta="AI">
+          Przetłumacz pismo z ZUS
+        </Item>
         <Item icon={<FolderOpen />} onClick={then(onCases)}>
           Przykładowe sprawy
         </Item>

@@ -269,7 +269,18 @@ function Picker({
   )
 }
 
-function UploadZone({ onFile }: { onFile: (file: File) => void }) {
+/** Drop or pick a PDF or a photo; read by AI (marked). The cases and the letters from ZUS. */
+export function UploadZone({
+  onFile,
+  title = 'Wgraj sprawę (PDF albo zdjęcie)',
+  hint = 'Przeciągnij plik albo kliknij. ZAM, Z-3, poświadczenia, decyzje: wszystkie strony naraz.',
+  icon = ICONS.zaswiadczenie,
+}: {
+  onFile: (file: File) => void
+  title?: string
+  hint?: string
+  icon?: string
+}) {
   const [over, setOver] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const drop = (event: DragEvent) => {
@@ -294,13 +305,11 @@ function UploadZone({ onFile }: { onFile: (file: File) => void }) {
       )}
     >
       <span className="transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5">
-        <Illustration src={ICONS.zaswiadczenie} size="lane" />
+        <Illustration src={icon} size="lane" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-bold text-navy-900">Wgraj sprawę (PDF albo zdjęcie)</span>
-        <span className="block text-sm text-navy-500">
-          Przeciągnij plik albo kliknij. ZAM, Z-3, poświadczenia, decyzje: wszystkie strony naraz.
-        </span>
+        <span className="block font-bold text-navy-900">{title}</span>
+        <span className="block text-sm text-navy-500">{hint}</span>
       </span>
       <span className="rounded-full bg-zus-600 px-2 py-0.5 text-[10px] font-black tracking-wide text-white">AI</span>
       <input
@@ -335,16 +344,22 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 /** While AI reads the scans: a page with a line moving over it, the time it takes, and a way out. */
-function Reading({
+export function Reading({
   label,
   pages,
   started,
   onCancel,
+  what = 'AI przepisuje dane z dokumentów',
+  note = 'Pierwszy odczyt trwa zwykle kilkanaście sekund. Potem sprawa jest w pamięci serwera i otwiera się od razu.',
+  icon = ICONS.zaswiadczenie,
 }: {
   label: string
   pages: number | null
   started: number
   onCancel: () => void
+  what?: string
+  note?: string
+  icon?: string
 }) {
   const reduce = useReducedMotion()
   const [now, setNow] = useState(() => Date.now())
@@ -356,7 +371,7 @@ function Reading({
   return (
     <div className="flex flex-col items-center py-8 text-center" aria-live="polite">
       <div className="relative grid size-32 place-items-center overflow-hidden rounded-[32px] bg-navy-50">
-        <Illustration src={ICONS.zaswiadczenie} size="lane" className="scale-150" />
+        <Illustration src={icon} size="lane" className="scale-150" />
         {!reduce && (
           <motion.span
             className="absolute inset-x-4 h-0.5 rounded-full bg-zus-400 shadow-[0_0_12px_2px_var(--color-zus-300)]"
@@ -368,7 +383,7 @@ function Reading({
       </div>
       <h2 className="mt-6 text-2xl font-bold tracking-tight text-navy-900">{label}</h2>
       <p className="mt-1 text-navy-500">
-        {pages ? `${pages} stron · ` : ''}AI przepisuje dane z dokumentów
+        {pages ? `${pages} stron · ` : ''}{what}
         <span className="ml-2 rounded-full bg-zus-600 px-2 py-0.5 align-middle text-[10px] font-black tracking-wide text-white">
           AI
         </span>
@@ -376,10 +391,7 @@ function Reading({
       <p className="mt-4 text-3xl font-bold text-navy-900 tabular-nums">
         {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
       </p>
-      <p className="mt-2 max-w-sm text-sm text-pretty text-navy-500">
-        Pierwszy odczyt trwa zwykle kilkanaście sekund. Potem sprawa jest w pamięci serwera i
-        otwiera się od razu.
-      </p>
+      <p className="mt-2 max-w-sm text-sm text-pretty text-navy-500">{note}</p>
       <button
         type="button"
         onClick={onCancel}

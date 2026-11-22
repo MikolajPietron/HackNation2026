@@ -16,6 +16,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel'
 import { MobileBar } from '@/components/layout/MobileBar'
 import { TopBar } from '@/components/layout/TopBar'
 import { CasesDialog } from '@/components/cases/CasesDialog'
+import { LetterDialog } from '@/components/letters/LetterDialog'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
@@ -140,6 +141,7 @@ export function PlanScreen({
   const [loginOpen, setLoginOpen] = useState(false)
   const [zusOpen, setZusOpen] = useState(false)
   const [casesOpen, setCasesOpen] = useState(false)
+  const [letterOpen, setLetterOpen] = useState(false)
   const plan = usePlanChange(scenario, onUpdate)
   /** Changes from the interface wait while the assistant is writing (it may be changing the
    *  same plan). */
@@ -198,6 +200,7 @@ export function PlanScreen({
           onLogout={() => setPersona(null)}
           onZusData={() => setZusOpen(true)}
           onCases={() => setCasesOpen(true)}
+          onLetter={() => setLetterOpen(true)}
         />
       ) : (
         <MobileBar
@@ -206,6 +209,7 @@ export function PlanScreen({
           onLogout={() => setPersona(null)}
           onZusData={() => setZusOpen(true)}
           onCases={() => setCasesOpen(true)}
+          onLetter={() => setLetterOpen(true)}
           onAbout={() => setWhy({})}
           onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
@@ -491,6 +495,7 @@ export function PlanScreen({
       />
       <ZusDataDialog persona={persona} open={zusOpen} onClose={() => setZusOpen(false)} onMock={showMock} />
       <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
+      <LetterDialog open={letterOpen} onClose={() => setLetterOpen(false)} timeline={timeline} onSelect={onSelect} />
 
       <UndoPill change={plan.change} onUndo={() => void plan.undo()} onDismiss={plan.dismiss} />
 

@@ -17,6 +17,7 @@ import {
   Ear,
   FolderOpen,
   LogOut,
+  Mail,
   Search,
   UserRound,
   Type,
@@ -37,10 +38,12 @@ interface TopBarProps {
   onZusData: () => void
   /** Example cases for the jury. */
   onCases: () => void
+  /** "Przetłumacz pismo z ZUS" (AI). */
+  onLetter: () => void
   className?: string
 }
 
-export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases, className }: TopBarProps) {
+export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases, onLetter, className }: TopBarProps) {
   return (
     <header
       className={cn(
@@ -50,6 +53,9 @@ export function TopBar({ onMock, persona, onLogin, onLogout, onZusData, onCases,
     >
       <Brand />
       <nav aria-label="Usługi" className="ml-auto flex items-center gap-1">
+        <TextButton onClick={onLetter} className="flex gap-1.5">
+          <Mail className="size-4" /> Pismo z ZUS
+        </TextButton>
         <TextButton onClick={onCases} className="flex gap-1.5">
           <FolderOpen className="size-4" /> Przykładowe sprawy
         </TextButton>
