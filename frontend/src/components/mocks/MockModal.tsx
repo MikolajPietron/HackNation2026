@@ -31,7 +31,10 @@ export function MockModal({
           exit={{ opacity: 0, transition: { duration: 0.15 } }}
           transition={{ duration: 0.2, ease: EASE_OUT }}
           onClick={onClose}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-navy-900/15 backdrop-blur-[3px] sm:items-center sm:p-6 lg:p-10"
+          // Opened over a phone sheet (Vaul sets pointer-events: none on the body), the window
+          // still takes clicks, and the sheet under it stays open (components/ui/sheet).
+          data-overlay-window
+          className="pointer-events-auto fixed inset-0 z-50 flex items-end justify-center bg-navy-900/15 backdrop-blur-[3px] sm:items-center sm:p-6 lg:p-10"
         >
           <ModalPanel label={label} onClose={onClose} sheetOnPhone className={cn('max-w-lg', className)}>
             {children}

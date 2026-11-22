@@ -36,6 +36,10 @@ export function Sheet({
         <Drawer.Overlay className="fixed inset-0 z-50 bg-navy-900/25 backdrop-blur-[2px]" />
         <Drawer.Content
           aria-describedby={undefined}
+          // A window opened from the sheet (e.g. ordering a birth certificate from a request)
+          // sits above it: using it must not close the sheet and lose what was typed there.
+          onPointerDownOutside={keepForWindows}
+          onInteractOutside={keepForWindows}
           className={cn(
             'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-[28px] bg-white outline-none',
             fullHeight && 'h-[92dvh]',
@@ -62,4 +66,9 @@ export function Sheet({
       </Drawer.Portal>
     </Drawer.Root>
   )
+}
+
+/** Clicks in a window above the sheet are not "outside" it. */
+function keepForWindows(event: { target: EventTarget | null; preventDefault: () => void }) {
+  if (event.target instanceof Element && event.target.closest('[data-overlay-window]')) event.preventDefault()
 }
