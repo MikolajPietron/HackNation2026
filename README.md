@@ -123,6 +123,8 @@ Prosty język, większy tekst, tryb wysokiego kontrastu, widoczny fokus klawiatu
 
 Każda funkcja AI jest oznaczona w interfejsie. **AI nigdy nie liczy dat ani kwot i nie ustala prawa do zasiłku.**
 
+<img src="docs/prezentacja/zrzuty/23-asystent-ai-czat-obok-planu.jpg" alt="Asystent AI obok planu: odpowiedź z liczbami z silnika i źródłem" width="74%"> <img src="docs/prezentacja/zrzuty/t10-telefon-asystent-ai.jpg" alt="Asystent AI na telefonie" width="24%">
+
 | Funkcja | AI | Rola |
 |---|---|---|
 | Asystent w czacie | tak | prowadzi rozmowę po jednym pytaniu, zapisuje odpowiedzi narzędziami, które wołają silnik, i tłumaczy oś prostym językiem z cytatami; treść i kolejność pytań ustala kod |
