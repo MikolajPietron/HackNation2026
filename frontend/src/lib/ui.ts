@@ -1,4 +1,4 @@
-import type { Lane, SourceRef, Tone, Work } from '../types'
+import type { Lane, PlanGoal, SourceRef, Tone, Work } from '../types'
 import { formatDate } from './dates'
 import { formatPln } from './money'
 
@@ -188,6 +188,14 @@ export const WORK_LABEL: Record<Work, string> = {
   none: 'nie pracuje',
 }
 
+/** The goals of planning parental leave (F8, backend engine/plans.py `GOAL_LABEL`). */
+export const PLAN_GOAL_LABEL: Record<PlanGoal, string> = {
+  'most-money': 'najwięcej pieniędzy',
+  'longest-home': 'najdłużej w domu',
+  'equal-split': 'równy podział',
+  'quick-return': 'szybki powrót do pracy',
+}
+
 /** "jedno dziecko", "bliźnięta", "trojaczki", "4 dzieci" — for headers. */
 export function childrenLabel(count: number): string {
   return { 1: 'jedno dziecko', 2: 'bliźnięta', 3: 'trojaczki' }[count] ?? `${count} dzieci`
@@ -312,6 +320,11 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
         ? `Praca ${who} w czasie urlopu rodzicielskiego: ${args.work_fraction} etatu`
         : `Bez pracy ${who} w czasie urlopu rodzicielskiego`
     }
+    // F8 plans for a goal and F11 the stress test: computed by the engine, nothing changes.
+    case 'propose_plans':
+      return `Układam plany: ${PLAN_GOAL_LABEL[args.goal as PlanGoal] ?? 'Wasz cel'}`
+    case 'stress_test':
+      return 'Sprawdzam, co zmieniłoby się w planie'
     default:
       return name
   }

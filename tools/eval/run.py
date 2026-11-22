@@ -138,6 +138,7 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
         dt.date(y, m, d) for y, m, d in extract_dates(step.get("say", ""), default_year=2026)
     }
     extra = user_dates | src_dates | (timeline_dates(before) if before else set())
+    extra |= {dt.date.fromisoformat(iso) for iso in step.get("extra_dates", [])}
     checks.append(check_reply_dates(text, after, extra))
     mention = step.get("mention", {})
     checks += check_mentions(text, mention.get("dates", []), mention.get("numbers", []))
