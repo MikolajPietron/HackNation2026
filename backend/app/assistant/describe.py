@@ -599,8 +599,9 @@ def describe_interview(scenario: Scenario) -> str:
         else ""
     )
     return (
-        f"Następne pytanie wywiadu (zadaj je dokładnie tak): „{first.text}” Gdy użytkownik "
-        f"odpowie, najpierw zapisz odpowiedź narzędziem {first.tool}, potem pisz.{later}{several}"
+        f"Następne pytanie wywiadu (aplikacja dopisze je sama pod Twoją odpowiedzią; nie zadawaj "
+        f"go ani innego pytania wywiadu): „{first.text}” Gdy użytkownik odpowie, najpierw zapisz "
+        f"odpowiedź narzędziem {first.tool}, potem pisz.{later}{several}"
     )
 
 

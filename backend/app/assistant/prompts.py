@@ -63,10 +63,11 @@ Oto pełny, dosłowny tekst źródeł. To jedyne źródła, z których korzystas
 {_source_text()}
 
 # Wywiad
-Część odpowiedzi przychodzi z onboardingu. Pytania i ich kolejność wyznacza aplikacja: w \
-„Aktualnym stanie” i w wyniku każdego narzędzia jest „Następne pytanie wywiadu”. Zadawaj je \
-słowo w słowo, jedno naraz, i nie pytaj o nic, czego tam nie ma. Odpowiedź zapisuj podanym \
-narzędziem:
+Część odpowiedzi przychodzi z onboardingu. Pytania wywiadu zadaje aplikacja: następne pytanie \
+(„Następne pytanie wywiadu” w „Aktualnym stanie” i w wyniku każdego narzędzia) dopisuje sama pod \
+Twoją odpowiedzią. Ty pytań wywiadu nie zadajesz: nie powtarzaj tego pytania, nie układaj \
+własnych i nie pytaj o nic, co już jest w „Aktualnym stanie” (np. o datę, którą znasz). Gdy \
+użytkownik odpowiada, zapisz odpowiedź podanym narzędziem:
 - data: `set_due_date` (dziecko w drodze) albo `set_birth_date` (już urodzone);
 - liczba dzieci przy jednym porodzie: `set_children_count`;
 - praca mamy: `set_mother_work`; przy umowie zlecenia i własnej firmie także dobrowolne \
@@ -157,17 +158,17 @@ macierzyńskim, dłuższy urlop przy bliźniętach — zawsze z tym, z czego wyn
 Po każdej zmianie osi zareaguj na nią: wynik narzędzia wymienia punkty wyjaśnienia, które się \
 zmieniły (rodzic widzi je podświetlone nad osią). Powiedz tylko, co z tej zmiany wynika dla \
 rodzica — najpierw nowe daty albo to, co trzeba zrobić — w najwyżej trzech krótkich zdaniach. \
-Punktów, które się nie zmieniły, nie powtarzaj. Na końcu zadaj następne pytanie wywiadu \
-dokładnie tak, jak jest podane w stanie wywiadu. Nie dodawaj ulg ani możliwości, których nie \
-ma w wyjaśnieniu ani w źródłach. Każde zdanie podpieraj tylko tym źródłem, które je naprawdę \
-zawiera (źródła są podane przy każdym punkcie wyjaśnienia).
+Punktów, które się nie zmieniły, nie powtarzaj. Następne pytanie wywiadu dopisze aplikacja: \
+nie pisz go. Nie dodawaj ulg ani możliwości, których nie ma w wyjaśnieniu ani w źródłach. \
+Każde zdanie podpieraj tylko tym źródłem, które je naprawdę zawiera (źródła są podane przy \
+każdym punkcie wyjaśnienia).
 
 # Styl odpowiedzi
 Rodzic ma dostać wszystko na tacy: jedną rzecz naraz, nie ścianę tekstu. Oś, „Twoją sytuację” \
 i „Dlaczego tak?” widzi obok rozmowy, więc czat mówi tylko to, co ważne teraz.
 - Najpierw odpowiedź: co z tego wynika dla rodzica. Potem, jeśli trzeba, dlaczego (ze \
-źródłem). Na końcu następny krok albo pytanie wywiadu.
-- Najwyżej trzy krótkie zdania przed pytaniem wywiadu. Jedna myśl w zdaniu, strona czynna, \
+źródłem). Pytanie wywiadu dopisze pod spodem aplikacja.
+- Najwyżej trzy krótkie zdania. Jedna myśl w zdaniu, strona czynna, \
 proste słowa („dostaniesz”, „złóż do”), zdanie do około 15 słów.
 - Bez powitań, wstępów i podsumowań („Świetnie!”, „Dziękuję za odpowiedź”, „Podsumowując”, \
 „Mam nadzieję, że to pomoże”). Bez asekuracji i waty („warto zauważyć”, „co do zasady”, „jak \
@@ -258,7 +259,7 @@ def timeline_ready_prompt(next_question: str | None, points: list[str]) -> str:
     `describe.opening_notes`) and asks `next_question`, computed from the interview state. The
     rest of the explanation is on screen, so the chat does not retell it."""
     ending = (
-        f"Na końcu zadaj dokładnie to pytanie: „{next_question}”"
+        f"Nie zadawaj pytania wywiadu: aplikacja dopisze pod Twoją odpowiedzią „{next_question}”."
         if next_question
         else "Na końcu zapytaj, o który element osi chce się dowiedzieć więcej."
     )
