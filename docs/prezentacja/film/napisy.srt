@@ -1,115 +1,111 @@
 1
-00:00:00,400 --> 00:00:05,794
-Kiedy w rodzinie pojawia się dziecko, rodzice mają dziesiątki pytań.
+00:00:00,400 --> 00:00:07,332
+Rodzice mają dziesiątki pytań: ile urlopu nam się należy, ile dostaniemy, co złożyć i do kiedy.
 
 2
-00:00:05,794 --> 00:00:07,905
-Ile urlopu nam się należy?
+00:00:07,332 --> 00:00:11,592
+A jedna przegapiona data potrafi kosztować tysiące złotych.
 
 3
-00:00:07,905 --> 00:00:09,156
-Ile dostaniemy?
-
-4
-00:00:09,156 --> 00:00:10,876
-Co złożyć i do kiedy?
-
-5
-00:00:10,876 --> 00:00:17,443
-Przepisy są rozproszone, a jedna przegapiona data potrafi kosztować tysiące złotych.
-
-6
-00:00:18,143 --> 00:00:27,390
+00:00:12,092 --> 00:00:21,443
 Zasiłkowy Przewodnik Przyszłego Rodzica zaczyna od kilku prostych pytań: kim jesteś, kiedy jest termin porodu i jak pracujecie.
 
-7
-00:00:27,390 --> 00:00:30,496
+4
+00:00:21,443 --> 00:00:24,584
 Po chwili rodzina widzi swój osobisty plan.
 
-8
-00:00:31,177 --> 00:00:36,561
+5
+00:00:25,092 --> 00:00:30,256
 Sercem aplikacji jest oś czasu: jeden kalkulator zamiast dziesięciu.
 
-9
-00:00:36,561 --> 00:00:43,194
-Urlop mamy i taty, terminy wniosków i dni, po których prawa nie da się już odzyskać.
+6
+00:00:30,256 --> 00:00:36,317
+Urlop mamy i taty, terminy wniosków i dni, po których prawa nie da się odzyskać.
 
-10
-00:00:43,194 --> 00:00:48,267
-Każdy element ma dosłowny cytat z przepisu albo z materiałów ZUS.
+7
+00:00:36,317 --> 00:00:39,535
+Każdy element ma dosłowny cytat z przepisu.
 
-11
-00:00:48,977 --> 00:00:53,020
+8
+00:00:40,025 --> 00:00:44,069
 Kwoty liczy silnik reguł, nie sztuczna inteligencja.
 
-12
-00:00:53,020 --> 00:01:00,192
+9
+00:00:44,069 --> 00:00:51,241
 Okno „Dlaczego tyle?” pokazuje podstawę wymiaru krok po kroku, z przepisem przy każdym kroku.
 
-13
-00:01:00,192 --> 00:01:07,135
+10
+00:00:51,241 --> 00:00:58,183
 Aplikacja mówi, kto wypłaci zasiłek, pracodawca czy ZUS, i wypełnia wnioski danymi z planu.
 
+11
+00:00:58,692 --> 00:01:05,071
+Rodzina zaczyna od celu: najwięcej pieniędzy, najdłużej w domu albo równy podział.
+
+12
+00:01:05,071 --> 00:01:12,604
+Silnik układa konkretne plany z datami i kwotami, a jedno kliknięcie przenosi wybrany plan na oś.
+
+13
+00:01:12,604 --> 00:01:17,754
+Potem ten plan można przetestować: co, jeśli urodzi się wcześniak?
+
 14
-00:01:07,843 --> 00:01:10,643
-A co, jeśli urodzi się wcześniak?
+00:01:17,754 --> 00:01:22,980
+Dochodzi urlop uzupełniający, a stary plan zostaje na osi jako cień.
 
 15
-00:01:10,643 --> 00:01:20,522
-Plan przelicza się od razu: dochodzi urlop uzupełniający, terminy się przesuwają, a stary plan zostaje na osi jako cień.
+00:01:23,492 --> 00:01:30,133
+Na telefonie działa to tak samo: oś układa się pionowo, a przy każdym okresie widać kwotę.
 
 16
-00:01:21,210 --> 00:01:30,219
-Na telefonie wszystko działa tak samo: oś układa się pionowo, mama i tata są obok siebie, a przy każdym okresie widać kwotę.
-
-17
-00:01:30,910 --> 00:01:34,154
+00:01:30,625 --> 00:01:33,762
 Najważniejszy test to prawdziwe sprawy ZUS.
 
-18
-00:01:34,154 --> 00:01:36,881
+17
+00:01:33,762 --> 00:01:36,400
 Wybieramy sprawę albo wgrywamy skan.
 
-19
-00:01:36,881 --> 00:01:42,557
+18
+00:01:36,400 --> 00:01:41,890
 Sztuczna inteligencja tylko przepisuje fakty z dokumentów, z numerem strony.
 
-20
-00:01:42,557 --> 00:01:44,474
+19
+00:01:41,890 --> 00:01:43,743
 Resztę robi silnik reguł.
 
-21
-00:01:44,474 --> 00:01:53,614
+20
+00:01:43,743 --> 00:01:52,583
 Tutaj sprawdza ubezpieczenie chorobowe w dniu porodu, dochodzi do odmowy z tego samego powodu co ZUS i wskazuje strony akt.
 
-22
-00:01:53,614 --> 00:01:59,732
+21
+00:01:52,583 --> 00:01:58,501
 W kolejnej sprawie liczy podstawę z zaświadczenia płatnika i kwotę za każdy okres.
 
-23
-00:01:59,732 --> 00:02:03,418
+22
+00:01:58,501 --> 00:02:02,065
 Jednym kliknięciem sprawa staje się planem na osi.
 
-24
-00:02:04,110 --> 00:02:14,956
+23
+00:02:02,559 --> 00:02:13,607
 Wszystko liczy silnik reguł, nie sztuczna inteligencja: każdą datę co do dnia i każdą kwotę co do grosza, z przepisem przy każdym kroku.
 
-25
-00:02:14,956 --> 00:02:29,048
+24
+00:02:13,607 --> 00:02:27,961
 Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a ponad czterysta osiemdziesiąt dosłownych cytatów z przepisów jest sprawdzanych co do znaku.
 
-26
-00:02:29,748 --> 00:02:39,493
+25
+00:02:28,461 --> 00:02:37,639
 Gdy zmienią się przepisy, ekspert zmienia liczby w panelu, bez programisty, z datą obowiązywania i podglądem skutków.
 
-27
-00:02:39,493 --> 00:02:46,513
+26
+00:02:37,639 --> 00:02:44,251
 A asystent AI tłumaczy plan prostym językiem, zawsze liczbami z silnika i ze źródłem.
 
-28
-00:02:47,613 --> 00:02:50,513
+27
+00:02:45,151 --> 00:02:48,007
 Zasiłkowy Przewodnik Przyszłego Rodzica.
 
-29
-00:02:50,513 --> 00:02:53,697
+28
+00:02:48,007 --> 00:02:51,142
 Wszystko, co się należy, na jednej osi czasu.

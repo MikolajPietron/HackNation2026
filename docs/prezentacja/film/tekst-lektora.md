@@ -1,10 +1,10 @@
 # Film: tekst lektora
 
-Głos: ElevenLabs (Paweł, eleven_multilingual_v2). Długość filmu: 2:56.
+Głos: ElevenLabs (Paweł, eleven_multilingual_v2, tempo 1,06). Długość filmu: 2:53.
 
 ## Problem
 
-Kiedy w rodzinie pojawia się dziecko, rodzice mają dziesiątki pytań. Ile urlopu nam się należy? Ile dostaniemy? Co złożyć i do kiedy? Przepisy są rozproszone, a jedna przegapiona data potrafi kosztować tysiące złotych.
+Rodzice mają dziesiątki pytań: ile urlopu nam się należy, ile dostaniemy, co złożyć i do kiedy. A jedna przegapiona data potrafi kosztować tysiące złotych.
 
 ## Kilka pytań na start
 
@@ -12,19 +12,19 @@ Zasiłkowy Przewodnik Przyszłego Rodzica zaczyna od kilku prostych pytań: kim 
 
 ## Oś czasu
 
-Sercem aplikacji jest oś czasu: jeden kalkulator zamiast dziesięciu. Urlop mamy i taty, terminy wniosków i dni, po których prawa nie da się już odzyskać. Każdy element ma dosłowny cytat z przepisu albo z materiałów ZUS.
+Sercem aplikacji jest oś czasu: jeden kalkulator zamiast dziesięciu. Urlop mamy i taty, terminy wniosków i dni, po których prawa nie da się odzyskać. Każdy element ma dosłowny cytat z przepisu.
 
 ## Pieniądze i wnioski
 
 Kwoty liczy silnik reguł, nie sztuczna inteligencja. Okno „Dlaczego tyle?” pokazuje podstawę wymiaru krok po kroku, z przepisem przy każdym kroku. Aplikacja mówi, kto wypłaci zasiłek, pracodawca czy ZUS, i wypełnia wnioski danymi z planu.
 
-## Co jeśli
+## Od celu do konkretu
 
-A co, jeśli urodzi się wcześniak? Plan przelicza się od razu: dochodzi urlop uzupełniający, terminy się przesuwają, a stary plan zostaje na osi jako cień.
+Rodzina zaczyna od celu: najwięcej pieniędzy, najdłużej w domu albo równy podział. Silnik układa konkretne plany z datami i kwotami, a jedno kliknięcie przenosi wybrany plan na oś. Potem ten plan można przetestować: co, jeśli urodzi się wcześniak? Dochodzi urlop uzupełniający, a stary plan zostaje na osi jako cień.
 
 ## Telefon
 
-Na telefonie wszystko działa tak samo: oś układa się pionowo, mama i tata są obok siebie, a przy każdym okresie widać kwotę.
+Na telefonie działa to tak samo: oś układa się pionowo, a przy każdym okresie widać kwotę.
 
 ## Sprawy ZUS
 
