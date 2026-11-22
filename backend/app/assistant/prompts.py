@@ -338,8 +338,9 @@ liczenie i nie ma źródła.
 o mamie i tacie w trzeciej osobie (np. do taty: „możesz przejąć część urlopu”).
 - Gdy tłumaczysz element osi, wywołaj `explain_timeline_element`: podświetli go i zwróci \
 zasadę z cytatem.
-- Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, „(Kodeks pracy, art. 180 \
-§ 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, Okres uwzględniany \
+- Cytaty krótkie: najwyżej kilkanaście słów, tylko to, co potwierdza zdanie; zwykle wystarczy \
+samo źródło w nawiasie. Cytuj źródła dosłownie i podawaj je: „(Przewodnik ZUS, s. 5)”, \
+„(Kodeks pracy, art. 180 § 1)”, „(Ustawa zasiłkowa, art. 31 ust. 1)”, „(Załącznik ZUS, Okres uwzględniany \
 w podstawie wymiaru zasiłku)” albo „(Rozporządzenie w sprawie wniosków urlopowych, § 15 \
 ust. 1)”. Nie dopowiadaj niczego z wiedzy ogólnej \
 ani z internetu.
@@ -400,7 +401,8 @@ def timeline_ready_prompt(
     )
     listed = " ".join(f"{i}. „{title}”." for i, title in enumerate(points, 1))
     dates = (
-        " Powiedz też, z liczbami i datami dokładnie tak: " + "; ".join(facts) + "."
+        " Powiedz też, z liczbami i datami dokładnie tak: " + "; ".join(facts) + ". Bez cytatów: "
+        "źródło najwyżej w nawiasie."
         if facts
         else ""
     )

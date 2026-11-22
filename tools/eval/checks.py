@@ -374,6 +374,9 @@ APP_CARD_NAMES = [
 ]
 """Names of the app's cards the assistant may point to (B.16): in „…” but not quotes of sources."""
 
+WELCOME_CHARS = 750
+"""The welcome says the case, the right and the leave with its dates (opening_facts)."""
+
 BRIEF_CHARS = 600
 """The longest reply, without the interview question, that is not yet a wall of text: about
 three short sentences with a source or two."""

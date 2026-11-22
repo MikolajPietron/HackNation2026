@@ -32,6 +32,7 @@ from checks import (  # noqa: E402
     BRIEF_CHARS,
     OUT_OF_SCOPE,
     SYMPATHY,
+    WELCOME_CHARS,
     Check,
     Turn,
     check_brief,
@@ -189,7 +190,8 @@ def step_checks(step: dict, rec: dict, sources: dict, src_dates: set) -> list[Ch
             text,
             question,
             soft=bool(step.get("sensitive")),
-            limit=step.get("max_chars", BRIEF_CHARS),
+            # The welcome carries the key dates too (situation, right, leave and its dates).
+            limit=step.get("max_chars", WELCOME_CHARS if "event" in step else BRIEF_CHARS),
         )
     )
     leak = re.search(

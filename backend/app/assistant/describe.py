@@ -779,6 +779,11 @@ def opening_facts(timeline: Timeline) -> list[str]:
     return facts
 
 
+def _specific(sources: list[SourceRef]) -> SourceRef:
+    """The provision with the number (Kodeks pracy, ustawa) before the guide's general mention."""
+    return next((s for s in sources if s.doc in ("kp", "ustawa")), sources[0])
+
+
 def describe_note_changes(
     timeline: Timeline, changed_notes: list[str] | None, changed: list[str] | None = None
 ) -> str:
@@ -793,8 +798,10 @@ def describe_note_changes(
     notes = [n for n in timeline.notes if n.id in changed_notes]
     titles = [f"„{n.title}”" for n in notes]
     # Eval 22.11.2026: a new length of leave was said without its source. Give the label to say.
+    # The most specific source: the provision with the number (Kodeks pracy, ustawa), not the
+    # guide's general mention (eval: "65 tyg." was cited to the guide's page 6, which has no 65).
     cite = [
-        f"„{n.title}” — ({source_label(n.sources[0])})"
+        f"„{n.title}” — ({source_label(_specific(n.sources))})"
         for n in notes
         if n.kind != "situation" and n.sources
     ]
