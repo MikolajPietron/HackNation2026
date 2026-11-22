@@ -2,11 +2,17 @@
 (structured output). The model only transcribes what the documents say, with page numbers; it
 never computes dates or amounts (CLAUDE.md). Tests use a fake reader (no key, no network)."""
 
-from typing import Protocol
+import base64
+import json
+import sys
+from typing import Any, Protocol
 
+from pydantic import ValidationError
 from pydantic_ai import Agent, BinaryContent, ToolOutput
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
+
+from app.assistant.claude_code import run_claude
 
 from .models import CaseFacts
 from .pages import Page
@@ -95,3 +101,75 @@ class ModelCaseReader:
                 content.append(BinaryContent(data=tile, media_type="image/jpeg"))
         result = await self._agent.run(content)
         return result.output
+
+
+CLAUDE_CODE_PREFIX = "claude-code:"
+"""`CASES_MODEL=claude-code:opus`: the scans go to the local `claude -p` (ClaudeCodeCaseReader)."""
+
+
+class ClaudeCodeCaseReader:
+    """Dev only: the same reading through the local Claude Code CLI on the developer's claude.ai
+    subscription instead of an API key (`app/assistant/claude_code.py`), for `app.cases.batch`.
+    The pages go in as images in one message, as in `ModelCaseReader`; the answer is structured
+    output against the `CaseFacts` schema, validated here. Claude only: the scans still go to
+    Anthropic and nowhere else (CLAUDE.md). Never on a server."""
+
+    def __init__(self, model: str) -> None:
+        self._model = model
+
+    async def read(self, pages: list[Page]) -> CaseFacts:
+        content: list[dict[str, Any]] = [_text(f"Sprawa ma {len(pages)} stron (puste pominięto).")]
+        for page in pages:
+            for index, tile in enumerate(page.tiles):
+                part = "górna połowa" if index == 0 else "dolna połowa"
+                content.append(_text(f"Strona {page.number} ({part}):"))
+                data = base64.b64encode(tile).decode()
+                source = {"type": "base64", "media_type": "image/jpeg", "data": data}
+                content.append({"type": "image", "source": source})
+        content.append(_text("Przepisz dane do formularza (JSON wg schematu, daty RRRR-MM-DD)."))
+        schema = _loose(CaseFacts.model_json_schema())
+        for attempt in (1, 2):
+            result = await run_claude(
+                self._model, system=INSTRUCTIONS, prompt=content, schema=schema
+            )
+            _report(self._model, result)
+            try:
+                return CaseFacts.model_validate(result.get("structured_output"))
+            except ValidationError as error:
+                if attempt == 2:
+                    raise
+                # One more try with the errors: the whole case goes again, so only once.
+                content.append(_text(f"Poprzednia odpowiedź nie pasowała do schematu: {error}"))
+        raise AssertionError("unreachable")
+
+
+def _loose(node: Any) -> Any:
+    """The schema Claude Code enforces, without what made it give up on a real case
+    (`error_max_structured_output_retries`, sending every page again each time): no `format`,
+    `minimum` or `maximum`, and the allowed values in the description instead of `enum`.
+    `CaseFacts` validates the answer afterwards and its errors go back once (`read`)."""
+    if isinstance(node, list):
+        return [_loose(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out = {k: _loose(v) for k, v in node.items() if k not in ("format", "minimum", "maximum")}
+    if "enum" in out:
+        values = ", ".join(json.dumps(v, ensure_ascii=False) for v in out.pop("enum"))
+        out["description"] = f"{out.get('description', '')} Jedna z wartości: {values}.".strip()
+    return out
+
+
+def _text(text: str) -> dict[str, Any]:
+    return {"type": "text", "text": text}
+
+
+def _report(model: str, result: dict[str, Any]) -> None:
+    """Tokens of one read on stderr, to watch the subscription's limits (no case content)."""
+    usage = result.get("usage") or {}
+    sent = sum(usage.get(k) or 0 for k in ("input_tokens", "cache_creation_input_tokens"))
+    print(
+        f"  claude -p {model}: {sent + (usage.get('cache_read_input_tokens') or 0)} in, "
+        f"{usage.get('output_tokens') or 0} out, {result.get('duration_ms', 0) / 1000:.0f} s",
+        file=sys.stderr,
+        flush=True,
+    )

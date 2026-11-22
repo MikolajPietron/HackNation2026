@@ -4,6 +4,7 @@ so every page goes as two overlapping halves (top and bottom; left and right whe
 on its side). Blank pages (about 15% of the scans) are marked so they are not sent."""
 
 import io
+import threading
 from dataclasses import dataclass
 
 import pypdfium2 as pdfium
@@ -15,6 +16,10 @@ JPEG_QUALITY = 74
 OVERLAP = 0.06
 # A page with less than this share of dark pixels is blank (a scanned empty back side).
 BLANK_INK = 0.004
+PDFIUM = threading.Lock()
+"""pdfium is not thread-safe: two cases rendered at once in threads (`app.cases.batch --jobs 2`,
+two uploads to the server) crashed the process with SIGBUS in FPDF_LoadPage (22.11.2026). Every
+pdfium call holds this lock, and documents are closed inside it, not by the garbage collector."""
 
 
 @dataclass(frozen=True)
@@ -49,7 +54,12 @@ def _encode(image: Image.Image) -> tuple[tuple[bytes, ...], bool]:
 def page_count(data: bytes) -> int:
     if not data.startswith(b"%PDF"):
         return 1
-    return len(pdfium.PdfDocument(data))
+    with PDFIUM:
+        document = pdfium.PdfDocument(data)
+        try:
+            return len(document)
+        finally:
+            document.close()
 
 
 def render_pages(data: bytes) -> list[Page]:
@@ -58,13 +68,20 @@ def render_pages(data: bytes) -> list[Page]:
         image = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
         tiles, blank = _encode(image.convert("RGB"))
         return [Page(1, tiles, blank)]
-    document = pdfium.PdfDocument(data)
     pages: list[Page] = []
-    for index in range(len(document)):
-        page = document[index]
-        width, height = page.get_size()
-        scale = LONG_SIDE / max(width, height)
-        image = page.render(scale=scale, grayscale=True).to_pil()
-        tiles, blank = _encode(image)
-        pages.append(Page(index + 1, tiles, blank))
+    with PDFIUM:
+        document = pdfium.PdfDocument(data)
+        try:
+            for index in range(len(document)):
+                page = document[index]
+                width, height = page.get_size()
+                scale = LONG_SIDE / max(width, height)
+                bitmap = page.render(scale=scale, grayscale=True)
+                image = bitmap.to_pil().copy()  # own pixels: the bitmap is closed below
+                bitmap.close()
+                page.close()
+                tiles, blank = _encode(image)
+                pages.append(Page(index + 1, tiles, blank))
+        finally:
+            document.close()
     return pages

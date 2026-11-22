@@ -40,15 +40,15 @@ from pydantic_ai.tools import ToolDefinition
 TIMEOUT_S = 300
 """One request: the CLI starts, the model may think, structured output takes a second round."""
 
-EFFORT: dict[str, str] = {"minimal": "low", "low": "low", "medium": "medium", "high": "high"}
-EFFORT |= {"xhigh": "xhigh", "max": "max"}
+EFFORT = {"minimal": "low", "low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}
+EFFORT |= {"max": "max"}
 """`ModelSettings.thinking` → `claude --effort` (the CLI has no "minimal")."""
 
 API_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDECODE")
 """Removed from the CLI's environment: with an API key set, Claude Code bills the key instead of
 the subscription, which is the whole point of this model."""
 
-INVISIBLE = "​‌‍⁠﻿"
+INVISIBLE = "\u200b\u200c\u200d\u2060\ufeff"
 
 ANSWER_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -117,59 +117,14 @@ def claude_code_model(model: str) -> FunctionModel:
 
 async def _ask(model: str, messages: list[ModelMessage], info: AgentInfo) -> dict[str, Any]:
     tools = [*info.function_tools, *info.output_tools]
-    system = (info.instructions or "") + PROTOCOL + _tools_text(tools)
     thinking = (info.model_settings or {}).get("thinking")
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", dir=_workdir(), delete=False) as f:
-        f.write(system)
-        system_file = f.name
-    try:
-        command = [
-            "claude",
-            "-p",
-            "--output-format",
-            "json",
-            "--model",
-            model,
-            "--tools",
-            "",
-            "--setting-sources",
-            "",
-            "--strict-mcp-config",
-            "--no-session-persistence",
-            "--system-prompt-file",
-            system_file,
-            "--json-schema",
-            json.dumps(ANSWER_SCHEMA),
-        ]
-        if isinstance(thinking, str) and thinking in EFFORT:
-            command += ["--effort", EFFORT[thinking]]
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            cwd=_workdir(),
-            env={k: v for k, v in os.environ.items() if k not in API_ENV},
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            out, err = await asyncio.wait_for(
-                process.communicate(_conversation_text(messages).encode()), TIMEOUT_S
-            )
-        except TimeoutError:
-            process.kill()
-            raise RuntimeError(f"claude -p: no answer in {TIMEOUT_S} s") from None
-    finally:
-        Path(system_file).unlink(missing_ok=True)
-    return _answer(out.decode(), err.decode(), process.returncode)
-
-
-def _answer(out: str, err: str, code: int | None) -> dict[str, Any]:
-    try:
-        result = json.loads(out)
-    except json.JSONDecodeError:
-        raise RuntimeError(f"claude -p exited {code}: {(err or out).strip()[:500]}") from None
-    if result.get("is_error"):
-        raise RuntimeError(f"claude -p: {result.get('subtype')}: {str(result.get('result'))[:500]}")
+    result = await run_claude(
+        model,
+        system=(info.instructions or "") + PROTOCOL + _tools_text(tools),
+        prompt=_conversation_text(messages),
+        schema=ANSWER_SCHEMA,
+        effort=EFFORT.get(thinking) if isinstance(thinking, str) else None,
+    )
     answer = result.get("structured_output")
     if not isinstance(answer, dict):
         try:
@@ -180,10 +135,75 @@ def _answer(out: str, err: str, code: int | None) -> dict[str, Any]:
     return answer if isinstance(answer, dict) else {"text": str(answer), "tool_calls": []}
 
 
+async def run_claude(
+    model: str,
+    *,
+    system: str,
+    prompt: str | list[dict[str, Any]],
+    schema: dict[str, Any],
+    effort: str | None = None,
+) -> dict[str, Any]:
+    """One `claude -p` run with no tools, no settings, no MCP and no saved session, on the
+    subscription; returns Claude Code's result (`structured_output`, `usage`). `prompt` is text,
+    or content blocks (text and base64 images, as in the Messages API) sent as one stream-json
+    user message."""
+    blocks = not isinstance(prompt, str)
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", dir=_workdir(), delete=False) as f:
+        f.write(system)
+        system_file = f.name
+    command = ["claude", "-p", "--model", model, "--tools", "", "--setting-sources", ""]
+    command += ["--strict-mcp-config", "--no-session-persistence"]
+    command += ["--system-prompt-file", system_file, "--json-schema", json.dumps(schema)]
+    if blocks:
+        command += ["--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
+        message = {"type": "user", "message": {"role": "user", "content": prompt}}
+        stdin = json.dumps(message, ensure_ascii=False) + "\n"
+    else:
+        command += ["--output-format", "json"]
+        stdin = str(prompt)
+    if effort:
+        command += ["--effort", effort]
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            cwd=_workdir(),
+            env={k: v for k, v in os.environ.items() if k not in API_ENV},
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            out, err = await asyncio.wait_for(process.communicate(stdin.encode()), TIMEOUT_S)
+        except TimeoutError:
+            process.kill()
+            raise RuntimeError(f"claude -p: no answer in {TIMEOUT_S} s") from None
+    finally:
+        Path(system_file).unlink(missing_ok=True)
+    return _result(out.decode(), err.decode(), process.returncode)
+
+
+def _result(out: str, err: str, code: int | None) -> dict[str, Any]:
+    """The result object: the whole output (json) or its last `result` line (stream-json)."""
+    result: dict[str, Any] | None = None
+    for line in reversed(out.strip().splitlines()):
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(item, dict) and item.get("type") == "result":
+            result = item
+            break
+    if result is None:
+        raise RuntimeError(f"claude -p exited {code}: {(err or out).strip()[-500:]}")
+    if result.get("is_error"):
+        raise RuntimeError(f"claude -p: {result.get('subtype')}: {str(result.get('result'))[:500]}")
+    return result
+
+
 @cache
 def _workdir() -> str:
     """An empty folder: no CLAUDE.md, memory or project settings reach the CLI."""
-    return tempfile.mkdtemp(prefix="claude-code-chat-")
+    return tempfile.mkdtemp(prefix="claude-code-")
 
 
 def _tools_text(tools: Iterable[ToolDefinition]) -> str:

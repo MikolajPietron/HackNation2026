@@ -38,7 +38,12 @@ from app.cases.models import (
     CaseResult,
 )
 from app.cases.pages import page_count, render_pages
-from app.cases.reader import CaseReader, ModelCaseReader
+from app.cases.reader import (
+    CLAUDE_CODE_PREFIX,
+    CaseReader,
+    ClaudeCodeCaseReader,
+    ModelCaseReader,
+)
 from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
@@ -68,6 +73,8 @@ def get_reader_factory(settings: Annotated[Settings, Depends(get_settings)]) -> 
 
     def make() -> CaseReader:
         name = settings.cases_model_name
+        if name.startswith(CLAUDE_CODE_PREFIX):  # dev only: the local Claude Code CLI
+            return ClaudeCodeCaseReader(name.removeprefix(CLAUDE_CODE_PREFIX))
         # Claude or Gemini, never the chat's model of another vendor: see Settings.cases_model.
         if name.startswith("gemini"):
             if not settings.gemini_api_key:
