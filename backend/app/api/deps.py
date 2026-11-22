@@ -16,6 +16,7 @@ from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.settings import CacheConfig, ModelSettings
 
+from app.assistant.claude_code import claude_code_model
 from app.clock import today_in_warsaw
 from app.config import LlmProvider, Settings, ThinkingLevel, get_settings
 from app.engine import Params
@@ -52,6 +53,8 @@ async def get_session_store(settings: Annotated[Settings, Depends(get_settings)]
 
 
 def get_chat_model(settings: Annotated[Settings, Depends(get_settings)]) -> Model:
+    if settings.claude_code_model:
+        return claude_code_model(settings.claude_code_model)
     if not settings.llm_api_key:
         raise HTTPException(
             status_code=503,

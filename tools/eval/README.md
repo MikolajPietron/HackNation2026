@@ -28,6 +28,30 @@ uv run python ../tools/eval/run.py --only twins-and-back,leave-before-birth --ru
 uv run python ../tools/eval/run.py --rescore /tmp/eval.json      # re-check, no LLM calls
 ```
 
+### Without API costs: through Claude Code
+
+With `CLAUDE_CODE_MODEL` set, the backend sends every model request of the chat to the local
+`claude -p` (Claude Code CLI) instead of a provider's API, so the eval counts against your
+claude.ai subscription's limits (Pro/Max) and costs no API tokens (`backend/app/assistant/claude_code.py`).
+You need `claude` installed and logged in with your claude.ai account (`claude auth status`);
+an `ANTHROPIC_API_KEY` in the environment is removed for the CLI, so it never bills the key.
+
+```bash
+cd backend
+SUPABASE_URL= SUPABASE_SECRET_KEY= APP_TODAY=2026-11-21 CLAUDE_CODE_MODEL=sonnet \
+  uv run uvicorn app.main:app --port 8010
+# terminal 2, as usual:
+uv run python ../tools/eval/run.py --label claude-code-sonnet --out /tmp/eval-cc-sonnet.json
+```
+
+What it checks is the same; what differs from production: the tools are emulated (the
+instructions are the system prompt, the tools and the conversation are text, the answer is
+structured output `{text, tool_calls}`), nothing streams and each request starts the CLI (about
+10–12 s per turn instead of about 3 s to the first text), and the tokens and cost in the table are
+estimates, not the bill. So it is good for the prompts, the tools and the engine; the time, cache
+and cost columns need a run on the API. Only on your own machine: a personal subscription is not a
+backend for the app.
+
 Options: `--only` (comma-separated scenario ids), `--runs` (override runs per scenario),
 `--parallel` (sessions at once, default 4), `--out` (every turn: reply, tool calls, timelines
 before and after, checks, time and tokens), `--label` (the chat model the backend runs, saved in

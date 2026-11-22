@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     llm_fallback_model: str = ""
     """A model of the same provider (same key) the chat falls back to when the main one is rate
     limited, overloaded or unreachable even after one more attempt. Empty = no fallback."""
+    claude_code_model: str = ""
+    """Dev only (tools/eval): the chat runs through the local Claude Code CLI with this model
+    (`opus`, `sonnet`, a full id) on the developer's claude.ai subscription instead of an API key
+    (assistant/claude_code.py). Empty = off. Never on a server."""
 
     # Example cases from ZUS (scanned PDFs, confidential, never in git): the folder they are in,
     # and where the facts read from them are kept. Empty = docs/dokumentyZUS/sprawy.
