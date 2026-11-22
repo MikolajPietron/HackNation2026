@@ -192,7 +192,8 @@ def current_state(ctx: RunContext[AssistantDeps]) -> str:
     else:
         lines += ["", "Aktualny stan osi czasu:", describe_timeline(ctx.deps.timeline)]
         if any(n.id == "loss" for n in ctx.deps.timeline.notes):
-            # Eval 22.11.2026: a later answer after a stillbirth started with the rules.
+            # The turn that records the loss; later turns also get `grief_hint` with the
+            # parent's message (api/chat.py).
             lines += [
                 "",
                 "Rodzina straciła dziecko: zacznij tę odpowiedź od jednego krótkiego, ludzkiego "

@@ -54,7 +54,7 @@ from app.assistant.agent import (
     assistant,
 )
 from app.assistant.describe import interview_questions, next_question, opening_facts, opening_notes
-from app.assistant.prompts import timeline_ready_prompt
+from app.assistant.prompts import grief_hint, timeline_ready_prompt
 from app.engine import Params, Scenario, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore, session_lock
 
@@ -112,8 +112,10 @@ async def _locked_turn(
                 # Saved under older rules: keep the conversation, ask for the facts again.
                 deps.scenario = Scenario()
         turn = _Turn(request.session_id, session, store)
+        prompt: str | list[str]
         if request.message is not None:
-            prompt = request.message
+            hint = grief_hint(deps.scenario)
+            prompt = request.message if hint is None else [request.message, hint]
         else:  # the only event: "timeline_ready"
             deps.answers_allowed = False
             questions = interview_questions(deps.scenario)
@@ -141,7 +143,11 @@ class _Turn:
 
 
 async def _stream(
-    message: str, history: list[ModelMessage], deps: AssistantDeps, model: Model, turn: _Turn
+    message: str | list[str],
+    history: list[ModelMessage],
+    deps: AssistantDeps,
+    model: Model,
+    turn: _Turn,
 ) -> AsyncIterator[str]:
     to_payload = _Translator()
     try:

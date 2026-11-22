@@ -11,7 +11,7 @@ from pydantic_ai import (
     UserPromptPart,
 )
 
-from app.assistant.prompts import EVENT_MARKER
+from app.assistant.prompts import EVENT_MARKER, HINT_MARKER
 
 
 def to_chat_messages(history: list[ModelMessage]) -> list[dict[str, Any]]:
@@ -28,10 +28,14 @@ def to_chat_messages(history: list[ModelMessage]) -> list[dict[str, Any]]:
     for message in history:
         if isinstance(message, ModelRequest):
             for part in message.parts:
-                if isinstance(part, UserPromptPart) and isinstance(part.content, str):
-                    # App events are not the user's words: hidden, the reply starts fresh.
-                    if not part.content.startswith(EVENT_MARKER):
-                        add("user")["parts"].append({"kind": "text", "text": part.content})
+                if isinstance(part, UserPromptPart):
+                    # App events and hints are not the user's words: hidden, the reply starts
+                    # fresh. A message with a hint is [the user's text, hint].
+                    texts = [part.content] if isinstance(part.content, str) else part.content
+                    hidden = (EVENT_MARKER, HINT_MARKER)
+                    said = [t for t in texts if isinstance(t, str) and not t.startswith(hidden)]
+                    if said:
+                        add("user")["parts"].append({"kind": "text", "text": "\n\n".join(said)})
                     assistant = None
                 elif isinstance(part, ToolReturnPart) and part.tool_call_id in tools:
                     ok = part.outcome == "success"

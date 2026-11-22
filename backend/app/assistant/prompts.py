@@ -12,6 +12,7 @@ The two static parts come first, so the provider can serve them from its prompt 
 from app.assistant.guide import guide_sections
 from app.assistant.law import kp_articles, ustawa_articles, zalacznik_sections
 from app.assistant.stage import SourceKey, Topic, sources_for
+from app.engine.models import Scenario
 
 
 def source_text(keys: list[SourceKey]) -> str:
@@ -384,6 +385,23 @@ PATCH_NOTE = "Rodzic zmienił w aplikacji, bez czatu:"
 # App events: the assistant reacts to a timeline that changed outside the chat. The user does
 # not see the prompt, and the transcript hides it (see transcript.py).
 EVENT_MARKER = "⟦Zdarzenie z aplikacji⟧"
+HINT_MARKER = "⟦Wskazówka aplikacji⟧"
+
+
+def grief_hint(scenario: Scenario) -> str | None:
+    """A reminder sent with the parent's message after the loss of a child or the mother's death
+    (hidden in the chat, kept in the model's history). Eval 22.11.2026: with the rule only in the
+    instructions, every other follow-up answer after a stillbirth started with the rules."""
+    if scenario.losses:
+        who = "Rodzina straciła dziecko"
+    elif scenario.mother_event is not None and scenario.mother_event.kind == "death":
+        who = "Mama dziecka zmarła"
+    else:
+        return None
+    return (
+        f"{HINT_MARKER} {who}: zacznij odpowiedź od jednego krótkiego, ludzkiego zdania "
+        "współczucia, dopiero potem odpowiedz. Bez wykrzykników."
+    )
 
 
 def timeline_ready_prompt(
