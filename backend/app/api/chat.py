@@ -287,12 +287,25 @@ def _turn_logger() -> logging.Logger:
 turn_log = _turn_logger()
 
 
+QUOTA_WORDS = ("limit exceeded", "spend cap", "spending cap", "credits", "quota", "insufficient")
+"""Words of a provider's error that mean the account or key ran out of money, whatever status it
+came with: OpenRouter's key limit is a 403, Google's monthly spend cap a 429 (eval, 22.11.2026)."""
+
+QUOTA_MESSAGE = (
+    "Asystent AI jest chwilowo niedostępny: wyczerpał się limit konta albo klucza modelu."
+)
+
+
 def _error_message(exc: Exception) -> str:
+    if isinstance(exc, ModelAuthenticationError | ModelRateLimitError) and any(
+        word in str(exc).lower() for word in QUOTA_WORDS
+    ):
+        return QUOTA_MESSAGE
     match exc:
         case ModelAuthenticationError():
             return "Klucz API modelu jest nieprawidłowy."
         case ModelQuotaExceededError():
-            return "Asystent AI jest chwilowo niedostępny: wyczerpał się limit konta modelu."
+            return QUOTA_MESSAGE
         case ModelRateLimitError() | ModelUnavailableError() | ModelServerError():
             return "Model AI jest teraz przeciążony. Spróbuj za chwilę."
         case ModelConnectionError():

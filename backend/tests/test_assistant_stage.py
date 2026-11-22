@@ -350,3 +350,22 @@ def test_the_assistant_knows_the_interface_notes(
     for card in ("„Jak dzielicie urlop rodzicielski?”", "„Planach dla Was”", "„Pieniądze”"):
         assert card in BASE_INSTRUCTIONS
     assert "Nie dopytuj od zera" in BASE_INSTRUCTIONS
+
+
+def test_a_key_limit_or_spend_cap_says_so() -> None:
+    """Found by the eval (22.11.2026): OpenRouter's key limit came as 403 and showed "Klucz API
+    modelu jest nieprawidłowy"; Google's monthly spend cap came as 429 and showed "przeciążony".
+    Both mean the money ran out, and the parent is told that."""
+    from pydantic_ai.exceptions import ModelAuthenticationError
+
+    from app.api.chat import QUOTA_MESSAGE
+
+    key_limit = ModelAuthenticationError(
+        "m", "Key limit exceeded (total limit). $5.32 of $5.00 used"
+    )
+    spend_cap = ModelRateLimitError("m", "429 RESOURCE_EXHAUSTED: monthly spending cap")
+    assert _error_message(key_limit) == QUOTA_MESSAGE
+    assert _error_message(spend_cap) == QUOTA_MESSAGE
+    assert _error_message(ModelAuthenticationError("m", "invalid api key")) == (
+        "Klucz API modelu jest nieprawidłowy."
+    )
