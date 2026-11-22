@@ -77,6 +77,15 @@ ACTS = {
             "§ 16",
             "§ 17 ust. 1",
             "§ 17 ust. 2",
+            # A child taken in for upbringing (engine/adoption_applications.py): the leave on the
+            # terms of maternity leave (§ 18), supplementary (§ 14 ust. 3-4) and parental leave
+            # (§ 15 ust. 3-4).
+            "§ 14 ust. 3",
+            "§ 14 ust. 4",
+            "§ 15 ust. 3",
+            "§ 15 ust. 4",
+            "§ 18 ust. 1",
+            "§ 18 ust. 2",
             "§ 22",
         ],
     },
@@ -94,7 +103,7 @@ ACTS = {
         # § 15, § 17, annex 4) and the maternity benefit: the data of the request
         # (§ 12, annex 6), the documents from the birth (§ 13), for the father taking over
         # (§ 20, § 22, § 23), supplementary leave (§ 26), an uninsured mother (§ 32) and
-        # paternity leave (§ 33).
+        # paternity leave (§ 33); a child taken in for upbringing (§ 16).
         "provisions": [
             "§ 2",
             # After the insurance ended (ustawa art. 7, 30; engine/applications.py): the
@@ -115,6 +124,9 @@ ACTS = {
             # The mother stops her maternity benefit: the father takes over (§ 18), she has
             # a ruling of incapacity (§ 21) or is in hospital (§ 24).
             "§ 18 ust. 1",
+            # A child taken in for upbringing: adoption (ust. 1), foster family (ust. 2).
+            "§ 16 ust. 1",
+            "§ 16 ust. 2",
             "§ 20 ust. 1",
             "§ 20 ust. 3",
             "§ 20 ust. 4",

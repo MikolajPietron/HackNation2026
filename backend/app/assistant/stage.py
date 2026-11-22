@@ -121,7 +121,9 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "18": ("sick",),
     "19": ("sick",),
     "22": ("sick",),
-    "29": ("mother-event",),  # the father's benefit in the mother's special situations
+    # ust. 1-2: the age limits of a child taken in; ust. 3-9: the father's benefit in the
+    # mother's special situations.
+    "29": ("mother-event", "taken-in"),
     "29a": ("core",),
     "30": ("job-loss",),  # ust. 1 and 4: USTAWA_EXCEPTIONS below
     "30a": ("money",),

@@ -392,7 +392,9 @@ def test_a_foster_child_past_seven_and_postponed_schooling() -> None:
     """Born 01.01.2018, taken in 02.11.2026: 7 on 01.01.2025, too old; 10 only on 01.01.2028."""
     t = taken_in(birth_date="2018-01-01")
     way = note(t, "taken-in-way")
-    assert note_ids(t)[note_ids(t).index("taken-in-leave") + 1] == "taken-in-way"
+    # Right after the point that says the child is past the age limit.
+    assert note_ids(t)[note_ids(t).index("insurance") + 1] == "taken-in-way"
+    assert note(t, "insurance").kind == "risk"
     assert "odroczeniu obowiązku szkolnego" in way.text and "10 lat" in way.text
     assert any(s.article == "art. 183 § 1" for s in way.sources)
     assert "taken-in-way" not in note_ids(taken_in(birth_date="2018-01-01", school_postponed=False))

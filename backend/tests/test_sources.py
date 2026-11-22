@@ -230,6 +230,9 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 29 ust. 6",
         "art. 29 ust. 7",
         "art. 29 ust. 9",
+        # Who has the right: a child born or taken in, the age limits (section D).
+        "art. 29 ust. 1",
+        "art. 29 ust. 2",
         "art. 29a ust. 1",
         "art. 30 ust. 1",
         "art. 30 ust. 3",
@@ -286,6 +289,9 @@ def test_ustawa_zasilkowa_provisions() -> None:
         in (texts["art. 4 ust. 1"])
     )
     assert texts["art. 12 ust. 1"].endswith("Okresy te wlicza się do okresu zasiłkowego.")
+    # The age limits of a child taken in (section D); the page header inside is left out.
+    assert "2) przyjęła na wychowanie dziecko w wieku do 14 roku życia" in texts["art. 29 ust. 1"]
+    assert texts["art. 29 ust. 1"].endswith("- do 10 roku życia.")
     assert "art. 182¹ᵃ § 4 Kodeksu pracy" in texts["art. 31 ust. 3f"]
     assert texts["art. 3 pkt 3"].startswith("wynagrodzenie - przychód pracownika")
     assert "13,71%" in texts["art. 3 pkt 4"]
@@ -325,6 +331,10 @@ def test_the_two_regulations_on_requests() -> None:
         ),
         "§ 16",
         "§ 22",
+        # A child taken in for upbringing.
+        *(f"§ {n} ust. {u}" for n in (14, 15) for u in (3, 4)),
+        "§ 18 ust. 1",
+        "§ 18 ust. 2",
     }
     assert set(zasilki) == {
         "§ 2",
@@ -340,6 +350,8 @@ def test_the_two_regulations_on_requests() -> None:
         "§ 13 ust. 2",
         "§ 13 ust. 3",
         "§ 18 ust. 1",
+        "§ 16 ust. 1",
+        "§ 16 ust. 2",
         "§ 20 ust. 1",
         "§ 20 ust. 3",
         "§ 20 ust. 4",
@@ -384,6 +396,10 @@ def test_the_two_regulations_on_requests() -> None:
     # § 18 and § 24 start after a page header: it is left out.
     assert zasilki["§ 18 ust. 1"].startswith("Dokumentami niezbędnymi do zaniechania wypłaty")
     assert zasilki["§ 24 ust. 1"].endswith("której zasiłek macierzyński wypłaca Zakład.")
+    # A child taken in: the paragraphs of art. 183 carry their superscripts again.
+    assert "art. 183 § 3¹ Kodeksu pracy" in wnioski["§ 14 ust. 3"]
+    assert "art. 183 § 4–4² Kodeksu pracy" in wnioski["§ 15 ust. 3"]
+    assert wnioski["§ 18 ust. 1"].startswith("Wniosek, o którym mowa w art. 183 § 6 Kodeksu pracy")
 
 
 def test_the_forms_quote_only_what_the_regulations_and_the_guide_say() -> None:
