@@ -26,6 +26,7 @@ export function ShareDialog() {
 
   return (
     <div className="space-y-4 text-navy-700">
+      <h2 className="pr-10 text-2xl font-bold tracking-tight text-navy-900">Udostępnij plan</h2>
       <p>
         Wyślij link partnerowi albo partnerce: zobaczy Wasz plan — urlopy, pieniądze i terminy — bez logowania. Tylko
         do odczytu: niczego nie zmieni. Dane osobowe z wniosków zostają w Twojej przeglądarce.

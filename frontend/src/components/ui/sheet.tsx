@@ -5,6 +5,7 @@
 // Vaul brings what Emil's guide asks of a sheet: drag to dismiss with velocity (a flick is
 // enough), damping past the edge, pointer capture, and an iOS-like drawer curve. When the content
 // changes size the sheet glides to the new height (react-use-measure + Motion), as in the demo.
+// `top` stays above the scrolling content (the breadcrumbs of components/ui/window-nav).
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
 import useMeasure from 'react-use-measure'
@@ -17,6 +18,7 @@ export function Sheet({
   onOpenChange,
   title,
   fullHeight = false,
+  top,
   className,
   children,
 }: {
@@ -26,6 +28,8 @@ export function Sheet({
   title: string
   /** A fixed tall sheet whose content scrolls inside (e.g. the chat). */
   fullHeight?: boolean
+  /** Above the content, not scrolling with it: the breadcrumbs. */
+  top?: ReactNode
   className?: string
   children: ReactNode
 }) {
@@ -48,6 +52,7 @@ export function Sheet({
         >
           <Drawer.Title className="sr-only">{title}</Drawer.Title>
           <div aria-hidden className="mx-auto mt-3 mb-1 h-1.5 w-12 shrink-0 rounded-full bg-navy-100" />
+          {top && <div className="shrink-0 px-5 pt-2 pb-1">{top}</div>}
           {fullHeight ? (
             <div className="min-h-0 flex-1">{children}</div>
           ) : (
@@ -55,7 +60,7 @@ export function Sheet({
               animate={{ height: bounds.height || 'auto' }}
               transition={{ duration: 0.35, ease: EASE_DRAWER }}
               data-scroll
-              className="scrollbar-soft min-h-0 overflow-y-auto overscroll-contain"
+              className="scrollbar-soft min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain"
             >
               <div ref={inner} className="px-5 pt-2 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                 {children}

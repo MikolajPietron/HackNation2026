@@ -9,9 +9,9 @@ import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { daysLeftLabel } from '@/lib/plan'
 import { sourceLabel } from '@/lib/ui'
 import { Illustration } from '@/components/ui/illustration'
-import { ICONS } from '@/lib/icons'
+import { documentIcon, ICONS, markerIcon, segmentIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import type { SourceRef, Timeline } from '@/types'
+import type { Lane, SourceRef, Timeline } from '@/types'
 import type { TimelineItem } from './items'
 
 interface Props {
@@ -35,12 +35,14 @@ interface Fact {
 const dotted = (iso: string) => iso.split('-').reverse().join('.')
 
 /**
- * What the parent needs about one element. The facts come first and big (from, to, how long;
- * or when and how far away), the explanation with its numbers in bold, the sources last.
+ * What the parent needs about one element, readable at a glance: what it is (a period, a day, a
+ * request, money — and whose), the facts big (from, to, how long; or when and how far away), the
+ * one sentence that explains it, the rest smaller, the sources last and quiet.
  */
 export function ElementDetails({ item, timeline, onSelect, onFill, onCertificate }: Props) {
   return (
     <div className="text-[15px] leading-relaxed text-navy-700">
+      <Kind item={item} />
       <Body item={item} timeline={timeline} onSelect={onSelect} onFill={onFill} onCertificate={onCertificate} />
       <Sources sources={item.element.sources} text={elementText(item)} />
     </div>
@@ -65,9 +67,7 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
               { label: 'Ile', value: weeksOrDays(s.days) },
             ]}
           />
-          <p className="mt-5">
-            <Emphasis text={s.summary} />
-          </p>
+          <Lead text={s.summary} />
           <Bullets items={s.details} />
           {payment && (
             <button
@@ -88,7 +88,7 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
             </button>
           )}
           {documents.length > 0 && (
-            <ul className="mt-5 space-y-2">
+            <ul aria-label="Wnioski i dokumenty" className="mt-5 space-y-2">
               {documents.map((d) => (
                 <li key={d.id}>
                   <button
@@ -127,18 +127,7 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
               },
             ]}
           />
-          {m.irreversible && m.irreversible.days_left >= 0 && (
-            <p className="mt-5 flex gap-3 rounded-2xl border border-sun-300 bg-sun-100/50 px-4 py-3">
-              <Lock className="mt-1 size-4 shrink-0 text-sun-700" strokeWidth={2.5} />
-              <span>
-                <span className="block font-bold text-navy-900">Punkt bez powrotu</span>
-                {m.irreversible.lost}
-              </span>
-            </p>
-          )}
-          <p className="mt-5">
-            <Emphasis text={m.summary} />
-          </p>
+          <Lead text={m.summary} />
           <Bullets items={m.details} />
           {m.id === 'birth' && onCertificate && (
             <button
@@ -167,9 +156,7 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
               { label: `Za ${p.days} dni`, value: formatPln(p.total), copy: formatPln(p.total) },
             ]}
           />
-          <p className="mt-5">
-            <Emphasis text={p.summary} />
-          </p>
+          <Lead text={p.summary} />
           <Bullets items={p.details} />
           {segment && (
             <button
@@ -205,9 +192,7 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
               { label: 'Status', value: d.done ? 'już jest' : d.form ? 'do złożenia' : 'do zdobycia' },
             ]}
           />
-          <p className="mt-5">
-            <Emphasis text={d.rule} />
-          </p>
+          <Lead text={d.rule} />
           {onFill && d.form && !d.done && (
             <button
               type="button"
@@ -233,19 +218,68 @@ function Body({ item, timeline, onSelect, onFill, onCertificate }: Props) {
   }
 }
 
-function Title({ children }: { children: string }) {
+/** Whose it is. The child's track holds days of both parents (the request for 81,5% is the
+ *  mother's), so it names nobody. */
+const WHO: Partial<Record<Lane, string>> = { mother: 'Mama', father: 'Tata' }
+
+/**
+ * What this window is about, above its title: "Okres · Mama", "Do wyboru · Tata", "Termin",
+ * "Wniosek", "Zasiłek · Mama"; a day after which something is lost for good says so with a lock
+ * (F10; the lead under the facts says what is lost).
+ */
+function Kind({ item }: { item: TimelineItem }) {
+  const who = WHO[item.lane]
+  const [icon, kind] = ((): [string, string] => {
+    switch (item.kind) {
+      case 'segment': {
+        const tone = item.element.tone
+        return [segmentIcon(item.element), tone === 'option' ? 'Do wyboru' : tone === 'work' ? 'Praca' : 'Okres']
+      }
+      case 'marker': {
+        const id = item.element.id
+        return [markerIcon(item.element), id.includes('deadline') || id.includes('limit') ? 'Termin' : 'Ważny dzień']
+      }
+      case 'document':
+        return [documentIcon(item.element), item.element.form ? 'Wniosek' : 'Dokument']
+      case 'payment':
+        return [ICONS.pieniadze, 'Zasiłek']
+    }
+  })()
+  const locked = item.kind === 'marker' && item.element.irreversible !== null && item.element.irreversible.days_left >= 0
   return (
-    <h3 className="pr-10 text-2xl leading-tight font-bold tracking-tight text-navy-900">{children}</h3>
+    <p className="flex flex-wrap items-center gap-2 pr-10 text-sm font-bold text-navy-500">
+      <Illustration src={icon} size="hint" />
+      {item.kind === 'document' || !who ? kind : `${kind} · ${who}`}
+      {locked && (
+        <span className="flex items-center gap-1.5 rounded-full bg-sun-100 px-2.5 py-0.5 text-sun-700">
+          <Lock className="size-3.5" strokeWidth={2.5} />
+          Punkt bez powrotu
+        </span>
+      )}
+    </p>
   )
 }
 
-/** The numbers that matter, large enough to read without reading the text. */
+function Title({ children }: { children: string }) {
+  return (
+    <h3 className="mt-2 pr-10 text-2xl leading-tight font-bold tracking-tight text-navy-900">{children}</h3>
+  )
+}
+
+/** The one sentence that explains the element: what a parent reads first under the facts. */
+function Lead({ text }: { text: string }) {
+  return (
+    <p className="mt-5 text-base text-navy-900">
+      <Emphasis text={text} />
+    </p>
+  )
+}
+
+/** The numbers that matter, large enough to read without reading the text. On a narrow phone
+ *  they wrap to the next row rather than run out of their tiles. */
 function Facts({ facts }: { facts: Fact[] }) {
   return (
-    <dl
-      className="mt-4 grid gap-2"
-      style={{ gridTemplateColumns: `repeat(${facts.length}, minmax(0, 1fr))` }}
-    >
+    <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-2">
       {facts.map(({ label, value, copy }) => (
         <div key={label} className="relative rounded-2xl bg-navy-50/70 px-4 py-3">
           {copy && <CopyValue value={copy} label={label.toLowerCase()} className="absolute top-1.5 right-1.5" />}
@@ -275,7 +309,6 @@ function Bullets({ items }: { items: string[] }) {
   )
 }
 
-/** Literal quotes: the guide first, the Labour Code behind a toggle so the details stay short. */
 /** The element's own sentence, to see which numbers in it its quotes must back. */
 function elementText(item: TimelineItem): string {
   switch (item.kind) {
@@ -308,7 +341,7 @@ function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
   if (sources.length === 0) return null
   return (
     <section className="mt-6 border-t border-line pt-5">
-      <p className="text-sm font-bold text-navy-900">Źródło</p>
+      <p className="text-sm font-bold text-navy-500">Źródło</p>
       <div className="mt-3 space-y-4">
         {guide.map((source) => (
           <Quote key={source.quote} source={source} />
@@ -366,9 +399,9 @@ function lawToggle(law: SourceRef[]): string {
 
 function Quote({ source }: { source: SourceRef }) {
   return (
-    <figure>
-      <blockquote className="text-navy-700">„{source.quote}”</blockquote>
-      <figcaption className="mt-1 text-sm text-navy-400">{sourceLabel(source)}</figcaption>
+    <figure className="border-l-2 border-navy-100 pl-3">
+      <blockquote className="text-sm leading-relaxed text-navy-500">„{source.quote}”</blockquote>
+      <figcaption className="mt-1 text-xs font-bold text-navy-400">{sourceLabel(source)}</figcaption>
     </figure>
   )
 }

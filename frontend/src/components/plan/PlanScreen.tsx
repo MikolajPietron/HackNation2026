@@ -5,6 +5,8 @@
 // plans and risks. The why, with the sources, opens on demand ("Dlaczego tak?").
 // Wide screens: the assistant is open beside the plan and can be hidden; details are a dialog.
 // Phones: the assistant and the details come up as sheets from the bottom (Vaul).
+// The windows that lead to one another (an element's details, its money, the request to fill in,
+// "Dlaczego tyle?", "Dlaczego tak?") are one window: moving between them keeps breadcrumbs back.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
@@ -23,17 +25,21 @@ import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
 import { Sheet } from '@/components/ui/sheet'
 import { UndoPill } from '@/components/ui/undo-pill'
+import { WindowCrumbs, WindowPage } from '@/components/ui/window-nav'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
+import type { TimelineItem } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { usePlanChange } from '@/hooks/usePlanChange'
 import { usePlanSpotlight } from '@/hooks/usePlanSpotlight'
 import type { PlanApply } from '@/hooks/usePlanChange'
 import { usePlanView } from '@/hooks/usePlanView'
+import { useTrail } from '@/hooks/useTrail'
 import { EASE_OUT, SPRING_PANEL, SPRING_PRESS } from '@/lib/ease'
 import { nextQuestion } from '@/lib/interview'
 import type { Choice } from '@/lib/interview'
+import { periodName } from '@/lib/plan'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
@@ -76,6 +82,38 @@ const LINKS = [
     href: 'https://www.pip.gov.pl/dla-pracodawcow/porady-prawne/rodzicielstwo',
   },
 ]
+
+/** A window over the plan; one at a time, the earlier ones as breadcrumbs (hooks/useTrail). */
+type Pane =
+  | { kind: 'element'; id: string }
+  | { kind: 'fill'; id: string }
+  | { kind: 'money' }
+  | { kind: 'why'; focus?: string }
+
+const samePane = (a: Pane, b: Pane) =>
+  a.kind === b.kind && (a.kind === 'element' || a.kind === 'fill' ? a.id === (b as { id: string }).id : true)
+
+const paneKey = (pane: Pane) => (pane.kind === 'element' || pane.kind === 'fill' ? `${pane.kind}:${pane.id}` : pane.kind)
+
+/** A window's name in the breadcrumbs: short, the title is right under them. */
+function paneLabel(pane: Pane, items: TimelineItem[]): string {
+  switch (pane.kind) {
+    case 'money':
+      return 'Dlaczego tyle?'
+    case 'why':
+      return 'Dlaczego tak?'
+    case 'fill':
+      return 'Wypełnianie wniosku'
+    case 'element': {
+      const item = items.find((i) => i.id === pane.id)
+      if (!item) return 'Szczegóły'
+      if (item.kind === 'segment') return periodName(item.element)
+      // "Zasiłek mamy: urlop macierzyński po porodzie" -> "Zasiłek mamy" (the period is the crumb before).
+      if (item.kind === 'payment') return item.title.split(':')[0]
+      return item.title
+    }
+  }
+}
 
 interface Props {
   messages: ChatMessage[]
@@ -131,15 +169,6 @@ export function PlanScreen({
   /** The request being filled in (a document id). */
   const [fill, setFill] = useState<string | null>(null)
   const fillDocument = timeline?.documents.find((d) => d.id === fill) ?? null
-  const openFill = (id: string) => {
-    onSelect(null)
-    setFill(id)
-  }
-  /** A finding of the request check points at the timeline: the form closes, the element opens. */
-  const showFromForm = (id: string) => {
-    setFill(null)
-    onSelect(id)
-  }
   const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -184,6 +213,81 @@ export function PlanScreen({
   const selected = items.find((item) => item.id === selectedId) ?? null
   const next = scenario && timeline ? nextQuestion(scenario, question) : null
 
+  /** The window open over the plan. The assistant may open an element over another window: the
+   *  element wins, and closing it shows the other one again. */
+  const pane: Pane | null = !timeline
+    ? null
+    : fillDocument
+      ? { kind: 'fill', id: fillDocument.id }
+      : selected
+        ? { kind: 'element', id: selected.id }
+        : moneyOpen
+          ? { kind: 'money' }
+          : why
+            ? { kind: 'why', focus: why.focus }
+            : null
+  const trail = useTrail(pane, samePane)
+  /** Exactly this window, or none. */
+  const show = (to: Pane | null) => {
+    setFill(to?.kind === 'fill' ? to.id : null)
+    setMoneyOpen(to?.kind === 'money')
+    setWhy(to?.kind === 'why' ? { focus: to.focus } : null)
+    onSelect(to?.kind === 'element' ? to.id : null)
+  }
+  /** A window opened from the plan (or closed): it starts without breadcrumbs. */
+  const open = (to: Pane | null) => {
+    trail.reset()
+    show(to)
+  }
+  /** From one window to the next: the one left becomes a breadcrumb. */
+  const go = (to: Pane) => show(trail.forward(to))
+  const select = (id: string | null) => open(id ? { kind: 'element', id } : null)
+  const openFill = (id: string) => open({ kind: 'fill', id })
+  const openWhy = (focus?: string) => open({ kind: 'why', focus })
+  const openMoney = () => open({ kind: 'money' })
+  const windowLabel =
+    pane?.kind === 'element' && selected
+      ? selected.title
+      : pane?.kind === 'fill' && fillDocument
+        ? fillDocument.title
+        : pane
+          ? paneLabel(pane, items)
+          : 'Szczegóły'
+  const windowContent =
+    pane && timeline ? (
+      <WindowPage page={paneKey(pane)} direction={trail.direction}>
+        {pane.kind === 'element' && selected ? (
+          <ElementDetails
+            item={selected}
+            timeline={shown ?? timeline}
+            onSelect={(id) => go({ kind: 'element', id })}
+            onFill={previewing ? undefined : (id) => go({ kind: 'fill', id })}
+            onCertificate={() => setCertOpen(true)}
+          />
+        ) : pane.kind === 'fill' && fillDocument ? (
+          // A finding of the request check points at the timeline: its element opens.
+          <ApplicationForm
+            timeline={timeline}
+            document={fillDocument}
+            onSelect={(id) => go({ kind: 'element', id })}
+            onCertificate={() => setCertOpen(true)}
+          />
+        ) : pane.kind === 'money' ? (
+          <MoneyExplanation timeline={timeline} onSelect={(id) => go({ kind: 'element', id })} />
+        ) : pane.kind === 'why' ? (
+          <Explanation timeline={timeline} focusId={pane.focus} />
+        ) : null}
+      </WindowPage>
+    ) : null
+  const crumbs =
+    pane && trail.trail.length > 0 ? (
+      <WindowCrumbs
+        trail={trail.trail.map((p) => paneLabel(p, items))}
+        current={paneLabel(pane, items)}
+        onBack={(index) => show(trail.back(index))}
+      />
+    ) : null
+
   useEffect(() => () => window.clearTimeout(mockTimer.current), [])
 
   /** A mocked service was used: say so plainly (FUNKCJE: simulations are clearly marked). */
@@ -224,7 +328,7 @@ export function PlanScreen({
       onStop={onStop}
       onShowTimeline={(id) => {
         if (!wide) setChatOpen(false)
-        if (id) onSelect(id)
+        if (id) select(id)
       }}
       planBeside={wide}
       onCollapse={wide ? () => setChatOpen(false) : undefined}
@@ -252,7 +356,7 @@ export function PlanScreen({
           onZusData={() => setZusOpen(true)}
           onCases={() => setCasesOpen(true)}
           onLetter={() => setLetterOpen(true)}
-          onAbout={() => setWhy({})}
+          onAbout={() => openWhy()}
           onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
           onMock={showMock}
@@ -276,10 +380,10 @@ export function PlanScreen({
                     changed={changed}
                     wide={wide}
                     decisionPending={Boolean(next?.title)}
-                    onWhy={(focus) => setWhy({ focus })}
-                    onSelect={onSelect}
+                    onWhy={openWhy}
+                    onSelect={select}
                     onStartOver={onStartOver}
-                    onMoney={() => setMoneyOpen(true)}
+                    onMoney={openMoney}
                     onAsk={choose}
                     onFill={openFill}
                     onShare={() => setShareOpen(true)}
@@ -314,7 +418,7 @@ export function PlanScreen({
                       banner={banner}
                       loading={eventLoading}
                       error={eventError}
-                      onSelect={onSelect}
+                      onSelect={select}
                       onDismiss={dismissBanner}
                       onSwitch={(id) => void showEvent(id)}
                       onHappened={(prompt) => {
@@ -328,7 +432,7 @@ export function PlanScreen({
                         changedIds={axisChanged}
                         changeVersion={axisVersion}
                         selectedId={selectedId}
-                        onSelect={onSelect}
+                        onSelect={select}
                         overlayRoot={overlayRoot}
                         focus={axisFocus}
                         preview={previewing !== null}
@@ -341,7 +445,7 @@ export function PlanScreen({
                           changeVersion={axisVersion}
                           hoveredId={null}
                           onHover={() => undefined}
-                          onSelect={onSelect}
+                          onSelect={select}
                         />
                         {/* The whole plan is long on a phone: what lies ahead is above, the rest on demand
                             (opened by itself while an event is previewed on it). */}
@@ -357,11 +461,11 @@ export function PlanScreen({
                                 changedIds={axisChanged}
                                 changeVersion={axisVersion}
                                 selectedId={selectedId}
-                                onSelect={onSelect}
+                                onSelect={select}
                               />
                             ) : (
                               <div className="mt-4">
-                                <YearCalendar timeline={shown ?? timeline} onSelect={onSelect} />
+                                <YearCalendar timeline={shown ?? timeline} onSelect={select} />
                               </div>
                             )}
                             <button
@@ -391,8 +495,8 @@ export function PlanScreen({
                       scenario={scenario}
                       hoveredId={moneyHover}
                       onHover={setMoneyHover}
-                      onSelect={onSelect}
-                      onWhy={() => setMoneyOpen(true)}
+                      onSelect={select}
+                      onWhy={openMoney}
                       onApply={apply}
                     />
                   </motion.div>
@@ -402,7 +506,7 @@ export function PlanScreen({
                       timeline={timeline}
                       scenario={scenario}
                       onFill={openFill}
-                      onSelect={onSelect}
+                      onSelect={select}
                       onPersonal={() => setPersonalOpen(true)}
                     />
                   </motion.div>
@@ -436,7 +540,7 @@ export function PlanScreen({
                                   <LeftOnTable
                                     timeline={timeline}
                                     scenario={scenario}
-                                    onSelect={onSelect}
+                                    onSelect={select}
                                     onFill={openFill}
                                     onApply={apply}
                                     onCompare={() =>
@@ -474,7 +578,7 @@ export function PlanScreen({
                           id: 'risks',
                           label: 'Na co uważać',
                           icon: ICONS.zlecenie,
-                          content: <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={(focus) => setWhy({ focus })} />,
+                          content: <RiskRadar timeline={timeline} scenario={scenario} onCheckZus={checkZus} onWhy={openWhy} />,
                         },
                       ]}
                     />
@@ -491,14 +595,9 @@ export function PlanScreen({
 
           {wide && (
             <AnimatePresence>
-              {selected && timeline && (
-                <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
-                  <ElementDetails key={selected.id} item={selected} timeline={shown ?? timeline} onSelect={onSelect} onFill={previewing ? undefined : openFill} onCertificate={() => setCertOpen(true)} />
-                </Dialog>
-              )}
-              {fillDocument && timeline && (
-                <Dialog key="fill" label={fillDocument.title} onClose={() => setFill(null)}>
-                  <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} onCertificate={() => setCertOpen(true)} />
+              {pane && (
+                <Dialog key="window" label={windowLabel} onClose={() => open(null)} top={crumbs}>
+                  {windowContent}
                 </Dialog>
               )}
               {shareOpen && (
@@ -514,22 +613,6 @@ export function PlanScreen({
               {supportOpen && (
                 <Dialog key="support" label="Wsparcie dla rodziców" onClose={() => setSupportOpen(false)}>
                   <SupportWindow />
-                </Dialog>
-              )}
-              {moneyOpen && timeline && (
-                <Dialog key="money" label="Dlaczego tyle?" onClose={() => setMoneyOpen(false)}>
-                  <MoneyExplanation
-                    timeline={timeline}
-                    onSelect={(id) => {
-                      setMoneyOpen(false)
-                      onSelect(id)
-                    }}
-                  />
-                </Dialog>
-              )}
-              {why && timeline && (
-                <Dialog key="why" label="Dlaczego tak?" onClose={() => setWhy(null)}>
-                  <Explanation timeline={timeline} focusId={why.focus} />
                 </Dialog>
               )}
             </AnimatePresence>
@@ -585,23 +668,8 @@ export function PlanScreen({
           <Sheet open={chatOpen} onOpenChange={setChatOpen} title="Rozmowa z asystentem" fullHeight>
             {chat}
           </Sheet>
-          <Sheet
-            open={selected !== null && timeline !== null}
-            onOpenChange={(open) => !open && onSelect(null)}
-            title={selected?.title ?? 'Szczegóły'}
-          >
-            {selected && timeline && (
-              <ElementDetails key={selected.id} item={selected} timeline={shown ?? timeline} onSelect={onSelect} onFill={previewing ? undefined : openFill} onCertificate={() => setCertOpen(true)} />
-            )}
-          </Sheet>
-          <Sheet
-            open={fillDocument !== null && timeline !== null}
-            onOpenChange={(open) => !open && setFill(null)}
-            title={fillDocument?.title ?? 'Wniosek'}
-          >
-            {fillDocument && timeline && (
-              <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} onCertificate={() => setCertOpen(true)} />
-            )}
+          <Sheet open={pane !== null} onOpenChange={(isOpen) => !isOpen && open(null)} title={windowLabel} top={crumbs}>
+            {windowContent}
           </Sheet>
           <Sheet open={shareOpen} onOpenChange={setShareOpen} title="Udostępnij plan">
             <ShareDialog />
@@ -611,24 +679,6 @@ export function PlanScreen({
           </Sheet>
           <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
             <SupportWindow />
-          </Sheet>
-          <Sheet open={moneyOpen && timeline !== null} onOpenChange={setMoneyOpen} title="Dlaczego tyle?">
-            {timeline && (
-              <MoneyExplanation
-                timeline={timeline}
-                onSelect={(id) => {
-                  setMoneyOpen(false)
-                  onSelect(id)
-                }}
-              />
-            )}
-          </Sheet>
-          <Sheet
-            open={why !== null && timeline !== null}
-            onOpenChange={(open) => !open && setWhy(null)}
-            title="Dlaczego tak?"
-          >
-            {timeline && <Explanation timeline={timeline} focusId={why?.focus} />}
           </Sheet>
         </>
       )}
@@ -652,12 +702,12 @@ export function PlanScreen({
         onApply={apply}
         onWhy={(focus) => {
           setZusOpen(false)
-          setWhy({ focus })
+          openWhy(focus)
         }}
       />
       <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
       <BirthCertificate open={certOpen} onClose={() => setCertOpen(false)} />
-      <LetterDialog open={letterOpen} onClose={() => setLetterOpen(false)} timeline={timeline} onSelect={onSelect} />
+      <LetterDialog open={letterOpen} onClose={() => setLetterOpen(false)} timeline={timeline} onSelect={select} />
 
       <UndoPill change={plan.change} onUndo={() => void plan.undo()} onDismiss={plan.dismiss} />
 

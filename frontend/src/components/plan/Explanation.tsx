@@ -32,8 +32,8 @@ export function Explanation({ timeline, focusId }: { timeline: Timeline; focusId
       <header className="pr-10">
         <h2 className="text-2xl font-bold tracking-tight text-navy-900">Dlaczego tak?</h2>
         <p className="mt-2">
-          Daty liczy kalkulator reguł, bez AI. Każdy punkt ma dosłowny cytat z Przewodnika ZUS
-          albo Kodeksu pracy.
+          Z czego wynika Wasz plan, punkt po punkcie: sytuacja, prawa, wybory i to, co
+          policzyliśmy, każdy punkt ze źródłem. Daty liczy kalkulator reguł, bez AI.
         </p>
       </header>
       {timeline.notes.length > 0 && (

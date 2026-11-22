@@ -11,9 +11,12 @@ import { TimelineCard } from '@/components/plan/TimelineCard'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
 import { Sheet } from '@/components/ui/sheet'
+import { WindowCrumbs, WindowPage } from '@/components/ui/window-nav'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useTrail } from '@/hooks/useTrail'
 import { formatShortDate } from '@/lib/dates'
 import { formatPln } from '@/lib/money'
+import { periodName } from '@/lib/plan'
 import type { Scenario, Timeline } from '@/types'
 
 const NO_CHANGES = new Set<string>()
@@ -38,6 +41,31 @@ export function SharedPlan({ token }: { token: string }) {
 
   const items = useMemo(() => (data ? timelineItems(data.timeline) : []), [data])
   const selected = items.find((i) => i.id === selectedId) ?? null
+  // From one element's details to another's (a period, its money, its request): breadcrumbs back.
+  const trail = useTrail(selected?.id ?? null, (a, b) => a === b)
+  const open = (id: string | null) => {
+    trail.reset()
+    setSelectedId(id)
+  }
+  const crumbName = (id: string) => {
+    const item = items.find((i) => i.id === id)
+    if (!item) return 'Szczegóły'
+    if (item.kind === 'segment') return periodName(item.element)
+    return item.kind === 'payment' ? item.title.split(':')[0] : item.title
+  }
+  const crumbs =
+    selected && trail.trail.length > 0 ? (
+      <WindowCrumbs
+        trail={trail.trail.map(crumbName)}
+        current={crumbName(selected.id)}
+        onBack={(index) => setSelectedId(trail.back(index))}
+      />
+    ) : null
+  const details = selected && data && (
+    <WindowPage page={selected.id} direction={trail.direction}>
+      <ElementDetails item={selected} timeline={data.timeline} onSelect={(id) => setSelectedId(trail.forward(id))} />
+    </WindowPage>
+  )
 
   if (error) return <Centered>{error}</Centered>
   if (!data) {
@@ -95,7 +123,7 @@ export function SharedPlan({ token }: { token: string }) {
               changedIds={NO_CHANGES}
               changeVersion={0}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={open}
               overlayRoot={overlayRoot}
             />
           ) : (
@@ -104,7 +132,7 @@ export function SharedPlan({ token }: { token: string }) {
               changedIds={NO_CHANGES}
               changeVersion={0}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={open}
             />
           )}
         </section>
@@ -147,14 +175,19 @@ export function SharedPlan({ token }: { token: string }) {
       {wide ? (
         <AnimatePresence>
           {selected && (
-            <Dialog key="details" label={selected.title} onClose={() => setSelectedId(null)}>
-              <ElementDetails item={selected} timeline={timeline} onSelect={setSelectedId} />
+            <Dialog key="details" label={selected.title} onClose={() => open(null)} top={crumbs}>
+              {details}
             </Dialog>
           )}
         </AnimatePresence>
       ) : (
-        <Sheet open={selected !== null} onOpenChange={(open) => !open && setSelectedId(null)} title={selected?.title ?? 'Szczegóły'}>
-          {selected && <ElementDetails item={selected} timeline={timeline} onSelect={setSelectedId} />}
+        <Sheet
+          open={selected !== null}
+          onOpenChange={(isOpen) => !isOpen && open(null)}
+          title={selected?.title ?? 'Szczegóły'}
+          top={crumbs}
+        >
+          {details}
         </Sheet>
       )}
     </div>

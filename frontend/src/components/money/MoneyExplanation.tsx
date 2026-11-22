@@ -38,7 +38,8 @@ export function MoneyExplanation({ timeline, onSelect }: { timeline: Timeline; o
       <header className="pr-10">
         <h2 className="text-2xl font-bold tracking-tight text-navy-900">Dlaczego tyle?</h2>
         <p className="mt-2">
-          Kwoty liczy kalkulator reguł, bez AI. Przy każdym kroku jest przepis, z którego wynika.
+          Jak z zarobków wychodzi zasiłek: najpierw podstawa wymiaru krok po kroku, potem kwota za
+          każdy okres. Liczy kalkulator reguł, bez AI; przy każdym kroku jest przepis.
         </p>
       </header>
 

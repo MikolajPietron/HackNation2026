@@ -2,7 +2,8 @@
 // the screen: only its content scrolls (without dragging the page under it along), and the close
 // button stays in its corner. Motion after Emil Kowalski: from scale 0.96 with opacity, ease-out
 // under 300 ms, a faster exit; a sheet from the bottom on phones when asked.
-// Escape and the close button close it; the backdrop around it is the caller's.
+// Escape and the close button close it; the backdrop around it is the caller's. `top` stays above
+// the scrolling content, beside the close button (the breadcrumbs of components/ui/window-nav).
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
@@ -14,11 +15,14 @@ export function ModalPanel({
   label,
   onClose,
   sheetOnPhone = false,
+  top,
   className,
   children,
 }: {
   label: string
   onClose: () => void
+  /** Above the content, not scrolling with it (the way back between windows). */
+  top?: ReactNode
   /** On phones the panel comes up from the bottom edge like a sheet. */
   sheetOnPhone?: boolean
   className?: string
@@ -63,9 +67,13 @@ export function ModalPanel({
       >
         <X className="size-5" />
       </button>
+      {top && <div className="shrink-0 px-6 pt-5 pr-16 sm:px-8 sm:pt-6">{top}</div>}
       <div
         data-scroll
-        className="scrollbar-soft min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-8"
+        className={cn(
+          'scrollbar-soft min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-8',
+          top && 'pt-5 sm:pt-6',
+        )}
       >
         {children}
       </div>

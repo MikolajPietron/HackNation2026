@@ -8,10 +8,13 @@ import { EASE_OUT } from '@/lib/ease'
 export function Dialog({
   label,
   onClose,
+  top,
   children,
 }: {
   label: string
   onClose: () => void
+  /** Above the content, not scrolling with it: the breadcrumbs. */
+  top?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -23,7 +26,7 @@ export function Dialog({
       onClick={onClose}
       className="absolute inset-0 z-30 flex items-center justify-center bg-white/75 p-6 backdrop-blur-[3px] lg:p-10"
     >
-      <ModalPanel label={label} onClose={onClose} className="max-w-xl">
+      <ModalPanel label={label} onClose={onClose} top={top} className="max-w-xl">
         {children}
       </ModalPanel>
     </motion.div>

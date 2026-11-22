@@ -47,6 +47,7 @@ export function PersonalData({
         onDone()
       }}
     >
+      <h2 className="pr-10 text-2xl font-bold tracking-tight text-navy-900">Twoje dane do wniosków</h2>
       <p className="flex gap-2.5 rounded-2xl bg-zus-50 px-4 py-3 text-sm text-zus-900">
         <Lock className="mt-0.5 size-4 shrink-0" />
         Wpisz raz — trafią do wszystkich wniosków. Zostają tylko w tej przeglądarce: nie wysyłamy ich na serwer
