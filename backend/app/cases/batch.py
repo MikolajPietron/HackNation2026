@@ -30,6 +30,9 @@ async def main() -> None:
     parser.add_argument("ids", nargs="*", help="np. S01 S25; puste = wszystkie")
     parser.add_argument("--jobs", type=int, default=1, help="ile spraw naraz (domyślnie 1)")
     parser.add_argument("--summary", type=Path, help="zapisz wyniki spraw do pliku JSON")
+    parser.add_argument(
+        "--only-cached", action="store_true", help="niczego nie czytaj, tylko podsumuj odczytane"
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -53,7 +56,7 @@ async def main() -> None:
                 to_read = [page for page in pages if not page.blank]
                 facts = await make_reader().read(to_read)
             except Exception as error:  # noqa: BLE001 — report and go on with the next case
-                print(f"{case.id} BŁĄD {type(error).__name__}: {str(error)[:160]}", flush=True)
+                print(f"{case.id} BŁĄD {type(error).__name__}: {str(error)[:400]}", flush=True)
                 return
             cache.put(key, CachedRead(facts=facts, pages=len(pages), pages_read=len(to_read)))
             print(
@@ -61,7 +64,8 @@ async def main() -> None:
                 flush=True,
             )
 
-    await asyncio.gather(*(read(case) for case in cases))
+    if not args.only_cached:
+        await asyncio.gather(*(read(case) for case in cases))
 
     params, today = load_params(), today_in_warsaw()
     rows = []

@@ -29,7 +29,13 @@ Zadanie: „kalkulator wysokości zasiłku przy uwzględnianiu indywidualnej pod
 
 ### 2. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86” z CLAUDE.md)
 - `cd backend && uv run python -m app.cases.batch --summary /tmp/sprawy.json` czyta sprawy, których nie ma w pamięci odczytów (`backend/.cases_cache/`, poza gitem), i wypisuje zgodność oraz listę różnic.
-- Na komputerze A wsad wszystkich 86 spraw przez Gemini właśnie trwa; wynik dopiszemy tutaj. Pamięć odczytów to dane z poufnych spraw: nie do gita. Żeby nie płacić drugi raz, można skopiować folder `.cases_cache` lokalnie (AirDrop, pendrive).
+- Wynik z komputera A (22.11.2026, Gemini Pro): przeczytane 30 z 86 spraw. Wsad przerwał chwilowy limit Google (429 „temporarily rate-limited to prevent exceeding its monthly…”). Rozstrzygnięcie ZUS w aktach: przyznano 11, odmowa 8, częściowo 1, brak 10. **Zgodność: 15/20** tam, gdzie znane są obie strony. Oś powstała dla 19 spraw, kwoty dla 11. Różnice:
+  - S08 (zlecenie, odmowa macierzyńskiego): kalkulator mówi „ubezpieczona”; sprawdzić dobrowolne chorobowe w odczycie i `insured_voluntarily`.
+  - S09 (umowa pozorna, odmowa): ustalenie ZUS o niepodleganiu nie trafiło do okresu ubezpieczenia (`sickness: none`); poprawić instrukcję czytnika albo regułę.
+  - S10 (zadłużenie, odmowa ojcowskiego): zadłużenie składkowe na dzień powstania prawa nie jest modelowane.
+  - S19 (rodzina zastępcza, przyznano): kalkulator mówi „nieubezpieczona”; sprawdzić dzień powstania prawa przy przyjęciu dziecka (`right_day`, `taken_in_on`).
+  - S21 (zasiłek w wysokości macierzyńskiego po likwidacji, przyznano): fakty nie są przekładane na `JobLoss` / zasiłek po ustaniu ubezpieczenia (`after_insurance.py`).
+- Dalej: `uv run python -m app.cases.batch --jobs 1` doczyta pozostałe 56 spraw. Uwaga na miesięczny limit wydatków projektu Google: ten sam klucz obsługuje czat. `--only-cached` liczy samo podsumowanie, bez AI. Pamięć odczytów to dane z poufnych spraw: nie do gita. Żeby nie płacić drugi raz, można skopiować folder `.cases_cache` lokalnie (AirDrop, pendrive).
 - Przejrzyj wiersze „różnica” i popraw przełożenie faktów na scenariusz w `backend/app/cases/assess.py`: utrata pracy w ciąży → `JobLoss`, dobrowolne chorobowe przy zleceniu i JDG, zadłużenie składkowe (S04), umowa „dla pozoru” (S07), części rodzicielskiego (S11), sprawy taty, adopcja. Sprawdzenie ubezpieczenia jest w `check_insurance`, porównanie z ZUS w `compare`.
 - Gotowe, gdy: zgodność policzona na wszystkich sprawach z rozstrzygnięciem i każda różnica opisana (błąd odczytu, brak reguły albo inny powód odmowy).
 
