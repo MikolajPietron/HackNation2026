@@ -1,7 +1,6 @@
 // The plan's timeline on phones: one vertical line, everything in date order, months as
-// headings, "Dziś" where today falls, and on top what is happening today. Same picture standards
-// as the wide timeline: events on a tile on the line, hints as a small icon. Tapping an element
-// opens its details with the source.
+// headings, "Dziś" where today falls. Same picture standards as the wide timeline: events on a
+// tile on the line, hints as a small icon. Tapping an element opens its details with the source.
 import { Fragment } from 'react'
 import { motion } from 'motion/react'
 import { ITEM } from '@/components/onboarding/motion'
@@ -13,7 +12,6 @@ import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import type { Segment, Timeline } from '@/types'
 import { NoReturnTag } from './NextSteps'
-import { Readout } from './Readout'
 
 interface Row {
   id: string
@@ -96,9 +94,7 @@ export function MobileTimeline({
 
   return (
     <div>
-      <Readout timeline={timeline} day={today} onSelect={onSelect} onHover={() => undefined} />
-
-      <ol className="relative mt-5">
+      <ol className="relative">
         <span aria-hidden className="absolute top-2 bottom-2 left-[17px] w-0.5 rounded-full bg-line" />
         {list.map((row, index) => {
           const newMonth = index === 0 || month(list[index - 1].day) !== month(row.day)

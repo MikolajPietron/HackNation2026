@@ -1,7 +1,6 @@
 // The plan's timeline, built like a video editor's: a ruler with months and week ticks, tracks
 // (Dziecko, Mama, Tata, Dokumenty) with clips for leave and keyframes for important days, and a
-// playhead. Drag the playhead along the ruler and the readout below says what happens on that
-// day; ‹ › jump between events like keyframes. The tracks scroll sideways with momentum (drag
+// playhead. Drag the playhead along the ruler to a day; ‹ › jump between events like keyframes. The tracks scroll sideways with momentum (drag
 // them, or use the trackpad) and zoom on a spring (− / +, Ctrl/⌘ + wheel or pinch, anchored at
 // the pointer). After a recalculation the old plan stays for a moment as a shadow (FUNKCJE F16).
 //
@@ -47,7 +46,6 @@ import { remPx, textWidth, whenFontsReady } from '@/lib/textWidth'
 import { LANE_ORDER } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { Lane, Payment, Segment, Timeline } from '@/types'
-import { Readout } from './Readout'
 
 /** Days of margin before the first and after the last element. */
 const PAD_DAYS = 10
@@ -563,8 +561,8 @@ export function PlanTimeline({
     reveal(day)
   }
 
-  // A change of the plan puts the playhead on what changed, so the readout says what it is; the
-  // axis scrolls to it when zoomed in. An axis that opens later does not jump to an old change.
+  // A change of the plan puts the playhead on what changed; the axis scrolls to it when zoomed
+  // in. An axis that opens later does not jump to an old change.
   const focusKey = focus?.key ?? null
   const focusDay = focus?.day ?? null
   const [focusSeen, setFocusSeen] = useState(focusKey)
@@ -1308,7 +1306,6 @@ export function PlanTimeline({
           document.body,
         )}
 
-      <Readout timeline={timeline} day={head} onSelect={onSelect} onHover={onHover} />
     </div>
   )
 }
