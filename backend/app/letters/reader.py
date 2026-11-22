@@ -60,7 +60,7 @@ class ModelLetterReader:
             # Not strict, like the case reader: Pydantic validates the answer and asks again.
             output_type=ToolOutput(LetterReading, name="zapisz_wyjasnienie_pisma", strict=False),
             instructions=INSTRUCTIONS,
-            model_settings=ModelSettings(max_tokens=6000),
+            model_settings=ModelSettings(max_tokens=16000, thinking="low"),
             retries={"output": 2},
         )
 

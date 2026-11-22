@@ -86,7 +86,9 @@ class ModelCaseReader:
             # Pydantic still validates the answer and asks again when it does not fit.
             output_type=ToolOutput(CaseFacts, name="zapisz_dane_sprawy", strict=False),
             instructions=INSTRUCTIONS,
-            model_settings=ModelSettings(max_tokens=12000),
+            # The cap counts the model's thinking too: a 74-page case spent 12 000 tokens thinking
+            # and wrote nothing (Gemini Pro, 22.11.2026). Copying fields needs little thinking.
+            model_settings=ModelSettings(max_tokens=32000, thinking="low"),
             retries={"output": 2},
         )
 

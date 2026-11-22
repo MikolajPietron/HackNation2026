@@ -10,6 +10,7 @@ PUT  /api/cases/session/{session_id} load the case into the plan (a new conversa
 """
 
 import datetime as dt
+import logging
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
@@ -48,11 +49,16 @@ from app.config import Settings, get_settings
 from app.engine import Params, ScenarioError, build_timeline
 from app.services.sessions import Session, SessionStore
 
+logger = logging.getLogger("uvicorn.error")
+
 
 def _reading_failed(error: Exception) -> str:
-    """What the parent sees when the model could not read the file: no provider's raw answer."""
+    """What the parent sees when the model could not read the file: no provider's raw answer.
+    The real error goes to the log."""
+    logger.exception("Reading a case failed", exc_info=error)
     text = str(error).lower()
-    if any(word in text for word in ("spend cap", "spending cap", "quota", "credits", "limit")):
+    out_of_money = ("spend cap", "spending cap", "quota", "credits", "insufficient")
+    if any(word in text for word in out_of_money):
         return (
             "Odczyt dokumentów przez AI jest chwilowo niedostępny: wyczerpał się limit konta "
             "albo klucza modelu. Przykładowe rodziny i kalkulator działają bez AI."
