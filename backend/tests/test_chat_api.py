@@ -16,7 +16,8 @@ from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls
 from app.api.deps import get_chat_model, get_param_store, get_session_store, get_today
 from app.assistant.describe import interview_questions, opening_notes
 from app.assistant.law import zalacznik_available
-from app.assistant.prompts import STATIC_INSTRUCTIONS
+from app.assistant.prompts import BASE_INSTRUCTIONS, stage_instructions
+from app.assistant.stage import stage_topics
 from app.config import Settings, get_settings
 from app.engine.models import CaseNote, Scenario
 from app.main import app
@@ -25,6 +26,12 @@ from app.services.sessions import MemorySessionStore, Session
 
 TODAY = dt.date(2026, 11, 21)
 SESSION = "7f1c8f0e-4d7a-4b52-9c35-0d8a4f1c2b11"
+
+
+def stage_text(**scenario: Any) -> str:
+    """The static instructions the model gets at this scenario's stage (ZADANIA B.17)."""
+    topics = stage_topics(Scenario.model_validate(scenario))
+    return f"{BASE_INSTRUCTIONS}\n{stage_instructions(topics)}"
 
 
 def scripted(
@@ -108,7 +115,7 @@ def test_interview_is_stored_and_restored(client: TestClient) -> None:
     assert "".join(e["delta"] for e in out if e["type"] == "text") == (
         "Mam datę.\n\nIle dzieci urodzi się przy jednym porodzie?"
     )
-    assert out[-1] == {"type": "done"}
+    assert out[-1]["type"] == "done"
 
     # Next answers: the server remembers the session; the client sends only the message.
     model = scripted("set_children_count", {"count": 1}, "Jedno dziecko.")
@@ -200,7 +207,7 @@ def test_too_many_weeks_are_rejected(client: TestClient, store: MemorySessionSto
     }
     assert rejected in out
     assert not any(e["type"] == "timeline" for e in out)
-    assert out[-1] == {"type": "done"}
+    assert out[-1]["type"] == "done"
     step = client.get(f"/api/session/{SESSION}").json()["messages"][1]["parts"][0]
     assert (step["name"], step["status"]) == ("set_leave_before_birth", "failed")
 
@@ -333,7 +340,7 @@ def test_timeline_ready_event_starts_the_conversation(client: TestClient) -> Non
     )
     # ...and the server adds it under the answer.
     assert "".join(e["delta"] for e in out if e["type"] == "text").endswith(mother_work)
-    assert out[-1] == {"type": "done"}
+    assert out[-1]["type"] == "done"
     # The parent answered nothing in this turn: the model can only point at the timeline.
     assert tools == [["explain_timeline_element"]]
 
@@ -836,10 +843,10 @@ def test_the_mothers_situation_is_recorded_and_cleared(
 
 
 def test_the_fathers_leave_is_in_scope() -> None:
-    scope = STATIC_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
+    scope = BASE_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
     assert "Tata: urlop ojcowski; jego część urlopu rodzicielskiego; przejęcie" in scope
     out_of_scope = next(
-        line for line in STATIC_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
+        line for line in BASE_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
     )
     for in_scope_now in ("ojcowski", "taty", "podział urlopu rodzicielskiego", "łączenie urlopu"):
         assert in_scope_now not in out_of_scope
@@ -847,14 +854,14 @@ def test_the_fathers_leave_is_in_scope() -> None:
     # Section D (adoption, foster care) is in scope too.
     assert "przysposobieniu" not in out_of_scope
     for tool in ("set_father_work", "set_father_insurance", "set_father_takeover"):
-        assert f"`{tool}`" in STATIC_INSTRUCTIONS
-    assert "`set_mother_situation`" in STATIC_INSTRUCTIONS
+        assert f"`{tool}`" in BASE_INSTRUCTIONS
+    assert "`set_mother_situation`" in BASE_INSTRUCTIONS
     # Guide E and B.3: recorded when the parent says so, never asked.
     assert "łączenie urlopu rodzicielskiego z pracą na część etatu" in scope
     for tool in ("set_parental_plan", "set_parental_work"):
-        assert f"`{tool}`" in STATIC_INSTRUCTIONS
+        assert f"`{tool}`" in BASE_INSTRUCTIONS
     assert "O podział urlopu rodzicielskiego i o pracę w czasie tego urlopu też nie pytaj" in (
-        STATIC_INSTRUCTIONS
+        BASE_INSTRUCTIONS
     )
 
 
@@ -1042,12 +1049,14 @@ def test_employer_reasons_need_an_employment_contract(client: TestClient) -> Non
 
 
 def test_pregnancy_is_in_scope() -> None:
-    scope = STATIC_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
+    scope = BASE_INSTRUCTIONS.split("# Zakres\n")[1].split("\n")[0]
     assert "Ciąża: zwolnienie lekarskie w ciąży" in scope
     out_of_scope = next(
-        line for line in STATIC_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
+        line for line in BASE_INSTRUCTIONS.splitlines() if line.startswith("- Pytania spoza")
     )
     assert "zasiłek chorobowy" not in out_of_scope
+    # While the child is on the way (ZADANIA B.17: the stage's instructions).
+    expecting = stage_text(child_born=False, due_date="2027-03-15")
     for tool in (
         "set_sick_leave",
         "set_insured_since",
@@ -1055,7 +1064,7 @@ def test_pregnancy_is_in_scope() -> None:
         "set_job_loss",
         "set_contribution_base_raised",
     ):
-        assert f"`{tool}`" in STATIC_INSTRUCTIONS
+        assert f"`{tool}`" in expecting
 
 
 # Guide E and B.3: the parents' plan of parental leave, recorded when they say so.
@@ -1213,12 +1222,15 @@ def test_the_rate_choice_needs_an_insured_mother(
 
 
 def test_the_money_tools_and_the_ustawa_are_in_the_instructions() -> None:
-    assert "`set_monthly_pay`" in STATIC_INSTRUCTIONS
-    assert "`set_rate_choice`" in STATIC_INSTRUCTIONS
-    assert "[Ustawa zasiłkowa, art. 31 ust. 3]" in STATIC_INSTRUCTIONS
-    assert "[Przewodnik ZUS, s. 9: Wysokość zasiłku macierzyńskiego: 100% podstawy]" in (
-        STATIC_INSTRUCTIONS
-    )
+    assert "`set_monthly_pay`" in BASE_INSTRUCTIONS
+    assert "`set_rate_choice`" in BASE_INSTRUCTIONS
+    # The rates of the guide always; the law on amounts once there is an amount (B.17).
+    early = stage_text(child_born=False, due_date="2027-03-15", work="employment")
+    paid = stage_text(child_born=False, due_date="2027-03-15", work="employment", mother_pay=8000)
+    rate = "[Przewodnik ZUS, s. 9: Wysokość zasiłku macierzyńskiego: 100% podstawy]"
+    assert rate in early and rate in paid
+    assert "[Ustawa zasiłkowa, art. 31 ust. 3]" in paid
+    assert "[Ustawa zasiłkowa, art. 31 ust. 3]" not in early
 
 
 # The benefit base in detail (engine/base.py).
@@ -1266,10 +1278,11 @@ def test_the_pay_history_is_recorded_month_by_month(
     assert rejected("set_pay_history") in out
     gone = timeline_after(client, "set_pay_history", {"parent": "mother", "replace": True})
     assert gone["scenario"]["mother_pay_history"] is None
-    assert "`set_pay_history`" in STATIC_INSTRUCTIONS
+    assert "`set_pay_history`" in BASE_INSTRUCTIONS
     if zalacznik_available():  # built locally from the ZUS materials, not in git
-        assert "[Załącznik ZUS, Okres uwzględniany w podstawie wymiaru zasiłku]" in (
-            STATIC_INSTRUCTIONS
+        history = {"months": [{"month": "2026-03", "amount": 3000}]}
+        assert "[Załącznik ZUS, Okres uwzględniany w podstawie wymiaru zasiłku]" in stage_text(
+            child_born=False, due_date="2027-03-15", work="employment", mother_pay_history=history
         )
 
 
@@ -1307,7 +1320,7 @@ def test_the_interview_question_comes_from_the_code_not_the_model(
     )
     text = "".join(e["delta"] for e in out if e["type"] == "text")
     assert text.endswith("\n\n" + expected.text)
-    assert out[-1] == {"type": "done"}
+    assert out[-1]["type"] == "done"
     # An answer that already ends with the question gets nothing added.
     model = FunctionModel(stream_function=lambda messages, info: _words("Dobrze. " + expected.text))
     app.dependency_overrides[get_chat_model] = lambda: model
@@ -1363,7 +1376,7 @@ def test_the_model_gets_no_deadline_the_materials_do_not_give(
     ) in state
     assert "do pracodawcy, do 1 marca 2027" not in state
     assert "Gdy rodzic pyta o termin takiego wniosku, powiedz wprost, że materiały go nie " in (
-        STATIC_INSTRUCTIONS
+        BASE_INSTRUCTIONS
     )
 
     # The parent asks for the deadline; the model looks the request up.

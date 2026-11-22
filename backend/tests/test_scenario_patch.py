@@ -152,7 +152,7 @@ def test_the_next_chat_turn_sees_the_note(client: TestClient, store: MemorySessi
     app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
     response = client.post("/api/chat", json={"session_id": SESSION, "message": "Co dalej?"})
     lines = [json.loads(line) for line in response.text.splitlines() if line]
-    assert lines[-1] == {"type": "done"}
+    assert lines[-1]["type"] == "done"
     assert any(text.startswith(EVENT_MARKER) and "rate_815 = false" in text for text in seen)
     assert "Co dalej?" in seen
 

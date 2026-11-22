@@ -68,6 +68,10 @@ class Turn:
     error: str | None = None
     done: bool = False
     seconds: float = 0.0
+    first_text_seconds: float | None = None
+    """Until the first text reached the client (measured by the harness)."""
+    usage: dict = field(default_factory=dict)
+    """The server's measurement of the turn (`done` event): tokens, cost, server-side times."""
 
     @property
     def changed(self) -> set[str]:

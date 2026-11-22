@@ -12,7 +12,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field, ValidationError
 from pydantic_ai import Agent, CustomEvent, ModelRetry, RunContext, UsageLimits
-from pydantic_ai.capabilities import PrepareTools
+from pydantic_ai.capabilities import AbstractCapability, PrepareTools, RetryOnModelErrors
+from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import ToolDefinition
 
 from app.assistant.describe import (
@@ -21,9 +22,16 @@ from app.assistant.describe import (
     describe_note_changes,
     describe_person,
     describe_timeline,
+    describe_timeline_changes,
 )
 from app.assistant.describe_plans import describe_plans, describe_stress
-from app.assistant.prompts import STATIC_INSTRUCTIONS, WEEKDAYS
+from app.assistant.prompts import (
+    BASE_INSTRUCTIONS,
+    WEEKDAYS,
+    late_instructions,
+    stage_instructions,
+)
+from app.assistant.stage import Topic, hidden_tools, stage_topics
 from app.engine import (
     Params,
     Scenario,
@@ -102,41 +110,71 @@ EXPLAIN_ONLY = {"explain_timeline_element"}
 def _tools_for_turn(
     ctx: RunContext[AssistantDeps], tool_defs: list[ToolDefinition]
 ) -> list[ToolDefinition]:
+    """Before every request: only the tools that can apply now (stage.hidden_tools). A child taken
+    in has nothing about pregnancy or the birth, a child on the way nothing that needs the date
+    of birth; a tool comes back as soon as a fact recorded in this turn makes it apply."""
     if not ctx.deps.answers_allowed:
         return [t for t in tool_defs if t.name in EXPLAIN_ONLY]
-    # A child taken in for upbringing: nothing about pregnancy or the birth; the other way round,
-    # no questions that only adoption and foster care have.
-    hidden = BIRTH_ONLY if ctx.deps.scenario.taken_in is not None else TAKEN_IN_ONLY
+    hidden = hidden_tools(ctx.deps.scenario, ctx.deps.timeline)
     return [t for t in tool_defs if t.name not in hidden]
 
 
-BIRTH_ONLY = {
-    "set_birth_date",
-    "set_leave_before_birth",
-    "set_medical_certificate",
-    "set_child_loss",
-    "set_father_takeover",
-    "set_mother_situation",
-    "set_rehab_benefit",
-    "propose_plans",
-    "stress_test",
-}
-"""Pregnancy and the birth (section A, B.1-B.2): the child's own birth date of a child taken in
-goes through `set_taken_in`. `set_hospital_care` serves both paths (art. 183 § 3¹)."""
-TAKEN_IN_ONLY = {
-    "set_school_postponed",
-    "set_adoption_ruling",
-    "set_leave_handover",
-    "set_foster_before",
-}
+MAX_TOKENS = 4096
+"""Output cap of one answer, thinking included: a few short sentences ("Styl odpowiedzi") need a
+few hundred tokens, a plan list or a calm answer after a loss a few more; the cap only stops a
+runaway answer."""
+EVENT_MAX_TOKENS = 2048
+"""The welcome after the onboarding: at most three short sentences and one highlight."""
+
+
+def _turn_settings(ctx: RunContext[AssistantDeps]) -> ModelSettings:
+    """No long thinking (ZADANIA B.17): the engine computes, the model only records and explains.
+    `LLM_THINKING` still sets it for answers; the welcome turn thinks minimally."""
+    if not ctx.deps.answers_allowed:
+        return ModelSettings(thinking="minimal", max_tokens=EVENT_MAX_TOKENS)
+    thinking = (ctx.model_settings or {}).get("thinking") or "low"
+    return ModelSettings(thinking=thinking, max_tokens=MAX_TOKENS)
+
+
+@dataclass
+class StageInstructions(AbstractCapability[AssistantDeps]):
+    """The instructions and literal sources for the family's stage, and the turn's settings.
+
+    The stage is read when the turn starts and its text is static, so it follows
+    `BASE_INSTRUCTIONS` in the cached prefix: turns of one stage send the same prefix. When a
+    tool moves the family to another stage during the turn (the birth, a loss, an amount),
+    `late_instructions` adds what the new stage needs for the rest of the turn, after the prefix.
+    """
+
+    topics: frozenset[Topic] = frozenset()
+
+    async def for_run(self, ctx: RunContext[AssistantDeps]) -> "StageInstructions":
+        return StageInstructions(topics=stage_topics(ctx.deps.scenario))
+
+    def get_instructions(self) -> Any:
+        if not self.topics:  # the agent's own instance, before any run
+            return None
+        return [stage_instructions(self.topics), self.late]
+
+    def late(self, ctx: RunContext[AssistantDeps]) -> str:
+        return late_instructions(self.topics, stage_topics(ctx.deps.scenario))
+
+    def get_model_settings(self) -> Any:
+        return _turn_settings
 
 
 assistant = Agent(
     deps_type=AssistantDeps,
     name="przewodnik",
-    instructions=STATIC_INSTRUCTIONS,
+    instructions=BASE_INSTRUCTIONS,
     retries=2,
-    capabilities=[PrepareTools(_tools_for_turn)],
+    capabilities=[
+        PrepareTools(_tools_for_turn),
+        StageInstructions(),
+        # A rate limit or a network error: one more attempt after a short wait, then the chat
+        # shows a short Polish message (api/chat.py). The SDKs' own retries are off (deps.py).
+        RetryOnModelErrors(max_attempts=2, initial_delay=1.0, max_delay=10.0),
+    ],
 )
 
 
@@ -185,9 +223,11 @@ async def _apply(ctx: RunContext[AssistantDeps], scenario: Scenario, *focus: str
     )
     if timeline is None:
         return f"Zapisane. Oś pojawi się po ustawieniu daty. {describe_interview(scenario)}"
+    # Only what changed: the whole timeline is in the current state, rebuilt before the next
+    # request (`current_state`), and a tool result stays in the history for every later turn.
     return "\n\n".join(
         [
-            describe_timeline(timeline, changed),
+            describe_timeline_changes(old, timeline, changed),
             describe_note_changes(timeline, None if old is None else changed_notes),
             describe_interview(scenario),
         ]

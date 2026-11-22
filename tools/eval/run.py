@@ -5,6 +5,10 @@ Costs real LLM calls (one per chat step). Not part of CI. See README.md.
     cd backend && uv run python ../tools/eval/run.py --base http://127.0.0.1:8010 --out run.json
     cd backend && uv run python ../tools/eval/run.py --only twins-and-back --runs 3
     cd backend && uv run python ../tools/eval/run.py --rescore run.json   # no LLM calls
+    cd backend && uv run python ../tools/eval/run.py --compare a.json b.json   # no LLM calls
+
+After the checks it prints time to the first text, turn time, tokens (cached too) and cost per
+scenario, from the `done` event of every turn (ZADANIA B.17).
 """
 
 import argparse
@@ -13,6 +17,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import statistics
 import sys
 import time
 import uuid
@@ -62,6 +67,8 @@ async def chat(client: httpx.AsyncClient, base: str, sid: str, step: dict) -> Tu
             event = json.loads(line)
             match event["type"]:
                 case "text":
+                    if turn.first_text_seconds is None:
+                        turn.first_text_seconds = time.monotonic() - start
                     turn.text += event["delta"]
                 case "tool-call":
                     turn.tool_calls.append({"name": event["name"], "args": event.get("args", {})})
@@ -75,6 +82,7 @@ async def chat(client: httpx.AsyncClient, base: str, sid: str, step: dict) -> Tu
                     turn.error = event["message"]
                 case "done":
                     turn.done = True
+                    turn.usage = event.get("usage") or {}
     turn.seconds = time.monotonic() - start
     return turn
 
@@ -95,7 +103,7 @@ def tool_checks(step: dict, calls: list[dict], results: list[dict]) -> list[Chec
         called = [c for c in calls if c["name"] == name]
         out.append(Check(f"no tool {name}", not called, str([c["args"] for c in called])))
     setters = [c["name"] for c in calls if c["name"].startswith("set_")]
-    if step.get("out_of_scope") or step.get("event"):
+    if step.get("out_of_scope") or step.get("event") or step.get("no_setters"):
         # Nobody answered anything: the assistant must not record answers itself.
         out.append(Check("no unrequested scenario change", not setters, ", ".join(setters)))
     return out
@@ -202,6 +210,12 @@ async def run_scenario(client, base: str, scenario: dict, run: int) -> dict:
     timeline = r.json()["timeline"]
     record["onboarding_today"] = timeline["today"]
     for index, step in enumerate(scenario["steps"]):
+        if "patch" in step:
+            # B.16: the parent changes the plan in the app (week tiles, the 81,5% switch, a plan
+            # for a goal) before writing; the server leaves a hidden note in the history.
+            patched = await client.patch(f"{base}/api/session/{sid}/scenario", json=step["patch"])
+            patched.raise_for_status()
+            timeline = patched.json()["timeline"]
         before = timeline
         turn = await chat(client, base, sid, step)
         view = (await client.get(f"{base}/api/session/{sid}")).json()
@@ -222,6 +236,10 @@ async def run_scenario(client, base: str, scenario: dict, run: int) -> dict:
                 "question": view.get("question"),
                 "live_differs": live_differs,
                 "seconds": round(turn.seconds, 1),
+                "first_text_seconds": (
+                    None if turn.first_text_seconds is None else round(turn.first_text_seconds, 2)
+                ),
+                "usage": turn.usage,
                 "before": before,
                 "after": timeline,
                 "timeline_sha": hashlib.sha256(
@@ -325,6 +343,74 @@ def print_report(records: list[dict], det: list[dict]) -> int:
     return hard_fail
 
 
+def _median(values: list[float]) -> float | None:
+    return round(statistics.median(values), 2) if values else None
+
+
+def summarize(steps: list[dict]) -> dict:
+    """Time, tokens and cost of these turns (ZADANIA B.17). `input` counts cached tokens too,
+    `cached` only those read from the provider's prompt cache."""
+    usages = [s.get("usage") or {} for s in steps]
+    costs = [u["cost_usd"] for u in usages if u.get("cost_usd") is not None]
+    first = [s["first_text_seconds"] for s in steps if s.get("first_text_seconds") is not None]
+    return {
+        "turns": len(steps),
+        "first_text_median_s": _median(first),
+        "turn_median_s": _median([s["seconds"] for s in steps if s.get("seconds") is not None]),
+        "input_tokens": sum(u.get("input_tokens", 0) for u in usages),
+        "cached_tokens": sum(u.get("cache_read_tokens", 0) for u in usages),
+        "output_tokens": sum(u.get("output_tokens", 0) for u in usages),
+        "requests": sum(u.get("requests", 0) for u in usages),
+        "cost_usd": round(sum(costs), 4) if costs else None,
+        # From the second turn on the static prefix should come from the cache.
+        "later_turns_with_cache": sum(1 for u in usages[1:] if u.get("cache_read_tokens")),
+    }
+
+
+def print_usage(records: list[dict]) -> dict:
+    """Per scenario: time to the first text and of the whole turn (medians), tokens, cost."""
+    by_scenario: dict[str, list[dict]] = {}
+    for r in records:
+        by_scenario.setdefault(r["scenario"], []).extend(r["steps"])
+    print("\nTime and tokens per scenario (medians over turns; tokens and cost summed)")
+    head = f"{'scenario':24} {'turns':>5} {'1st text':>8} {'turn':>6} {'input':>9} {'cached':>9}"
+    print(f"{head} {'output':>7} {'per turn':>9} {'cost $':>8}  cache from 2nd turn")
+    print("-" * 110)
+    out = {}
+    for name, steps in [*by_scenario.items(), ("ALL", [s for r in records for s in r["steps"]])]:
+        s = out[name] = summarize(steps)
+        per_turn = s["input_tokens"] // s["turns"] if s["turns"] else 0
+        cost = "-" if s["cost_usd"] is None else f"{s['cost_usd']:.4f}"
+        later = max(s["turns"] - 1, 0) if name != "ALL" else "-"
+        print(
+            f"{name:24} {s['turns']:>5} {s['first_text_median_s'] or '-':>8} "
+            f"{s['turn_median_s'] or '-':>6} {s['input_tokens']:>9} {s['cached_tokens']:>9} "
+            f"{s['output_tokens']:>7} {per_turn:>9} {cost:>8}  "
+            f"{s['later_turns_with_cache']}/{later}"
+        )
+    return out
+
+
+def compare(paths: list[Path]) -> None:
+    """Model comparison from saved `--out` files: accuracy, time, cost (no LLM calls)."""
+    print(f"\n{'run':28} {'model':28} {'ok steps':>9} {'1st text':>8} {'turn':>6} {'in/turn':>8}")
+    print("-" * 110)
+    for path in paths:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        records = data["records"]
+        score(records)
+        steps = [s for r in records for s in r["steps"]]
+        ok = sum(1 for s in steps if not any(not c["ok"] and not c["soft"] for c in s["checks"]))
+        s = summarize(steps)
+        per_turn = s["input_tokens"] // s["turns"] if s["turns"] else 0
+        cost = "-" if s["cost_usd"] is None else f"${s['cost_usd']:.4f}"
+        print(
+            f"{path.name:28} {data.get('label', '?'):28} {ok:>4}/{len(steps):<4} "
+            f"{s['first_text_median_s'] or '-':>8} {s['turn_median_s'] or '-':>6} "
+            f"{per_turn:>8}  cost {cost}, cached {s['cached_tokens']} of {s['input_tokens']}"
+        )
+
+
 async def run_all(args) -> list[dict]:
     chosen = [s for s in SCENARIOS if not args.only or s["id"] in args.only.split(",")]
     async with httpx.AsyncClient() as client:
@@ -356,10 +442,21 @@ def main() -> int:
     parser.add_argument("--parallel", type=int, default=4)
     parser.add_argument("--out", type=Path, help="write all turns and checks as JSON here")
     parser.add_argument("--rescore", type=Path, help="re-check a saved --out file; no LLM calls")
+    parser.add_argument(
+        "--label", default="?", help="the chat model the backend runs, saved with --out"
+    )
+    parser.add_argument(
+        "--compare", type=Path, nargs="+", help="compare saved --out files; no LLM calls"
+    )
     args = parser.parse_args()
 
+    if args.compare:
+        compare(args.compare)
+        return 0
+    label = args.label
     if args.rescore:
-        records = json.loads(args.rescore.read_text(encoding="utf-8"))["records"]
+        saved = json.loads(args.rescore.read_text(encoding="utf-8"))
+        records, label = saved["records"], saved.get("label", label)
         if args.only:
             records = [r for r in records if r["scenario"] in args.only.split(",")]
     else:
@@ -367,9 +464,14 @@ def main() -> int:
     score(records)
     det = determinism(records)
     failures = print_report(records, det)
+    usage = print_usage(records)
     if args.out:
         args.out.write_text(
-            json.dumps({"records": records, "determinism": det}, ensure_ascii=False, indent=1),
+            json.dumps(
+                {"label": label, "records": records, "determinism": det, "usage": usage},
+                ensure_ascii=False,
+                indent=1,
+            ),
             encoding="utf-8",
         )
         print(f"details: {args.out}")
