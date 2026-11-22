@@ -109,8 +109,18 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     if (init?.signal?.aborted) throw error
     throw new Error(OFFLINE)
   }
-  if (!response.ok) throw new Error(await errorDetail(response))
+  if (!response.ok) throw new ApiError(await errorDetail(response), response.status)
   return (await response.json()) as T
+}
+
+/** A refusal from our API: the server's Polish message and the HTTP status (409 = the session is
+ *  busy with a chat turn, ZADANIA B.15). */
+export class ApiError extends Error {
+  readonly status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
 }
 
 /** Admin panel: the base parameters, the numbers in force and every saved version. */

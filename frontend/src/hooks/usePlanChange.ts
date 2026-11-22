@@ -1,9 +1,10 @@
 // Changes to the plan made from the interface, without the chat (the 81,5% choice, a plan for a
 // goal, the parental plan): PATCH /api/session/{id}/scenario, then the timeline is replaced and
 // what changed lights up. Every change can be undone for a moment: the undo is the same PATCH
-// with the fields as they were before.
+// with the fields as they were before. While a chat turn holds the session the server refuses
+// the PATCH with 409 (ZADANIA B.15): the change then waits and goes through once the turn ends.
 import { useCallback, useRef, useState } from 'react'
-import { changeScenario } from '@/api'
+import { ApiError, changeScenario } from '@/api'
 import { currentSessionId } from '@/lib/session'
 import type { Scenario, ScenarioChanges, SessionStart } from '@/types'
 
@@ -14,6 +15,23 @@ export interface PlanChange {
   detail?: string
   /** The fields as they were before; null once undone or when the change failed. */
   undo: ScenarioChanges | null
+}
+
+const RETRY_MS = 1500
+/** About a minute and a half: a chat turn rarely takes longer. */
+const TRIES = 60
+
+/** PATCH the scenario; while the assistant is answering (409), wait and try again. */
+async function patchWhenFree(changes: ScenarioChanges, onWait: () => void): Promise<SessionStart> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await changeScenario(currentSessionId(), changes)
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 409) || attempt >= TRIES) throw error
+      if (attempt === 1) onWait()
+      await new Promise((resolve) => window.setTimeout(resolve, RETRY_MS))
+    }
+  }
 }
 
 /** Change the plan from the interface; resolves to whether the engine accepted it. */
@@ -33,8 +51,10 @@ export function usePlanChange(scenario: Scenario | null, onUpdate: (start: Sessi
         Object.keys(changes).map((key) => [key, scenario[key as keyof Scenario] ?? null]),
       ) as ScenarioChanges
       setChange({ id, status: 'working', title: 'Przeliczam plan…', undo: null })
+      const waiting = () =>
+        setChange({ id, status: 'working', title: 'Zmienię plan, gdy asystent skończy', detail: 'Asystent właśnie odpowiada.', undo: null })
       try {
-        onUpdate(await changeScenario(currentSessionId(), changes))
+        onUpdate(await patchWhenFree(changes, waiting))
         setChange({ id, status: 'done', title, detail, undo })
         return true
       } catch (error) {
@@ -58,8 +78,10 @@ export function usePlanChange(scenario: Scenario | null, onUpdate: (start: Sessi
     busy.current = true
     const { id, undo: before } = change
     setChange({ id, status: 'working', title: 'Cofam…', undo: null })
+    const waiting = () =>
+      setChange({ id, status: 'working', title: 'Cofnę, gdy asystent skończy', detail: 'Asystent właśnie odpowiada.', undo: null })
     try {
-      onUpdate(await changeScenario(currentSessionId(), before))
+      onUpdate(await patchWhenFree(before, waiting))
       setChange({ id, status: 'undone', title: 'Cofnięte', detail: 'Plan jest taki jak wcześniej.', undo: null })
     } catch (error) {
       setChange({
