@@ -89,6 +89,7 @@ RequestKind = Literal[
     "supplementary-request",
     "parental-request",
     "parental-father-request",
+    "parental-work-request",
     "paternity-request",
     "zam",
     "rate-815",

@@ -2,7 +2,7 @@
 fields as the regulations name them, filled in from the scenario and the timeline.
 
 Sources: the regulation of 11 March 2025 on the leave requests (rozp_wnioski: § 2, § 3, § 5,
-§ 7, § 14, § 15, § 17, § 22), the regulation of 27 September 2026 on the benefit documents
+§ 7, § 14, § 15, § 16, § 17, § 22), the regulation of 27 September 2026 on the benefit documents
 (rozp_zasilki: § 2, § 12, § 13, § 32, § 33, annexes 1 and 6), the guide (A.4, page 12).
 
 Expected dates were computed by hand, today being 21.11.2026:
@@ -22,7 +22,19 @@ Expected dates were computed by hand, today being 21.11.2026:
 - born 10.11.2026, a plan: the mother 20 weeks right after maternity leave 30.03-16.08.2027
   (+139 days), the father 9 weeks at the same time 30.03-31.05.2027 (+62 days), the mother
   12 weeks from 01.06.2028 to 23.08.2028 (+83 days); each request 21 days before its part:
-  09.03.2027, 09.03.2027, 11.05.2028.
+  09.03.2027, 09.03.2027, 11.05.2028;
+- born 10.11.2026, a plan with work at 1/2 of full time (ZADANIA B.13): the mother 32 weeks
+  from 30.03.2027, working the first 20 (30.03-16.08.2027, +139 days); the extension
+  20 × 1/2 = 10 weeks, so the part ends 30.03.2027 + 32 × 7 + 70 - 1 = +293 days = 17.01.2028,
+  the extension 09.11.2027-17.01.2028; the father 9 weeks right after, from 18.01.2028, working
+  all 9 (18.01-20.03.2028, +62 days, 2028 a leap year); his extension 9 × 7 × 1/2 = 31,5 days,
+  so 31; his part ends 18.01.2028 + 63 + 31 - 1 = +93 days = 20.04.2028, the extension
+  21.03-20.04.2028. Each request to work 21 days before the work starts (its part's first day):
+  30.03.2027 - 21 = 09.03.2027, 18.01.2028 - 21 = 28.12.2027;
+- born 01.07.2026, no leave before: maternity leave until 17.11.2026 (+139 days); the mother's
+  part with work from 18.11.2026 is under way on 21.11.2026 (no requests any more); the father
+  9 weeks at 1/2 from 01.12.2026: request by 01.12.2026 - 21 = 10.11.2026, passed; his work
+  01.12.2026-01.02.2027 (+62 days).
 """
 
 import datetime as dt
@@ -385,6 +397,178 @@ def test_every_part_of_a_parental_plan_is_its_own_request() -> None:
     assert (
         "Wniosek o urlop rodzicielski (część 2) — do pracodawcy, najpóźniej 11 maja 2028." in told
     )
+
+
+def test_a_part_with_work_needs_the_request_to_work_during_the_leave() -> None:
+    """ZADANIA B.13, art. 182¹ᵉ § 2: work during parental leave starts on a request filed at
+    least 21 days before the work; its content is § 16 of the regulation on the requests."""
+    t = timeline(
+        **PARENTS,
+        **BORN,
+        parental_parts=[
+            {"parent": "mother", "weeks": 32, "work_fraction": "1/2", "work_weeks": 20},
+            {"parent": "father", "weeks": 9, "work_fraction": "1/2"},
+        ],
+    )
+    requests = [
+        (d.id, d.label, d.title, d.segment_id, d.needed_by, d.deadline)
+        for d in t.documents
+        if "work-request" in d.id
+    ]
+    assert requests == [
+        (
+            "parental-work-request-1",
+            "Wniosek: praca w czasie urlopu, cz. 1",
+            "Wniosek o łączenie urlopu rodzicielskiego z pracą (część 1)",
+            "parental-mother-1",
+            dt.date(2027, 3, 9),
+            dt.date(2027, 3, 9),
+        ),
+        (
+            "parental-father-work-request-1",
+            "Wniosek taty: praca w czasie urlopu, cz. 1",
+            "Wniosek taty o łączenie urlopu rodzicielskiego z pracą (część 1)",
+            "parental-father-1",
+            dt.date(2027, 12, 28),
+            dt.date(2027, 12, 28),
+        ),
+    ]
+    mothers = document(t, "parental-work-request-1")
+    assert mothers.rule == (
+        "W planie mama od 30.03.2027 do 16.08.2027 łączy urlop z pracą na 1/2 etatu. Wniosek "
+        "składa pracodawcy, który udziela urlopu. Najpóźniej 09.03.2027: co najmniej 21 dni "
+        "przed rozpoczęciem pracy (30.03.2027). Łączyć urlop rodzicielski z pracą może tylko "
+        "pracownik, u pracodawcy, który udziela tego urlopu, i najwyżej na 1/2 etatu. Pracodawca "
+        "uwzględnia wniosek, chyba że nie pozwala na to organizacja pracy albo rodzaj pracy; "
+        "o przyczynie odmowy informuje w ciągu 7 dni od otrzymania wniosku."
+    )
+    quotes = [s.quote for s in mothers.sources]
+    assert quotes[0].endswith(
+        "w terminie nie krótszym niż 21 dni przed rozpoczęciem wykonywania pracy."
+    )
+    assert quotes[1].startswith("Ubezpieczony-pracownik może łączyć")  # guide E: employees only
+    assert {s.article for s in mothers.sources} >= {"art. 182¹ᵉ § 1", "art. 182¹ᵉ § 2"}
+    assert document(t, "parental-father-work-request-1").rule.startswith(
+        "W planie tata od 18.01.2028 do 20.03.2028 łączy urlop z pracą na 1/2 etatu. Wniosek "
+        "składa swojemu pracodawcy, który udziela urlopu. Najpóźniej 28.12.2027:"
+    )
+
+    f = form(t, "parental-work-request-1")
+    assert (f.applicant, f.addressee, f.addressee_label) == (
+        "mother",
+        "employer",
+        "Pracodawca mamy",
+    )
+    assert articles(f) == ["§ 16"]
+    assert (f.start, f.end) == (dt.date(2027, 3, 30), dt.date(2027, 8, 16))
+    assert values(f) == {
+        "employee-name": None,
+        "work-fraction": "1/2 etatu",
+        "work-period": "od 30.03.2027 do 16.08.2027 (20 tyg.)",
+        "extension-work": (
+            "Brak takiego zamiaru: w planie wydłużenie tej części urlopu od 09.11.2027 do "
+            "17.01.2028 (10 tyg.) jest bez pracy."
+        ),
+    }
+    assert field(f, "employee-name").personal
+    period = field(f, "work-period")
+    assert (period.kind, period.start, period.end) == (
+        "period",
+        dt.date(2027, 3, 30),
+        dt.date(2027, 8, 16),
+    )
+    assert period.hint == (
+        "Z planu na osi: pierwsze 20 tyg. tej części urlopu rodzicielskiego, która razem "
+        "z wydłużeniem trwa od 30.03.2027 do 17.01.2028 (42 tyg.). Możesz wskazać inne tygodnie."
+    )
+    assert field(f, "extension-work").kind == "statement"
+    assert all(s.article == "§ 16" for x in f.fields for s in x.sources)
+    assert f.attachments == []  # § 16 names none
+    assert [n.text for n in f.notes] == [
+        "Urlop wydłuża się o tygodnie pracy razy wymiar pracy (20 tyg. × 1/2 = 10 tyg.). Za okres "
+        "wydłużonego urlopu rodzicielskiego też przysługuje zasiłek macierzyński.",
+        "Wniosek składa się w postaci papierowej albo elektronicznej. Pracodawca uwzględnia go, "
+        "chyba że nie pozwala na to organizacja pracy albo rodzaj Twojej pracy; o przyczynie "
+        "odmowy informuje w ciągu 7 dni od otrzymania wniosku.",
+    ]
+    assert "art. 182¹ᶠ § 4" not in {s.article for s in f.notes[0].sources}  # whole weeks
+
+    his = form(t, "parental-father-work-request-1")
+    assert (his.applicant, his.addressee_label) == ("father", "Pracodawca taty")
+    assert values(his)["work-period"] == "od 18.01.2028 do 20.03.2028 (9 tyg.)"
+    assert values(his)["extension-work"] == (
+        "Brak takiego zamiaru: w planie wydłużenie tej części urlopu od 21.03.2028 do "
+        "20.04.2028 (31 dni) jest bez pracy."
+    )
+    assert his.notes[0].text.startswith(
+        "Urlop wydłuża się o tygodnie pracy razy wymiar pracy (9 tyg. × 1/2 = 4,5 tyg., czyli "
+        "31,5 dnia; niepełny dzień się pomija, więc 31 dni)."
+    )
+    assert "art. 182¹ᶠ § 4" in {s.article for s in his.notes[0].sources}
+
+    told = next(n for n in t.notes if n.id == "applications").text
+    assert (
+        "Wniosek o łączenie urlopu rodzicielskiego z pracą (część 1) — do pracodawcy, "
+        "najpóźniej 9 marca 2027." in told
+    )
+    assert (
+        "Wniosek taty o łączenie urlopu rodzicielskiego z pracą (część 1) — do pracodawcy, "
+        "najpóźniej 28 grudnia 2027." in told
+    )
+
+
+def test_the_request_to_work_only_for_parts_with_work_still_ahead() -> None:
+    """A part under way needs no requests any more; a part without work needs no request to
+    work; a passed deadline stays where it was (the plan fixes the day the work starts)."""
+    t = timeline(
+        **PARENTS,
+        child_born=True,
+        birth_date="2026-07-01",
+        leave_before_birth_weeks=0,
+        children_count=1,
+        parental_parts=[
+            {"parent": "mother", "weeks": 20, "work_fraction": "1/2"},
+            {"parent": "father", "weeks": 9, "work_fraction": "1/2", "start": "2026-12-01"},
+            {"parent": "mother", "weeks": 12, "start": "2028-06-01"},
+        ],
+    )
+    ids = [d.id for d in t.documents if d.id.startswith("parental-")]
+    assert ids == [
+        "parental-request-2",
+        "parental-father-request-1",
+        "parental-father-work-request-1",
+    ]
+    late = document(t, "parental-father-work-request-1")
+    assert (late.needed_by, late.deadline) == (dt.date(2026, 11, 10), dt.date(2026, 11, 10))
+    assert (
+        "Termin minął 10.11.2026: wniosek składa się co najmniej 21 dni przed rozpoczęciem "
+        "pracy (01.12.2026)." in late.rule
+    )
+    assert values(form(t, "parental-father-work-request-1"))["work-period"] == (
+        "od 01.12.2026 do 01.02.2027 (9 tyg.)"
+    )
+    told = next(n for n in t.notes if n.id == "applications").text
+    assert (
+        "Wniosek taty o łączenie urlopu rodzicielskiego z pracą (część 1) — do pracodawcy: "
+        "termin minął 10 listopada 2026." in told
+    )
+
+
+def test_work_that_adds_no_whole_day_needs_no_statement_on_the_extension() -> None:
+    """1 week at 1/8 of full time: 7 × 1/8 = 0,875 day, the incomplete day is dropped (art.
+    182¹ᶠ § 4), so there is no extension to work in (§ 16 pkt 4)."""
+    t = timeline(
+        **PARENTS,
+        **BORN,
+        parental_parts=[{"parent": "mother", "weeks": 1, "work_fraction": "1/8"}],
+    )
+    f = form(t, "parental-work-request-1")
+    assert values(f) == {
+        "employee-name": None,
+        "work-fraction": "1/8 etatu",
+        "work-period": "od 30.03.2027 do 05.04.2027 (1 tyg.)",
+    }
+    assert [n.text.split(" ")[0] for n in f.notes] == ["Wniosek"]
 
 
 def test_documents_that_are_not_requests_have_no_form() -> None:

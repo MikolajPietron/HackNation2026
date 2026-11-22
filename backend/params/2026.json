@@ -1816,6 +1816,17 @@
         }
       ]
     },
+    "employer_answer_days": {
+      "value": 7,
+      "note": "Pracodawca uwzględnia wniosek o pracę w czasie urlopu rodzicielskiego, chyba że nie pozwala na to organizacja pracy albo rodzaj pracy; o przyczynie odmowy informuje w tylu dniach od otrzymania wniosku.",
+      "sources": [
+        {
+          "doc": "kp",
+          "article": "art. 182¹ᵉ § 2",
+          "quote": "Pracodawca jest obowiązany uwzględnić wniosek pracownika, chyba że nie jest to możliwe ze względu na organizację pracy lub rodzaj pracy wykonywanej przez pracownika. O przyczynie odmowy uwzględnienia wniosku pracodawca informuje pracownika w postaci papierowej lub elektronicznej w terminie 7 dni od dnia otrzymania wniosku."
+        }
+      ]
+    },
     "max_weeks_with_work": {
       "value": [
         82,
@@ -3585,6 +3596,58 @@
                 "doc": "rozp_wnioski",
                 "article": "§ 15 ust. 2",
                 "quote": "kopię zaświadczenia, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin „Za życiem” (Dz.U. z 2024 r. poz. 1829), w przypadku gdy wniosek o udzielenie urlopu rodzicielskiego lub jego części dotyczy urlopu rodzicielskiego w wymiarze, o którym mowa w art. 182¹ᵃ § 2 Kodeksu pracy"
+              }
+            ]
+          }
+        }
+      },
+      "parental-work": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 16",
+            "quote": "Wniosek, o którym mowa w art. 182¹ᵉ § 2 Kodeksu pracy, o łączenie przez pracownika korzystania z urlopu rodzicielskiego lub jego części z wykonywaniem pracy w wymiarze nie wyższym niż połowa pełnego wymiaru czasu pracy u pracodawcy udzielającego tego urlopu zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 16",
+                "quote": "imię i nazwisko pracownika"
+              }
+            ]
+          },
+          "work-fraction": {
+            "label": "Wymiar czasu pracy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 16",
+                "quote": "określenie wymiaru czasu pracy"
+              }
+            ]
+          },
+          "work-period": {
+            "label": "Okres łączenia urlopu rodzicielskiego z pracą",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 16",
+                "quote": "wskazanie okresu, w którym pracownik zamierza łączyć korzystanie z urlopu rodzicielskiego lub jego części z wykonywaniem pracy w niepełnym wymiarze czasu pracy"
+              }
+            ]
+          },
+          "extension-work": {
+            "label": "Oświadczenie, czy w czasie wydłużenia urlopu też pracujesz (i w jakim wymiarze)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 16",
+                "quote": "oświadczenie pracownika o zamiarze łączenia części urlopu rodzicielskiego powstałej w wyniku proporcjonalnego wydłużenia tego urlopu z pracą w wymiarze nie wyższym niż połowa pełnego wymiaru czasu pracy, z określeniem wymiaru czasu pracy, albo o braku takiego zamiaru"
               }
             ]
           }

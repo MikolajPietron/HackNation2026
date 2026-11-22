@@ -198,6 +198,53 @@ def test_parental_leave_deadline_21_days_before() -> None:
     assert not problems(on_time, "deadline-passed")
 
 
+def test_the_request_to_work_during_parental_leave() -> None:
+    """ZADANIA B.13: the request to combine parental leave with work (art. 182¹ᵉ § 2, § 16 of the
+    regulation) is its own kind: 21 days before the work starts; the part of full time and the
+    statement on the extension are not weeks of leave."""
+    title = "Wniosek o łączenie urlopu rodzicielskiego z pracą (część 1)"
+    assert read_request(FilledRequest(title=title), PARAMS, TODAY).kind == "parental-work-request"
+    by_id = FilledRequest(title="Wniosek", form_id="parental-father-work-request-1")
+    assert read_request(by_id, PARAMS, TODAY).kind == "parental-work-request"
+
+    def filled(start: str) -> FilledRequest:
+        return FilledRequest(
+            title=title,
+            form_id="parental-work-request-1",
+            parent="mother",
+            addressee="Pracodawca mamy",
+            fields=[
+                RequestField(id="employee-name", label="Imię i nazwisko", value="X"),
+                RequestField(id="work-fraction", label="Wymiar czasu pracy", value="1/2 etatu"),
+                RequestField(
+                    id="work-period",
+                    label="Okres łączenia urlopu rodzicielskiego z pracą",
+                    value=f"od {start} do 01.02.2027 (9 tyg.)",
+                ),
+                RequestField(
+                    id="extension-work",
+                    label="Oświadczenie, czy w czasie wydłużenia urlopu też pracujesz (i w jakim "
+                    "wymiarze)",
+                    value="Brak takiego zamiaru: wydłużenie od 02.02.2027 do 04.03.2027.",
+                ),
+            ],
+        )
+
+    # Work from 01.12.2026 − 21 days = 10.11.2026: passed on 22.11.2026.
+    late = check(filled("01.12.2026"), params=PARAMS, today=TODAY)
+    assert late.kind == "parental-work-request"
+    found = problems(late, "deadline-passed")[0]
+    assert found.message == (
+        "Termin minął 10.11.2026: wniosek składa się co najmniej 21 dni przed rozpoczęciem "
+        "pracy (01.12.2026)."
+    )
+    assert found.sources == PARAMS.parental_plan.work_request_days.sources
+    assert found.field == "Okres łączenia urlopu rodzicielskiego z pracą"
+    # 13.12.2026 − 21 days = 22.11.2026: the last day, still in time.
+    on_time = check(filled("13.12.2026"), params=PARAMS, today=TODAY)
+    assert [p.check for p in on_time.problems] == ["no-timeline"]
+
+
 def test_paternity_supplementary_and_resignation_deadlines() -> None:
     # Paternity: 7 days. 28.11.2026 − 7 = 21.11.2026, passed.
     paternity = run("Wniosek o urlop ojcowski", ("Od", "28.11.2026"))

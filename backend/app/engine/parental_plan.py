@@ -79,12 +79,24 @@ class Planned:
         """The last day of the weeks combined with work."""
         if self.part.work_fraction is None:
             return None
-        return self.start + work_weeks(self.part) * WEEK - DAY
+        return work_end(self.part, self.start)
 
 
 def work_weeks(part: ParentalPart) -> int:
     """Weeks of the part combined with work (all of it unless said otherwise)."""
     return part.work_weeks or part.weeks
+
+
+def work_end(part: ParentalPart, start: dt.date) -> dt.date:
+    """The last day of the weeks combined with work in a part that starts on `start`: they are
+    the first weeks of the part (our reading, see the module's docstring)."""
+    return start + work_weeks(part) * WEEK - DAY
+
+
+def planned_parts(scenario: Scenario) -> dict[str, ParentalPart]:
+    """The parts of the plan by the id of their segment (`parental-mother-1`...)."""
+    parts = scenario.parental_parts
+    return dict(zip(part_ids(parts), parts, strict=True))
 
 
 def extension_days(part: ParentalPart) -> int:
