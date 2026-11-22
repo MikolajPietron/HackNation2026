@@ -107,7 +107,9 @@ class OnboardingAnswers(BaseModel):
     hospital_care: bool | None = None
     """Born child: premature, or in hospital after the birth. The chat asks the details."""
     leave_before_birth_weeks: int | None = Field(default=None, ge=0)
-    """Born child: weeks of maternity leave the mother took before the birth (0 = none)."""
+    """Weeks of maternity leave before the birth (0 = none): for a born child the weeks the mother
+    took, for a child on the way the weeks she plans (a decision the onboarding asks since
+    22.11.2026, with "not yet" leaving it to the plan screen)."""
     sick_leave: bool | None = None
     """Child on the way: the mother is (or was) on sick leave in this pregnancy."""
     sick_leave_start: dt.date | None = None
@@ -129,11 +131,10 @@ class OnboardingAnswers(BaseModel):
             raise ValueError(problem)
         born = self.child_born and self.taken_in is None
         expected = not self.child_born and self.taken_in is None
-        about_birth = (self.hospital_care, self.leave_before_birth_weeks)
-        if not born and any(answer is not None for answer in about_birth):
-            raise ValueError(
-                "O szpital i urlop przed porodem pytamy, gdy dziecko już się urodziło."
-            )
+        if not born and self.hospital_care is not None:
+            raise ValueError("O szpital pytamy, gdy dziecko już się urodziło.")
+        if self.taken_in is not None and self.leave_before_birth_weeks is not None:
+            raise ValueError("O urlop przed porodem nie pytamy przy przyjęciu dziecka.")
         if not expected and self.sick_leave is not None:
             raise ValueError("O zwolnienie lekarskie w ciąży pytamy, gdy dziecko jest w drodze.")
         if self.sick_leave and self.sick_leave_start is None:

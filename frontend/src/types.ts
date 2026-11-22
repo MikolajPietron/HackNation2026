@@ -277,7 +277,8 @@ export interface OnboardingAnswers {
   taken_in?: { kind: TakenIn; date: string } | null
   /** Born child: premature or in hospital after the birth (the chat asks the details). */
   hospital_care?: boolean | null
-  /** Born child: weeks of maternity leave the mother took before the birth (0 = none). */
+  /** Weeks of maternity leave before the birth (0 = none): taken (born child) or planned (child on
+   *  the way; null = not decided yet, the plan asks). */
   leave_before_birth_weeks?: number | null
   /** Child on the way: the mother's sick leave in this pregnancy; no end = until the birth. */
   sick_leave?: boolean | null

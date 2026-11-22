@@ -181,6 +181,12 @@ def test_not_knowing_leaves_the_question_to_the_chat(client: TestClient) -> None
         ({"pay": 8}, "bardzo mała kwota"),
         ({"partner": {"work": "employment", "insured": False}}, "Dobrowolne ubezpieczenie"),
         ({"hospital_care": True}, "gdy dziecko już się urodziło"),
+        (
+            {"child_born": True, "date": "2026-11-02", "sick_leave": None}
+            | {"sick_leave_start": None, "leave_before_birth_weeks": 2}
+            | {"taken_in": {"kind": "adoption", "date": "2026-11-02"}},
+            "przy przyjęciu dziecka",
+        ),
         ({"child_born": True, "date": "2026-11-02"}, "gdy dziecko jest w drodze"),
         ({"sick_leave_start": None}, "data początku zwolnienia"),
         ({"sick_leave": False}, "tylko razem ze zwolnieniem"),
@@ -192,6 +198,30 @@ def test_answers_that_do_not_go_together_are_rejected(
     response = client.put(URL, json={**EXPECTING_MOTHER, **change})
     assert response.status_code == 422
     assert message in response.text
+
+
+@pytest.mark.parametrize(
+    ("weeks", "left"),
+    [
+        # 2 weeks before 15.03.2027: from 01.03.2027; the chat then asks for the doctor's note.
+        (2, ["certificate", "insured-since", "rate-815"]),
+        # Work until the birth: nothing more about the leave.
+        (0, ["insured-since", "rate-815"]),
+    ],
+)
+def test_a_mother_on_the_way_can_decide_her_leave_before_the_birth(
+    client: TestClient, weeks: int, left: list[str]
+) -> None:
+    """Decision of 22.11.2026: the onboarding also asks when the leave starts, so the plan does
+    not open with that choice; "not yet" (no answer) leaves it to the plan, as before."""
+    started = client.put(URL, json={**EXPECTING_MOTHER, "leave_before_birth_weeks": weeks})
+    assert started.status_code == 200, started.text
+    assert started.json()["scenario"]["leave_before_birth_weeks"] == weeks
+    assert remaining(started.json()) == left
+    if weeks:
+        segments = started.json()["timeline"]["segments"]
+        leave = next(s for s in segments if s["id"] == "maternity-prenatal")
+        assert leave["start"] == "2027-03-01"
 
 
 def test_data_from_zus_leaves_only_the_decisions(client: TestClient) -> None:

@@ -197,7 +197,8 @@ function order(a: Answers): StepId[] {
     who === 'own'
       ? ['work', 'zus-data', 'insurance', 'payer', 'pay']
       : Object.values(WORK_STEPS.partner)
-  const mother: StepId[] = ['leave-before', 'leave-weeks', 'sick-leave', 'sick-start', 'sick-end']
+  // The facts of the pregnancy (sick leave) first, the decision about the leave after them.
+  const mother: StepId[] = ['sick-leave', 'sick-start', 'sick-end', 'leave-before', 'leave-weeks']
   const parents =
     a.role === 'father'
       ? [...work('own'), ...work('partner'), ...mother]
@@ -245,8 +246,10 @@ function relevant(step: StepId, a: Answers): boolean {
     case 'pay':
     case 'partner-pay':
       return a.takenIn === null && PAID.includes(facts.work) && facts.insured !== false
+    // Born: the weeks she took. On the way: the weeks she plans (decision of 22.11.2026; "not
+    // yet" leaves the choice to "Co wybierasz?" on the plan).
     case 'leave-before':
-      return bornHere(a) && mayBeInsured(mothersWork(a))
+      return (bornHere(a) || expecting(a)) && mayBeInsured(mothersWork(a))
     case 'leave-weeks':
       return relevant('leave-before', a) && a.tookLeave === true
     case 'sick-leave':
@@ -779,6 +782,37 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
     }
     case 'leave-before': {
       const own = motherFills
+      if (answers.born === false) {
+        screen = (
+          <Question
+            title={own ? 'Kiedy chcesz zacząć urlop macierzyński?' : 'Kiedy mama chce zacząć urlop macierzyński?'}
+            subtitle="Urlop można zacząć nawet 6 tygodni przed przewidywaną datą porodu."
+          >
+            <Cards label="Początek urlopu macierzyńskiego">
+              <ImageChoice
+                image={odpoczynek}
+                label="Przed porodem"
+                hint="do 6 tygodni wcześniej"
+                {...state('tookLeave', true)}
+                onSelect={() => choose({ tookLeave: true })}
+              />
+              <ImageChoice
+                image={etat}
+                label="Od dnia porodu"
+                hint={own ? 'pracuję do porodu' : 'pracuje do porodu'}
+                {...state('tookLeave', false)}
+                onSelect={() => choose({ tookLeave: false, leaveWeeks: null })}
+              />
+            </Cards>
+            <UnknownLink
+              label="Jeszcze nie wiem"
+              selected={answers.tookLeave === 'unknown'}
+              onSelect={() => choose({ tookLeave: 'unknown', leaveWeeks: null })}
+            />
+          </Question>
+        )
+        break
+      }
       screen = (
         <Question
           title={
@@ -814,15 +848,24 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
       )
       break
     }
-    case 'leave-weeks':
+    case 'leave-weeks': {
+      const planned = answers.born === false
       screen = (
         <Question
           title={
-            motherFills
-              ? 'Ile tygodni przed porodem zaczęłaś urlop?'
-              : 'Ile tygodni przed porodem mama zaczęła urlop?'
+            planned
+              ? motherFills
+                ? 'Ile tygodni przed porodem chcesz zacząć urlop?'
+                : 'Ile tygodni przed porodem mama chce zacząć urlop?'
+              : motherFills
+                ? 'Ile tygodni przed porodem zaczęłaś urlop?'
+                : 'Ile tygodni przed porodem mama zaczęła urlop?'
           }
-          subtitle="W pełnych tygodniach, licząc od dnia porodu."
+          subtitle={
+            planned
+              ? 'Liczymy od przewidywanej daty porodu. Najwyżej 6 tygodni.'
+              : 'W pełnych tygodniach, licząc od dnia porodu.'
+          }
         >
           <Pills
             label="Tygodnie przed porodem"
@@ -831,19 +874,23 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
             leaving={leaving}
             onSelect={(leaveWeeks) => choose({ leaveWeeks })}
           />
-          {/* A child born after the due date: more weeks than the cards. The chat asks. */}
-          <motion.div variants={ITEM} className="mt-6 flex h-11 justify-center">
-            <button
-              type="button"
-              onClick={() => choose({ leaveWeeks: null })}
-              className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
-            >
-              Więcej niż 6
-            </button>
-          </motion.div>
+          {/* A child born after the due date: more weeks than the cards. The chat asks. Before
+              the birth there is no more: 6 weeks before the due date is the earliest start. */}
+          {!planned && (
+            <motion.div variants={ITEM} className="mt-6 flex h-11 justify-center">
+              <button
+                type="button"
+                onClick={() => choose({ leaveWeeks: null })}
+                className="h-11 text-sm font-bold text-navy-500 transition-colors hover:text-navy-900"
+              >
+                Więcej niż 6
+              </button>
+            </motion.div>
+          )}
         </Question>
       )
       break
+    }
     case 'sick-leave': {
       const own = motherFills
       const options: { value: SickLeave; label: string }[] = [
@@ -1098,7 +1145,15 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 /** "Nie wiem" under picture cards: about the other parent, the respondent may not know. */
-function UnknownLink({ selected, onSelect }: { selected: boolean; onSelect: () => void }) {
+function UnknownLink({
+  selected,
+  onSelect,
+  label = 'Nie wiem',
+}: {
+  selected: boolean
+  onSelect: () => void
+  label?: string
+}) {
   return (
     <motion.div variants={ITEM} className="mt-8 flex h-11 justify-center">
       <button
@@ -1111,7 +1166,7 @@ function UnknownLink({ selected, onSelect }: { selected: boolean; onSelect: () =
           selected ? 'bg-zus-50 text-zus-900' : 'text-navy-500 hover:text-navy-900',
         )}
       >
-        Nie wiem
+        {label}
       </button>
     </motion.div>
   )
