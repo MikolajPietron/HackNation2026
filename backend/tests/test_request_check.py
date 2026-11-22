@@ -480,3 +480,25 @@ def test_apply_phrasing_keeps_the_original_message() -> None:
     phrased = apply_phrasing(result.problems, {problem.id: "Za późno."}, PARAMS)
     assert next(p for p in phrased if p.id == problem.id).phrased is None
     assert next(p for p in phrased if p.id == problem.id).message == problem.message
+
+
+def test_a_form_from_the_timeline_is_read_by_its_field_ids() -> None:
+    """A request filled in from the timeline's form (engine/forms.py) carries field ids, so its
+    dates are read without guessing from the labels, whatever the label says."""
+    from app.request_check.adapter import FORM_FIELD_KEYS, read_request
+    from app.request_check.models import FilledRequest, RequestField
+    from app.services.params import load_params
+
+    request = FilledRequest(
+        title="Wniosek o urlop rodzicielski",
+        fields=[
+            RequestField(id="leave-period", label="Okres", value="01.06.2027 – 30.08.2027"),
+            RequestField(id="child-birth-date", label="Dziecko", value="10.11.2026"),
+        ],
+    )
+    read = read_request(request, load_params(), dt.date(2026, 11, 21))
+    assert (read.start, read.end) == (dt.date(2027, 6, 1), dt.date(2027, 8, 30))
+    assert read.birth_date == dt.date(2026, 11, 10)
+    assert set(FORM_FIELD_KEYS) <= {
+        f for t in load_params().forms.templates.values() for f in t.fields
+    }

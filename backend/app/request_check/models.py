@@ -50,6 +50,9 @@ class RequestField(BaseModel):
     source: str | None = None
     """Where the form took the value from (scenario, timeline, to fill in); not checked."""
     key: FieldKey | None = None
+    id: str | None = None
+    """The field's id in the timeline's request form (`Document.form.fields[].id`, engine/forms.py),
+    when the request comes from it: its meaning is then known, not inferred from the label."""
     required: bool = True
     """An empty required field is a problem."""
 

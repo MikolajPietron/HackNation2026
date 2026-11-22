@@ -27,9 +27,11 @@ Wymóg wyzwania: „wskazanie, które z funkcjonalności działają ze wsparciem
 **Z AI:**
 - **Czat-wywiad i wyjaśnienia** (Pydantic AI; Gemini Flash albo Claude): zapisuje odpowiedzi rodzica narzędziami, które zmieniają scenariusz, i tłumaczy oś prostym językiem, cytując źródła. Pytania wywiadu i ich kolejność wyznacza kod, nie model.
 - **Odczyt przykładowych spraw ze skanów** (model z obsługą obrazu; Gemini Pro albo Claude): wyciąga fakty (zatrudnienie, okresy ubezpieczenia, zarobki z Z-3, decyzję ZUS) z numerami stron. Rodzic albo juror może je poprawić przed liczeniem.
+- **„Przetłumacz pismo z ZUS”** (Gemini Pro albo Claude): ze zdjęcia albo PDF pisma mówi prostym językiem, co to za pismo, co zrobić i do kiedy; daty tylko przepisane z pisma, bez danych osobowych, nic nie jest zapisywane.
+- **Sprawdzenie wniosku przed złożeniem**: reguły bez AI (brakujące pola, daty, terminy, załączniki, formularze zlikwidowane 24.10.2026); AI może na życzenie tylko przeredagować komunikaty.
 - **Ilustracje** w interfejsie wygenerowano modelem obrazów (`tools/illustrations/`); w działającej aplikacji to zwykłe pliki.
 
-**Bez AI (deterministyczny silnik reguł):** wszystkie daty i kwoty, prawo do zasiłku, podstawa wymiaru, wnioski i terminy, sprawdzenie ubezpieczenia w sprawie i porównanie z decyzją ZUS, panel parametrów. AI nigdy nie liczy kwot ani dat i nie ustala prawa do zasiłku.
+**Bez AI (deterministyczny silnik reguł):** wszystkie daty i kwoty, prawo do zasiłku, podstawa wymiaru, wnioski z formularzami i terminy, plany od celu i test odporności planu, „Zostawiacie na stole”, punkty bez powrotu, sprawdzenie ubezpieczenia w sprawie i porównanie z decyzją ZUS, panel parametrów. AI nigdy nie liczy kwot ani dat i nie ustala prawa do zasiłku.
 
 ## Stack
 

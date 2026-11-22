@@ -1236,6 +1236,8 @@ export interface RequestField {
   value: string | null
   source?: string | null
   key?: RequestFieldKey | null
+  /** The field's id in the timeline's form (`FormField.id`): its meaning is known, not guessed. */
+  id?: string | null
   /** An empty required field is a problem; default true. */
   required?: boolean
 }

@@ -77,6 +77,18 @@ class ReadRequest:
     """The title, values and attachments together: where a form code may be named."""
 
 
+FORM_FIELD_KEYS: dict[str, FieldKey] = {
+    "leave-period": "period",
+    "benefit-period": "period",
+    "sick-period": "period",
+    "leave-from": "start",
+    "return-date": "return_to_work",
+    "maternity-end": "maternity_end",
+    "child-birth-date": "birth_date",
+}
+"""The timeline's request form fields (params `forms`, engine/forms.py) the checks read, by id."""
+
+
 def field_key(label: str) -> FieldKey | None:
     """What a field means, from its label. The order matters: "Termin zakończenia urlopu
     macierzyńskiego" is the end of maternity leave, not the end of this leave."""
@@ -159,7 +171,7 @@ def read_request(request: FilledRequest, params: Params, today: dt.date) -> Read
             elif value.lower() != "nie":
                 read.attachments.append(value)
             continue
-        key = f.key or field_key(f.label)
+        key = f.key or FORM_FIELD_KEYS.get(f.id or "") or field_key(f.label)
         if key is None:
             continue
         dates = dates_in(value)
