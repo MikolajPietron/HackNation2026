@@ -32,8 +32,9 @@ export function Explanation({ timeline, focusId }: { timeline: Timeline; focusId
       <header className="pr-10">
         <h2 className="text-2xl font-bold tracking-tight text-navy-900">Dlaczego tak?</h2>
         <p className="mt-2">
-          Daty liczy kalkulator reguł, bez AI. Każdy punkt ma dosłowny cytat z Przewodnika ZUS
-          albo Kodeksu pracy.
+          Daty i kwoty liczy kalkulator reguł, bez AI. Każda zasada ma dosłowny cytat ze źródła
+          (Przewodnik ZUS, Kodeks pracy, ustawa zasiłkowa, Załącznik, rozporządzenia, Poradnik
+          ZUS). Punkt „Sytuacja” opisuje nasze liczenie.
         </p>
       </header>
       {timeline.notes.length > 0 && (

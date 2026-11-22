@@ -100,7 +100,9 @@ export function StressTest({
             aria-expanded={gentleOpen}
             className="flex w-full items-center gap-2 rounded-2xl px-2 py-3 text-left text-sm font-bold text-navy-500 transition-colors hover:bg-navy-50/60"
           >
-            <span className="flex-1">Trudne sytuacje mamy: choroba, szpital ({gentle.length})</span>
+            <span className="flex-1">
+              Trudne sytuacje mamy: orzeczenie o niezdolności do samodzielnej egzystencji, szpital ({gentle.length})
+            </span>
             <ChevronDown className={cn('size-4 transition-transform duration-200', gentleOpen && 'rotate-180')} />
           </button>
           <AnimatePresence initial={false}>
@@ -114,7 +116,8 @@ export function StressTest({
               >
                 <p className="px-2 pb-3 text-sm text-navy-500">
                   Co dzieje się z urlopem, gdy mama nie może opiekować się dzieckiem. Tata może wtedy
-                  przejąć urlop macierzyński.
+                  przejąć urlop macierzyński wcześniej niż po 14 tygodniach (przy orzeczeniu albo
+                  szpitalu: po 8 tygodniach urlopu mamy po porodzie).
                 </p>
                 <ul className="grid gap-3 pb-1 sm:grid-cols-2 xl:grid-cols-3">
                   {gentle.map((event, index) => (

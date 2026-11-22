@@ -18,12 +18,12 @@ import { TextStates } from '@/components/ui/text-states'
 import type { ChangeSet } from '@/hooks/useAssistant'
 import { SPRING_LAYOUT, SPRING_PRESS } from '@/lib/ease'
 import { formatPlnShort, formatRate, headlinePayment } from '@/lib/money'
-import { COUNTDOWN_DAYS, daysLeftLabel, entitlement, headline, leaveBudget, length, nextSteps, periodName } from '@/lib/plan'
+import { COUNTDOWN_DAYS, daysLeftLabel, entitlement, headline, leaveBudget, length, nextSteps, periodName, workOf } from '@/lib/plan'
 import type { Step } from '@/lib/plan'
 import { dayNumber, formatDistance, formatShortDate } from '@/lib/dates'
 import { documentIcon, markerIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import type { CaseNote, Segment, Timeline } from '@/types'
+import type { CaseNote, Scenario, Segment, Timeline } from '@/types'
 
 const BAR: Record<'mother' | 'father', Record<'leave' | 'option', string>> = {
   mother: { leave: 'bg-zus-600', option: 'bg-zus-200' },
@@ -32,6 +32,7 @@ const BAR: Record<'mother' | 'father', Record<'leave' | 'option', string>> = {
 
 export function Overview({
   timeline,
+  scenario,
   changed,
   wide,
   decisionPending,
@@ -44,6 +45,8 @@ export function Overview({
   onShare,
 }: {
   timeline: Timeline
+  /** How the parents work: the words for leave (a contract or a firm has the benefit, no leave). */
+  scenario: Scenario | null
   changed: ChangeSet
   wide: boolean
   /** The interview has a question open: the decision card is "what now", no tile for it. */
@@ -60,7 +63,7 @@ export function Overview({
   /** "Udostępnij plan": a read-only link for the partner. */
   onShare?: () => void
 }) {
-  const { title, text } = headline(timeline)
+  const { title, text } = headline(timeline, scenario)
   const right = entitlement(timeline.notes)
   const budget = leaveBudget(timeline)
   const steps = nextSteps(timeline)
@@ -120,6 +123,13 @@ export function Overview({
   // The tiles sit in a row when the plan column is wide enough, else two by two.
   const columns = tiles.length >= 4 ? '@[52rem]:grid-cols-4' : tiles.length === 3 ? '@[44rem]:grid-cols-3' : ''
   const moneySegment = money ? timeline.segments.find((s) => s.id === money.now.segment_id) : undefined
+  // On a contract or with one's own firm the amount is the contribution base, not pay (ustawa
+  // zasiłkowa art. 3 pkt 4).
+  const ownWork = scenario?.role ? workOf(scenario, scenario.role) : null
+  const payPrompt =
+    ownWork === 'contract' || ownWork === 'business'
+      ? 'Chcę podać podstawę składki chorobowej'
+      : 'Chcę podać moje miesięczne zarobki brutto'
 
   return (
     <>
@@ -203,7 +213,7 @@ export function Overview({
           {(money || askPay) && (
             <Tile
               question="Ile dostaniecie?"
-              onClick={money ? onMoney : () => onAsk('Chcę podać moje miesięczne zarobki brutto')}
+              onClick={money ? onMoney : () => onAsk(payPrompt)}
               pulse={money && changedIds.has(money.now.id) ? changed.version : null}
             >
               {money ? (
@@ -223,6 +233,7 @@ export function Overview({
                       potem <b className="text-navy-900 tabular-nums">{formatPlnShort(money.then.monthly)}</b> / mies.
                     </span>
                   )}
+                  <span className="mt-1 block text-xs text-navy-400">brutto, przed podatkiem</span>
                 </>
               ) : (
                 <>

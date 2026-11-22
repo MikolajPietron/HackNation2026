@@ -383,7 +383,7 @@ async def set_mother_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
 @assistant.tool(sequential=True)
 async def set_voluntary_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
     """Mother on a contract of mandate or with her own business: record whether she is
-    registered for the voluntary sickness insurance (pays the sickness contribution).
+    registered for the voluntary sickness insurance.
 
     Args:
         registered: True if she is registered for it, False if she is not.
@@ -419,7 +419,7 @@ async def set_father_work(ctx: RunContext[AssistantDeps], work: Work) -> str:
 @assistant.tool(sequential=True)
 async def set_father_insurance(ctx: RunContext[AssistantDeps], registered: bool) -> str:
     """Father on a contract of mandate or with his own business: record whether he is
-    registered for the voluntary sickness insurance (pays the sickness contribution).
+    registered for the voluntary sickness insurance.
 
     Args:
         registered: True if he is registered for it, False if he is not.

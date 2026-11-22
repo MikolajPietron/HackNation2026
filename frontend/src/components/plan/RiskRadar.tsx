@@ -133,6 +133,8 @@ export function RiskRadar({
   }, [])
 
   const list = lines(timeline, scenario, quotes)
+  // The contribution debt row rests on the ustawa, not on the guide's pages.
+  const debt = list.some((line) => line.id.startsWith('debt-'))
   // After a loss the plan speaks gently and only of what the mother is owed: no risk list.
   if (list.length === 0 || timeline.notes.some((n) => n.id === 'loss' || n.text.startsWith('Bardzo nam przykro'))) return null
   return (
@@ -140,7 +142,9 @@ export function RiskRadar({
       <h2 id="risk-radar" className="text-2xl leading-tight font-bold tracking-tight text-navy-900">
         Na co uważać
       </h2>
-      <p className="mt-1 text-navy-500">Co może zabrać albo obniżyć zasiłek · Przewodnik ZUS, s. 9–10</p>
+      <p className="mt-1 text-navy-500">
+        Co może zabrać albo obniżyć zasiłek · Przewodnik ZUS, s. 9–10{debt && '; ustawa zasiłkowa, art. 2a'}
+      </p>
       <ul className="mt-5 divide-y divide-line rounded-3xl border border-line">
         {list.map((line) => (
           <Row key={line.id} line={line} onCheckZus={onCheckZus} onWhy={onWhy} />

@@ -142,8 +142,8 @@ def explain(
         for a in [*actions, *([appeal] if appeal else [])]
     ):
         warnings.append(
-            "Termin liczony od dnia doręczenia zależy od tego, kiedy pismo do Ciebie dotarło: "
-            "liczy się od dnia odbioru."
+            "Termin liczy się od dnia doręczenia pisma. Aplikacja go nie liczy: sprawdź, kiedy "
+            "pismo zostało Ci doręczone."
         )
 
     # The forms: what the guide says about them; abolished ones get a warning.

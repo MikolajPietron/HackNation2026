@@ -98,8 +98,8 @@ export function nextQuestion(scenario: Scenario, asked: InterviewQuestion | null
     case 'rate-815':
       return ask(
         mother
-          ? ['Chcę 81,5% przez cały urlop', 'Wolę 100% i 70%', 'Czym to się różni?']
-          : ['Mama chce 81,5% przez cały urlop', 'Mama woli 100% i 70%', 'Czym to się różni?'],
+          ? ['Chcę 81,5% za urlop macierzyński i rodzicielski', 'Wolę 100% i 70%', 'Czym to się różni?']
+          : ['Mama chce 81,5% za urlop macierzyński i rodzicielski', 'Mama woli 100% i 70%', 'Czym to się różni?'],
       )
     default:
       return ask([])
@@ -156,11 +156,11 @@ function leaveBeforeBirth(scenario: Scenario, question: string): NextQuestion {
       {
         // A whole answer (the longest leave the law allows): the model must not guess a number.
         // A shorter leave goes through the chat, where the assistant asks for the weeks.
-        label: 'Urlop 6 tyg. przed porodem',
+        label: 'Urlop 6 tyg. przed terminem porodu',
         hint: 'najwcześniej, jak można',
         prompt: mother
-          ? 'Chcę zacząć urlop 6 tygodni przed porodem'
-          : 'Mama chce zacząć urlop 6 tygodni przed porodem',
+          ? 'Chcę zacząć urlop 6 tygodni przed przewidywaną datą porodu'
+          : 'Mama chce zacząć urlop 6 tygodni przed przewidywaną datą porodu',
         image: 'rest',
       },
       {

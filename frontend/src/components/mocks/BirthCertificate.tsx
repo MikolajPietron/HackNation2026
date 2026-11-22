@@ -1,6 +1,7 @@
-// "Wniosek o odpis aktu urodzenia" (FUNKCJE F35, a simulation the brief asks for). The requests on
-// the timeline need a short copy of the birth certificate as an attachment (the regulations'
-// forms), so the plan offers to order one. Nothing is sent and no personal data is asked for:
+// "Wniosek o odpis aktu urodzenia" (FUNKCJE F35, a simulation the brief asks for). The leave
+// requests filed with the employer need a short copy of the birth certificate as an attachment
+// (regulation of 11.03.2025); for a benefit ZUS pays it is not presented (regulation of
+// 27.09.2026, § 13 ust. 2). So the plan offers to order one. Nothing is sent and no personal data is asked for:
 // the flow shows the choices a real service would ask about and ends with a clear "symulacja".
 import { useState } from 'react'
 import type { ReactNode } from 'react'
@@ -17,7 +18,11 @@ type Kind = 'short' | 'full' | 'multilingual'
 type Delivery = 'online' | 'post' | 'office'
 
 const KINDS: { id: Kind; title: string; hint: string }[] = [
-  { id: 'short', title: 'Odpis skrócony', hint: 'Ten jest załącznikiem do wniosków na Waszej osi' },
+  {
+    id: 'short',
+    title: 'Odpis skrócony',
+    hint: 'Dołącza się go do wniosków o urlop u pracodawcy. Do zasiłku wypłacanego przez ZUS odpisu się nie przedstawia.',
+  },
   { id: 'full', title: 'Odpis zupełny', hint: 'Pełna treść aktu z wpisami' },
   { id: 'multilingual', title: 'Odpis wielojęzyczny', hint: 'Do użycia za granicą' },
 ]

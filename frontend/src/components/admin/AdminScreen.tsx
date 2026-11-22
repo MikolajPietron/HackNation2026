@@ -54,14 +54,14 @@ const RATES: NumberField[] = [
     param: (p) => p.money.rate_parental,
     icon: ICONS.wozek,
     label: 'Urlop rodzicielski',
-    hint: 'Gdy mama nie złoży wniosku o jedną stawkę',
+    hint: 'Gdy mama nie złoży wniosku o jedną stawkę; za 9 tygodni drugiego rodzica zawsze',
   },
   {
     key: 'rate_single',
     param: (p) => p.money.rate_single,
     icon: ICONS.skarbonka,
     label: 'Jedna stawka na wniosek mamy',
-    hint: 'Za cały urlop macierzyński i rodzicielski',
+    hint: 'Za urlop macierzyński i rodzicielski, poza 9 tygodniami drugiego rodzica',
   },
 ]
 

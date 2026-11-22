@@ -273,6 +273,7 @@ export function PlanScreen({
                 <>
                   <Overview
                     timeline={timeline}
+                    scenario={scenario}
                     changed={changed}
                     wide={wide}
                     decisionPending={Boolean(next?.title)}
