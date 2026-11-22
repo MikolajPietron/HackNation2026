@@ -4,6 +4,9 @@ docs/dokumentyZUS/
 # Tekst rozdziału Załącznika ZUS do cytowania — budowany lokalnie z materiałów
 # (python3 tools/przewodnik/extract_zalacznik.py), też nie trafia do repo.
 backend/app/assistant/zalacznik.json
+# Tekst stron Poradnika ZUS 2026 do cytowania — też dokument ZUS, budowany lokalnie
+# (python3 tools/przewodnik/extract_poradnik.py), nie trafia do repo.
+backend/app/assistant/poradnik.json
 
 # Sekrety
 .env

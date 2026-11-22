@@ -727,11 +727,15 @@ def add_base_notes(notes: list[CaseNote], timeline: Timeline, before: str) -> li
     return [*notes[:at], *extra, *notes[at:]]
 
 
-def base_assumptions(timeline: Timeline) -> list[str]:
+def base_assumptions(timeline: Timeline, params: Params) -> list[str]:
     """What we assume about the bases, and where the materials leave a gap."""
     bases = timeline.bases
     if not bases:
         return []
+    deducted = percent(dec(params.money.contributions_percent.value))
+    cap = pln(dec(params.benefit_base.voluntary_cap.value))
+    # The one-off top-up (money.py) is not a period: no break between periods comes from it.
+    periods = [p for p in timeline.payments if not p.one_off]
     found = [
         "Za miesiąc, w którym powstało prawo do zasiłku, przyjmujemy miesiąc pierwszego dnia "
         "zasiłku (albo zwolnienia lekarskiego lub zasiłku, po którym następuje bez przerwy)."
@@ -750,19 +754,30 @@ def base_assumptions(timeline: Timeline) -> list[str]:
             "Miesiąc uzupełniony do pełnego, przeciętną i jedną dwunastą premii zaokrąglamy do "
             "pełnych groszy."
         )
+    if any(b.detailed and b.employee for b in bases):
+        found.append(
+            "Zakładamy, że wymiar czasu pracy się nie zmieniał. Gdy zmienił się w miesiącach, "
+            "z których liczy się podstawa, albo w miesiącu powstania prawa, podstawą jest "
+            "wynagrodzenie ustalone dla nowego wymiaru czasu pracy (art. 40 ustawy zasiłkowej, "
+            "przez art. 47). Gdy zmienił się między okresami zasiłków, podstawę ustala się na "
+            "nowo także po przerwie krótszej niż miesiąc (Poradnik ZUS 2026). Takiej zmiany nie "
+            "liczymy."
+        )
     if any(b.employee for b in bases):
         found.append(
-            "Od wynagrodzenia brutto pracownika odejmujemy 13,71%: tyle wynoszą jego składki na "
-            "ubezpieczenia emerytalne, rentowe i chorobowe według Załącznika ZUS. Wyciąg "
+            f"Od wynagrodzenia brutto pracownika odejmujemy {deducted}: tyle wynoszą jego składki "
+            "na ubezpieczenia emerytalne, rentowe i chorobowe według Załącznika ZUS. Wyciąg "
             "z ustawy wymienia te składki, ale nie podaje ich stawek."
         )
     if any(not b.employee for b in bases):
         found.append(
             "Przy umowie zlecenia i własnej firmie liczymy z podstawy składki na dobrowolne "
-            "ubezpieczenie chorobowe, najwyżej 23 550,00 zł miesięcznie (Załącznik ZUS)."
+            f"ubezpieczenie chorobowe, najwyżej {cap} miesięcznie (Załącznik ZUS). To granica "
+            "na 2026 rok; stosujemy ją do każdego miesiąca, z którego liczy się podstawa, także "
+            "z 2025 roku: granicy na inne lata nie ma w materiałach."
         )
     first_paid = {
-        parent: min((p.start for p in timeline.payments if p.lane == parent), default=None)
+        parent: min((p.start for p in periods if p.lane == parent), default=None)
         for parent in ("mother", "father")
     }
     if any(first_paid[b.parent] not in (None, b.right_from) for b in bases):
@@ -773,7 +788,7 @@ def base_assumptions(timeline: Timeline) -> list[str]:
             "zasiłku chorobowego (art. 92 § 2 Kodeksu pracy)."
         )
     for parent, who in (("mother", "mamy"), ("father", "taty")):
-        paid = sorted((p for p in timeline.payments if p.lane == parent), key=lambda p: p.start)
+        paid = sorted((p for p in periods if p.lane == parent), key=lambda p: p.start)
         if any(b.start >= month_later(a.end + DAY) for a, b in zip(paid, paid[1:], strict=False)):
             found.append(
                 f"Między okresami zasiłku {who} jest przerwa co najmniej miesiąca: ZUS ustala "

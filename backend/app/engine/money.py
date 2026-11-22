@@ -16,10 +16,16 @@ adding one entry there (and, for a new rule, one `Kind` and one branch in `piece
 - parental: 70% (art. 31 ust. 2). After the request: 81,5% for the requesting parent, and for
   the other parent's weeks beyond their own 9, which the mother shares with the father (art. 30a
   ust. 3); the other parent's own 9 weeks stay at 70% (ust. 3f); with no day of the benefit for
-  parental leave in the child's first year, 70% for all of it, and the benefit for maternity
-  leave is topped up to 100% on request (ust. 3g, ust. 4). While parental leave is combined
-  with part-time work, the benefit is less in proportion to the working time (ust. 4a); for the
-  extension of the leave the benefit is due in full (guide E);
+  parental leave in the child's first year, 70% for all of it (ust. 3g), and the benefit for
+  maternity leave paid at 81,5% is topped up once to 100% on request (ust. 4): a separate
+  one-off payment (`Payment.one_off`, shown on the first birthday). While parental leave is
+  combined with part-time work, the benefit is less in proportion to the working time (ust. 4a);
+  for the extension of the leave the benefit is due in full (guide E);
+- the request applies only while the requesting parent has both the leave it covers and
+  parental leave on the timeline (it covers them "w pełnym wymiarze", art. 30a ust. 1): after a
+  stillbirth or a child's death before parental leave, 100%, and the point says why (for a
+  stillborn child also the ZUS Poradnik: 100%), with the one-off top-up of art. 31 ust. 4 when
+  the request was already filed;
 - sick-pay: the employer's sick pay in pregnancy, 100% of the pay, computed like the base of the
   sickness benefit, for every day (Labour Code art. 92 § 1-2);
 - sick-benefit: the sickness benefit in pregnancy, 100% with code "B" (guide page 4; art. 11
@@ -33,7 +39,8 @@ for the first paid period.
 Every benefit is due for every day, days off work included (art. 31 ust. 5, art. 11 ust. 4; sick
 pay: art. 92 § 2); the base for one day is one thirtieth of the monthly base (art. 36 ust. 3).
 Amounts appear only for a parent whose monthly amount (or months of pay) was given in the chat;
-the onboarding's range of earnings is never used.
+the onboarding's range of earnings is never used. They are before the income tax advance (PIT),
+which the ZUS Poradnik says is still deducted from a benefit (`BEFORE_TAX`).
 
 Our readings, not settled by the materials (CLAUDE.md, open questions):
 - an employee's own contributions (art. 3 pkt 3) are 13,71% of the gross pay, as the ZUS
@@ -47,6 +54,12 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
 - "the child's first year" ends the day before the first birthday; whether a day of the benefit
   for parental leave falls in it is read from the requesting mother's own parental leave; for a
   child taken in ust. 3g is not applied;
+- the one-off top-up (ust. 4) is shown on the first birthday, when it is known that no day of
+  the benefit for parental leave fell in the first year; when and by whom it is paid out the
+  materials do not say; per day: the daily amount at 100% less the daily amount at 81,5%;
+- when the mother died or left the child, her own periods keep the 81,5% she chose;
+- leave before the birth after the request: 81,5% (guide page 9, art. 31 ust. 3, Załącznik); the
+  ZUS Poradnik says 100% for it (an open question, `money_assumptions`);
 - "less in proportion to the working time" (ust. 4a): the benefit times (1 - the part of full
   time worked), for the weeks of work only;
 - the benefit equal to the maternity benefit is counted like the maternity benefit: every day,
@@ -166,6 +179,19 @@ DEADLINE_ID = "rate-815-deadline"
 CHOICE_ID = "rate-815"
 NOTE_ID = "money"
 JOB_LOSS_SEGMENT = "job-loss-benefit"
+TOP_UP_ID = "maternity-top-up"
+"""`Payment.segment_id` of the one-off top-up to 100% (art. 31 ust. 4): no period has it."""
+BEFORE_TAX = "To kwota przed zaliczką na podatek dochodowy (PIT)."
+TAXED: tuple[Kind, ...] = (
+    "maternity",
+    "full",
+    "taken-over",
+    "parental",
+    "sick-benefit",
+    "job-loss",
+)
+"""Benefits (zasiłki) the ZUS Poradnik says are reduced by the income tax advance: the amounts
+shown are before it. Not said there of the employer's sick pay and the rehabilitation benefit."""
 
 
 def paid_for(segment_id: str) -> Paid | None:
@@ -334,6 +360,24 @@ def chose_815(scenario: Scenario, cover: Coverage) -> bool:
     return scenario.rate_815 is True and cover not in NOT_INSURED
 
 
+def mother_left(scenario: Scenario) -> bool:
+    event = scenario.mother_event
+    return event is not None and event.kind in ("death", "abandonment")
+
+
+def effective_815(
+    segments: list[Segment], scenario: Scenario, req: Request, cover: Coverage
+) -> bool:
+    """The request for 81,5% applies: chosen, and the requesting parent has both the leave it
+    covers and parental leave on the timeline; it covers them "w pełnym wymiarze" (art. 30a
+    ust. 1). After a stillbirth or a child's death no parental leave follows, so the chosen
+    81,5% does not apply (100%, `ineffective_line`). When the mother died or left the child,
+    her own periods keep the rate she chose (our reading: the materials do not say)."""
+    if not chose_815(scenario, cover):
+        return False
+    return _has_both(segments, req) or (mother_left(scenario) and not req.taken_in)
+
+
 # The pieces a period is paid in.
 
 
@@ -357,6 +401,8 @@ class Context:
     work: dict[str, tuple[dt.date, Fraction]]
     """Parts of the parents' plan combined with work: the last day of work, the part of full
     time."""
+    cover: Coverage
+    """The sickness insurance of the parent who may ask for 81,5%."""
 
 
 def context(
@@ -364,7 +410,7 @@ def context(
 ) -> Context:
     """`cover`: the insurance of the parent who may ask for 81,5%."""
     req = request(scenario, params, anchor)
-    requester = req.who if chose_815(scenario, cover) else None
+    requester = req.who if effective_815(segments, scenario, req, cover) else None
     parental = sorted(
         (s for s in segments if _kind(s) == "parental" and s.lane in ("mother", "father")),
         key=lambda s: s.start,
@@ -376,8 +422,7 @@ def context(
         and bool(mine)
         and all(s.start >= one_year_later(anchor) for s in mine)
     )
-    event = scenario.mother_event
-    left = event is not None and event.kind in ("death", "abandonment")
+    left = mother_left(scenario)
     own_end = None
     if requester is not None:
         own_end = _own_weeks_end([s for s in parental if s.lane != requester], params)
@@ -397,6 +442,7 @@ def context(
         first_year_lost=first_year_lost,
         own_end=own_end,
         work=work,
+        cover=cover,
     )
 
 
@@ -569,7 +615,129 @@ def payments(
     for segment, paid, piece, base in found:
         seen[segment.id] = seen.get(segment.id, 0) + 1
         made.append(_payment(segment, paid, piece, base, ctx, seen[segment.id], count[segment.id]))
+    extra = top_up(found, ctx)
+    if extra is not None:
+        made.append(_top_up_payment(extra, ctx))
     return made
+
+
+@dataclass(frozen=True)
+class TopUp:
+    """The one-off top-up of the benefit for maternity leave to 100% (art. 31 ust. 4)."""
+
+    parent: Parent
+    base: Base
+    days: int
+    """Days of maternity leave paid at 81,5%."""
+    daily: Decimal
+    """The daily amount at 100% less the daily amount at 81,5%."""
+    monthly: Decimal
+    day: dt.date
+    """The day it is shown on: the child's first birthday (our reading)."""
+
+    @property
+    def total(self) -> Decimal:
+        return self.daily * self.days
+
+
+def top_up(found: list[tuple[Segment, Paid, Piece, Base]], ctx: Context) -> TopUp | None:
+    """Art. 31 ust. 4: after the request for 81,5%, with no day of the benefit for parental
+    leave in the child's first year, the benefit for maternity leave paid at 81,5% is topped up
+    once to 100%, on request. Each day: the daily amount at 100% less the one at 81,5% (each
+    rounded to the grosz, as paid)."""
+    if not ctx.first_year_lost:
+        return None
+    m, params = ctx.params.money, ctx.params
+    paid = [
+        (piece, base)
+        for segment, rule, piece, base in found
+        if rule.kind == "maternity"
+        and segment.lane == ctx.requester
+        and piece.rate is m.rate_single
+    ]
+    if not paid:
+        return None
+    base = paid[0][1]
+    full, single = _dec(m.rate_full.value), _dec(m.rate_single.value)
+    return TopUp(
+        parent=base.parent,
+        base=base,
+        days=sum(piece.days for piece, _ in paid),
+        daily=daily(base, full, params) - daily(base, single, params),
+        monthly=monthly(base, full) - monthly(base, single),
+        day=one_year_later(ctx.anchor),
+    )
+
+
+def top_up_without_parental(timeline: Timeline, params: Params, parent: Parent) -> Decimal:
+    """The one-off top-up (art. 31 ust. 4) of the parent's maternity leave paid at 81,5% on the
+    timeline, as if no day of the benefit for parental leave fell in the child's first year:
+    what a plan that leaves parental leave for later counts (plans.py, F8). 0 without such
+    payments (no request, or no amounts)."""
+    m = params.money
+    full, single = _dec(m.rate_full.value), _dec(m.rate_single.value)
+    total = Decimal(0)
+    for p in timeline.payments:
+        rule = paid_for(p.segment_id)
+        if p.lane != parent or p.one_off or rule is None or rule.kind != "maternity":
+            continue
+        if _dec(p.rate) != single:
+            continue
+        at_full = cents(_dec(p.base) * full / 100 / m.days_in_month.value)
+        total += (at_full - _dec(p.daily)) * p.days
+    return total
+
+
+def _top_up_payment(extra: TopUp, ctx: Context) -> Payment:
+    params = ctx.params
+    m = params.money
+    rf, _, rs = rates(params)
+    full = daily(extra.base, _dec(m.rate_full.value), params)
+    single = daily(extra.base, _dec(m.rate_single.value), params)
+    who = WHO[extra.parent]
+    details = [
+        f"W pierwszym roku życia dziecka (do {fmt(extra.day - DAY)}) {who} nie wykorzysta ani "
+        f"jednego dnia zasiłku za urlop rodzicielski, więc zasiłek pobrany za urlop macierzyński "
+        f"w wysokości {rs} wyrównuje się jednorazowo do {rf} podstawy. Wyrównanie następuje na "
+        "wniosek.",
+        _base_line(extra.base),
+        f"Za jeden dzień: {pln(full)} przy {rf} − {pln(single)} przy {rs} = {pln(extra.daily)}. "
+        f"Za {extra.days} dni urlopu macierzyńskiego: {extra.days} × {pln(extra.daily)} = "
+        f"{pln(extra.total)}.",
+        f"Pokazujemy je w dniu pierwszych urodzin dziecka ({fmt(extra.day)}): od tego dnia "
+        "wiadomo, że w pierwszym roku życia nie było dnia zasiłku za urlop rodzicielski. Kiedy "
+        "zostanie wypłacone, materiały nie mówią.",
+        BEFORE_TAX,
+    ]
+    if not ctx.scenario.child_born:
+        details.append("Liczymy od przewidywanej daty porodu.")
+    return Payment(
+        id=f"pay-{TOP_UP_ID}",
+        segment_id=TOP_UP_ID,
+        lane=extra.parent,
+        title=f"Jednorazowe wyrównanie zasiłku {WHOSE[extra.parent]} do {rf}",
+        start=extra.day,
+        end=extra.day,
+        days=extra.days,
+        rate=float(_dec(m.rate_full.value) - _dec(m.rate_single.value)),
+        base=float(extra.base.base),
+        monthly=float(extra.monthly),
+        daily=float(extra.daily),
+        total=float(extra.total),
+        summary=(
+            f"Na wniosek, jednorazowo: {extra.days} dni × {pln(extra.daily)} = "
+            f"{pln(extra.total)}. {BEFORE_TAX}"
+        ),
+        details=details,
+        sources=merge_sources(
+            m.top_up.sources,
+            m.rate_full.sources,
+            m.rate_single.sources,
+            _kind_sources("maternity", extra.base, params),
+            m.before_tax.sources,
+        ),
+        one_off=True,
+    )
 
 
 def _choice_open(
@@ -726,6 +894,9 @@ def _payment(
         )
     reduced = f", zmniejszone za pracę na {fraction(piece.work)} etatu" if piece.work else ""
     of = "wynagrodzenia" if paid.kind == "sick-pay" else "podstawy"
+    taxed = f" {BEFORE_TAX}" if paid.kind in TAXED else ""
+    if taxed:
+        sources.append(m.before_tax.sources)
     return Payment(
         id=f"pay-{segment.id}" + (f"-part-{number}" if number > 1 else ""),
         segment_id=segment.id,
@@ -741,7 +912,7 @@ def _payment(
         total=float(total),
         summary=(
             f"{percent(rate)} {of}{reduced}: {pln(per_month)} miesięcznie. Za {piece.days} dni "
-            f"razem {pln(total)}."
+            f"razem {pln(total)}.{taxed}"
         ),
         details=details,
         sources=merge_sources(*sources),
@@ -760,6 +931,9 @@ def _reasons(
     lines: list[str] = []
     sources: list[list[SourceRef]] = []
     if ctx.requester is None:
+        unused = ineffective_line(ctx)
+        if unused is not None and paid.kind == "maternity" and segment.lane == req.who:
+            return [unused[0]], [unused[1]]
         return lines, sources
     asker, other = WHO[req.who], WHOSE["father" if req.who == "mother" else "mother"]
     if piece.rate is m.rate_single and segment.lane == req.who:
@@ -795,9 +969,9 @@ def _reasons(
         lines.append(
             "Mama nie wykorzysta w pierwszym roku życia dziecka ani jednego dnia zasiłku za urlop "
             f"rodzicielski, więc na jej wniosek zasiłek za urlop macierzyński wyrówna się "
-            f"jednorazowo do {rf}."
+            f"jednorazowo do {rf}: to osobna wypłata na osi."
         )
-        sources.append(m.first_year.sources)
+        sources.append(m.top_up.sources)
     if paid.kind == "full" and segment.id == "supplementary":
         lines.append(
             f"{rs} dotyczy urlopu macierzyńskiego i rodzicielskiego; uzupełniający urlop "
@@ -827,6 +1001,57 @@ def _option_line(segment: Segment, scenario: Scenario) -> str:
             "sądu."
         )
     return "To okres do wyboru: kwota dotyczy urlopu wziętego tak, jak pokazuje oś."
+
+
+def _no_child_lives(scenario: Scenario) -> bool:
+    return bool(scenario.losses) and len(scenario.losses) >= (scenario.children_count or 1)
+
+
+def _stillborn(scenario: Scenario) -> bool:
+    """Every child of the birth was stillborn."""
+    return _no_child_lives(scenario) and all(loss.stillborn for loss in scenario.losses)
+
+
+def ineffective_line(ctx: Context) -> tuple[str, list[SourceRef]] | None:
+    """81,5% was chosen but does not apply (`effective_815`): why the benefit for the leave is
+    100%. None when the choice applies or was not made."""
+    scenario, m = ctx.scenario, ctx.params.money
+    if ctx.requester is not None or not chose_815(scenario, ctx.cover):
+        return None
+    rf, _, rs = rates(ctx.params)
+    req = ctx.request
+    article = "art. 30a ust. 2" if req.taken_in else "art. 30a ust. 1"
+    covers = [s for s in m.request_covers.sources if s.article == article]
+    leave = (
+        "urlopu na warunkach urlopu macierzyńskiego i urlopu rodzicielskiego"
+        if req.taken_in
+        else "urlopu macierzyńskiego i urlopu rodzicielskiego"
+    )
+    why = f"wniosek o {rs} dotyczy {leave} w pełnym wymiarze"
+    if _stillborn(scenario):
+        return (
+            f"Gdy dziecko urodzi się martwe, zasiłek macierzyński wynosi {rf} podstawy: {why}.",
+            merge_sources(m.stillborn_full.sources, covers),
+        )
+    if req.taken_in:
+        return (
+            f"Na osi nie ma urlopu rodzicielskiego, a {why}, więc liczymy {rf}.",
+            covers,
+        )
+    if _no_child_lives(scenario):
+        return (
+            f"Zasiłek za urlop macierzyński wynosi {rf} podstawy: {why}, a urlopu rodzicielskiego "
+            f"nie będzie. Jeśli mama złożyła już ten wniosek i dostała zasiłek w wysokości {rs}, "
+            f"przysługuje jej jednorazowe wyrównanie do {rf}, na jej wniosek.",
+            merge_sources(covers, m.top_up.sources),
+        )
+    return (
+        f"Mama wybrała {rs}, ale na osi nie ma jej urlopu rodzicielskiego, a {why}. Liczymy więc "
+        f"{rf}: gdy w pierwszym roku życia dziecka nie ma ani jednego dnia zasiłku za urlop "
+        f"rodzicielski, zasiłek pobrany za urlop macierzyński wyrównuje się jednorazowo do {rf} "
+        "na wniosek.",
+        merge_sources(covers, m.top_up.sources),
+    )
 
 
 # The case explanation (CLAUDE.md, "Wyjaśnianie przypadku"): the choice of rate among the
@@ -906,13 +1131,13 @@ def _choice_note(scenario: Scenario, timeline: Timeline, params: Params) -> Case
         text += (
             f" Jeśli przy {rs} w pierwszym roku życia dziecka mama nie wykorzysta ani jednego "
             f"dnia zasiłku za urlop rodzicielski, za ten urlop dostanie {rp}, a zasiłek za urlop "
-            f"macierzyński wyrówna się do {rf} na jej wniosek."
+            f"macierzyński wyrówna się jednorazowo do {rf} na jej wniosek."
         )
-        sources.append(m.first_year.sources)
+        sources += [m.first_year.sources, m.top_up.sources]
     return CaseNote(
         id=CHOICE_ID,
         kind="choice",
-        title=f"Zasiłek: {rf} i {rp} albo {rs} przez cały czas",
+        title=f"Zasiłek: {rf} i {rp} albo {rs} za {LEAVE[req.leave]} i rodzicielski",
         text=text,
         sources=merge_sources(*sources),
     )
@@ -927,7 +1152,10 @@ class RequestTotals:
     standard: Decimal
     """At 100% and 70%."""
     single: Decimal
-    """At 81,5%, after the request."""
+    """At 81,5%, after the request, with the one-off top-up (`top_up`)."""
+    top_up: Decimal = Decimal(0)
+    """The one-off top-up of the benefit for maternity leave to 100% (art. 31 ust. 4) in
+    `single`: with no day of the benefit for parental leave in the child's first year."""
 
 
 def request_totals(scenario: Scenario, timeline: Timeline, params: Params) -> RequestTotals | None:
@@ -940,19 +1168,23 @@ def request_totals(scenario: Scenario, timeline: Timeline, params: Params) -> Re
         s for s in timeline.segments if s.lane == req.who and _kind(s) in ("maternity", "parental")
     ]
     totals = []
+    extra = Decimal(0)
     for choice in (False, True):
         asked = scenario.model_copy(update={"rate_815": choice})
         ctx = _timeline_context(asked, timeline, params)
+        found = priced(periods, asked, ctx, bases)
+        paid = top_up(found, ctx)
+        extra = paid.total if paid is not None else Decimal(0)
         totals.append(
             sum(
                 (
                     _amounts(base, _dec(piece.rate.value), piece.work, params)[1] * piece.days
-                    for _, _, piece, base in priced(periods, asked, ctx, bases)
+                    for _, _, piece, base in found
                 ),
-                Decimal(0),
+                extra,
             )
         )
-    return RequestTotals(sum(s.days for s in periods), totals[0], totals[1])
+    return RequestTotals(sum(s.days for s in periods), totals[0], totals[1], extra)
 
 
 def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Request) -> str:
@@ -964,9 +1196,14 @@ def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Req
     rf, rp, rs = rates(params)
     whose = WHOSE[req.who]
     leave = LEAVE[req.leave]
+    extra = (
+        f" (z jednorazowym wyrównaniem za urlop macierzyński do {rf}: {pln(totals.top_up)})"
+        if totals.top_up
+        else ""
+    )
     return (
         f" Za {leave} i rodzicielski {whose} pokazany na osi ({totals.days} dni) to razem "
-        f"{pln(totals.standard)} przy {rf} i {rp} albo {pln(totals.single)} przy {rs}."
+        f"{pln(totals.standard)} przy {rf} i {rp} albo {pln(totals.single)} przy {rs}{extra}."
     )
 
 
@@ -982,19 +1219,28 @@ def _computed_note(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
     bases = _bases_of(timeline)
     parts = []
     sources: list[list[SourceRef]] = []
+    rf = rates(params)[0]
     for parent, who in (("mother", "Mama"), ("father", "Tata")):
         paid = [p for p in timeline.payments if p.lane == parent]
         base = bases[parent]
         if not paid or base is None:
             continue
         periods = "; ".join(
-            f"{_label(p)} — {percent(_dec(p.rate))}: {pln(_dec(p.monthly))} "
+            f"jednorazowe wyrównanie do {rf} na wniosek: {pln(_dec(p.total))}"
+            if p.one_off
+            else f"{_label(p)} — {percent(_dec(p.rate))}: {pln(_dec(p.monthly))} "
             f"miesięcznie, za {p.days} dni {pln(_dec(p.total))}"
             for p in paid
         )
         parts.append(f"{who} — {_base_line(base, 'podstawa')} {periods[0].upper()}{periods[1:]}.")
         sources.append(_base_sources(base, params))
         sources += [piece.rate.sources for _, _, piece, b in used if b.parent == parent]
+        if any(p.one_off for p in paid):
+            sources.append(m.top_up.sources)
+    unused = ineffective_line(ctx)
+    if unused is not None and any(p.lane == ctx.request.who for p in timeline.payments):
+        parts.append(unused[0])
+        sources.append(unused[1])
     if any(piece.work is not None for _, _, piece, _ in used):
         parts.append(
             "W tygodniach pracy na część etatu zasiłek zmniejsza się proporcjonalnie do wymiaru "
@@ -1006,6 +1252,12 @@ def _computed_note(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
         "każdy dzień, także wolny od pracy."
     )
     sources += [m.days_in_month.sources, m.every_day.sources]
+    if any(_taxed(p) for p in timeline.payments):
+        parts.append(
+            "Kwoty zasiłków są przed zaliczką na podatek dochodowy (PIT): zasiłek pomniejsza się "
+            "jeszcze o nią."
+        )
+        sources.append(m.before_tax.sources)
     return CaseNote(
         id=NOTE_ID,
         kind="computed",
@@ -1013,6 +1265,12 @@ def _computed_note(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
         text=" ".join(parts),
         sources=merge_sources(*sources),
     )
+
+
+def _taxed(payment: Payment) -> bool:
+    """A benefit the income tax advance is still deducted from (`TAXED`); the top-up too."""
+    paid = paid_for(payment.segment_id)
+    return payment.one_off or (paid is not None and paid.kind in TAXED)
 
 
 def _label(payment: Payment) -> str:
@@ -1035,12 +1293,13 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
         assumptions += [
             "Kwoty zaokrąglamy do pełnych groszy (od pół grosza w górę): podstawę, kwotę "
             "miesięczną i kwotę za dzień; kwota za okres to kwota za dzień razy liczba dni. "
-            "Pokazujemy zasiłek bez potrąceń, np. zaliczki na podatek.",
+            "Pokazujemy zasiłek bez potrąceń, przed zaliczką na podatek dochodowy (PIT): jej "
+            "wysokości nie liczymy.",
             "Nie stosujemy podwyższenia zasiłku do kwoty świadczenia rodzicielskiego (art. 31 "
             "ust. 3a ustawy zasiłkowej): tej kwoty nie ma w naszych materiałach.",
         ]
     # The benefit base in detail (base.py).
-    assumptions += base_assumptions(timeline)
+    assumptions += base_assumptions(timeline, params)
     if kinds & {"sick-pay", "sick-benefit", "rehab", "job-loss"}:
         assumptions.append(
             "Wynagrodzenie chorobowe, zasiłek chorobowy i zasiłek w wysokości zasiłku "
@@ -1098,6 +1357,24 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
             "Pierwszy rok życia dziecka kończy się dzień przed pierwszymi urodzinami. Czy mama "
             "wykorzysta w nim dzień zasiłku za urlop rodzicielski, sprawdzamy po jej urlopie "
             "rodzicielskim na osi."
+        )
+    if any(p.one_off for p in timeline.payments):
+        assumptions.append(
+            f"Jednorazowe wyrównanie zasiłku za urlop macierzyński do {rf} pokazujemy w dniu "
+            "pierwszych urodzin dziecka, w miesiącu tego dnia: materiały nie mówią, kiedy "
+            "i kto je wypłaca. Liczymy je dzień po dniu: kwota za dzień przy "
+            f"{rf} minus kwota za dzień przy {rs}, każda zaokrąglona do grosza, razy dni urlopu "
+            f"macierzyńskiego opłacone w wysokości {rs}."
+        )
+    prenatal = not timeline.child_born or any(
+        s.id == "maternity-prenatal" for s in timeline.segments
+    )
+    if ctx.requester is not None and not timeline.taken_in and prenatal:
+        assumptions.append(
+            f"Za urlop macierzyński przed porodem po wniosku o {rs} liczymy {rs}, jak "
+            "w Przewodniku (s. 9), w ustawie zasiłkowej (art. 31 ust. 3) i w Załączniku ZUS. "
+            f"Poradnik ZUS 2026 podaje za ten czas {rf} podstawy; tę rozbieżność zgłaszamy jako "
+            "pytanie do ZUS."
         )
     if timeline.taken_in and ctx.requester is not None:
         assumptions.append(

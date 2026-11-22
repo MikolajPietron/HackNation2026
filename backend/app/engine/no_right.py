@@ -17,9 +17,13 @@ give the right, only as far as the materials say it (explain.py adds it).
 - A child taken in by a foster family past the age limit of 7, while nobody has said whether
   compulsory schooling was postponed: then the limit is 10 (guide D.1; KP art. 183 § 1).
 
-Nothing about "świadczenie rodzicielskie": the materials name it only in art. 31 ust. 3a of the
-ustawa zasiłkowa, without saying who has it or how much it is. Nothing after a loss when no child
-lives: there is nothing to offer in its place.
+- For a parent without sickness insurance (the mother, the father) also, as "Co zamiast": the
+  ZUS Poradnik says that people who cannot get the maternity benefit because of their work
+  situation (e.g. unemployed, students, a contract for a specific task) have the parental
+  allowance (świadczenie rodzicielskie) or the maternity pay (uposażenie macierzyńskie). Only
+  that sentence, without an amount or conditions: the materials give neither (the ustawa names
+  the allowance's amount only in art. 31 ust. 3a, without stating it).
+Nothing after a loss when no child lives: there is nothing to offer in its place.
 """
 
 from app.engine.adoption import birthday, cover_of, taken_in_leave, taker
@@ -86,6 +90,18 @@ def _way_note(
 
 def _quoting(sources: list[SourceRef], fragment: str) -> list[SourceRef]:
     return [s for s in sources if fragment in s.quote]
+
+
+def _allowance(params: Params) -> tuple[str, list[SourceRef]]:
+    """The parental allowance or the maternity pay instead of the benefit (ZUS Poradnik)."""
+    return (
+        "Kto z powodu swojej sytuacji zawodowej nie może skorzystać z zasiłku macierzyńskiego, "
+        "a sprawuje opiekę nad dzieckiem, ma świadczenie rodzicielskie albo uposażenie "
+        "macierzyńskie (np. osoba bezrobotna, studentka lub student, osoba pracująca na umowę "
+        "o dzieło). Kwot i warunków tych świadczeń nie ma w naszych materiałach; więcej na "
+        "stronie „Świadczenie rodzicielskie” w portalu Gov.pl.",
+        params.benefit.instead_of_benefit.sources,
+    )
 
 
 def _no_child_lives(scenario: Scenario, timeline: Timeline, params: Params) -> bool:
@@ -155,6 +171,9 @@ def _mother_instead(
     if work_ended_before_birth(scenario) and scenario.mothers_work in ("employment", None):
         lines.append(FIXED_TERM)
         sources.append(fixed_term_sources(params))
+    allowance, allowance_sources = _allowance(params)
+    lines.append(allowance)
+    sources.append(allowance_sources)
     return lines, sources
 
 
@@ -221,16 +240,23 @@ def _father_way(scenario: Scenario, timeline: Timeline, params: Params) -> CaseN
         ]
     else:
         deadline = paternity_deadline(timeline.birth_date, params)
-        if deadline < timeline.today:
-            return None
         estimate = "" if timeline.child_born else " Liczymy od przewidywanej daty porodu."
-        todo = [
-            "Urlop ojcowski przysługuje także tacie, który rozpoczął pracę po narodzinach "
-            f"dziecka, o ile dziecko nie ukończyło {f.paternity_months.value} miesięcy: "
-            f"najpóźniej do {long_date(deadline)}.{estimate}"
-        ]
-        sources = [_quoting(f.paternity_who.sources, "rozpoczął pracę"), f.paternity_months.sources]
-    return _way_note("father-way", "Zasiłek taty", [], todo, sources)
+        todo = (
+            []
+            if deadline < timeline.today
+            else [
+                "Urlop ojcowski przysługuje także tacie, który rozpoczął pracę po narodzinach "
+                f"dziecka, o ile dziecko nie ukończyło {f.paternity_months.value} miesięcy: "
+                f"najpóźniej do {long_date(deadline)}.{estimate}"
+            ]
+        )
+        sources = (
+            [_quoting(f.paternity_who.sources, "rozpoczął pracę"), f.paternity_months.sources]
+            if todo
+            else []
+        )
+    allowance, allowance_sources = _allowance(params)
+    return _way_note("father-way", "Zasiłek taty", [allowance], todo, [*sources, allowance_sources])
 
 
 # A child taken in.

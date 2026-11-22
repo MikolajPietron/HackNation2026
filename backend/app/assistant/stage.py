@@ -129,6 +129,7 @@ USTAWA_TOPICS: dict[str, tuple[Topic, ...]] = {
     "36": ("money",),  # ust. 2 and 4: PAY_HISTORY below
     "37": ("pay-history",),
     "38": ("pay-history",),
+    "40": ("pay-history",),  # a change of working time: an assumption of the detailed base
     "42": ("pay-history",),
     "43": ("money",),  # the base stays after a short break (e.g. sick leave, then maternity)
     "45": ("money",),

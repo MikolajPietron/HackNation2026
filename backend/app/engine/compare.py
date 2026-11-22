@@ -1,8 +1,9 @@
 """What two timelines of the same family differ in: entitlements, periods, money. Shared by the
 stress test (stress.py, F11) and the plans for a goal (plans.py, F8).
 
-Pure: it reads two finished timelines and states no rule of its own, so every claim the callers
-make keeps the sources of the timelines' elements and notes.
+Pure: it reads two finished timelines (and, for the pool of parental leave, the two scenarios
+with parental.py's rule) and states no rule of its own, so every claim the callers make keeps
+the sources of the timelines' elements and notes.
 """
 
 import datetime as dt
@@ -12,11 +13,16 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.engine.amounts import dec, pln
-from app.engine.models import Lane, Payment, Role, Segment, Timeline
+from app.engine.models import Lane, Payment, Role, Scenario, Segment, Timeline
+from app.engine.params import Params
+from app.engine.parental import parental_weeks
 from app.engine.wording import fmt
 
-RightKind = Literal["maternity", "supplementary", "paternity", "parental", "job-loss", "sick"]
-"""A kind of entitlement on the parents' lanes, whoever of them uses it."""
+RightKind = Literal[
+    "maternity", "supplementary", "paternity", "parental", "job-loss", "sick", "parental-pool"
+]
+"""A kind of entitlement on the parents' lanes, whoever of them uses it; "parental-pool": the
+weeks of parental leave both parents have together, drawn or not (`pool_change`)."""
 
 RIGHT_LABEL: dict[RightKind, str] = {
     "maternity": "urlop macierzyński",
@@ -27,6 +33,7 @@ RIGHT_LABEL: dict[RightKind, str] = {
     "sick": "wynagrodzenie i zasiłek chorobowy w ciąży",
 }
 """How a sentence names the kind, after "Dochodzi:" or "Przepada:"."""
+POOL_LABEL = "pula urlopu rodzicielskiego"
 
 MATERNITY_IDS = ("maternity-prenatal", "maternity", "maternity-resumed", "maternity-father")
 PARENTAL_OPTIONS = ("parental", "parental-father")
@@ -89,6 +96,26 @@ def right_changes(before: Timeline, after: Timeline) -> list[RightChange]:
         for kind in RIGHT_LABEL
         if old.get(kind, 0) != new.get(kind, 0)
     ]
+
+
+def pool_change(
+    before: Scenario,
+    after: Scenario,
+    params: Params,
+    timelines: tuple[Timeline, Timeline],
+) -> RightChange | None:
+    """The pool of parental leave for both parents together (KP art. 182¹ᵃ § 1-2: by the number
+    of children, longer with "Za życiem"). It can grow while no period on the timeline moves (a
+    plan of parts that keeps its weeks), so `right_changes` alone would miss it. None when
+    neither timeline has parental leave or the pool stays."""
+    if not any(right_kind(s.id) == "parental" for t in timelines for s in parent_segments(t)):
+        return None
+    old, new = parental_weeks(before, params)[0], parental_weeks(after, params)[0]
+    if old == new:
+        return None
+    return RightChange(
+        kind="parental-pool", label=POOL_LABEL, days_before=old * 7, days_after=new * 7
+    )
 
 
 class PeriodChange(BaseModel):
@@ -276,6 +303,9 @@ def sentence(text: str) -> str:
 
 def right_line(change: RightChange) -> str:
     label = change.label[0].upper() + change.label[1:]
+    if change.kind == "parental-pool":
+        after, before = weeks_text(change.days_after), weeks_text(change.days_before)
+        return sentence(f"{label}: {after} zamiast {before}")
     if change.days_before == 0:
         return sentence(f"Dochodzi: {change.label} — {weeks_text(change.days_after)}")
     if change.days_after == 0:

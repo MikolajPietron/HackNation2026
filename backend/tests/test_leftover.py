@@ -321,7 +321,11 @@ def test_a_mother_not_registered_for_the_voluntary_insurance_before_the_birth() 
     quotes = [s.quote for s in way.sources]
     assert any("niezgłoszenie się" in q for q in quotes)  # section H, risk 3
     assert any("matka na dzień porodu nie była ubezpieczona" in q for q in quotes)  # B.3
-    assert "świadczeni" not in way.text  # not described by the materials
+    # The ZUS Poradnik (page 35): the parental allowance instead, without an amount.
+    assert "ma świadczenie rodzicielskie albo uposażenie macierzyńskie" in way.text
+    assert "Kwot i warunków tych świadczeń nie ma w naszych materiałach" in way.text
+    assert any(s.doc == "poradnik" and s.page == 35 for s in way.sources)
+    assert way.text.index("świadczenie rodzicielskie") < way.text.index("Co zrobić")
 
 
 def test_after_the_birth_only_what_instead() -> None:
@@ -350,16 +354,25 @@ def test_a_job_that_ended_before_the_birth_and_a_fixed_term_contract() -> None:
 
 
 def test_both_parents_uninsured_after_the_birth() -> None:
-    """Nothing instead and nothing to do for the mother after the birth; the father who does not
-    work: paternity leave if he starts work before the child completes 12 months (09.11.2027)."""
+    """After the birth only the parental allowance instead for the mother (ZUS Poradnik, page
+    35), nothing to do; the father who does not work: the same instead, and paternity leave if
+    he starts work before the child completes 12 months (09.11.2027)."""
     t = born(work="none", father_work="none")
-    assert "insurance-way" not in note_ids(t)
+    mother = note(t, "insurance-way")
+    assert mother.title == "Zasiłek mamy: co zamiast"
+    assert mother.text.startswith("Co zamiast: Kto z powodu swojej sytuacji zawodowej nie może")
+    assert "Co zrobić" not in mother.text
+    assert [s.doc for s in mother.sources] == ["poradnik", "poradnik"]
     way = note(t, "father-way")
     assert note_ids(t)[note_ids(t).index("father") + 1] == "father-way"
-    assert way.title == "Zasiłek taty: co zrobić, żeby przysługiwał"
+    assert way.title == "Zasiłek taty: co zamiast i co zrobić"
+    assert "świadczenie rodzicielskie albo uposażenie macierzyńskie" in way.text
     assert "rozpoczął pracę po narodzinach dziecka" in way.text
     assert "najpóźniej do 9 listopada 2027" in way.text
     assert any("rozpoczął pracę" in s.quote for s in way.sources)
+    # Once paternity leave can no longer start, the allowance is what is left to say.
+    late = born(work="none", father_work="none", birth_date=dt.date(2025, 1, 10))
+    assert note(late, "father-way").title == "Zasiłek taty: co zamiast"
 
 
 def test_a_father_not_registered_for_the_voluntary_insurance() -> None:

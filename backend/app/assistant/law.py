@@ -1,6 +1,6 @@
 """Provisions of the Labour Code, of the ustawa zasiłkowa and of the two regulations on the
-requests the app cites (public law text; regenerate with tools/przewodnik/), and the chapter of
-the ZUS Załącznik on the benefit base.
+requests the app cites (public law text; regenerate with tools/przewodnik/), the chapter of the
+ZUS Załącznik on the benefit base and the pages of the ZUS Poradnik for parents.
 
 The model reads them in its instructions, and every quote from them shown in the UI is checked
 against them.
@@ -68,6 +68,37 @@ def zalacznik_contains(section: str, quote: str) -> bool:
     """True if `quote` is a literal fragment of that section (whitespace aside)."""
     text = zalacznik_sections().get(section)
     return text is not None and normalize(quote) in text
+
+
+# The ZUS Poradnik for parents (2026; source no. 4, quoted only where the guide, the Załącznik
+# and the law are silent), page by page, the PRINTED page numbers (the PDF's page minus one). A
+# ZUS document like the Załącznik, so not in git: each checkout builds it from the materials with
+# tools/przewodnik/extract_poradnik.py. Without it the literal-quote test skips its quotes. The
+# model is not given the whole Poradnik (too long): only the quotes the timeline carries.
+PORADNIK_FILE = Path(__file__).with_name("poradnik.json")
+
+
+def poradnik_available() -> bool:
+    return PORADNIK_FILE.exists()
+
+
+@lru_cache
+def poradnik_pages() -> dict[int, str]:
+    """Printed page of the Poradnik -> its text. Empty when the file was not built."""
+    if not poradnik_available():
+        return {}
+    pages = json.loads(PORADNIK_FILE.read_text(encoding="utf-8"))["pages"]
+    return {int(page): normalize(text) for page, text in pages.items()}
+
+
+def poradnik_contains(page: int, page_to: int | None, quote: str) -> bool:
+    """True if `quote` is a literal fragment of the printed page `page` (whitespace aside), or of
+    the pages from `page` to `page_to` read one after the other (a sentence over a page break)."""
+    pages = poradnik_pages()
+    numbers = range(page, (page_to or page) + 1)
+    if not all(n in pages for n in numbers):
+        return False
+    return normalize(quote) in " ".join(pages[n] for n in numbers)
 
 
 # Two regulations the request forms quote (public law text; regenerate with

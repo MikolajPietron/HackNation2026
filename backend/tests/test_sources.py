@@ -11,6 +11,9 @@ from app.assistant.law import (
     ROZPORZADZENIA,
     kp_articles,
     kp_contains,
+    poradnik_available,
+    poradnik_contains,
+    poradnik_pages,
     rozporzadzenie_contains,
     rozporzadzenie_provisions,
     ustawa_articles,
@@ -44,6 +47,14 @@ def is_literal(source: SourceRef) -> bool:
     if source.doc in ROZPORZADZENIA:
         return source.article is not None and rozporzadzenie_contains(
             source.doc, source.article, source.quote
+        )
+    if source.doc == "poradnik":
+        # Like the Załącznik, a ZUS document not in git: checked where it was built. The page is
+        # the number printed on it (tools/przewodnik/extract_poradnik.py).
+        if not poradnik_available():
+            return source.page is not None
+        return source.page is not None and poradnik_contains(
+            source.page, source.page_to, source.quote
         )
     assert source.section is not None
     pages = SECTIONS[source.section].pages_of(source.quote)
@@ -250,6 +261,7 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 38 ust. 1",
         "art. 38 ust. 2",
         "art. 38 ust. 3",
+        "art. 40",
         "art. 42 ust. 1",
         "art. 42 ust. 2",
         "art. 42 ust. 3",
@@ -290,6 +302,8 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert texts["art. 43"].endswith("krótsza niż miesiąc kalendarzowy.")
     # A footnote's number glued to the paragraph's ("2.7") is not part of it.
     assert texts["art. 61b ust. 2"].startswith("Postępowanie w sprawie przyznania i wypłaty")
+    assert texts["art. 40"].startswith("W razie zmiany umowy o pracę lub innego aktu")
+    assert texts["art. 40"].endswith("lub w miesiącach, o których mowa w art. 36.")
     assert texts["art. 49 ust. 1"].endswith(
         "na rzecz danego płatnika składek za miesiąc, w którym "
         "powstało prawo do zasiłku - dla osób wykonujących "
@@ -406,6 +420,27 @@ def test_zalacznik_sections() -> None:
     # The original's typo stays.
     components = sections["Składniki wynagrodzenia w podstawie wymiaru zasiłku"]
     assert "(gdy przysługuje w czasie zawonienia)" in components
+
+
+@pytest.mark.skipif(
+    not poradnik_available(), reason="poradnik.json is built locally from the ZUS materials"
+)
+def test_poradnik_pages_are_the_printed_pages() -> None:
+    """The ZUS Poradnik, page by page under the number printed on the page (the PDF's page minus
+    one), without running headers, page numbers and the pictograms of the "WAŻNE!" boxes."""
+    pages = poradnik_pages()
+    assert set(pages) == set(range(1, 42))
+    assert pages[1].startswith("ZAKŁAD UBEZPIECZEŃ SPOŁECZNYCH Poradnik dla rodziców")
+    stillborn = "Zasiłek macierzyński, gdy dziecko urodzi się martwe – 100% podstawy wymiaru"
+    assert stillborn in pages[34] and stillborn not in pages[35]
+    assert pages[24].startswith("WAŻNE! Osoby, które same opłacają")
+    assert not any("PORADNIK DLA RODZICÓW I OPIEKUNÓW DZIECI" in t for t in pages.values())
+    assert poradnik_contains(34, None, stillborn)
+    assert not poradnik_contains(35, None, stillborn)
+    # A sentence over a page break: the last words of page 24 run on into page 25.
+    end, start = pages[24][-40:], pages[25][:40]
+    assert poradnik_contains(24, 25, f"{end} {start}")
+    assert not poradnik_contains(24, None, f"{end} {start}")
 
 
 def test_every_quote_in_params_is_literal() -> None:

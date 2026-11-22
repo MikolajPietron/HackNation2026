@@ -39,6 +39,9 @@ class BenefitRules(BaseModel):
     without_insurance: Rule
     non_employees: Rule
     same_rules_for_non_employees: Rule
+    instead_of_benefit: Rule
+    """No maternity benefit because of the work situation: the parental allowance or the maternity
+    pay instead (ZUS Poradnik; their amounts and conditions are not in the materials)."""
 
 
 class ParentalParams(BaseModel):
@@ -318,7 +321,14 @@ class MoneyParams(BaseModel):
     other_parent_parental: Rule
     """The other parent's own weeks of parental leave stay at `rate_parental`."""
     first_year: Rule
-    """With the request: no day of parental benefit in the first year -> 70%, and a top-up."""
+    """With the request: no day of parental benefit in the first year -> 70% for it (ust. 3g)."""
+    top_up: Rule
+    """...and the benefit for maternity leave is topped up once to `rate_full`, on request
+    (ust. 4)."""
+    request_covers: Rule
+    """The request covers maternity and parental leave in full (art. 30a ust. 1)."""
+    stillborn_full: Rule
+    """A stillborn child: the maternity benefit is 100% (ZUS Poradnik)."""
     contributions_percent: Param[float]
     """Deducted from the gross pay (employee) or the contribution base (non-employee)."""
     base_employee: Rule
@@ -346,6 +356,9 @@ class MoneyParams(BaseModel):
     request_days_taken_in: Param[int]
     """A child taken in: the request for `rate_single` within this many days (art. 30a
     ust. 2)."""
+    before_tax: Rule
+    """The benefit is further reduced by the income tax advance (PIT): the amounts shown are
+    before it (ZUS Poradnik)."""
 
 
 class BaseParams(BaseModel):

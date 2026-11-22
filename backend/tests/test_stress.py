@@ -137,7 +137,10 @@ def test_twins_lengthen_maternity_and_parental_leave() -> None:
     mother's 34: 18.10.2027-11.06.2028 (238 days), the father's 12.06-13.08.2028. The money: 77
     more days × 230,11 = 17 718,47 + 14 × 161,07 = 2254,98, so 19 973,45 zł more."""
     e = event(report(), "twins")
+    # The pool grows with the options drawn on the timeline: one line says it, not two.
     assert rights(e) == {"maternity": (140, 217), "parental": (287, 301)}
+    assert "Urlop rodzicielski: 43 tyg. zamiast 41 tyg. (dłużej)." in e.lines
+    assert not any(line.startswith("Pula urlopu") for line in e.lines)
     assert period(e, "maternity").end_after == d("2027-10-17")
     assert (period(e, "parental").start_after, period(e, "parental").end_after) == (
         d("2027-10-18"),
@@ -225,6 +228,29 @@ def test_a_dated_plan_that_no_longer_fits_is_reported() -> None:
     assert rights(twins) == {"maternity": (140, 217), "parental": (287, 301)}
     assert twins.patch["parental_parts"] == []
     assert event(r, "za-zyciem").plan_breaks is None  # the plan still fits there
+
+
+def test_za_zyciem_with_a_plan_that_keeps_its_weeks_still_changes_the_pool() -> None:
+    """The plan: the mother 32 weeks, the father 9 (the whole pool of 41). "Za życiem" makes the
+    pool 65 weeks (KP art. 182¹ᵃ § 2) while every period of the plan stays where it is: the
+    test must still say so, never "Na osi nic się nie zmienia"."""
+    r = report(parental_parts=[{"parent": "mother", "weeks": 32}, {"parent": "father", "weeks": 9}])
+    za_zyciem = event(r, "za-zyciem")
+    assert za_zyciem.plan_breaks is None and za_zyciem.periods == []
+    assert rights(za_zyciem) == {"parental-pool": (287, 455)}
+    assert za_zyciem.lines[0] == "Pula urlopu rodzicielskiego: 65 tyg. zamiast 41 tyg."
+    assert "Na osi nic się nie zmienia." not in za_zyciem.lines
+    assert za_zyciem.verdict == "kept"  # more rights, nothing lost
+    assert any(s.article == "art. 182¹ᵃ § 2" for s in za_zyciem.sources)
+
+
+def test_twins_with_a_plan_of_the_whole_pool_say_the_pool_grows() -> None:
+    """The plan: the mother 32 weeks, the father 9. Twins: 43 weeks for both (KP art. 182¹ᵃ
+    § 1), the plan keeps its 41, so the pool line says it."""
+    r = report(parental_parts=[{"parent": "mother", "weeks": 32}, {"parent": "father", "weeks": 9}])
+    twins = event(r, "twins")
+    assert rights(twins)["parental-pool"] == (287, 301)
+    assert "Pula urlopu rodzicielskiego: 43 tyg. zamiast 41 tyg." in twins.lines
 
 
 def test_a_born_child_has_only_what_can_still_happen() -> None:

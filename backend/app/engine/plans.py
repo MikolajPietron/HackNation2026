@@ -27,7 +27,13 @@ How the figures count (the same for the current timeline and every plan):
   the timeline draws them, and parental leave only where a plan decides it: a parent's share
   still drawn as an option ("do wyboru") is left out, since the plan does not take it now;
 - the money: the payments for those periods (money.py); benefits in pregnancy are the same in
-  every plan and are left out;
+  every plan and are left out. After the request for 81,5%, when the mother's parental leave in
+  the plan has no day in the child's first year (also: none in the plan, "Mama wraca po urlopie
+  macierzyńskim"), the one-off top-up of her benefit for maternity leave to 100% counts too
+  (ustawa art. 31 ust. 4: on her request; a later parental leave is then paid 70%, ust. 3g);
+- "longest-home" with part-time work: longer in the calendar for the same pool of weeks, since
+  in the weeks of work the leave covers the rest of full time (KP art. 182¹ᵉ § 1), and only if
+  the employer grants the request (§ 2: it may refuse for the organisation or kind of work);
 - back to work: the day after the parent's first unbroken stretch of leave, or the first day of
   a part combined with work, if earlier.
 """
@@ -42,7 +48,7 @@ from pydantic import BaseModel
 
 from app.engine.amounts import dec, pln
 from app.engine.compare import LEAVE_KINDS, PARENTAL_OPTIONS, right_kind, weeks_text
-from app.engine.draft import DAY, WEEK, merge_sources
+from app.engine.draft import DAY, WEEK, merge_sources, one_year_later
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     ParentalPart,
@@ -53,7 +59,7 @@ from app.engine.models import (
     SourceRef,
     Timeline,
 )
-from app.engine.money import rates, request_deadline
+from app.engine.money import rates, request_deadline, top_up_without_parental
 from app.engine.params import Params
 from app.engine.parental import parental_deadline, parental_table, parental_weeks
 from app.engine.parental_plan import extension_days, fraction, part_ids, work_weeks
@@ -570,16 +576,18 @@ def figures(scenario: Scenario, timeline: Timeline, params: Params) -> PlanFigur
         )
         money = None
         if parent in bases:
-            money = float(
-                sum(
-                    (
-                        dec(p.total)
-                        for p in timeline.payments
-                        if p.lane == parent and p.segment_id in ids
-                    ),
-                    Decimal(0),
-                )
-            )
+            # The one-off top-up to 100% (art. 31 ust. 4) is maternity leave's money too.
+            paid = [
+                p
+                for p in timeline.payments
+                if p.lane == parent and (p.segment_id in ids or p.one_off)
+            ]
+            amount = sum((dec(p.total) for p in paid), Decimal(0))
+            if not any(p.one_off for p in paid) and not first_year_parental(
+                segments, parent, timeline.birth_date
+            ):
+                amount += top_up_without_parental(timeline, params, parent)
+            money = float(amount)
         parents[parent] = ParentFigures(
             leave_days=sum(s.days for s in mine),
             work_days=work_days,
@@ -600,6 +608,15 @@ def figures(scenario: Scenario, timeline: Timeline, params: Params) -> PlanFigur
         pool_used=used,
         pool_total=total,
         rate_815=scenario.rate_815,
+    )
+
+
+def first_year_parental(segments: list[Segment], parent: Role, birth: dt.date) -> bool:
+    """The parent's parental leave the plan decides (`counted`) has a day in the child's first
+    year (until the day before the first birthday; money.py reads it the same way)."""
+    return any(
+        s.lane == parent and right_kind(s.id) == "parental" and s.start < one_year_later(birth)
+        for s in segments
     )
 
 
@@ -659,9 +676,13 @@ def _plan(
     ]
     if any(part.work_fraction for part in candidate.parts):
         sources += [pp.max_work_fraction.sources, pp.extension.sources, m.work_reduces.sources]
+        sources += [pp.employer_answer_days.sources, pp.rest_of_time.sources]
     if candidate.rate_815 is not None and frame.rate_open:
         sources += [m.rate_full.sources, m.rate_parental.sources, m.rate_single.sources]
         sources += [m.request_days.sources]
+    mother_now = first_year_parental(counted(timeline), "mother", timeline.birth_date)
+    if candidate.rate_815 is True and _top_up_counted(timeline, params, mother_now):
+        sources += [m.top_up.sources, m.first_year.sources]
     if candidate.takes_over and not frame.scenario.father_takes_over:
         sources += [params.father.takeover_after_weeks.sources]
     return Plan(
@@ -711,7 +732,7 @@ def _summary(frame: Frame, candidate: Candidate, timeline: Timeline, f: PlanFigu
     rf, rp, rs = rates(frame.params)
     if frame.rate_open and candidate.rate_815 is True:
         sentences.append(
-            f"Zasiłek {rs} za cały urlop macierzyński i rodzicielski mamy: wniosek najpóźniej "
+            f"Zasiłek {rs} za urlop macierzyński i rodzicielski mamy: wniosek najpóźniej "
             f"{fmt(request_deadline(timeline.birth_date, frame.params))}."
         )
     elif frame.rate_open and candidate.rate_815 is False:
@@ -757,19 +778,47 @@ def _given_up(frame: Frame, candidate: Candidate, timeline: Timeline, f: PlanFig
             lines.append(
                 f"Przez {work_weeks(part)} tyg. {WHO[part.parent]} pracuje na "
                 f"{fraction(part.work_fraction)} etatu: zasiłek za te tygodnie jest mniejszy "
-                "proporcjonalnie do wymiaru pracy."
+                "proporcjonalnie do wymiaru pracy. Pracę podejmuje się na wniosek, a pracodawca "
+                "może go nie uwzględnić, gdy nie pozwala na to organizacja pracy albo rodzaj "
+                "pracy."
             )
+    if any(part.work_fraction for part in candidate.parts):
+        lines.append(
+            "Pula tygodni urlopu się nie zmienia: w tygodniach pracy urlopu udziela się na "
+            "pozostałą część etatu, więc urlop trwa dłużej w kalendarzu."
+        )
     rf, rp, rs = rates(params)
-    if frame.rate_open and candidate.rate_815 is True:
-        lines.append(f"Za urlop macierzyński zasiłek wynosi {rs} zamiast {rf}.")
+    mother_now = first_year_parental(counted(timeline), "mother", timeline.birth_date)
+    if frame.rate_open and candidate.rate_815 is True and mother_now:
+        lines.append(
+            f"Za urlop macierzyński zasiłek wynosi {rs} zamiast {rf}, za urlop rodzicielski mamy "
+            f"{rs} zamiast {rp}."
+        )
     elif frame.rate_open and candidate.rate_815 is False:
         lines.append(f"Bez wniosku o {rs}: za urlop rodzicielski zasiłek wynosi {rp}.")
+    if candidate.rate_815 is True and _top_up_counted(timeline, params, mother_now):
+        first_year_end = one_year_later(timeline.birth_date) - DAY
+        lines.append(
+            f"Przy {rs}: jeśli w pierwszym roku życia dziecka (do {fmt(first_year_end)}) mama nie "
+            f"wykorzysta ani jednego dnia zasiłku za urlop rodzicielski, zasiłek za urlop "
+            f"macierzyński wyrówna się jednorazowo do {rf}, ale tylko na jej wniosek (kwota planu "
+            f"to uwzględnia). Za urlop rodzicielski wzięty później zasiłek wynosi wtedy {rp}."
+        )
     if candidate.takes_over and not frame.scenario.father_takes_over:
         lines.append(
             "Mama kończy urlop macierzyński wcześniej, a jego resztę wykorzystuje tata; zasiłek "
             "za tę resztę liczymy z podstawy taty."
         )
     return lines
+
+
+def _top_up_counted(timeline: Timeline, params: Params, mother_now: bool) -> bool:
+    """The plan's money has the one-off top-up of the mother's maternity leave to 100%: from the
+    engine (her parental leave starts after the first birthday) or counted by `figures` (no
+    parental leave of hers in the plan's first year)."""
+    if any(p.one_off and p.lane == "mother" for p in timeline.payments):
+        return True
+    return not mother_now and top_up_without_parental(timeline, params, "mother") > 0
 
 
 def _notes(goal: Goal, frame: Frame, shown: list[PlanFigures]) -> list[str]:
