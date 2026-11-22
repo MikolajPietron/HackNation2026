@@ -51,14 +51,6 @@ const MARKDOWN: Components = {
   ),
 }
 
-/**
- * Gemini can answer in two text pieces that Pydantic AI joins with nothing between them, so the
- * interview question sticks to the sentence before it ("…2027.Chcesz…"). A sentence end right
- * before a capitalised word starts a new paragraph again ("Dz.U.", "S.A." stay as they are).
- */
-const GLUED = /([.!?])(?=[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż])/g
-const unglue = (text: string) => text.replace(GLUED, '$1\n\n')
-
 /** "(Przewodnik ZUS, s. 5; Kodeks pracy, art. 183¹ § 2)" in the text becomes pills below it. */
 const CITATION = /\s*\(([^()]*(?:Przewodnik|Kodeks pracy)[^()]*)\)/g
 
@@ -284,7 +276,7 @@ function AssistantMessage({
 }
 
 function TextBlock({ text }: { text: string }) {
-  const { text: clean, sources } = splitCitations(unglue(text))
+  const { text: clean, sources } = splitCitations(text)
   return (
     <div className="w-full text-[15px] leading-relaxed text-navy-700">
       <Markdown components={MARKDOWN}>{clean}</Markdown>

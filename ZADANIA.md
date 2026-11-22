@@ -28,9 +28,6 @@ Demo online (B.5) **na razie pomijamy** (decyzja z 22.11.2026 w nocy). Zgodnoś�
 - Stare odczyty z `.cases_cache` nie mają nowych pól. Ponownie: S21 (`job_loss`), S08 i S09 (`zus_finding`), S10 i S04 (`contribution_debt`), sprawy z niepełnymi miesiącami w Z-3, z premiami, z przejęciem urlopu w sytuacji szczególnej (`mother_event`). S19 i S11 mogą działać na starych odczytach.
 - `cd backend && uv run python -m app.cases.batch --jobs 1` (pozostałe 56 spraw i ponowny odczyt powyższych), potem `--only-cached --summary …`; każdą różnicę opisać; brakujące reguły jako osobne punkty tutaj.
 
-### Drobne: pytanie wywiadu sklejone ze zdaniem (Gemini)
-- Pydantic AI łączy kolejne kawałki tekstu z Gemini bez odstępu (`pydantic_ai/models/google.py`, `_map_text`). Gdy model sam dopisze pytanie wywiadu osobnym kawałkiem, wychodzi „…2027.Chcesz zacząć…”, a `_closing_question` w `chat.py` uznaje, że odpowiedź już kończy się pytaniem, i nic nie dodaje. Front to maskuje (`unglue` w `ChatPanel.tsx`), ale w historii modelu tekst zostaje sklejony. Poprawka po stronie B: gdy odpowiedź kończy się pytaniem bez odstępu przed nim, w historii wstaw `\n\n` przed pytaniem (albo mocniej zabroń modelowi pisać pytanie).
-
 ### Odłożone
 - **Demo online (B.5), pomijamy na razie.** Plan na później: jeden kontener, FastAPI serwuje `frontend/dist` (fallback na `index.html` dla `/admin`, `/raport`), hostowany Supabase, `CASES_MODEL` + płatny klucz; na serwerze nie ma skanów spraw, jury wgrywa PDF samo (decyzja Mikołaja z 22.11.2026). Adres potem do README i CLAUDE.md.
 
@@ -57,7 +54,7 @@ Zrobione 22.11.2026 w nocy (szczegóły w „Zrobione”): wszystko, co B dał d
 4. Przegląd całości na telefonie i desktopie przed nagraniem filmu.
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
-`LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
+Od 22.11.2026 czat przez OpenRouter (Gemini Flash się nie sprawdzał): `LLM_PROVIDER=openrouter`, `LLM_MODEL=anthropic/claude-sonnet-5.5`, `OPENROUTER_API_KEY`. Sprawy nadal `CASES_MODEL=gemini-pro-latest` z `GEMINI_API_KEY` (projekt bywa przy limicie wydatków, 429), `CASES_DIR` (folder ze skanami).
 
 ## Zrobione
 - Front (A, 22.11.2026): symulacja zaświadczenia o zadłużeniu składkowym (wymóg z s. 13: „wystawienie zaświadczenia i wysokość zadłużenia” na dzień powstania prawa) w „Twoje dane z ZUS”; kwota przechodzi do planu przez PATCH, skutek opisuje silnik (`debt.py`).
