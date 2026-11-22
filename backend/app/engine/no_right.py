@@ -6,7 +6,8 @@ give the right, only as far as the materials say it (explain.py adds it).
   voluntary insurance, not working, or her work ended before the birth). Instead: the father's
   benefit for parental leave and his paternity leave (guide B.3, B.4), when he is insured or
   assumed so; after an employment that ended, the extension of a fixed-term contract until the
-  birth, with the maternity benefit after it (guide I, KP art. 177 § 3; ustawa art. 30 ust. 4).
+  birth (not a contract to replace an absent employee), with the maternity benefit after a
+  fixed-term contract (guide I, KP art. 177 § 3 and § 3¹; ustawa art. 30 ust. 4).
   To have the right, while the child is on the way: sickness insurance on the day of the birth
   (guide pages 3-5 and 10), with the guide's warning about a contract or a business concluded
   only for that (section H, risk 1).
@@ -22,6 +23,7 @@ lives: there is nothing to offer in its place.
 """
 
 from app.engine.adoption import birthday, cover_of, taken_in_leave, taker
+from app.engine.after_insurance import FIXED_TERM, fixed_term_sources
 from app.engine.draft import merge_sources
 from app.engine.father import paternity_deadline
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage, work_ended_before_birth
@@ -151,14 +153,8 @@ def _mother_instead(
             sources.append(b.paid_to_the_insured.sources)
     # Her employment ended before the birth for a reason that gives no benefit (insurance.py).
     if work_ended_before_birth(scenario) and scenario.mothers_work in ("employment", None):
-        p, a = params.pregnancy, params.applications
-        lines.append(
-            "Jeśli była to umowa o pracę na czas określony albo na okres próbny dłuższy niż "
-            "miesiąc, która skończyłaby się po upływie trzeciego miesiąca ciąży, umowa przedłuża "
-            "się do dnia porodu. Gdy umowę na czas określony przedłużono do dnia porodu, po "
-            "porodzie przysługuje zasiłek macierzyński po ustaniu ubezpieczenia."
-        )
-        sources += [a.fixed_term_extended.sources, p.fixed_term_after_insurance.sources]
+        lines.append(FIXED_TERM)
+        sources.append(fixed_term_sources(params))
     return lines, sources
 
 

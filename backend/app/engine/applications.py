@@ -18,19 +18,24 @@ Applied last, on the finished timeline (`add_applications`, before the case note
   (on a contract of mandate the payer determines the benefit or ZUS does, with Z-3a from the
   payer). What each request contains is forms.py's (applied after this module);
 - protection: for an employed mother, the last day of the special protection her leave on the
-  timeline gives, and the extension of a fixed-term contract until the birth;
+  timeline gives, and the extension of a fixed-term contract until the birth (not a contract to
+  replace an absent employee, KP art. 177 § 3¹), after which the maternity benefit is due after
+  the insurance ended (ustawa art. 30 ust. 4: a fixed-term contract, not a probation);
 - sick leave in pregnancy (guide page 3, pregnancy.py draws the periods): e-ZLA goes straight to
   ZUS and to the employer's profile; an employee informs her employer of the absence; the
   employer pays its days (wynagrodzenie chorobowe), then the sickness benefit is paid by the
   payer or ZUS by the same rule of more than 20 insured, the payer sending Z-3 (ZAS-12 for a
   further period) or, on a contract of mandate, Z-3a; with a business ZAS-53 goes to ZUS;
-- the benefit after losing the job (guide page 4): after an unlawful termination, the final court
-  judgment it needs.
-  timeline gives, and the extension of a fixed-term contract until the birth (after which the
-  maternity benefit is due after the insurance ended, ustawa art. 30 ust. 4);
+- the benefits after the insurance ended, which ZUS determines and pays (ustawa art. 61 ust. 1
+  pkt 2 lit. d), with the documents of the regulation of 27.09.2026: the sickness benefit after
+  the work ended, a statement (§ 4, annex 4); the benefit equal to the maternity benefit after
+  the employer's bankruptcy, liquidation or death, the pregnancy certificate, the document on
+  the end of the employment and a statement that no other employment was offered (§ 17); after
+  an unlawful termination, the final court judgment the guide asks for (page 4);
 - a mother whose employment ended in pregnancy and who has the benefit after it (ustawa art. 30
   ust. 1, after_insurance.py) is no longer an employee: she files ZAM with ZUS, ZUS pays (art. 61
-  ust. 1 pkt 2 lit. d), and no protection marker is drawn.
+  ust. 1 pkt 2 lit. d), with the documents of § 15 of the same regulation, and no protection
+  marker is drawn.
 
 Our readings (CLAUDE.md, open questions):
 - "w terminie nie krótszym niż N dni przed" a day: the request is filed N days before that day at
@@ -48,15 +53,16 @@ Our readings (CLAUDE.md, open questions):
   only while that day is ahead; the documents for the sickness benefit (contract, business) have
   no deadline in the materials: shown on the day the benefit starts, like ZAM; with a business
   ZAS-53 goes to ZUS, so ZUS pays the sickness benefit too;
-- the guide does not say by when the court judgment must come, nor what to file for the benefit
-  after losing the job or who pays it: the judgment is shown on the day the benefit would start,
-  the rest is not on the timeline.
+- the materials do not say by when the court judgment must come, nor by when the documents for
+  a benefit after the insurance ended are filed: shown on the day the benefit starts (would
+  start); for the benefit equal to the maternity benefit after an unlawful termination the
+  regulation names no documents (§ 17 covers the employer's bankruptcy, liquidation and death).
 """
 
 import datetime as dt
 from typing import Literal
 
-from app.engine.after_insurance import after_job_loss
+from app.engine.after_insurance import FIXED_TERM, after_job_loss, fixed_term_sources
 from app.engine.draft import DAY, merge_sources
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
@@ -72,7 +78,7 @@ from app.engine.models import (
 )
 from app.engine.params import Params
 from app.engine.parental_plan import fraction, planned_parts, work_end
-from app.engine.pregnancy import JOB_LOSS_SEGMENT, SEGMENT_IDS
+from app.engine.pregnancy import EMPLOYER_GONE, JOB_LOSS_SEGMENT, LOSS_REASON, SEGMENT_IDS
 from app.engine.wording import fmt, long_date
 
 Parent = Literal["mother", "father"]
@@ -99,11 +105,17 @@ first."""
 WORK_REQUESTS = ("parental-work-request-", "parental-father-work-request-")
 """Prefixes of the requests to combine a part of the plan with work (art. 182¹ᵉ § 2), numbered
 like the request for that part: "parental-work-request-1" goes with "parental-request-1"."""
-SICK_DOCUMENTS = ("sick-leave-notice", "sick-benefit-request")
-"""Sick leave in pregnancy: informing the employer; the documents for the sickness benefit."""
+SICK_AFTER_REQUEST = "sick-after-insurance-request"
+"""The documents for the sickness benefit after the work ended (statement of § 4)."""
+SICK_DOCUMENTS = ("sick-leave-notice", "sick-benefit-request", SICK_AFTER_REQUEST)
+"""Sick leave in pregnancy: informing the employer; the documents for the sickness benefit, in
+the insurance and after it ended."""
 COURT_JUDGMENT = "court-judgment"
 """The final court judgment the benefit after an unlawful termination needs."""
+JOB_LOSS_REQUEST = "job-loss-request"
+"""The documents for the benefit equal to the maternity benefit (§ 17)."""
 SICK_PAY, SICK_BENEFIT = SEGMENT_IDS["employer"], SEGMENT_IDS["benefit"]
+SICK_AFTER = SEGMENT_IDS["after"]
 WORKING = ("employment", "contract", "business")
 
 WHOSE = {"mother": "mamy", "father": "taty"}
@@ -311,7 +323,58 @@ def sick_payer_line(scenario: Scenario, params: Params) -> tuple[str, list[Sourc
     )
 
 
+def _is_sick_after(segment: Segment) -> bool:
+    """The sickness benefit after the work ended (paid by ZUS)."""
+    return segment.lane == "mother" and segment.id.startswith(SICK_AFTER)
+
+
 def _sick_documents(
+    scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
+) -> list[Document]:
+    return [
+        *_sick_insured_documents(scenario, timeline, params, today),
+        *_sick_after_documents(scenario, timeline, params, today),
+    ]
+
+
+def _sick_after_documents(
+    scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
+) -> list[Document]:
+    """The sickness benefit after the work ended: ZUS determines and pays it (ustawa art. 61
+    ust. 1 pkt 2 lit. d), on the statement of annex 4 (regulation of 27.09.2026, § 4). Shown
+    while the benefit lasts."""
+    after = [s for s in timeline.segments if _is_sick_after(s) and s.end >= today]
+    loss = scenario.job_loss
+    if not after or loss is None:
+        return []
+    p = params.pregnancy
+    first = min(after, key=lambda s: s.start)
+    rule = (
+        f"Praca mamy ustała {fmt(loss.ended_on)}. Za okres po ustaniu ubezpieczenia zasiłek "
+        "chorobowy ustala i wypłaca ZUS. Potrzebne jest do niego oświadczenie mamy, m.in. o tym, "
+        "czy ma prawo do emerytury lub renty albo zasiłku dla bezrobotnych i czy podjęła "
+        "działalność zarobkową. Zaświadczenie lekarskie e-ZLA trafia samo do ZUS. Materiały nie "
+        "podają terminu: pokazujemy je na dzień, od którego przysługuje zasiłek."
+    )
+    return [
+        Document(
+            id=SICK_AFTER_REQUEST,
+            label="Zasiłek po ustaniu pracy: oświadczenie",
+            title="Dokumenty do zasiłku chorobowego po ustaniu ubezpieczenia",
+            needed_by=first.start,
+            done=False,
+            rule=rule,
+            segment_id=first.id,
+            sources=merge_sources(
+                p.sick_after_insurance_statement.sources,
+                p.zus_after_insurance.sources,
+                p.e_zla.sources,
+            ),
+        )
+    ]
+
+
+def _sick_insured_documents(
     scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
 ) -> list[Document]:
     """Guide page 3. An employee informs her employer of the absence (shown while the first day
@@ -392,12 +455,43 @@ def _sick_documents(
 def _job_loss_documents(
     scenario: Scenario, timeline: Timeline, params: Params, today: dt.date
 ) -> list[Document]:
-    """Guide page 4: after a termination that broke the law, the benefit until the birth needs a
-    final court judgment. The guide names no document for the employer's bankruptcy,
-    liquidation or death."""
+    """The benefit equal to the maternity benefit until the birth. After the employer's
+    bankruptcy, liquidation or death: the documents of § 17 of the regulation of 27.09.2026,
+    filed with ZUS, which pays benefits for a period after the insurance ended (ustawa art. 61
+    ust. 1 pkt 2 lit. d). After a termination that broke the law: the final court judgment the
+    guide asks for (page 4); the regulation names no documents for that case."""
     loss = scenario.job_loss
     segment = _segment(timeline, JOB_LOSS_SEGMENT)
-    if loss is None or loss.reason != "unlawful" or segment is None or segment.end < today:
+    if loss is None or segment is None or segment.end < today:
+        return []
+    p = params.pregnancy
+    if loss.reason in EMPLOYER_GONE:
+        rule = (
+            "Zasiłek w wysokości zasiłku macierzyńskiego przysługuje za okres po ustaniu "
+            "ubezpieczenia, więc ustala go i wypłaca ZUS. Potrzebne są: zaświadczenie lekarskie "
+            "wystawione na zwykłym druku stwierdzające ciążę w okresie zatrudnienia, świadectwo "
+            "pracy albo inny dokument potwierdzający ustanie zatrudnienia z powodu "
+            f"{LOSS_REASON[loss.reason]} i oświadczenie mamy, że nie zapewniono jej innego "
+            "zatrudnienia. Materiały nie podają terminu: pokazujemy je na dzień, od którego "
+            "przysługuje zasiłek."
+        )
+        return [
+            Document(
+                id=JOB_LOSS_REQUEST,
+                label="Zasiłek do porodu: dokumenty",
+                title="Dokumenty do zasiłku w wysokości zasiłku macierzyńskiego",
+                needed_by=segment.start,
+                done=False,
+                rule=rule,
+                segment_id=JOB_LOSS_SEGMENT,
+                sources=merge_sources(
+                    p.job_loss_benefit.sources,
+                    p.job_loss_documents.sources,
+                    p.zus_after_insurance.sources,
+                ),
+            )
+        ]
+    if loss.reason != "unlawful":
         return []
     done = loss.court_confirmed is True
     rule = (
@@ -839,12 +933,27 @@ def _zam(
     work = _work(scenario, parent)
     loss = after_job_loss(scenario) if parent == "mother" else None
     if loss is not None:
+        p = params.pregnancy
+        gone = loss.reason in EMPLOYER_GONE
+        proof = (
+            "świadectwo pracy albo inny dokument potwierdzający ustanie zatrudnienia z powodu "
+            f"{LOSS_REASON[loss.reason]}"
+            if gone
+            else "prawomocne orzeczenie sądu o rozwiązaniu stosunku pracy z naruszeniem przepisów "
+            "prawa"
+        )
         rule = [
             f"Mama nie jest już pracownicą: zatrudnienie ustało {fmt(loss.ended_on)}. Wniosek "
             "o zasiłek macierzyński (ZAM) składa bezpośrednio do ZUS, który wypłaca zasiłki za "
-            "okres po ustaniu ubezpieczenia."
+            "okres po ustaniu ubezpieczenia.",
+            "Do zasiłku potrzebne są też: zaświadczenie lekarskie wystawione na zwykłym druku "
+            f"stwierdzające ciążę w okresie zatrudnienia i {proof}.",
         ]
-        sources = [a.non_employee_zam.sources, params.pregnancy.zus_after_insurance.sources]
+        sources = [
+            a.non_employee_zam.sources,
+            p.zus_after_insurance.sources,
+            (p.after_job_loss_documents if gone else p.after_unlawful_documents).sources,
+        ]
     elif work == "business":
         rule = [
             f"{who} nie jest pracownikiem i prowadzi własną firmę, więc składa wniosek "
@@ -1102,23 +1211,11 @@ def _fixed_term(scenario: Scenario, timeline: Timeline, params: Params) -> None:
     employed mother's fixed-term contract is extended until the birth."""
     if timeline.child_born or scenario.mothers_work != "employment" or scenario.job_loss:
         return
-    a = params.applications
     timeline.markers = [
         m.model_copy(
             update={
-                "details": [
-                    *m.details,
-                    "Jeśli mama ma umowę o pracę na czas określony albo na okres próbny dłuższy "
-                    "niż miesiąc, która skończyłaby się po upływie trzeciego miesiąca ciąży, umowa "
-                    "przedłuża się do dnia porodu. Gdy umowę na czas określony przedłużono do dnia "
-                    "porodu, po porodzie przysługuje zasiłek macierzyński po ustaniu "
-                    "ubezpieczenia.",
-                ],
-                "sources": merge_sources(
-                    m.sources,
-                    a.fixed_term_extended.sources,
-                    params.pregnancy.fixed_term_after_insurance.sources,
-                ),
+                "details": [*m.details, FIXED_TERM],
+                "sources": merge_sources(m.sources, fixed_term_sources(params)),
             }
         )
         if m.id == "due-date"
@@ -1174,10 +1271,18 @@ def _assumptions(scenario: Scenario, timeline: Timeline) -> list[str]:
             "Do kiedy musi zapaść wyrok sądu, Przewodnik nie podaje: pokazujemy go na dzień, od "
             "którego przysługiwałby zasiłek w wysokości zasiłku macierzyńskiego."
         )
-    if any(s.id == JOB_LOSS_SEGMENT for s in timeline.segments):
+    if shown & {JOB_LOSS_REQUEST, SICK_AFTER_REQUEST}:
         assumptions.append(
-            "Jaki wniosek złożyć o zasiłek w wysokości zasiłku macierzyńskiego i kto go wypłaca, "
-            "Przewodnik nie podaje, więc oś tego nie pokazuje."
+            "Terminu dokumentów do zasiłku za okres po ustaniu ubezpieczenia materiały nie "
+            "podają: pokazujemy je na dzień, od którego przysługuje zasiłek."
+        )
+    loss = scenario.job_loss
+    if loss is not None and loss.reason == "unlawful" and _segment(timeline, JOB_LOSS_SEGMENT):
+        assumptions.append(
+            "Dokumentów do zasiłku w wysokości zasiłku macierzyńskiego po rozwiązaniu umowy "
+            "z naruszeniem prawa rozporządzenie nie wymienia (wymienia je przy upadłości, "
+            "likwidacji i śmierci pracodawcy): oś pokazuje tylko wyrok sądu, o którym mówi "
+            "Przewodnik."
         )
     return assumptions
 
@@ -1227,16 +1332,8 @@ def _protection_note(scenario: Scenario, timeline: Timeline, params: Params) -> 
         if marker is not None:
             text += f" Przy urlopach jak na osi ochrona trwa do {long_date(marker.date)}."
         if not timeline.child_born:
-            text += (
-                " Umowa na czas określony albo na okres próbny dłuższy niż miesiąc, która "
-                "skończyłaby się po upływie trzeciego miesiąca ciąży, przedłuża się do dnia "
-                "porodu; po porodzie przysługuje wtedy zasiłek macierzyński po ustaniu "
-                "ubezpieczenia."
-            )
-            sources += [
-                a.fixed_term_extended.sources,
-                params.pregnancy.fixed_term_after_insurance.sources,
-            ]
+            text += f" {FIXED_TERM}"
+            sources.append(fixed_term_sources(params))
         return CaseNote(
             id="protection",
             kind="right",
@@ -1325,9 +1422,11 @@ def _payer_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseN
 def _sick_payer_lines(
     scenario: Scenario, timeline: Timeline, params: Params
 ) -> list[tuple[str, list[SourceRef]]]:
-    """Sick leave in pregnancy: the employer's days, then the sickness benefit."""
+    """Sick leave in pregnancy: the employer's days, then the sickness benefit, and after the
+    work ended the sickness benefit ZUS pays (ustawa art. 61 ust. 1 pkt 2 lit. d)."""
     sick = [s for s in timeline.segments if _is_sick(s)]
-    if scenario.mothers_work not in WORKING or not sick:
+    after = any(_is_sick_after(s) for s in timeline.segments)
+    if scenario.mothers_work not in WORKING or not (sick or after):
         return []
     lines = []
     if any(s.id.startswith(SICK_PAY) for s in sick):
@@ -1343,11 +1442,21 @@ def _sick_payer_lines(
         )
     if any(_is_sick_benefit(s) for s in sick):
         lines.append(sick_payer_line(scenario, params))
+    if after:
+        lines.append(
+            (
+                "Zasiłek chorobowy po ustaniu ubezpieczenia wypłaca mamie ZUS: ustala on "
+                "i wypłaca zasiłki osobom uprawnionym do nich za okres po ustaniu ubezpieczenia.",
+                params.pregnancy.zus_after_insurance.sources,
+            )
+        )
     return lines
 
 
 def _destination(document: Document, scenario: Scenario) -> str:
     """Where the request goes, in a few words."""
+    if document.id in (SICK_AFTER_REQUEST, JOB_LOSS_REQUEST):
+        return "do ZUS"
     if document.id == "father-benefit-request":
         work = scenario.fathers_work
     elif document.id in ("maternity-request", "sick-benefit-request"):
@@ -1380,9 +1489,12 @@ def _applications_line(document: Document, scenario: Scenario, today: dt.date) -
         # A deadline only where the Labour Code gives one (`Document.deadline`, ZADANIA B.4):
         # the day of any other request is when its leave or benefit starts, never "do" a day.
         case _ if document.deadline is None:
-            benefit = document.id in ("father-benefit-request", "sick-benefit-request") or (
-                "ZAM" in document.title
-            )
+            benefit = document.id in (
+                "father-benefit-request",
+                "sick-benefit-request",
+                SICK_AFTER_REQUEST,
+                JOB_LOSS_REQUEST,
+            ) or ("ZAM" in document.title)
             day = (
                 "dzień, od którego przysługuje zasiłek"
                 if benefit
@@ -1399,7 +1511,7 @@ def _applications_line(document: Document, scenario: Scenario, today: dt.date) -
 
 
 def _applications_note(scenario: Scenario, timeline: Timeline) -> CaseNote | None:
-    listed = (*REQUESTS, *SICK_DOCUMENTS, COURT_JUDGMENT)
+    listed = (*REQUESTS, *SICK_DOCUMENTS, COURT_JUDGMENT, JOB_LOSS_REQUEST)
     documents = sorted(
         (
             d

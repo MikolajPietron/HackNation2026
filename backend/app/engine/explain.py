@@ -392,11 +392,14 @@ def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
         else "Po porodzie: prawo do zasiłku macierzyńskiego"
     )
     # The guide: the benefit is paid "in defined situations also after the insurance has ended"
-    # (ustawa art. 30 ust. 1: after an employment that ended in pregnancy).
+    # (ustawa art. 30 ust. 1: after an employment that ended in pregnancy; ust. 4: after a
+    # fixed-term contract extended until the birth).
     exceptions = (
         "Po ustaniu ubezpieczenia zasiłek macierzyński przysługuje tylko w określonych "
         "sytuacjach: gdy ubezpieczenie ustało w ciąży wskutek śmierci, upadłości lub likwidacji "
-        "pracodawcy albo z naruszeniem przepisów prawa stwierdzonym prawomocnym orzeczeniem sądu."
+        "pracodawcy albo z naruszeniem przepisów prawa stwierdzonym prawomocnym orzeczeniem sądu, "
+        "a także pracownicy zatrudnionej na podstawie umowy o pracę na czas określony, którą "
+        "przedłużono do dnia porodu."
     )
     needed = "Zasiłek macierzyński: potrzebne ubezpieczenie chorobowe"
     denied = "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
@@ -513,6 +516,7 @@ def _insurance(scenario: Scenario, timeline: Timeline, params: Params, cover: Co
                     b.voluntary_insurance.sources,
                     b.without_insurance.sources,
                     params.pregnancy.maternity_after_job_loss.sources,
+                    params.pregnancy.fixed_term_after_insurance.sources,
                 ),
             )
 

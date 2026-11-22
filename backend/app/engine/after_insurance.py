@@ -30,7 +30,7 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
 import datetime as dt
 
 from app.engine.draft import DAY, Draft, merge_sources
-from app.engine.models import CaseNote, JobLoss, Scenario, Timeline
+from app.engine.models import CaseNote, JobLoss, Scenario, SourceRef, Timeline
 from app.engine.params import Params
 from app.engine.wording import fmt, long_date
 
@@ -44,6 +44,25 @@ REASON = {
 PERIODS = ("maternity", "maternity-resumed", "supplementary", "parental")
 """The mother's periods after the birth the benefit after the insurance ended is paid for (with
 the parts of the parents' plan, `parental-mother-<k>`)."""
+
+FIXED_TERM = (
+    "Umowa o pracę na czas określony albo na okres próbny przekraczający miesiąc, która "
+    "skończyłaby się po upływie trzeciego miesiąca ciąży, przedłuża się do dnia porodu; nie "
+    "dotyczy to umowy na czas określony zawartej w celu zastępstwa pracownika w czasie jego "
+    "usprawiedliwionej nieobecności. Gdy do dnia porodu przedłużono umowę na czas określony, po "
+    "porodzie przysługuje zasiłek macierzyński po ustaniu ubezpieczenia."
+)
+"""Guide section I, Labour Code art. 177 § 3 and § 3¹, ustawa art. 30 ust. 4: the benefit after
+the extension only for a fixed-term contract, not for a probation (`fixed_term_sources`)."""
+
+
+def fixed_term_sources(params: Params) -> list[SourceRef]:
+    a = params.applications
+    return merge_sources(
+        a.fixed_term_extended.sources,
+        a.fixed_term_replacement.sources,
+        params.pregnancy.fixed_term_after_insurance.sources,
+    )
 
 
 def after_job_loss(scenario: Scenario) -> JobLoss | None:

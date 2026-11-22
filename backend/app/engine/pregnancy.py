@@ -5,13 +5,16 @@ sytuacja – zasiłek w wysokości zasiłku macierzyńskiego" (page 4), section 
 Labour Code art. 92. Applied after the mother's and the father's rules (timeline.py).
 
 - Sick leave in pregnancy (e-ZLA, code "B"): the right to the sickness benefit arises, as a rule,
-  after 30 days of uninterrupted obligatory insurance (employment) or after 90 days of voluntary
-  insurance (contract, business). An employee gets her pay from the employer (wynagrodzenie
-  chorobowe, 100% in pregnancy) for the first 33 days of incapacity in a calendar year (14 after
-  the year in which she turned 50), then the sickness benefit; a woman who is not an employee
-  gets the benefit from the first day. 100% with code "B", at most 270 days (okres zasiłkowy).
-  When the incapacity lasts until the birth, maternity leave follows it. Without sickness
-  insurance there is no benefit.
+  after 30 days of uninterrupted obligatory insurance (employment) or after 90 days of
+  uninterrupted voluntary insurance (contract, business; ustawa art. 4 ust. 1); earlier insurance
+  after a break of up to 30 days counts, and some people have the right from the first day
+  (art. 4 ust. 2-3: explained, not counted). An employee gets her pay from the employer
+  (wynagrodzenie chorobowe, 100% in pregnancy) for the first 33 days of incapacity in a calendar
+  year (14 after the year in which she turned 50), then the sickness benefit; a woman who is not
+  an employee gets the benefit from the first day. 100% with code "B", at most 270 days (okres
+  zasiłkowy), the employer's days included (art. 12 ust. 1). When the incapacity lasts until the
+  birth, maternity leave follows it. Without sickness insurance there is no benefit, nor for an
+  incapacity that began before the insurance did (art. 6 ust. 1).
 - Losing the job in pregnancy through the employer's bankruptcy, liquidation or death (and no
   other employment offered), or through a termination that broke the law, confirmed by a final
   court judgment: a benefit equal to the maternity benefit, 100%, paid until the birth after the
@@ -29,27 +32,30 @@ Labour Code art. 92. Applied after the mother's and the father's rules (timeline
   when the sick leave outlasts the 270 days, the incapacity may go on with this benefit if
   further treatment or medical rehabilitation promises the recovery of the ability to work; the
   ZUS medical examiner rules on it; at most 12 months of 30 days; 100% of the sickness benefit
-  base when the incapacity falls in pregnancy. A note explains it; a period is drawn only when
-  the parent said it was applied for or granted (never asked).
+  base when the incapacity falls in pregnancy; also after the insurance ended (art. 22 with
+  art. 13 ust. 1; the regulation of 27.09.2026, § 11 ust. 3). A note explains it and the
+  documents (§ 11 ust. 1); a period is drawn only when the parent said it was applied for or
+  granted (never asked).
 
 Our readings, not settled by the guide (CLAUDE.md, open questions):
 - the 30 (90) days count from the first day of insurance, so the right begins on that day + 30;
+  with earlier insurance after a break of up to 30 days the parent gives the first day of the
+  earliest period, and the days of the break count with it;
 - the employer's 33 (14) days count only days of this sick leave with the right to the benefit,
   afresh in each calendar year; 14 apply to the whole leave when the mother turned 50 before the
   calendar year in which it began;
-- the 270 days count every day of this sick leave with pay or benefit (the employer's days too);
+- the 270 days count only this sick leave (earlier ones in the year are not known);
 - sick leave without an end runs until the day before the birth; when maternity leave before the
   birth starts earlier, the sick leave ends the day before it;
 - the benefit after losing the job runs from the day after the last day of work until the day
-  before the birth; from the birth the timeline shows the maternity benefit;
-- the rehabilitation benefit runs from the day after the 270 days to the last day of the sick
-  leave we count (the day before the birth or the leave before it, or the last day of work);
-  from the birth the timeline shows the maternity benefit: how the two meet, the materials do
-  not say.
   before the birth; from the birth the timeline shows the maternity benefit (after_insurance.py);
+- the rehabilitation benefit runs from the day after the 270 days to the last day of the sick
+  leave we count (the day before the birth or the leave before it); after a job loss that gives
+  the benefit equal to the maternity benefit, to the last day of work; from the birth the
+  timeline shows the maternity benefit: how the two meet, the materials do not say;
 - the sickness benefit after the insurance ended counts on in the same 270 days; the exclusions
   of art. 13 ust. 1 we cannot know (other work, unemployment benefit, a pension) are assumed not
-  to apply.
+  to apply, for the rehabilitation benefit too.
 """
 
 import datetime as dt
@@ -134,6 +140,8 @@ class SickLeave:
     after_refused: AfterRefused | None = None
     """The work ended (for no reason that gives the benefit equal to the maternity benefit) and
     there is no sickness benefit after it."""
+    before_insurance: bool = False
+    """The incapacity began before the insurance did: no benefit for it (ustawa art. 6 ust. 1)."""
 
 
 def sick_leave(scenario: Scenario, params: Params, birth: dt.date) -> SickLeave | None:
@@ -183,12 +191,14 @@ def sick_leave(scenario: Scenario, params: Params, birth: dt.date) -> SickLeave 
     pieces: list[Piece] = []
     limit_day = None
     refused = None
+    since = scenario.insured_since
+    before_insurance = insured and since is not None and start < since
     if insured and work_ended is not None and loss is not None and loss.reason == "other":
         # The sickness benefit after the insurance ended (guide page 2; ustawa art. 7, 8, 13).
         refused = _after_refused(start, end, work_ended, right_from, params)
         if refused is None:
             paid_end = end
-    if insured:
+    if insured and not before_insurance:
         day = start if right_from is None else max(start, right_from)
         counted = 0
         per_year: dict[int, int] = {}
@@ -222,7 +232,8 @@ def sick_leave(scenario: Scenario, params: Params, birth: dt.date) -> SickLeave 
         employer_days=employer_days,
         pieces=tuple(pieces),
         limit_day=limit_day,
-        after_refused=refused,
+        after_refused=None if before_insurance else refused,
+        before_insurance=before_insurance,
     )
 
 
@@ -285,7 +296,7 @@ def pregnancy_rules(draft: Draft, scenario: Scenario, params: Params, birth: dt.
         mine.append(job)
     _trim_work(draft, busy)
     draft.segments[0:0] = mine
-    return _assumptions(scenario, sick, job) + _rehab_assumptions(scenario, rehab)
+    return _assumptions(scenario, sick, job) + _rehab_assumptions(scenario, rehab, sick)
 
 
 def _sick_segments(sick: SickLeave, scenario: Scenario, params: Params) -> list[Segment]:
@@ -435,7 +446,13 @@ def _sick_markers(sick: SickLeave, params: Params) -> list[Marker]:
     p = params.pregnancy
     markers = []
     right = sick.right_from
-    if right is not None and sick.start < right <= (sick.work_ended or sick.end) and sick.insured:
+    ends = sick.work_ended or sick.end
+    if (
+        right is not None
+        and sick.start < right <= ends
+        and sick.insured
+        and not sick.before_insurance
+    ):
         waiting = p.waiting_days_voluntary if sick.voluntary else p.waiting_days_obligatory
         since = right - waiting.value * DAY
         details = ["Za wcześniejsze dni zwolnienia zasiłek chorobowy co do zasady nie przysługuje."]
@@ -446,6 +463,7 @@ def _sick_markers(sick: SickLeave, params: Params) -> list[Marker]:
                 "gdy pracownik nie ma prawa do zasiłku chorobowego."
             )
             sources = merge_sources(sources, p.no_pay_without_right.sources)
+        details.append(WAITING_EXCEPTIONS)
         markers.append(
             Marker(
                 id="sick-benefit-right",
@@ -455,14 +473,18 @@ def _sick_markers(sick: SickLeave, params: Params) -> list[Marker]:
                 date=right,
                 summary=(
                     f"Prawo do zasiłku chorobowego powstaje co do zasady po {waiting.value} dniach "
-                    + ("" if sick.voluntary else "nieprzerwanego ")
-                    + f"ubezpieczenia; mama jest ubezpieczona od {fmt(since)}."
+                    f"nieprzerwanego ubezpieczenia; mama jest ubezpieczona od {fmt(since)}."
                 ),
                 details=details,
-                sources=sources,
+                sources=merge_sources(sources, p.waiting_exceptions.sources),
             )
         )
     if sick.limit_day is not None:
+        details = [f"Potem przysługuje świadczenie rehabilitacyjne, jeśli {REHAB_IF}."]
+        sources = merge_sources(p.max_days.sources, p.rehab_benefit.sources)
+        if any(piece.kind == "employer" for piece in sick.pieces):
+            details.append(EMPLOYER_DAYS_COUNT)
+            sources = merge_sources(sources, p.employer_days_in_period.sources)
         markers.append(
             Marker(
                 id="sick-benefit-limit",
@@ -474,11 +496,27 @@ def _sick_markers(sick: SickLeave, params: Params) -> list[Marker]:
                     f"Zasiłek chorobowy przysługuje najwyżej przez {p.max_days.value} dni (okres "
                     "zasiłkowy). Za dalsze dni zwolnienia już nie przysługuje."
                 ),
-                details=[f"Potem przysługuje świadczenie rehabilitacyjne, jeśli {REHAB_IF}."],
-                sources=merge_sources(p.max_days.sources, p.rehab_benefit.sources),
+                details=details,
+                sources=sources,
             )
         )
     return markers
+
+
+WAITING_EXCEPTIONS = (
+    "Wyjątki: do tych dni wlicza się wcześniejsze ubezpieczenie chorobowe, jeśli przerwa nie "
+    "przekroczyła 30 dni albo wynikała z urlopu wychowawczego lub bezpłatnego, a od pierwszego "
+    "dnia ubezpieczenia prawo do zasiłku mają m.in. absolwenci szkół lub uczelni objęci "
+    "ubezpieczeniem chorobowym w ciągu 90 dni od ukończenia szkoły albo uzyskania dyplomu "
+    "i osoby ubezpieczone obowiązkowo, które mają wcześniejszy co najmniej 10-letni okres "
+    "obowiązkowego ubezpieczenia chorobowego. Wtedy prawo do zasiłku może powstać wcześniej, niż "
+    "pokazuje oś."
+)
+"""Ustawa art. 4 ust. 2-3, after the 30 (90) days: told, not counted (no answer records them)."""
+EMPLOYER_DAYS_COUNT = (
+    "Do okresu zasiłkowego wlicza się też dni, za które pracodawca wypłaca wynagrodzenie chorobowe."
+)
+"""Ustawa art. 12 ust. 1."""
 
 
 # The rehabilitation benefit after the 270 days (ustawa art. 18-19, 22).
@@ -494,17 +532,34 @@ REHAB_DECIDES = (
 )
 
 
+def rehab_after_insurance(sick: SickLeave, scenario: Scenario) -> bool:
+    """The work ended for a reason that gives no benefit until the birth, and the sickness
+    benefit was not refused for the time after it: the rehabilitation benefit goes on after the
+    insurance ended too (ustawa art. 22 with art. 13 ust. 1)."""
+    loss = scenario.job_loss
+    return (
+        sick.work_ended is not None
+        and loss is not None
+        and loss.reason == "other"
+        and sick.after_refused is None
+    )
+
+
 def rehab_period(
     sick: SickLeave, scenario: Scenario, params: Params
 ) -> tuple[dt.date, dt.date] | None:
     """The days the rehabilitation benefit can cover: from the day after the 270 days to the
-    last day of the sick leave we count (or of work), at most 12 months of 30 days, and not
-    after the end the parent gave. None when the sick leave does not outlast the 270 days."""
+    last day of the sick leave we count, at most 12 months of 30 days, and not after the end the
+    parent gave. After a job loss that gives the benefit equal to the maternity benefit, only
+    to the last day of work: that benefit follows. None when the sick leave does not outlast the
+    270 days, or nothing is left of it after them."""
     if sick.limit_day is None:
         return None
     p = params.pregnancy
     start = sick.limit_day + DAY
-    end = sick.work_ended if sick.work_ended is not None else sick.end
+    end = sick.end
+    if sick.work_ended is not None and not rehab_after_insurance(sick, scenario):
+        end = sick.work_ended
     longest = p.rehab_max_months.value * p.rehab_month_days.value
     end = min(end, start + (longest - 1) * DAY)
     given = scenario.rehab_benefit_end
@@ -515,7 +570,7 @@ def rehab_period(
                 f"od {fmt(start)}. Sprawdź datę jego końca."
             )
         end = min(end, given)
-    return start, end
+    return (start, end) if start <= end else None
 
 
 def _rehab_segment(sick: SickLeave, scenario: Scenario, params: Params) -> Segment | None:
@@ -542,12 +597,26 @@ def _rehab_segment(sick: SickLeave, scenario: Scenario, params: Params) -> Segme
         f"{p.rehab_max_months.value} miesięcy.",
         REHAB_DECIDES,
     ]
+    sources = merge_sources(
+        p.rehab_benefit.sources,
+        p.rehab_rate_percent.sources,
+        p.rehab_max_months.sources,
+        p.rehab_decides.sources,
+    )
+    after = rehab_after_insurance(sick, scenario)
+    if after:
+        assert sick.work_ended is not None
+        details.append(
+            f"Praca mamy ustała {fmt(sick.work_ended)}, ale świadczenie rehabilitacyjne "
+            f"przysługuje także po ustaniu ubezpieczenia. {REHAB_AFTER_STATEMENT}"
+        )
+        sources = merge_sources(sources, p.rehab_after_insurance.sources)
     if end == scenario.rehab_benefit_end:
         details.append(f"Pokazujemy je do {fmt(end)}: taki koniec podano.")
-    elif end == sick.work_ended:
+    elif end == sick.work_ended and not after:
         details.append(
-            f"Praca ustała {fmt(end)}. Świadczenia po ustaniu ubezpieczenia ten etap aplikacji "
-            "jeszcze nie pokazuje."
+            f"Praca ustała {fmt(end)}; od następnego dnia oś pokazuje zasiłek w wysokości zasiłku "
+            "macierzyńskiego."
         )
     elif end == sick.end and sick.leave_from is not None:
         details.append(
@@ -570,22 +639,33 @@ def _rehab_segment(sick: SickLeave, scenario: Scenario, params: Params) -> Segme
         days=days_between(start, end),
         summary=summary,
         details=details,
-        sources=merge_sources(
-            p.rehab_benefit.sources,
-            p.rehab_rate_percent.sources,
-            p.rehab_max_months.sources,
-            p.rehab_decides.sources,
-        ),
+        sources=sources,
     )
 
 
-def _rehab_assumptions(scenario: Scenario, rehab: Segment | None) -> list[str]:
+REHAB_AFTER_STATEMENT = (
+    "Do wniosku o to świadczenie dołącza się wtedy dodatkowo oświadczenie do zasiłku za okres "
+    "po ustaniu ubezpieczenia."
+)
+"""The regulation of 27.09.2026, § 11 ust. 3 (the statement of § 4)."""
+
+
+def _rehab_assumptions(
+    scenario: Scenario, rehab: Segment | None, sick: SickLeave | None
+) -> list[str]:
     if rehab is not None:
-        return [
+        assumptions = [
             "Świadczenie rehabilitacyjne pokazujemy od dnia po okresie zasiłkowym do końca "
             "zwolnienia lekarskiego, najpóźniej do dnia przed porodem: od dnia porodu oś pokazuje "
             "urlop macierzyński. Jak te świadczenia się łączą, materiały nie mówią."
         ]
+        if sick is not None and rehab_after_insurance(sick, scenario):
+            assumptions.append(
+                "Świadczenie rehabilitacyjne po ustaniu ubezpieczenia pokazujemy, zakładając, że "
+                "mama nie podjęła innej pracy i nie ma prawa do zasiłku dla bezrobotnych, "
+                "emerytury ani renty (art. 22 z art. 13 ust. 1 ustawy zasiłkowej)."
+            )
+        return assumptions
     if scenario.rehab_benefit in ("applied", "granted"):
         return [
             "Świadczenie rehabilitacyjne przysługuje dopiero po wyczerpaniu zasiłku chorobowego, "
@@ -693,16 +773,22 @@ def _assumptions(scenario: Scenario, sick: SickLeave | None, job: Segment | None
                 "Na razie zakładamy, że mama pracuje na umowie o pracę: od tego zależy, kto płaci "
                 "za zwolnienie."
             )
-        if sick.employee:
+        employer = [piece for piece in sick.pieces if piece.kind == "employer"]
+        if sick.employee and employer:
             assumptions.append(
                 f"{sick.employer_days} dni wynagrodzenia chorobowego liczymy osobno w każdym "
-                "roku kalendarzowym, od dnia, w którym powstało prawo do zasiłku. Do okresu "
-                "zasiłkowego wliczamy też dni wynagrodzenia chorobowego."
+                "roku kalendarzowym, od dnia, w którym powstało prawo do zasiłku."
             )
         if scenario.mother_over_50:
             assumptions.append(
                 "Krótszy limit wynagrodzenia chorobowego stosujemy do całego zwolnienia: mama "
                 "skończyła 50 lat przed rokiem, w którym zwolnienie się zaczęło."
+            )
+        elif scenario.mother_over_50 is False and len({piece.start.year for piece in employer}) > 1:
+            assumptions.append(
+                "Mama nie skończyła 50 lat przed rokiem, w którym zwolnienie się zaczęło. Jeśli "
+                "kończy je w tym roku, w następnym roku pracodawca płaci za najwyżej 14 dni "
+                "(art. 92 § 5 Kodeksu pracy): tego oś nie liczy."
             )
         if sick.right_from is None:
             assumptions.append(
@@ -712,8 +798,11 @@ def _assumptions(scenario: Scenario, sick: SickLeave | None, job: Segment | None
         else:
             assumptions.append(
                 "Dni ubezpieczenia liczymy od podanego dnia jego początku; prawo do zasiłku "
-                "powstaje następnego dnia po ich upływie. Przewodnik mówi „co do zasady”: "
-                "wyjątków ten etap aplikacji nie obejmuje."
+                "powstaje następnego dnia po ich upływie. Przy wcześniejszym ubezpieczeniu po "
+                "przerwie do 30 dni (art. 4 ust. 2 ustawy zasiłkowej) liczymy od początku "
+                "pierwszego okresu razem z dniami przerwy, więc przy krótkim ubezpieczeniu prawo "
+                "może powstać o tyle później. Prawa od pierwszego dnia ubezpieczenia (art. 4 "
+                "ust. 3) oś nie liczy."
             )
         if sick.open_end:
             assumptions.append(
@@ -824,8 +913,19 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
             sources=sources,
         )
 
+    if sick.before_insurance:
+        return _before_insurance_note(params, sick, scenario)
+    pieces = [
+        s
+        for s in timeline.segments
+        if any(s.id.startswith(prefix) for prefix in SEGMENT_IDS.values())
+    ]
+    if sick.work_ended is not None and sick.work_ended < sick.start:
+        return _after_end_note(scenario, params, sick, pieces)
+
     waiting = p.waiting_days_voluntary if sick.voluntary else p.waiting_days_obligatory
     rate = p.rate_percent.value
+    longest = f"Zasiłek przysługuje najwyżej przez {p.max_days.value} dni."
     if sick.employee:
         rule = (
             "Na zwolnieniu lekarskim w ciąży pracodawca wypłaca mamie wynagrodzenie chorobowe "
@@ -839,6 +939,9 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
             *p.employer_pay_in_pregnancy.sources,
             *p.benefit_after_employer.sources,
         ]
+        if any(piece.kind == "employer" for piece in sick.pieces):
+            longest += f" {EMPLOYER_DAYS_COUNT}"
+            sources += p.employer_days_in_period.sources
     else:
         rule = (
             "Mama nie jest pracownicą, więc na zwolnieniu lekarskim w ciąży zasiłek chorobowy "
@@ -847,28 +950,16 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
         )
         sources = list(p.non_employee_from_day_one.sources)
     sources += [*p.e_zla.sources, *p.rate_percent.sources, *p.max_days.sources]
-    parts = [rule, f"Zasiłek przysługuje najwyżej przez {p.max_days.value} dni."]
+    parts = [rule, longest]
 
-    pieces = [
-        s
-        for s in timeline.segments
-        if any(s.id.startswith(prefix) for prefix in SEGMENT_IDS.values())
-    ]
     if pieces:
-        name = {prefix: PAY_NAME[kind] for kind, prefix in SEGMENT_IDS.items()}
-        listed = "; ".join(
-            f"{name[next(x for x in name if s.id.startswith(x))]}"
-            f" od {long_date(s.start)} do {long_date(s.end)} ({s.days} {_days(s.days)})"
-            for s in pieces
-        )
-        parts.append(f"Policzyliśmy: {listed}.")
+        parts.append(f"Policzyliśmy: {_listed(pieces)}.")
     if sick.right_from is not None and sick.right_from > sick.start:
-        continuous = "" if sick.voluntary else "nieprzerwanego "
         unpaid = (
             ", a pracodawca nie płaci za nie wynagrodzenia chorobowego" if sick.employee else ""
         )
         right = (
-            f"Prawo do zasiłku powstaje co do zasady po {waiting.value} dniach {continuous}"
+            f"Prawo do zasiłku powstaje co do zasady po {waiting.value} dniach nieprzerwanego "
             f"ubezpieczenia, czyli od {long_date(sick.right_from)}."
         )
         if pieces:
@@ -876,13 +967,17 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
                 f"{right.replace('powstaje co', 'powstaje jednak co')} Za wcześniejsze dni "
                 f"zwolnienia zasiłek nie przysługuje{unpaid}."
             )
+        elif sick.work_ended is not None:
+            parts = [f"{right} Za wcześniejsze dni zwolnienia zasiłek nie przysługuje{unpaid}."]
+            sources = []
         else:
             parts = [
                 f"{right} Zwolnienie lekarskie kończy się wcześniej, więc za jego dni zasiłek "
                 f"chorobowy nie przysługuje{unpaid}."
             ]
             sources = []
-        sources += waiting.sources
+        parts.append(WAITING_EXCEPTIONS)
+        sources += [*waiting.sources, *p.waiting_exceptions.sources]
         if sick.employee:
             sources += p.no_pay_without_right.sources
     if sick.limit_day is not None:
@@ -918,8 +1013,6 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
             if any(piece.kind == "employer" for piece in sick.pieces)
             else "Zwolnienie lekarskie w ciąży: zasiłek chorobowy"
         )
-    elif sick.work_ended is not None and sick.work_ended < sick.start:
-        title = "Zwolnienie lekarskie po ustaniu pracy"
     else:
         title = "Zwolnienie lekarskie przed prawem do zasiłku"
     return CaseNote(
@@ -928,6 +1021,116 @@ def _sick_note(scenario: Scenario, timeline: Timeline, params: Params, sick: Sic
         title=title,
         text=" ".join(parts),
         sources=merge_sources(sources),
+    )
+
+
+def _listed(pieces: list[Segment]) -> str:
+    """ "zasiłek chorobowy od 1 lipca 2026 do 31 grudnia 2026 (184 dni); ..." """
+    name = {prefix: PAY_NAME[kind] for kind, prefix in SEGMENT_IDS.items()}
+    return "; ".join(
+        f"{name[next(x for x in name if s.id.startswith(x))]}"
+        f" od {long_date(s.start)} do {long_date(s.end)} ({s.days} {_days(s.days)})"
+        for s in pieces
+    )
+
+
+def _before_insurance_note(params: Params, sick: SickLeave, scenario: Scenario) -> CaseNote:
+    """Ustawa art. 6 ust. 1: the incapacity began before the insurance did."""
+    p = params.pregnancy
+    since = scenario.insured_since
+    assert since is not None
+    unpaid = (
+        ", a pracodawca nie wypłaca za nią wynagrodzenia chorobowego: nie przysługuje ono, gdy "
+        "pracownik nie ma prawa do zasiłku chorobowego"
+        if sick.employee
+        else ""
+    )
+    return CaseNote(
+        id="sick-leave",
+        kind="risk",
+        title="Zwolnienie lekarskie sprzed ubezpieczenia",
+        text=(
+            f"Zwolnienie lekarskie zaczęło się {long_date(sick.start)}, a mama podlega "
+            f"ubezpieczeniu chorobowemu od {long_date(since)}. Zasiłek chorobowy przysługuje "
+            "ubezpieczonemu, który stał się niezdolny do pracy z powodu choroby w czasie "
+            "trwania ubezpieczenia chorobowego, więc za tę niezdolność do pracy zasiłek "
+            f"chorobowy mamie nie przysługuje{unpaid}. Jeśli mama podlegała ubezpieczeniu "
+            "chorobowemu już w dniu, w którym zaczęło się zwolnienie, napisz asystentowi, od "
+            "kiedy naprawdę trwa ubezpieczenie, a oś się przeliczy."
+        ),
+        sources=merge_sources(
+            p.incapacity_while_insured.sources,
+            p.no_pay_without_right.sources if sick.employee else [],
+        ),
+    )
+
+
+def _after_end_note(
+    scenario: Scenario, params: Params, sick: SickLeave, pieces: list[Segment]
+) -> CaseNote:
+    """The sick leave began after the work ended: no employer's days. For a reason that gives
+    the benefit equal to the maternity benefit, that benefit; otherwise the sickness benefit
+    after the insurance ended (ustawa art. 7, 8 ust. 2), when it is due."""
+    p = params.pregnancy
+    loss = scenario.job_loss
+    ended = sick.work_ended
+    assert loss is not None and ended is not None
+    if loss.reason != "other":
+        return CaseNote(
+            id="sick-leave",
+            kind="computed",
+            title="Zwolnienie lekarskie po ustaniu pracy",
+            text=(
+                f"Zatrudnienie mamy ustało {long_date(ended)}, zanim zaczęło się zwolnienie "
+                f"lekarskie ({long_date(sick.start)}). Za dni zwolnienia oś pokazuje zasiłek "
+                "w wysokości zasiłku macierzyńskiego, wypłacany do dnia porodu po ustaniu "
+                "ubezpieczenia."
+            ),
+            sources=merge_sources(p.job_loss_benefit.sources),
+        )
+    if not pieces:
+        text, sources = _after_insurance_text(sick, params)
+        parts = [text]
+        if sick.after_refused == "right":
+            parts.append(WAITING_EXCEPTIONS)
+            sources = merge_sources(sources, p.waiting_exceptions.sources)
+        return CaseNote(
+            id="sick-leave",
+            kind="risk",
+            title="Zwolnienie lekarskie po ustaniu pracy",
+            text=" ".join(parts),
+            sources=sources,
+        )
+    within, least = p.sick_after_end_within_days.value, p.sick_after_end_min_days.value
+    parts = [
+        f"Praca mamy ustała {long_date(ended)}, zanim zaczęło się zwolnienie lekarskie "
+        f"({long_date(sick.start)}). Zasiłek chorobowy przysługuje również osobie, która stała "
+        "się niezdolna do pracy po ustaniu tytułu ubezpieczenia chorobowego, jeżeli niezdolność "
+        f"do pracy trwała bez przerwy co najmniej {least} dni i powstała nie później niż w ciągu "
+        f"{within} dni od jego ustania. Tu tak jest, więc mama dostaje zasiłek chorobowy: "
+        f"{p.rate_percent.value}% podstawy wymiaru, bo zaświadczenie e-ZLA w ciąży ma kod „B”. "
+        "W ciąży nie obowiązuje limit 91 dni po ustaniu ubezpieczenia, tylko okres zasiłkowy: "
+        f"najwyżej {p.max_days.value} dni. Wypłaca go ZUS.",
+        f"Policzyliśmy: {_listed(pieces)}.",
+    ]
+    if sick.limit_day is not None:
+        parts.append(
+            f"Okres zasiłkowy kończy się {long_date(sick.limit_day)}; za dalsze dni zwolnienia "
+            "zasiłek już nie przysługuje."
+        )
+    return CaseNote(
+        id="sick-leave",
+        kind="right",
+        title="Zwolnienie lekarskie po ustaniu pracy: zasiłek chorobowy",
+        text=" ".join(parts),
+        sources=merge_sources(
+            p.sick_after_end_within_days.sources,
+            p.sick_after_insurance.sources,
+            p.e_zla.sources,
+            p.rate_percent.sources,
+            p.max_days.sources,
+            p.zus_after_insurance.sources,
+        ),
     )
 
 
@@ -953,6 +1156,7 @@ def _rehab_note(
     shown = (
         f" od {long_date(segment.start)} do {long_date(segment.end)}" if segment is not None else ""
     )
+    more: list[list[SourceRef]] = []
     match scenario.rehab_benefit:
         case "refused":
             return CaseNote(
@@ -986,8 +1190,11 @@ def _rehab_note(
             title = "Po okresie zasiłkowym: świadczenie rehabilitacyjne"
             text = (
                 f"Okres zasiłkowy kończy się {limit}, a zwolnienie trwa dłużej. {rule} "
-                f"{length}. {pay} {REHAB_DECIDES}"
+                f"{length}. {pay} {REHAB_DECIDES} {_rehab_documents(scenario, sick)}"
             )
+            more.append(p.rehab_documents.sources)
+            if rehab_after_insurance(sick, scenario):
+                more.append(p.rehab_after_insurance.sources)
     return CaseNote(
         id="rehab-benefit",
         kind="right",
@@ -998,8 +1205,27 @@ def _rehab_note(
             p.rehab_max_months.sources,
             p.rehab_rate_percent.sources,
             p.rehab_decides.sources,
+            *more,
         ),
     )
+
+
+def _rehab_documents(scenario: Scenario, sick: SickLeave) -> str:
+    """The regulation of 27.09.2026, § 11 ust. 1 pkt 1-3 and ust. 3."""
+    began_after = sick.work_ended is not None and sick.work_ended < sick.start
+    interview = scenario.mothers_work != "business" and not began_after
+    text = (
+        "Do wniosku o świadczenie rehabilitacyjne dołącza się zaświadczenie o stanie zdrowia "
+        "wystawione przez lekarza prowadzącego leczenie nie wcześniej niż na miesiąc przed "
+        "złożeniem wniosku" + (" i wywiad zawodowy z miejsca pracy." if interview else ".")
+    )
+    if rehab_after_insurance(sick, scenario):
+        assert sick.work_ended is not None
+        text += (
+            f" Praca ustała {long_date(sick.work_ended)}, a świadczenie przysługuje także po "
+            f"ustaniu ubezpieczenia. {REHAB_AFTER_STATEMENT}"
+        )
+    return text
 
 
 def _after_insurance_text(sick: SickLeave, params: Params) -> tuple[str, list[SourceRef]]:
@@ -1051,24 +1277,40 @@ def _job_loss_note(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
             else "a liczy się dzień porodu: jeśli mama nie będzie wtedy podlegać ubezpieczeniu "
             "chorobowemu, zasiłek macierzyński nie będzie jej przysługiwał"
         )
+        text = (
+            f"Praca mamy skończyła się {long_date(loss.ended_on)}, przed porodem, {state}. "
+            "Zasiłek w wysokości zasiłku macierzyńskiego do dnia porodu przysługuje tylko wtedy, "
+            "gdy umowę o pracę rozwiązano z powodu upadłości, likwidacji albo śmierci pracodawcy "
+            "albo z naruszeniem przepisów prawa, potwierdzonym prawomocnym wyrokiem sądu."
+        )
+        sources = merge_sources(
+            b.work_ended_before_birth.sources,
+            b.insured_on_birth_day.sources,
+            b.without_insurance.sources,
+            p.job_loss_employer_gone.sources,
+            p.job_loss_unlawful.sources,
+        )
+        if scenario.mothers_work in ("employment", None):
+            # A fixed-term contract does not end in pregnancy: it is extended until the birth
+            # (the benefit after it: the "insurance-way" point right after this one).
+            a = params.applications
+            text += (
+                " Umowa o pracę na czas określony albo na okres próbny przekraczający miesiąc, "
+                "która skończyłaby się po upływie trzeciego miesiąca ciąży, przedłuża się jednak "
+                "do dnia porodu (poza umową na czas określony zawartą w celu zastępstwa "
+                "pracownika w czasie jego usprawiedliwionej nieobecności). Jeśli mama miała taką "
+                "umowę, praca nie skończyła się przed porodem: napisz o tym asystentowi, a oś się "
+                "przeliczy."
+            )
+            sources = merge_sources(
+                sources, a.fixed_term_extended.sources, a.fixed_term_replacement.sources
+            )
         return CaseNote(
             id="job-loss",
             kind="risk",
             title="Koniec pracy przed porodem",
-            text=(
-                f"Praca mamy skończyła się {long_date(loss.ended_on)}, przed porodem, {state}. "
-                "Zasiłek w wysokości zasiłku macierzyńskiego do dnia porodu przysługuje tylko "
-                "wtedy, gdy umowę o pracę rozwiązano z powodu upadłości, likwidacji albo śmierci "
-                "pracodawcy albo z naruszeniem przepisów prawa, potwierdzonym prawomocnym wyrokiem "
-                "sądu."
-            ),
-            sources=merge_sources(
-                b.work_ended_before_birth.sources,
-                b.insured_on_birth_day.sources,
-                b.without_insurance.sources,
-                p.job_loss_employer_gone.sources,
-                p.job_loss_unlawful.sources,
-            ),
+            text=text,
+            sources=sources,
         )
     segment = next((s for s in timeline.segments if s.id == JOB_LOSS_SEGMENT), None)
     reason = LOSS_REASON[loss.reason]

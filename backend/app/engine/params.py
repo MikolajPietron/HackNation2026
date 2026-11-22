@@ -137,6 +137,11 @@ class PregnancyParams(BaseModel):
     waiting_days_obligatory: Param[int]
     """The right arises after this many days of uninterrupted obligatory insurance."""
     waiting_days_voluntary: Param[int]
+    waiting_exceptions: Rule
+    """Earlier insurance after a break of up to 30 days counts; the right from the first day for
+    graduates and after 10 years of obligatory insurance (ustawa art. 4 ust. 2-3)."""
+    incapacity_while_insured: Rule
+    """The incapacity must begin while the insurance lasts (ustawa art. 6 ust. 1)."""
     employer_days: Param[int]
     """Days of incapacity in a calendar year paid by the employer (wynagrodzenie chorobowe)."""
     employer_days_from_50: Param[int]
@@ -149,6 +154,8 @@ class PregnancyParams(BaseModel):
     period: Rule
     max_days: Param[int]
     """The benefit period (okres zasiłkowy)."""
+    employer_days_in_period: Rule
+    """The days the employer pays count in the benefit period (ustawa art. 12 ust. 1)."""
     until_birth: Rule
     job_loss_benefit: Rule
     job_loss_employer_gone: Rule
@@ -167,6 +174,11 @@ class PregnancyParams(BaseModel):
     rehab_objection: Rule
     rehab_rate_percent: Param[int]
     """Percent of the sickness benefit base when the incapacity falls in pregnancy."""
+    rehab_after_insurance: Rule
+    """Also after the insurance ended (art. 22 with art. 13 ust. 1), with the statement of the
+    regulation of 27.09.2026 (§ 11 ust. 3)."""
+    rehab_documents: Rule
+    """The request and what goes with it (regulation of 27.09.2026, § 11 ust. 1)."""
     # After the insurance ends (ustawa art. 7, 8, 13, 29a, 30, 61; after_insurance.py).
     job_loss_law: Rule
     """The benefit equal to the maternity benefit until the birth (art. 30 ust. 3)."""
@@ -188,6 +200,15 @@ class PregnancyParams(BaseModel):
     """Incapacity that arose after the insurance ended: at most this many days after it..."""
     sick_after_end_min_days: Param[int]
     """...and lasting without a break at least this many days (art. 7)."""
+    # The documents for the benefits after the insurance ended (regulation of 27.09.2026).
+    sick_after_insurance_statement: Rule
+    """The sickness benefit after the insurance ended: the statement of annex 4 (§ 4)."""
+    job_loss_documents: Rule
+    """The benefit equal to the maternity benefit until the birth (§ 17)."""
+    after_job_loss_documents: Rule
+    """The maternity benefit after the employer's death, bankruptcy or liquidation (§ 15 ust. 1)."""
+    after_unlawful_documents: Rule
+    """...after a termination in breach of the law confirmed by a court (§ 15 ust. 2)."""
 
 
 class ParentalPlanParams(BaseModel):
@@ -409,6 +430,8 @@ class ApplicationParams(BaseModel):
     """An early request: the ban starts this many days before a part of maternity leave,
     supplementary or parental leave, paternity leave."""
     fixed_term_extended: Rule
+    fixed_term_replacement: Rule
+    """...not a fixed-term contract to replace an absent employee (KP art. 177 § 3¹)."""
     protection_employees_only: Rule
     # Sick leave in pregnancy (guide page 3): e-ZLA, informing the employer, the forms.
     sick_e_zla: Rule
@@ -459,7 +482,7 @@ class FormParams(BaseModel):
     """By kind of request: "prenatal", "maternity", "resignation", "father-takeover",
     "father-hospital-employee", "father-hospital-insured", "father-death",
     "father-abandonment", "supplementary", "parental", "parental-work", "paternity", "zam",
-    "sick"."""
+    "sick", "job-loss"."""
     personal_files: Rule
     """An employee attaches nothing the employer keeps in the personal files."""
     zus_forms: Rule

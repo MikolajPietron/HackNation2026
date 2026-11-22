@@ -495,13 +495,16 @@ def _pregnancy_questions(scenario: Scenario) -> list[Question]:
     if not scenario.sick_leave:
         return []
     if scenario.insured_since is None:
+        # Ustawa art. 4 ust. 2: earlier insurance after a break of up to 30 days counts.
+        gap = (
+            "Przerwa do 30 dni między kolejnymi okresami ubezpieczenia (albo urlop wychowawczy "
+            "lub bezpłatny) się nie liczy: wtedy podaj początek pierwszego z nich."
+        )
         if work == "employment":
             text = (
-                "Od kiedy bez przerwy pracujesz na umowie o pracę (podlegasz ubezpieczeniu "
-                "chorobowemu)?"
+                "Od kiedy podlegasz ubezpieczeniu chorobowemu, np. z umowy o pracę?"
                 if mother
-                else "Od kiedy mama bez przerwy pracuje na umowie o pracę (podlega ubezpieczeniu "
-                "chorobowemu)?"
+                else "Od kiedy mama podlega ubezpieczeniu chorobowemu, np. z umowy o pracę?"
             )
         else:
             text = (
@@ -509,7 +512,7 @@ def _pregnancy_questions(scenario: Scenario) -> list[Question]:
                 if mother
                 else "Od kiedy mama jest zgłoszona do dobrowolnego ubezpieczenia chorobowego?"
             )
-        return [Question(text, "`set_insured_since`", "insured-since")]
+        return [Question(f"{text} {gap}", "`set_insured_since`", "insured-since")]
     params = load_params()
     try:
         sick = sick_leave(scenario, params, scenario.anchor_date)

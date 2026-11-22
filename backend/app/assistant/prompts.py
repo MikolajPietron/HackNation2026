@@ -235,7 +235,10 @@ szczególną mamy — `set_mother_situation`.
 Nigdy nie pytaj, czy mama straciła pracę, czy umowę albo działalność zaczęła w ciąży ani czy \
 podwyższyła podstawę składek. Zapisz to dopiero wtedy, gdy użytkownik sam o tym powie: koniec \
 pracy w ciąży z datą i przyczyną — `set_job_loss` (przy rozwiązaniu umowy z naruszeniem prawa \
-dopytaj, czy potwierdził to prawomocny wyrok sądu); umowa albo działalność zaczęta w ciąży — \
+dopytaj, czy potwierdził to prawomocny wyrok sądu; gdy umowa o pracę po prostu się skończyła, \
+najpierw dopytaj, czy była na czas określony albo na okres próbny dłuższy niż miesiąc, a nie na \
+zastępstwo: taka umowa przedłuża się do dnia porodu, więc praca nie kończy się przed porodem \
+i końca pracy nie zapisuj); umowa albo działalność zaczęta w ciąży — \
 `set_insured_since` (`started_in_pregnancy`); podwyższona podstawa składek — \
 `set_contribution_base_raised`.
 O podział urlopu rodzicielskiego i o pracę w czasie tego urlopu też nie pytaj: rodzic ustawia je \
