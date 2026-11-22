@@ -20,10 +20,13 @@ import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
 import { ZusDataDialog } from '@/components/mocks/ZusData'
 import { ITEM, POP, STEP } from '@/components/onboarding/motion'
 import { Sheet } from '@/components/ui/sheet'
+import { UndoPill } from '@/components/ui/undo-pill'
 import { ElementDetails } from '@/components/timeline/ElementDetails'
 import { timelineItems } from '@/components/timeline/items'
 import type { ChangeSet, ChatMessage } from '@/hooks/useAssistant'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { usePlanChange } from '@/hooks/usePlanChange'
+import type { PlanApply } from '@/hooks/usePlanChange'
 import { usePlanView } from '@/hooks/usePlanView'
 import { EASE_OUT, SPRING_PANEL, SPRING_PRESS } from '@/lib/ease'
 import { nextQuestion } from '@/lib/interview'
@@ -40,6 +43,7 @@ import { MoneyExplanation } from '@/components/money/MoneyExplanation'
 import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
 import { GoalPlans } from './GoalPlans'
+import { LeftOnTable } from './LeftOnTable'
 import { MobileTimeline } from './MobileTimeline'
 import { NextSteps } from './NextSteps'
 import { Overview } from './Overview'
@@ -79,6 +83,8 @@ interface Props {
   onStartOver: () => void
   /** An example case became the plan (a new conversation from its facts). */
   onLoadCase: (start: SessionStart) => void
+  /** The plan was changed from the interface (no chat): new scenario and timeline. */
+  onUpdate: (start: SessionStart) => void
 }
 
 export function PlanScreen({
@@ -94,6 +100,7 @@ export function PlanScreen({
   onStop,
   onStartOver,
   onLoadCase,
+  onUpdate,
 }: Props) {
   const wide = useMediaQuery(WIDE)
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia(WIDE).matches)
@@ -117,6 +124,11 @@ export function PlanScreen({
     onSelect(null)
     setFill(id)
   }
+  /** A finding of the request check points at the timeline: the form closes, the element opens. */
+  const showFromForm = (id: string) => {
+    setFill(null)
+    onSelect(id)
+  }
   const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -125,6 +137,14 @@ export function PlanScreen({
   const [loginOpen, setLoginOpen] = useState(false)
   const [zusOpen, setZusOpen] = useState(false)
   const [casesOpen, setCasesOpen] = useState(false)
+  const plan = usePlanChange(scenario, onUpdate)
+  /** Changes from the interface wait while the assistant is writing (it may be changing the
+   *  same plan). */
+  const apply: PlanApply = (changes, title, detail) => {
+    if (!busy) return plan.apply(changes, title, detail)
+    plan.wait('Chwileczkę', 'Asystent jeszcze odpowiada. Zmień plan, gdy skończy.')
+    return Promise.resolve(false)
+  }
   const items = useMemo(() => (timeline ? timelineItems(timeline) : []), [timeline])
   const changedIds = useMemo(() => new Set(changed.ids), [changed])
   const selected = items.find((item) => item.id === selectedId) ?? null
@@ -282,6 +302,12 @@ export function PlanScreen({
                     )}
                   </motion.section>
 
+                  {timeline.left_on_table.length > 0 && (
+                    <motion.div variants={ITEM} className="mt-5">
+                      <LeftOnTable timeline={timeline} onSelect={onSelect} />
+                    </motion.div>
+                  )}
+
                   <motion.div variants={ITEM} className="mt-5">
                     <MoneyCard
                       timeline={timeline}
@@ -290,7 +316,7 @@ export function PlanScreen({
                       onHover={setMoneyHover}
                       onSelect={onSelect}
                       onWhy={() => setMoneyOpen(true)}
-                      onAsk={choose}
+                      onApply={apply}
                     />
                   </motion.div>
 
@@ -325,7 +351,7 @@ export function PlanScreen({
               )}
               {fillDocument && timeline && (
                 <Dialog key="fill" label={fillDocument.title} onClose={() => setFill(null)}>
-                  <ApplicationForm timeline={timeline} document={fillDocument} />
+                  <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
                 </Dialog>
               )}
               {supportOpen && (
@@ -416,7 +442,9 @@ export function PlanScreen({
             onOpenChange={(open) => !open && setFill(null)}
             title={fillDocument?.title ?? 'Wniosek'}
           >
-            {fillDocument && timeline && <ApplicationForm timeline={timeline} document={fillDocument} />}
+            {fillDocument && timeline && (
+              <ApplicationForm timeline={timeline} document={fillDocument} onSelect={showFromForm} />
+            )}
           </Sheet>
           <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
             <SupportWindow />
@@ -453,6 +481,8 @@ export function PlanScreen({
       />
       <ZusDataDialog persona={persona} open={zusOpen} onClose={() => setZusOpen(false)} onMock={showMock} />
       <CasesDialog open={casesOpen} onClose={() => setCasesOpen(false)} onLoaded={onLoadCase} />
+
+      <UndoPill change={plan.change} onUndo={() => void plan.undo()} onDismiss={plan.dismiss} />
 
       <AnimatePresence>
         {mock && (

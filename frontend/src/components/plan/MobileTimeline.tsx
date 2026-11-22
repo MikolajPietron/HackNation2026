@@ -12,6 +12,7 @@ import { documentIcon, isKeyMarker, markerIcon, segmentIcon } from '@/lib/icons'
 import { formatPln, formatRate, paymentFor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import type { Segment, Timeline } from '@/types'
+import { NoReturnTag } from './NextSteps'
 import { Readout } from './Readout'
 
 interface Row {
@@ -26,6 +27,8 @@ interface Row {
   lane?: Segment['lane']
   /** Section G: what the period pays a month, when the engine computed it. */
   money?: string
+  /** A point of no return (FUNKCJE F10). */
+  locked?: boolean
 }
 
 /** The coloured edge of a period: green for the mother, navy for the father. */
@@ -58,6 +61,7 @@ function rows(timeline: Timeline): Row[] {
       title: m.title,
       when: formatDayMonthShort(m.date),
       text: m.summary,
+      locked: m.irreversible !== null && m.irreversible.days_left >= 0,
     })),
     ...timeline.documents.map((d) => ({
       id: d.id,
@@ -151,6 +155,11 @@ export function MobileTimeline({
                   >
                     {row.title}
                   </span>
+                  {row.locked && (
+                    <span className="mt-1 block">
+                      <NoReturnTag />
+                    </span>
+                  )}
                   {row.money && (
                     <span className="mt-1 inline-block rounded-full bg-sun-100 px-2 py-0.5 text-xs font-bold text-sun-700">
                       {row.money}

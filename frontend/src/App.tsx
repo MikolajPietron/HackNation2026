@@ -49,6 +49,7 @@ function ParentsApp() {
     reset,
     submit,
     load,
+    update,
     scenario,
     question,
     timeline,
@@ -136,6 +137,7 @@ function ParentsApp() {
             onStop={stop}
             onStartOver={startOver}
             onLoadCase={finishOnboarding}
+            onUpdate={update}
           />
         </motion.div>
       )}

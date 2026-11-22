@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { ChevronRight } from 'lucide-react'
 import { calculateTimeline } from '@/api'
 import { Emphasis } from '@/components/ui/emphasis'
+import type { PlanApply } from '@/hooks/usePlanChange'
 import { Illustration } from '@/components/ui/illustration'
 import { dayNumber, formatDayMonthShort, formatShortDate, monthCells } from '@/lib/dates'
 import { EASE_OUT } from '@/lib/ease'
@@ -33,7 +34,7 @@ export function MoneyCard({
   onHover,
   onSelect,
   onWhy,
-  onAsk,
+  onApply,
 }: {
   timeline: Timeline
   scenario: Scenario | null
@@ -41,7 +42,8 @@ export function MoneyCard({
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
   onWhy: () => void
-  onAsk: (prompt: string) => void
+  /** Change the plan from the interface (with undo). */
+  onApply: PlanApply
 }) {
   const payments = useMemo(
     () =>
@@ -144,7 +146,7 @@ export function MoneyCard({
         </p>
       )}
 
-      <RateChoice timeline={timeline} scenario={scenario} onAsk={onAsk} />
+      <RateChoice timeline={timeline} scenario={scenario} onApply={onApply} />
     </section>
   )
 }
@@ -341,11 +343,11 @@ function StepChart({
 function RateChoice({
   timeline,
   scenario,
-  onAsk,
+  onApply,
 }: {
   timeline: Timeline
   scenario: Scenario | null
-  onAsk: (prompt: string) => void
+  onApply: PlanApply
 }) {
   const note = moneyNote(timeline, 'rate-815')
   const deadline = timeline.markers.find((m) => m.id === 'rate-815-deadline')
@@ -379,7 +381,8 @@ function RateChoice({
         ['Macierzyński', monthly(standard, 'maternity')],
         ['Rodzicielski', monthly(standard, 'parental')],
       ] as const,
-      prompt: 'Zostaję przy 100% za urlop macierzyński i 70% za rodzicielski',
+      value: false,
+      done: 'Zostajecie przy 100% i 70%',
     },
     {
       id: 'flat',
@@ -390,7 +393,8 @@ function RateChoice({
         ['Macierzyński', monthly(flat, 'maternity')],
         ['Rodzicielski', monthly(flat, 'parental')],
       ] as const,
-      prompt: 'Chcę dostawać 81,5% przez cały urlop macierzyński i rodzicielski',
+      value: true,
+      done: 'Wybrano 81,5% przez cały urlop',
     },
   ]
 
@@ -445,7 +449,15 @@ function RateChoice({
             {!option.selected && !passed && (
               <button
                 type="button"
-                onClick={() => onAsk(option.prompt)}
+                onClick={() =>
+                  void onApply(
+                    { rate_815: option.value },
+                    option.done,
+                    option.value && deadline
+                      ? `Wniosek o 81,5% złóż najpóźniej ${formatShortDate(deadline.date)}.`
+                      : undefined,
+                  )
+                }
                 className="mt-3 flex h-9 items-center gap-0.5 rounded-full px-3 text-sm font-bold text-zus-700 transition-colors hover:bg-zus-50"
               >
                 Wybieram to <ChevronRight className="size-4" />

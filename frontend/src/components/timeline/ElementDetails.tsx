@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronDown, ChevronRight, FileText, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Lock, Wallet } from 'lucide-react'
 import { Emphasis } from '@/components/ui/emphasis'
 import { formatDayMonthLong, formatDistance, formatShortDate } from '@/lib/dates'
 import { EASE_OUT } from '@/lib/ease'
 import { formatPln, formatRate, paymentFor } from '@/lib/money'
+import { daysLeftLabel } from '@/lib/plan'
 import { sourceLabel } from '@/lib/ui'
 import { cn } from '@/lib/utils'
 import type { SourceRef, Timeline } from '@/types'
@@ -107,9 +108,24 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
           <Facts
             facts={[
               { label: 'Kiedy', value: formatShortDate(m.date) },
-              { label: 'Od dziś', value: formatDistance(timeline.today, m.date) },
+              {
+                label: 'Od dziś',
+                value:
+                  m.irreversible && m.irreversible.days_left >= 0
+                    ? daysLeftLabel(m.irreversible.days_left)
+                    : formatDistance(timeline.today, m.date),
+              },
             ]}
           />
+          {m.irreversible && m.irreversible.days_left >= 0 && (
+            <p className="mt-5 flex gap-3 rounded-2xl border border-sun-300 bg-sun-100/50 px-4 py-3">
+              <Lock className="mt-1 size-4 shrink-0 text-sun-700" strokeWidth={2.5} />
+              <span>
+                <span className="block font-bold text-navy-900">Punkt bez powrotu</span>
+                {m.irreversible.lost}
+              </span>
+            </p>
+          )}
           <p className="mt-5">
             <Emphasis text={m.summary} />
           </p>
@@ -155,15 +171,19 @@ function Body({ item, timeline, onSelect, onFill }: Props) {
           <Title>{d.title}</Title>
           <Facts
             facts={[
-              { label: 'Potrzebne na', value: formatShortDate(d.needed_by) },
-              { label: 'Od dziś', value: formatDistance(timeline.today, d.needed_by) },
-              { label: 'Status', value: d.done ? 'już jest' : 'do zdobycia' },
+              // A Labour Code deadline is a deadline; otherwise the day is only when the leave
+              // or the benefit starts (Document.deadline).
+              d.deadline
+                ? { label: 'Złóż najpóźniej', value: formatShortDate(d.deadline) }
+                : { label: d.form ? 'Na dzień startu' : 'Potrzebne na', value: formatShortDate(d.needed_by) },
+              { label: 'Od dziś', value: formatDistance(timeline.today, d.deadline ?? d.needed_by) },
+              { label: 'Status', value: d.done ? 'już jest' : d.form ? 'do złożenia' : 'do zdobycia' },
             ]}
           />
           <p className="mt-5">
             <Emphasis text={d.rule} />
           </p>
-          {onFill && segment && d.id.endsWith('-request') && (
+          {onFill && d.form && !d.done && (
             <button
               type="button"
               onClick={() => onFill(d.id)}
@@ -252,7 +272,9 @@ const numbersIn = (text: string) => new Set(text.match(/\d+(?:,\d+)?/g) ?? [])
 function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
   // The ZUS Załącznik is shown with the guide: both are ZUS's own words, not the law.
   const guide = sources.filter((s) => s.doc === 'przewodnik' || s.doc === 'zalacznik')
-  const law = sources.filter((s) => s.doc === 'kp' || s.doc === 'ustawa')
+  // The law: the Labour Code, the ustawa zasiłkowa and the two regulations the request forms
+  // quote (leave requests, benefit documents).
+  const law = sources.filter((s) => s.doc !== 'przewodnik' && s.doc !== 'zalacznik')
   const inGuide = numbersIn(guide.map((s) => s.quote).join(' '))
   const inLaw = numbersIn(law.map((s) => s.quote).join(' '))
   const onlyInLaw = [...numbersIn(text)].some((n) => inLaw.has(n) && !inGuide.has(n))
@@ -303,9 +325,16 @@ function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
 }
 
 /** "Przepis z Kodeksu pracy", "Przepisy ustawy zasiłkowej (4)", "Przepisy (6)". */
+const FROM: Record<string, string> = {
+  kp: ' z Kodeksu pracy',
+  ustawa: ' ustawy zasiłkowej',
+  rozp_wnioski: ' rozporządzenia o wnioskach',
+  rozp_zasilki: ' rozporządzenia o dokumentach',
+}
+
 function lawToggle(law: SourceRef[]): string {
   const docs = new Set(law.map((s) => s.doc))
-  const from = docs.size > 1 ? '' : docs.has('kp') ? ' z Kodeksu pracy' : ' ustawy zasiłkowej'
+  const from = docs.size > 1 ? '' : (FROM[[...docs][0]] ?? '')
   return law.length === 1 ? `Przepis${from}` : `Przepisy${from} (${law.length})`
 }
 

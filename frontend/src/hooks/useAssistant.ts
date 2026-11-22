@@ -192,6 +192,24 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     setChanged((c) => ({ ids: [], notes: [], version: c.version + 1 }))
   }, [])
 
+  /**
+   * The plan was changed from the interface (PATCH /api/session/{id}/scenario): the conversation
+   * stays, the scenario and the timeline are replaced, and what changed lights up like after a
+   * tool of the assistant.
+   */
+  const update = useCallback((start: SessionStart) => {
+    setTimeline((before) => {
+      setChanged((c) => ({
+        ids: before ? changedElements(before, start.timeline) : [],
+        notes: before ? changedNotes(before, start.timeline) : [],
+        version: c.version + 1,
+      }))
+      return start.timeline
+    })
+    setScenario(start.scenario)
+    setQuestion(start.question)
+  }, [])
+
   /** Stop the answer that is being written. */
   const stop = useCallback(() => request.current?.abort(), [])
 
@@ -219,9 +237,29 @@ export function useAssistant({ onTimeline, onFocus }: Options = {}) {
     reset,
     submit,
     load,
+    update,
     scenario,
     question,
     timeline,
     changed,
   }
+}
+
+/** Elements of the timeline that are new or moved: their dates, length or amount differ. */
+function changedElements(before: Timeline, after: Timeline): string[] {
+  const shape = (t: Timeline) =>
+    new Map<string, string>([
+      ...t.segments.map((s) => [s.id, `${s.start}|${s.end}|${s.tone}`] as const),
+      ...t.markers.map((m) => [m.id, m.date] as const),
+      ...t.documents.map((d) => [d.id, `${d.needed_by}|${d.done}`] as const),
+      ...t.payments.map((p) => [p.id, `${p.start}|${p.end}|${p.monthly}`] as const),
+    ])
+  const old = shape(before)
+  return [...shape(after)].filter(([id, value]) => old.get(id) !== value).map(([id]) => id)
+}
+
+/** Points of the explanation whose words changed. */
+function changedNotes(before: Timeline, after: Timeline): string[] {
+  const old = new Map(before.notes.map((n) => [n.id, n.text]))
+  return after.notes.filter((n) => old.get(n.id) !== n.text).map((n) => n.id)
 }

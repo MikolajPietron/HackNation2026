@@ -24,6 +24,21 @@ const DEADLINE_OF: Record<string, string> = {
  *  leave's deadline is years away, so it is not drawn as a window. */
 const WINDOWED = new Set(['paternity'])
 
+/** How long until a point of no return (FUNKCJE F10), from the engine's `days_left`:
+ *  "ostatni dzień: dziś", "został 1 dzień", "zostały 3 dni", "zostało 101 dni". */
+export function daysLeftLabel(days: number): string {
+  if (days < 0) return 'termin minął'
+  if (days === 0) return 'ostatni dzień: dziś'
+  if (days === 1) return 'został 1 dzień'
+  const last = days % 10
+  const lastTwo = days % 100
+  const few = last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)
+  return `${few ? 'zostały' : 'zostało'} ${days} dni`
+}
+
+/** Points of no return close enough to count the days down. */
+export const COUNTDOWN_DAYS = 60
+
 /** "Urlop rodzicielski — do wyboru" -> "Urlop rodzicielski". */
 export const periodName = (segment: Segment) => segment.title.replace(/\s+[—–-]\s+do wyboru$/i, '')
 
@@ -165,6 +180,8 @@ export interface Step {
   icon: string
   decide: boolean
   overdue: boolean
+  /** A point of no return (FUNKCJE F10): what is lost after that day. */
+  noReturn?: string
 }
 
 const NOW_DAYS = 14
@@ -243,10 +260,14 @@ export function nextSteps(timeline: Timeline): Record<StepGroup, Step[]> {
       day,
       date: m.date,
       title: m.title,
-      detail: formatDistance(timeline.today, m.date),
+      detail:
+        m.irreversible && m.irreversible.days_left <= COUNTDOWN_DAYS
+          ? daysLeftLabel(m.irreversible.days_left)
+          : formatDistance(timeline.today, m.date),
       icon: markerIcon(m),
       decide: false,
       overdue: false,
+      noReturn: m.irreversible?.lost,
     })
   }
   for (const d of timeline.documents) {

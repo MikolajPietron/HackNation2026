@@ -3,7 +3,7 @@
 // what it is, and how long until it; what is still to decide carries a tag. No descriptions:
 // the details (with the source) open on a click, and a hover lights the element up on the axis.
 import { motion } from 'motion/react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Lock } from 'lucide-react'
 import { Pulse } from '@/components/timeline/Pulse'
 import { Illustration } from '@/components/ui/illustration'
 import { EASE_OUT } from '@/lib/ease'
@@ -139,6 +139,7 @@ function Row({
             {step.decide && (
               <span className="rounded-full bg-zus-50 px-2 py-0.5 text-[11px] font-bold text-zus-700">do wyboru</span>
             )}
+            {step.noReturn && <NoReturnTag />}
           </span>
           <span className={cn('block text-sm', step.overdue ? 'font-bold text-alert-600' : 'text-navy-500')}>
             {step.detail}
@@ -147,5 +148,15 @@ function Row({
         <ChevronRight className="size-4 shrink-0 text-navy-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-navy-500" />
       </button>
     </motion.li>
+  )
+}
+
+/** After this day the right is gone for good (FUNKCJE F10). */
+export function NoReturnTag() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sun-100 px-2 py-0.5 text-[11px] font-bold text-sun-700">
+      <Lock className="size-3" strokeWidth={2.5} />
+      bez powrotu
+    </span>
   )
 }

@@ -16,7 +16,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { PointerEvent, ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import type { AnimationPlaybackControls } from 'motion/react'
-import { Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Lock, Maximize2, Minimize2, Minus, Plus } from 'lucide-react'
 import dziecko from '@/assets/onboarding/dziecko.webp'
 import mama from '@/assets/onboarding/mama.webp'
 import pieniadze from '@/assets/onboarding/pieniadze.webp'
@@ -119,6 +119,8 @@ interface Flag {
   done?: boolean
   /** An event (bigger, bold, amber) rather than a hint. */
   key: boolean
+  /** A point of no return (FUNKCJE F10): a lock on the flag. */
+  locked?: boolean
 }
 
 interface PlacedFlag extends Flag {
@@ -510,6 +512,7 @@ export function PlanTimeline({
       icon: markerIcon(m),
       kind: 'marker',
       key: isKeyMarker(m),
+      locked: m.irreversible !== null && m.irreversible.days_left >= 0,
     })
   }
   for (const d of timeline.documents) {
@@ -994,6 +997,9 @@ function FlagChip({
     >
       <Illustration src={flag.icon} size={flag.key ? 'event' : 'hint'} className={flag.key ? 'bg-white' : ''} />
       {flag.text}
+      {flag.locked && (
+        <Lock className="size-3.5 text-sun-700" strokeWidth={2.5} aria-label="bez powrotu" />
+      )}
       {document && flag.done && <Check className="size-3.5" strokeWidth={3} />}
     </motion.button>
   )

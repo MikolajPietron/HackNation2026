@@ -90,6 +90,17 @@
   }
 }
 
+/* The undo pill's ring drains in 5 seconds (components/ui/undo-pill.tsx). Outside @theme, so it
+   is always emitted (it is used from an inline style, not a utility). */
+@keyframes undo-drain {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: var(--undo-length);
+  }
+}
+
 body {
   @apply bg-canvas text-navy-700 antialiased;
 }
