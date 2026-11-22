@@ -60,6 +60,7 @@ from app.engine.models import (
     TimelineElement,
 )
 from app.engine.money import money_assumptions, money_rules, taken_in_money
+from app.engine.monthly import add_monthly
 from app.engine.params import Params
 from app.engine.parental import (
     deadline_marker,
@@ -82,6 +83,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         # Guide section D: a child taken in for upbringing has its own rules (adoption.py).
         timeline = taken_in_timeline(scenario, params, today)
         taken_in_money(timeline, scenario, params)  # section G for the leave of a child taken in
+        add_monthly(timeline, scenario)  # F4: the money month by month (monthly.py)
         add_leftovers(timeline, scenario, params)  # F9, F10 (leftover.py)
         timeline.notes = case_notes(scenario, timeline, params)
         return timeline
@@ -166,6 +168,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         bases=draft.bases,
     )
     timeline.assumptions += money_assumptions(scenario, timeline, params)
+    add_monthly(timeline, scenario)  # F4: the money month by month (monthly.py)
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
     add_forms(timeline, scenario, params)  # every request as a form to fill in (forms.py)

@@ -711,6 +711,58 @@ class BenefitBase(BaseModel):
         return self.work == "employment"
 
 
+# F4 "Ile wpływa w którym miesiącu i kto płaci" (ZADANIA B.12; engine/monthly.py).
+
+PaidBy = Literal["employer", "payer", "zus", "payer-or-zus"]
+"""Who pays the money out: employer = the employer's own sick pay in pregnancy (wynagrodzenie
+chorobowe); payer = the payer of contributions pays the benefit itself, as it reports more than
+20 people to sickness insurance (an employee's employer, the principal of a contract of
+mandate); zus = ZUS; payer-or-zus = the payer or ZUS, by how many people the payer reports (not
+known yet)."""
+
+
+class MonthlyLine(BaseModel):
+    """One parent's money in one calendar month from one payer."""
+
+    parent: Role
+    payer: PaidBy | None
+    """None = the materials do not say who pays it (the rehabilitation benefit)."""
+    payer_label: str
+    """In Polish: "Pracodawca mamy (wynagrodzenie chorobowe)", "Pracodawca mamy",
+    "Zleceniodawca taty albo ZUS", "ZUS"."""
+    amount: Amount
+    """For each payment in `payment_ids`: its daily amount × its days in this month."""
+    payment_ids: list[str]
+    """The payments (`Timeline.payments`) with days in this month, the earliest first."""
+
+
+class MonthlyPayment(BaseModel):
+    """The money for the days of one calendar month: every payment's daily amount times its
+    days in the month. The months of a payment add up to its `total` exactly."""
+
+    month: str
+    """The calendar month, "2027-03"."""
+    mother: Amount
+    father: Amount
+    total: Amount
+    """`mother` + `father`; 0 in a month without a paid day (a gap)."""
+    lines: list[MonthlyLine] = []
+    """Who pays each parent this month: the mother's lines first, then the father's; more than
+    one for a parent when the month mixes payers (e.g. the employer's sick pay, then the
+    sickness benefit from ZUS). Empty in a gap."""
+    payment_ids: list[str] = []
+    """Every payment with days in this month, the earliest first."""
+
+
+class MoneyTotal(BaseModel):
+    """All payments on the timeline together: the sum of `Timeline.payments` (and of
+    `Timeline.monthly`)."""
+
+    total: Amount
+    mother: Amount
+    father: Amount
+
+
 TimelineElement = Segment | Marker | Document | Payment
 
 NoteKind = Literal["situation", "right", "risk", "choice", "relief", "computed"]
@@ -751,6 +803,11 @@ class Timeline(BaseModel):
     """Each parent's benefit base behind `payments`, step by step (engine/base.py)."""
     left_on_table: list[Leftover] = []
     """F9: what the family can still use and loses if they do nothing (leftover.py)."""
+    monthly: list[MonthlyPayment] = []
+    """F4: `payments` month by month, every calendar month from the first paid day to the last,
+    gaps included (monthly.py). Empty without payments."""
+    money_total: MoneyTotal | None = None
+    """F4: all `payments` together; None without payments."""
 
     def elements(self) -> list[TimelineElement]:
         return [*self.segments, *self.markers, *self.documents, *self.payments]

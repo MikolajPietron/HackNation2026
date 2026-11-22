@@ -131,7 +131,20 @@ def _covered(scenario: Scenario, parent: Parent) -> bool:
 
 
 def who_pays(scenario: Scenario, parent: Parent) -> Payer:
-    if _work(scenario, parent) == "business" or _after_job_loss(scenario, parent):
+    """Who pays the parent's maternity benefit: after the mother's employment ended in
+    pregnancy, ZUS (the benefit for the time after the insurance ended); otherwise
+    `payer_by_size`."""
+    if _after_job_loss(scenario, parent):
+        return "zus"
+    return payer_by_size(scenario, parent)
+
+
+def payer_by_size(scenario: Scenario, parent: Parent) -> Payer:
+    """The payer of contributions that reports more than 20 people to sickness insurance pays
+    the benefit, otherwise ZUS; with a business ZUS (guide page 1, footnote 1). Also the
+    sickness benefit for the days the mother still worked, before an employment that ended in
+    pregnancy."""
+    if _work(scenario, parent) == "business":
         return "zus"
     size = scenario.mother_payer_size if parent == "mother" else scenario.father_payer_size
     match size:
@@ -267,7 +280,7 @@ def sick_payer_line(scenario: Scenario, params: Params) -> tuple[str, list[Sourc
     else:
         payer, short, rule = "płatnik składek (zleceniodawca)", "zleceniodawca", a.sick_contract
         certificate = "Z-3a"
-    match who_pays(scenario, "mother"):
+    match payer_by_size(scenario, "mother"):
         case "payer":
             text = (
                 f"Zasiłek chorobowy mamy wypłaca jej {payer} na podstawie zaświadczenia e-ZLA: "
@@ -1223,7 +1236,7 @@ def _payer_note(scenario: Scenario, timeline: Timeline, params: Params) -> CaseN
         _is_sick_benefit(s) for s in timeline.segments
     )
     if any(who_pays(scenario, p) == "payer-or-zus" for p in parents) or (
-        sick_by_size and who_pays(scenario, "mother") == "payer-or-zus"
+        sick_by_size and payer_by_size(scenario, "mother") == "payer-or-zus"
     ):
         lines.append(
             "Liczbę ubezpieczonych ustala się według stanu na 30 listopada poprzedniego roku."

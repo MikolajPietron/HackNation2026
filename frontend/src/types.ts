@@ -519,6 +519,62 @@ export interface BenefitBase {
   sources: SourceRef[]
 }
 
+// --- F4 Wypłaty miesiąc po miesiącu (ZADANIA B.12; engine/monthly.py) ---
+
+/**
+ * Who pays the money out: employer = the employer's own sick pay in pregnancy (wynagrodzenie
+ * chorobowe); payer = the payer of contributions pays the benefit itself (more than 20 insured:
+ * an employee's employer, the principal of a contract of mandate); zus = ZUS; payer-or-zus = the
+ * payer or ZUS, by how many people the payer reports (not known yet).
+ */
+export type PaidBy = 'employer' | 'payer' | 'zus' | 'payer-or-zus'
+
+/** One parent's money in one calendar month from one payer. */
+export interface MonthlyLine {
+  parent: 'mother' | 'father'
+  /** null = the materials do not say who pays it (the rehabilitation benefit). */
+  payer: PaidBy | null
+  /**
+   * Ready to show: "Pracodawca mamy (wynagrodzenie chorobowe)", "Pracodawca mamy", "ZUS",
+   * "Zleceniodawca taty albo ZUS", "Materiały nie mówią, kto wypłaca".
+   */
+  payer_label: string
+  /** For each payment in `payment_ids`: its daily amount × its days in this month. */
+  amount: number
+  /** `Timeline.payments` ids with days in this month, the earliest first. */
+  payment_ids: string[]
+}
+
+/**
+ * The money for the days of one calendar month (not the day it reaches the account). Every
+ * month from the first paid day to the last is listed; a month without a paid day (a gap) has
+ * `total` 0 and no lines. The engine computes every amount: do not add them up in the front.
+ */
+export interface MonthlyPayment {
+  /** "2027-03". */
+  month: string
+  mother: number
+  father: number
+  /** `mother` + `father`. */
+  total: number
+  /**
+   * Who pays each parent this month: the mother's lines first, then the father's; more than one
+   * for a parent when the month mixes payers (sick pay from the employer, then ZUS).
+   */
+  lines: MonthlyLine[]
+  /** Every payment with days in this month, the earliest first. */
+  payment_ids: string[]
+}
+
+/** All payments together (the sum of `Timeline.payments`, and of `Timeline.monthly`). */
+export interface MoneyTotal {
+  total: number
+  mother: number
+  father: number
+}
+
+// --- end F4 ---
+
 /**
  * One point of the case explanation: situation = which case this is, right = what the mother is
  * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
@@ -556,6 +612,10 @@ export interface Timeline {
   bases: BenefitBase[]
   /** F9: what the family can still use and loses if they do nothing (see `Leftover`). */
   left_on_table: Leftover[]
+  /** F4: `payments` month by month, gaps included (see `MonthlyPayment`); empty without them. */
+  monthly: MonthlyPayment[]
+  /** F4: all `payments` together; null without payments. */
+  money_total: MoneyTotal | null
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */
