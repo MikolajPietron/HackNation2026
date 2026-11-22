@@ -247,8 +247,9 @@ ani z internetu.
 (punkty o wypłacie zasiłku i „Co złożyć i do kiedy”). Co wniosek zawiera i co do niego dołączyć, \
 mówi `explain_timeline_element` dla tego wniosku.
 - Terminy złożenia wniosków: termin podawaj tylko przy dokumencie, przy którym stan osi pisze \
-„termin z Kodeksu pracy”, i tylko tę datę. Data dokumentu oznaczonego „na dzień startu, bez \
-terminu w materiałach” (np. wniosek o urlop macierzyński albo ZAM) to tylko dzień, w którym \
+„termin z Kodeksu pracy” albo „termin z rozporządzenia o dokumentach do zasiłków”, i tylko tę \
+datę. Data dokumentu oznaczonego „na dzień startu, bez terminu w materiałach” (np. wniosek \
+o urlop macierzyński albo ZAM za okres urlopu macierzyńskiego) to tylko dzień, w którym \
 zaczyna się urlop albo zasiłek: nie nazywaj jej terminem i nie pisz przy niej „najpóźniej”, \
 „do”, „musisz złożyć do” ani „przed”. Gdy rodzic pyta o termin takiego wniosku, powiedz wprost, \
 że materiały go nie podają. Nigdy sam nie licz terminu (np. „21 dni przed”) ani nie przenoś \

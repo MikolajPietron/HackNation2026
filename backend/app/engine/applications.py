@@ -815,7 +815,11 @@ def _zam(
         "połączono z ZAM)."
     )
     rule.append(
-        "Materiały nie podają terminu tego wniosku: pokazujemy go na dzień, od którego "
+        "Za okres urlopu macierzyńskiego materiały nie podają terminu tego wniosku: pokazujemy go "
+        "na dzień, od którego przysługuje zasiłek. Za uzupełniający, rodzicielski i ojcowski "
+        "osoba niebędąca pracownikiem składa wniosek wcześniej: terminy są osobno na osi."
+        if any(s.id != first.id for s in periods)
+        else "Materiały nie podają terminu tego wniosku: pokazujemy go na dzień, od którego "
         "przysługuje zasiłek."
     )
     sources.append(a.zam_form.sources)
@@ -829,6 +833,9 @@ def _zam(
         supplementary = _segment(timeline, "supplementary")
         hospital = supplementary is not None and supplementary.lane == "father"
         rule, sources = _attachments(scenario, rule, sources, params, hospital=hospital)
+    later = _zam_deadlines(
+        scenario, [s for s in timeline.segments if s.lane == parent], params, today, parent
+    )
     return [
         Document(
             id="maternity-request" if parent == "mother" else "father-benefit-request",
@@ -841,8 +848,83 @@ def _zam(
             rule=" ".join(rule),
             segment_id=first.id,
             sources=merge_sources(*sources),
-        )
+        ),
+        *later,
     ]
+
+
+# ZAM of a parent who is not an employee, for the periods after maternity leave: the regulation
+# of 27.09.2026 says when it is filed (§ 26 pkt 3, § 29 pkt 3, § 30 ust. 1 pkt 4, § 32 ust. 1
+# pkt 3, § 33 ust. 1 pkt 3). Our reading of "przed terminem rozpoczęcia korzystania z zasiłku"
+# and "przed zakończeniem okresu pobierania": the latest day is the day before.
+
+
+def _zam_deadlines(
+    scenario: Scenario, periods: list[Segment], params: Params, today: dt.date, parent: Parent
+) -> list[Document]:
+    a = params.applications
+    documents = []
+    for segment in sorted(periods, key=lambda s: s.start):
+        stem = segment.id.rsplit("-", 1)[0] if segment.id[-1].isdigit() else segment.id
+        if segment.start < today:
+            continue  # the benefit is already being paid: the request is behind
+        if stem == "supplementary":
+            day = segment.start - DAY  # the last day of the maternity benefit
+            deadline = day - DAY
+            what = "uzupełniający urlop macierzyński"
+            before = f"przed końcem zasiłku za okres urlopu macierzyńskiego ({fmt(day)})"
+            rule = a.zam_supplementary_before
+        elif stem in ("parental", "parental-mother", "parental-father"):
+            deadline = segment.start - DAY
+            what = "urlop rodzicielski"
+            before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
+            if parent == "mother" or scenario.father_takes_over:
+                rule = a.zam_parental_before
+            elif coverage(scenario) in NOT_INSURED:
+                rule = a.zam_parental_before_father
+            else:
+                rule = a.zam_parental_before_other
+        elif stem == "paternity":
+            deadline = segment.start - DAY
+            what = "urlop ojcowski"
+            before = f"przed rozpoczęciem korzystania z zasiłku ({fmt(segment.start)})"
+            rule = a.zam_paternity_before
+        else:
+            continue
+        if deadline >= today:
+            needed_by, when = deadline, f"Najpóźniej {fmt(deadline)}: wniosek składa się {before}."
+        elif segment.tone == "option":
+            needed_by, when = (
+                today,
+                (
+                    f"Wniosek składa się {before}, więc dla tego dnia termin minął "
+                    f"{fmt(deadline)}. Złożony dziś jest w terminie dla zasiłku od "
+                    f"{fmt(today + DAY)}."
+                ),
+            )
+        else:
+            needed_by, when = (
+                deadline,
+                f"Termin minął {fmt(deadline)}: wniosek składa się {before}.",
+            )
+        whose = "" if parent == "mother" else " taty"
+        documents.append(
+            Document(
+                id=f"zam-{segment.id}",
+                label=f"ZAM{whose}: {what}",
+                title=f"Wniosek{whose} o zasiłek macierzyński za okres: {what} (ZAM)",
+                needed_by=needed_by,
+                done=False,
+                rule=(
+                    f"{WHO[parent]} nie jest pracownikiem: wniosek o zasiłek za ten okres składa "
+                    f"płatnikowi zasiłku (ZUS albo płatnikowi składek, jak ZAM). {when}"
+                ),
+                segment_id=segment.id,
+                sources=merge_sources(rule.sources, a.zam_form.sources),
+                deadline=deadline,
+            )
+        )
+    return documents
 
 
 def _attachments(

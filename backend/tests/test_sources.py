@@ -292,6 +292,8 @@ def test_the_two_regulations_on_requests() -> None:
         "§ 22 ust. 1",
         "§ 23 ust. 1",
         "§ 26",
+        "§ 29",
+        "§ 30 ust. 1",
         "§ 32 ust. 1",
         "§ 33 ust. 1",
         "zał. 1",

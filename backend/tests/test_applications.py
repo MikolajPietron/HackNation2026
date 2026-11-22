@@ -226,8 +226,18 @@ def test_a_mother_on_a_contract_files_zam() -> None:
     )
     assert "formularz ZUR połączono z nim 24 października 2026 r." in request.rule
     assert sections(request) >= {"A.4", "F"}
-    # Not an employee: no requests for each leave, no special protection.
-    assert [d.id for d in t.documents] == ["maternity-request"]
+    # Not an employee: no requests for each leave, no special protection. ZAM for the parental
+    # period is filed before that benefit starts (regulation of 27.09.2026 § 29 pkt 3): maternity
+    # 15.03-01.08.2027 (140 days), parental from 02.08.2027, so at the latest on 01.08.2027.
+    assert [d.id for d in t.documents] == ["maternity-request", "zam-parental"]
+    zam = document(t, "zam-parental")
+    assert (zam.deadline, zam.needed_by) == (dt.date(2027, 8, 1), dt.date(2027, 8, 1))
+    assert zam.rule.endswith(
+        "Najpóźniej 01.08.2027: wniosek składa się przed rozpoczęciem korzystania z zasiłku "
+        "(02.08.2027)."
+    )
+    assert {s.article for s in zam.sources if s.doc == "rozp_zasilki"} == {"§ 29"}
+    assert "Za uzupełniający, rodzicielski i ojcowski" in request.rule
     assert "protection-end" not in {m.id for m in t.markers}
     protection = note(t, "protection")
     assert (protection.kind, protection.title) == (
@@ -598,3 +608,41 @@ def test_bankruptcy_of_the_employer_needs_no_judgment() -> None:
     assert "court-judgment" not in {d.id for d in t.documents}
     # The guide does not say what to file for this benefit or who pays it.
     assert any("Przewodnik nie podaje, więc oś tego nie pokazuje" in a for a in t.assumptions)
+
+
+def test_zam_deadlines_of_a_father_with_a_business() -> None:
+    """A father with his own business, the mother employed, one child due 15.03.2027. ZAM for
+    paternity leave (drawn 15.03-28.03.2027) is filed before the benefit starts (rozporządzenie
+    § 33 ust. 1 pkt 3): at the latest 14.03.2027. His parental leave follows the mother's share:
+    maternity 15.03-01.08.2027, her 32 weeks 02.08.2027-12.03.2028 (224 days; 2028 is a leap
+    year), his from 13.03.2028, so ZAM at the latest 12.03.2028, after the other parent's
+    benefit (§ 30 ust. 1 pkt 4)."""
+    t = expecting(
+        **MOTHER,
+        children_count=1,
+        leave_before_birth_weeks=0,
+        father_work="business",
+        father_insured=True,
+    )
+    paternity = document(t, "zam-paternity")
+    assert (paternity.deadline, paternity.segment_id) == (dt.date(2027, 3, 14), "paternity")
+    assert {s.article for s in paternity.sources if s.doc == "rozp_zasilki"} == {"§ 33 ust. 1"}
+    parental = document(t, "zam-parental-father")
+    assert segment(t, "parental-father").start == dt.date(2028, 3, 13)
+    assert parental.deadline == dt.date(2028, 3, 12)
+    assert {s.article for s in parental.sources if s.doc == "rozp_zasilki"} == {"§ 30 ust. 1"}
+    assert (
+        parental.title == "Wniosek taty o zasiłek macierzyński za okres: urlop rodzicielski (ZAM)"
+    )
+    # The employed mother files leave requests with her employer: no ZAM deadlines for her.
+    assert not any(d.id.startswith("zam-") and d.segment_id == "parental" for d in t.documents)
+
+
+def test_the_model_is_told_where_a_zam_deadline_comes_from() -> None:
+    from app.assistant.describe import document_when
+
+    t = expecting(role="mother", work="contract", mother_payer_size="up-to-20", children_count=1)
+    assert document_when(document(t, "zam-parental"), TODAY) == (
+        "termin z rozporządzenia o dokumentach do zasiłków (policzył go kalkulator): "
+        "najpóźniej 01.08.2027"
+    )

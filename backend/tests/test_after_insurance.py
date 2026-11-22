@@ -76,7 +76,8 @@ def test_after_the_employer_went_bankrupt_the_maternity_benefit_follows_the_birt
     assert "Zasiłek mamy wypłaca ZUS" in maternity.details[-1]  # type: ignore[union-attr]
     assert "art. 30 ust. 3" in articles(job.sources)  # type: ignore[union-attr]
     # No request to an employer, no protection: ZAM to ZUS.
-    assert [d.id for d in t.documents] == ["maternity-request"]
+    # ZAM for the parental period: before that benefit starts, 02.08.2027 (rozporządzenie § 29).
+    assert [d.id for d in t.documents] == ["maternity-request", "zam-parental"]
     assert t.documents[0].title == "Wniosek o zasiłek macierzyński (ZAM)"
     assert "bezpośrednio do ZUS" in t.documents[0].rule
     assert not {"protection-end", "earliest-start"} & {m.id for m in t.markers}

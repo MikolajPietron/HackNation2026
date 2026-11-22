@@ -416,6 +416,17 @@ class ApplicationParams(BaseModel):
     """A contract of mandate: documents to ZUS or the payer; Z-3a."""
     sick_business: Rule
     """A business: ZAS-53 to ZUS."""
+    # When a non-employee files ZAM for the later periods (regulation of 27.09.2026).
+    zam_supplementary_before: Rule
+    """§ 26 pkt 3: before the maternity benefit for maternity leave ends."""
+    zam_parental_before: Rule
+    """§ 29 pkt 3: before the benefit for parental leave starts (the same parent before)."""
+    zam_parental_before_other: Rule
+    """§ 30 ust. 1 pkt 4: the same, after the other parent's maternity benefit."""
+    zam_parental_before_father: Rule
+    """§ 32 ust. 1 pkt 3: the same, for the father when the mother has no insurance title."""
+    zam_paternity_before: Rule
+    """§ 33 ust. 1 pkt 3: before the benefit for paternity leave starts."""
 
 
 # Request forms (engine/forms.py): what each request contains, as the regulations name it.

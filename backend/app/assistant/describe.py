@@ -85,6 +85,12 @@ def document_when(document: Document, today: dt.date) -> str:
         return "mama już je ma"
     if document.deadline is None:
         return NO_DEADLINE.format(day=fmt(document.needed_by))
+    # A non-employee's ZAM for the later periods: the regulation of 27.09.2026 (applications.py).
+    law = (
+        "termin z rozporządzenia o dokumentach do zasiłków"
+        if any(s.doc == "rozp_zasilki" for s in document.sources)
+        else "termin z Kodeksu pracy"
+    )
     if document.deadline < today:
         filed = (
             f"; złożony {fmt(document.needed_by)} jest w terminie dla późniejszego urlopu (zasada "
@@ -92,8 +98,8 @@ def document_when(document: Document, today: dt.date) -> str:
             if document.needed_by != document.deadline
             else ""
         )
-        return f"termin z Kodeksu pracy minął {fmt(document.deadline)}{filed}"
-    return f"termin z Kodeksu pracy (policzył go kalkulator): najpóźniej {fmt(document.deadline)}"
+        return f"{law} minął {fmt(document.deadline)}{filed}"
+    return f"{law} (policzył go kalkulator): najpóźniej {fmt(document.deadline)}"
 
 
 def describe_person(scenario: Scenario) -> str:
