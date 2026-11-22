@@ -510,16 +510,6 @@ export function PlanScreen({
                     />
                   </motion.div>
 
-                  {supportTopics && (
-                    <motion.section variants={ITEM} className="mt-5 rounded-4xl border border-line px-4 py-5 sm:px-5">
-                      <h2 className="flex items-center gap-3 text-lg font-bold text-navy-900">
-                        <Illustration src={ICONS.serce} size="event" className="bg-navy-50/60" />
-                        Gdzie szukać wsparcia
-                      </h2>
-                      <SupportList topics={[...supportTopics]} className="mt-4" />
-                    </motion.section>
-                  )}
-
                   {!loss && (
                     <SectionTabs
                       title="Dopasujcie plan"
@@ -581,6 +571,16 @@ export function PlanScreen({
                         },
                       ]}
                     />
+                  )}
+                  {/* Support last: it matters, but it answers no question about the plan. */}
+                  {supportTopics && (
+                    <motion.section variants={ITEM} className="mt-12 rounded-4xl border border-line px-4 py-5 sm:px-5 lg:mt-14">
+                      <h2 className="flex items-center gap-3 text-lg font-bold text-navy-900">
+                        <Illustration src={ICONS.serce} size="event" className="bg-navy-50/60" />
+                        Gdzie szukać wsparcia
+                      </h2>
+                      <SupportList topics={[...supportTopics]} className="mt-4" />
+                    </motion.section>
                   )}
                   <Footer onSupport={() => setSupportOpen(true)} />
                 </>
