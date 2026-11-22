@@ -18,7 +18,8 @@ import serce from '@/assets/onboarding/serce.webp'
 import tata from '@/assets/onboarding/tata.webp'
 import zlecenie from '@/assets/onboarding/zlecenie.webp'
 import { MObywatelLogin } from '@/components/mocks/MObywatelLogin'
-import { SimBadge } from '@/components/mocks/MockModal'
+import { MockModal, SimBadge } from '@/components/mocks/MockModal'
+import { SampleFamilies } from '@/components/cases/SampleFamilies'
 import { TextStates } from '@/components/ui/text-states'
 import { addDaysIso, formatLongDate, todayIso } from '@/lib/dates'
 import type { Persona } from '@/lib/mockData'
@@ -326,6 +327,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
   const [answers, setAnswers] = useState<Answers>(EMPTY)
   const [leaving, setLeaving] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
+  const [examplesOpen, setExamplesOpen] = useState(false)
   const timer = useRef(0)
   const step = path[path.length - 1]
 
@@ -406,7 +408,7 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
   let screen: ReactNode
   switch (step) {
     case 'intro':
-      screen = <Intro onStart={() => go('role')} onSkip={onSkip} saved={saved} />
+      screen = <Intro onStart={() => go('role')} onSkip={onSkip} onExample={() => setExamplesOpen(true)} saved={saved} />
       break
     case 'role':
       screen = (
@@ -946,6 +948,19 @@ export function Onboarding({ submit, onDone, onSkip, saved }: Props) {
       </div>
 
       <MObywatelLogin open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={fromZus} />
+      <MockModal open={examplesOpen} label="Przykładowe rodziny" onClose={() => setExamplesOpen(false)} className="max-w-4xl">
+        <h2 className="pr-10 text-2xl leading-tight font-bold tracking-tight text-navy-900">Zobacz na przykładzie</h2>
+        <p className="mt-1 text-navy-500">
+          Wybierz rodzinę, a pokażemy jej cały plan. Swój policzysz potem, odpowiadając na pytania.
+        </p>
+        <SampleFamilies
+          className="mt-5"
+          onLoaded={(start) => {
+            setExamplesOpen(false)
+            onDone(start)
+          }}
+        />
+      </MockModal>
 
       <AnimatePresence mode="wait">
         <motion.main
@@ -1104,10 +1119,13 @@ function UnknownLink({ selected, onSelect }: { selected: boolean; onSelect: () =
 function Intro({
   onStart,
   onSkip,
+  onExample,
   saved,
 }: {
   onStart: () => void
   onSkip: () => void
+  /** Open a ready example family instead of answering (no AI). */
+  onExample: () => void
   saved: SavedSession | null
 }) {
   return (
@@ -1166,6 +1184,13 @@ function Intro({
             Wolę porozmawiać z asystentem AI
           </button>
         )}
+        <button
+          type="button"
+          onClick={onExample}
+          className="text-sm font-bold text-zus-700 underline-offset-4 transition-colors hover:text-zus-900 hover:underline"
+        >
+          Zobacz na przykładowej rodzinie
+        </button>
       </motion.div>
     </div>
   )

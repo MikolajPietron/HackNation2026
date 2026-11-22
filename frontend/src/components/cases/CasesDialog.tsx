@@ -17,6 +17,7 @@ import { currentSessionId } from '@/lib/session'
 import { cn } from '@/lib/utils'
 import type { CaseFacts, CaseList, CaseListItem, CaseResult, SessionStart } from '@/types'
 import { CaseResultView } from './CaseResultView'
+import { SampleFamilies } from './SampleFamilies'
 
 /** A picture per category of the catalogue (tools/zus-data). */
 const CATEGORY_ICON: Record<string, string> = {
@@ -128,7 +129,16 @@ export function CasesDialog({
           transition={{ duration: 0.22, ease: EASE_OUT }}
         >
           {view.kind === 'pick' && (
-            <Picker list={list} error={error} onPick={pick} onUpload={upload} />
+            <Picker
+              list={list}
+              error={error}
+              onPick={pick}
+              onUpload={upload}
+              onSample={(start) => {
+                onLoaded(start)
+                onClose()
+              }}
+            />
           )}
           {view.kind === 'reading' && (
             <Reading
@@ -166,11 +176,14 @@ function Picker({
   error,
   onPick,
   onUpload,
+  onSample,
 }: {
   list: CaseList | null
   error: string | null
   onPick: (item: CaseListItem) => void
   onUpload: (file: File) => void
+  /** An example family became the plan (no AI). */
+  onSample: (start: SessionStart) => void
 }) {
   const [filter, setFilter] = useState<string | null>(null)
   const chips = useDragScroll<HTMLDivElement>()
@@ -198,6 +211,9 @@ function Picker({
         Raport zgodności z decyzjami ZUS <ChevronRight className="size-4" />
       </a>
 
+      <SampleFamilies onLoaded={onSample} className="mt-5" />
+
+      <h3 className="mt-7 font-bold text-navy-900">Sprawy z zestawu ZUS</h3>
       <UploadZone onFile={onUpload} />
 
       {error && <p className="mt-4 rounded-2xl bg-alert-50 px-4 py-3 text-sm text-alert-600">{error}</p>}
