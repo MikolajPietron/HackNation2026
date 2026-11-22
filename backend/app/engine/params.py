@@ -1,5 +1,6 @@
 """Legal parameters. Every number carries its sources; the engine never hardcodes them."""
 
+import datetime as dt
 from fractions import Fraction
 
 from pydantic import BaseModel, Field
@@ -359,6 +360,18 @@ class Rules(BaseModel):
     rest_after_birth: Rule
 
 
+class KnownForm(BaseModel):
+    """A ZUS form the guide names: for reading letters from ZUS and checking requests."""
+
+    code: str
+    name: str
+    abolished: bool = False
+    """Abolished on `ApplicationParams.forms_abolished_on`."""
+    merged_into: str | None = None
+    """The form it was merged into (ZUR and ZAO: ZAM)."""
+    sources: list[SourceRef] = Field(min_length=1)
+
+
 class ApplicationParams(BaseModel):
     """Applications and protection (guide A.4 page 6, page 1 footnote 1, page 3 for sick leave,
     page 12, section I page 10; Labour Code art. 177, 180 § 8-9 and § 16, 180² § 4-5, 182¹ᵈ § 1,
@@ -375,6 +388,10 @@ class ApplicationParams(BaseModel):
     contract_zam: Rule
     attachments: Rule
     zam_form: Rule
+    forms: list[KnownForm]
+    """The forms the guide names (pages 3, 6, 12): for letters from ZUS and the request check."""
+    forms_abolished_on: Param[dt.date]
+    """ZUR and ZAO merged into ZAM, Z-3b abolished, from this day (guide page 12, footnotes)."""
     parental_days_before: Param[int]
     supplementary_days_before_end: Param[int]
     supplementary_hospital_certificate: Rule
