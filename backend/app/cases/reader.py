@@ -103,6 +103,9 @@ class ModelCaseReader:
         return result.output
 
 
+READ_TIMEOUT_S = 600
+"""A whole case: usually 100–200 s, a 12-page case once took over 300 s (S63, 22.11.2026)."""
+
 CLAUDE_CODE_PREFIX = "claude-code:"
 """`CASES_MODEL=claude-code:opus`: the scans go to the local `claude -p` (ClaudeCodeCaseReader)."""
 
@@ -130,7 +133,11 @@ class ClaudeCodeCaseReader:
         schema = _loose(CaseFacts.model_json_schema())
         for attempt in (1, 2):
             result = await run_claude(
-                self._model, system=INSTRUCTIONS, prompt=content, schema=schema
+                self._model,
+                system=INSTRUCTIONS,
+                prompt=content,
+                schema=schema,
+                timeout=READ_TIMEOUT_S,
             )
             _report(self._model, result)
             try:

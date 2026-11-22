@@ -142,6 +142,7 @@ async def run_claude(
     prompt: str | list[dict[str, Any]],
     schema: dict[str, Any],
     effort: str | None = None,
+    timeout: float = TIMEOUT_S,
 ) -> dict[str, Any]:
     """One `claude -p` run with no tools, no settings, no MCP and no saved session, on the
     subscription; returns Claude Code's result (`structured_output`, `usage`). `prompt` is text,
@@ -173,10 +174,10 @@ async def run_claude(
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            out, err = await asyncio.wait_for(process.communicate(stdin.encode()), TIMEOUT_S)
+            out, err = await asyncio.wait_for(process.communicate(stdin.encode()), timeout)
         except TimeoutError:
             process.kill()
-            raise RuntimeError(f"claude -p: no answer in {TIMEOUT_S} s") from None
+            raise RuntimeError(f"claude -p: no answer in {timeout:.0f} s") from None
     finally:
         Path(system_file).unlink(missing_ok=True)
     return _result(out.decode(), err.decode(), process.returncode)
