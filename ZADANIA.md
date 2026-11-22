@@ -34,12 +34,6 @@ Demo online (B.5) **na razie pomijamy** (decyzja z 22.11.2026 w nocy). Zgodnoś�
 - **Co zrobić:** dokument `parental-work-request-<k>` (i taty) dla każdej części z pracą: `form` z polami z § 16, `deadline` = 21 dni przed podjęciem pracy, źródła dosłowne.
 - **Gotowe gdy:** test na planie z pracą na ½ etatu (dokument, termin, pola); `test_sources.py` przechodzi; front pokaże go sam (dokument z `form`).
 
-### 3. Ochrona przed nadpisaniem planu — B.15
-- **Po co:** `chat.py` wczytuje sesję na początku tury i na końcu zapisuje ją całą. Zmiana przez `PATCH /api/session/{id}/scenario` w trakcie odpowiedzi asystenta (druga karta, szybki klik) znika razem z ukrytą notatką. Front dziś blokuje zmiany, gdy asystent pisze, ale to tylko obejście.
-- **Pliki:** `backend/app/api/chat.py` (`_Turn.save`), `backend/app/api/session.py` (`change_scenario`), `backend/app/services/sessions.py`.
-- **Co zrobić:** na końcu tury wczytaj sesję ponownie i zapisz historię na aktualny scenariusz (z notatkami z PATCH), albo wersja sesji i `409` z polskim `detail` dla PATCH w trakcie tury.
-- **Gotowe gdy:** test: tura czatu na skryptowanym modelu + PATCH w jej trakcie → po turze scenariusz z PATCH i notatka w historii zostają.
-
 ### 4. Optymalizacja modelu (szybciej, taniej, nie gorzej) — B.17
 - **Po co:** każda tura czatu wysyła ok. 92 tys. znaków stałych instrukcji (`STATIC_INSTRUCTIONS`, ok. 30 tys. tokenów), stan osi i 34 narzędzia. Rodzic czeka na pierwsze słowo, a każda rozmowa kosztuje.
 - **Pliki:** `backend/app/assistant/prompts.py`, `backend/app/assistant/agent.py` (`STATIC_INSTRUCTIONS`, `current_state`, `_tools_for_turn`), `backend/app/api/deps.py` (`ModelSettings(cache=True)`, `LLM_THINKING`), `backend/app/api/chat.py`, `tools/eval/`.
@@ -89,6 +83,7 @@ Zrobione 22.11.2026 w nocy (szczegóły w „Zrobione”): wszystko, co B dał d
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- B.15 (22.11.2026): tura czatu trzyma blokadę sesji od wczytania do zapisu (`session_lock` w `app/services/sessions.py`); `PATCH /api/session/{id}/scenario` w trakcie tury dostaje **409** z polskim `detail` („Asystent właśnie odpowiada… spróbuj ponownie za chwilę”), więc zmiana nie ginie i nic nie jest zapisane w połowie; tura, która zaczyna się w trakcie PATCH, czeka na niego. **Dla frontu:** `changeScenario` przy 409 rzuca błąd z tym komunikatem — ponów zmianę po zdarzeniu `done` (blokadę interfejsu na czas odpowiedzi można zostawić). Test: `test_a_change_during_a_chat_turn_is_refused_not_lost`. Blokada działa w jednym procesie backendu (jak w demo); przy kilku procesach potrzebna byłaby kolumna wersji w `sessions`.
 - Front (A, 22.11.2026 noc), gałąź `ui/plan-redesign`: zmiany planu bez czatu (`usePlanChange`: `PATCH /scenario`, pigułka „Cofnij” 5 s, Escape cofa; zablokowane, gdy asystent pisze); stawka 81,5% wybierana bezpośrednio; „Nie zostawiajcie tego na stole” (F9); kłódki z odliczaniem na osi, w liście i w szczegółach (F10); wniosek z `Document.form` (pola, załączniki, podstawa prawna, termin z `deadline`) i „Sprawdź wniosek” (F23, dane osobowe nie idą na serwer, przeredagowanie AI na życzenie); „Plany dla Was” z silnika (F8); „Co, jeśli coś pójdzie inaczej?” (F11, chip „Utrata pracy w ciąży” otwiera te zdarzenia); „Pismo z ZUS” (F24); edytor podziału urlopu rodzicielskiego z kafelkami tygodni i pracą do ½ etatu, podgląd z silnika (F13, F6, F3); źródła z rozporządzeń w szczegółach.
 - Terminy ZAM osoby bez etatu (22.11.2026): nowe dokumenty osi `zam-supplementary`, `zam-parental`, `zam-parental-mother-<k>`, `zam-paternity`, `zam-parental-father`, `zam-parental-father-<k>` z `deadline` z rozporządzenia z 27.09.2026 (dzień przed startem zasiłku za ten okres; za uzupełniający dzień przed końcem zasiłku za urlop macierzyński). Źródło `rozp_zasilki` (§ 26, § 29, § 30 ust. 1, § 32 ust. 1, § 33 ust. 1). Główny ZAM (macierzyński) nadal bez terminu.
 - **Dla frontu (A), 22.11.2026 wieczór — wszystko w `main`, typy w `frontend/src/types.ts`, wywołania w `api.ts`:**

@@ -24,7 +24,7 @@ from app.engine.plausibility import (
     due_date_problem,
     taken_in_problem,
 )
-from app.services.sessions import Session, SessionStore
+from app.services.sessions import BUSY, Session, SessionStore, session_lock
 
 router = APIRouter(prefix="/api", tags=["session"])
 
@@ -224,44 +224,49 @@ async def change_scenario(
     loss (`job_loss`) or the months of pay (`mother_pay_history`). The fields given replace the
     saved ones (null clears one); the engine validates the result the same way as after a chat
     tool. The chat history gets a hidden note of what changed, so the assistant knows."""
-    unknown = sorted(set(changes) - set(Scenario.model_fields))
-    if unknown:
-        raise HTTPException(
-            status_code=422, detail=f"Nieznane pola scenariusza: {', '.join(unknown)}."
-        )
-    session = await store.load(session_id)
-    before = session.scenario.model_dump(mode="json")
-    try:
-        scenario = Scenario.model_validate({**before, **changes})
-    except ValidationError as exc:
-        field = ".".join(str(part) for part in exc.errors()[0]["loc"]) or "scenariusz"
-        raise HTTPException(
-            status_code=422, detail=f"Nieprawidłowa wartość pola „{field}”. Sprawdź dane."
-        ) from exc
-    if scenario.anchor_date is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Najpierw potrzebna jest data: przewidywana data porodu albo data urodzenia.",
-        )
-    try:
-        timeline = build_timeline(scenario, params, today)
-    except ScenarioError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    after = scenario.model_dump(mode="json")
-    changed = {k: after[k] for k in changes if after.get(k) != before.get(k)}
-    if changed:
-        listed = "; ".join(
-            f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in sorted(changed.items())
-        )
-        note = (
-            f"{EVENT_MARKER} Rodzic zmienił w aplikacji, bez czatu: {listed}. Oś czasu jest już "
-            "przeliczona; tych odpowiedzi nie zapisuj drugi raz."
-        )
-        history = [*load_history(session), ModelRequest(parts=[UserPromptPart(content=note)])]
-        session.history = ModelMessagesTypeAdapter.dump_python(history, mode="json")
-    session.scenario = scenario
-    await store.save(session_id, session)
-    return SessionStart(scenario=scenario, timeline=timeline, question=next_question(scenario))
+    lock = session_lock(session_id)
+    if lock.locked():
+        raise HTTPException(status_code=409, detail=BUSY)
+    async with lock:
+        unknown = sorted(set(changes) - set(Scenario.model_fields))
+        if unknown:
+            raise HTTPException(
+                status_code=422, detail=f"Nieznane pola scenariusza: {', '.join(unknown)}."
+            )
+        session = await store.load(session_id)
+        before = session.scenario.model_dump(mode="json")
+        try:
+            scenario = Scenario.model_validate({**before, **changes})
+        except ValidationError as exc:
+            field = ".".join(str(part) for part in exc.errors()[0]["loc"]) or "scenariusz"
+            raise HTTPException(
+                status_code=422, detail=f"Nieprawidłowa wartość pola „{field}”. Sprawdź dane."
+            ) from exc
+        if scenario.anchor_date is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Najpierw potrzebna jest data: przewidywana data porodu albo data "
+                "urodzenia.",
+            )
+        try:
+            timeline = build_timeline(scenario, params, today)
+        except ScenarioError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        after = scenario.model_dump(mode="json")
+        changed = {k: after[k] for k in changes if after.get(k) != before.get(k)}
+        if changed:
+            listed = "; ".join(
+                f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in sorted(changed.items())
+            )
+            note = (
+                f"{EVENT_MARKER} Rodzic zmienił w aplikacji, bez czatu: {listed}. Oś czasu jest "
+                "już przeliczona; tych odpowiedzi nie zapisuj drugi raz."
+            )
+            history = [*load_history(session), ModelRequest(parts=[UserPromptPart(content=note)])]
+            session.history = ModelMessagesTypeAdapter.dump_python(history, mode="json")
+        session.scenario = scenario
+        await store.save(session_id, session)
+        return SessionStart(scenario=scenario, timeline=timeline, question=next_question(scenario))
 
 
 @router.get("/session/{session_id}")

@@ -155,3 +155,56 @@ def test_the_next_chat_turn_sees_the_note(client: TestClient, store: MemorySessi
     assert lines[-1] == {"type": "done"}
     assert any(text.startswith(EVENT_MARKER) and "rate_815 = false" in text for text in seen)
     assert "Co dalej?" in seen
+
+
+def test_a_change_during_a_chat_turn_is_refused_not_lost(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """ZADANIA B.15: the chat turn holds the session from loading it to saving it. A change from
+    the interface during the turn gets 409 (Polish detail) instead of being overwritten when the
+    turn saves; after the turn the same change goes through and its note stays in the history."""
+    from fastapi import HTTPException
+
+    from app.api.session import change_scenario
+    from app.services.params import load_params
+    from app.services.sessions import BUSY
+
+    remember(store, FAMILY)
+    refused: list[HTTPException] = []
+
+    async def stream(messages: list[ModelMessage], info: AgentInfo) -> AsyncIterator[str]:
+        # Mid-turn: the interface tries to switch the rate to 81,5%.
+        try:
+            await change_scenario(UUID(SESSION), {"rate_815": True}, store, load_params(), TODAY)
+        except HTTPException as exc:
+            refused.append(exc)
+        yield "Dobrze."
+
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(stream_function=stream)
+    response = client.post("/api/chat", json={"session_id": SESSION, "message": "Co dalej?"})
+    assert response.status_code == 200
+    assert [(e.status_code, e.detail) for e in refused] == [(409, BUSY)]
+    saved = asyncio.run(store.load(UUID(SESSION)))
+    assert saved.scenario.rate_815 is None  # nothing half-applied
+    assert len(saved.history) == 2  # the turn's question and answer
+
+    # After the turn the change goes through, and its note is kept by the next turn.
+    body = client.patch(URL, json={"rate_815": True}).json()
+    assert body["scenario"]["rate_815"] is True
+    app.dependency_overrides[get_chat_model] = lambda: FunctionModel(
+        stream_function=lambda messages, info: _yes()
+    )
+    client.post("/api/chat", json={"session_id": SESSION, "message": "A teraz?"})
+    history = asyncio.run(store.load(UUID(SESSION))).history
+    notes = [
+        part["content"]
+        for message in history
+        for part in message["parts"]
+        if part.get("part_kind") == "user-prompt" and str(part["content"]).startswith(EVENT_MARKER)
+    ]
+    assert len(notes) == 1 and "rate_815 = true" in notes[0]
+    assert asyncio.run(store.load(UUID(SESSION))).scenario.rate_815 is True
+
+
+async def _yes() -> AsyncIterator[str]:
+    yield "Tak."
