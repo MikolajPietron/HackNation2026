@@ -51,6 +51,14 @@ const MARKDOWN: Components = {
   ),
 }
 
+/**
+ * Gemini can answer in two text pieces that Pydantic AI joins with nothing between them, so the
+ * interview question sticks to the sentence before it ("…2027.Chcesz…"). A sentence end right
+ * before a capitalised word starts a new paragraph again ("Dz.U.", "S.A." stay as they are).
+ */
+const GLUED = /([.!?])(?=[A-ZĄĆĘŁŃÓŚŹŻ][a-ząćęłńóśźż])/g
+const unglue = (text: string) => text.replace(GLUED, '$1\n\n')
+
 /** "(Przewodnik ZUS, s. 5; Kodeks pracy, art. 183¹ § 2)" in the text becomes pills below it. */
 const CITATION = /\s*\(([^()]*(?:Przewodnik|Kodeks pracy)[^()]*)\)/g
 
@@ -117,16 +125,26 @@ export function ChatPanel({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
+      {/* Desktop: a slim bar with a close button that is easy to see, above the conversation
+          (not floating over it). */}
       {onCollapse && (
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label="Schowaj asystenta"
-          title="Schowaj asystenta"
-          className="absolute top-2 right-3 z-10 grid size-9 place-items-center rounded-full text-navy-300 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.94] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
-        >
-          <PanelRightClose className="size-4" />
-        </button>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 pt-1 pb-3">
+          <p className="flex items-center gap-2 font-bold text-navy-900">
+            Asystent
+            <span className="rounded-full bg-zus-50 px-2 py-0.5 text-[10px] font-black tracking-wide text-zus-700">
+              AI
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={onCollapse}
+            title="Schowaj asystenta"
+            className="flex h-9 items-center gap-2 rounded-full border border-line bg-white pr-3.5 pl-3 text-sm font-bold text-navy-700 transition-[background-color,color,transform] duration-150 hover:bg-navy-50 hover:text-navy-900 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-zus-400 focus-visible:outline-none"
+          >
+            <PanelRightClose className="size-4" aria-hidden />
+            Schowaj
+          </button>
+        </div>
       )}
 
       <div
@@ -266,7 +284,7 @@ function AssistantMessage({
 }
 
 function TextBlock({ text }: { text: string }) {
-  const { text: clean, sources } = splitCitations(text)
+  const { text: clean, sources } = splitCitations(unglue(text))
   return (
     <div className="w-full text-[15px] leading-relaxed text-navy-700">
       <Markdown components={MARKDOWN}>{clean}</Markdown>
