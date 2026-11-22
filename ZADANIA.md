@@ -57,16 +57,17 @@ Demo online (B.5) **na razie pomijamy** (decyzja z 22.11.2026 w nocy). Zgodnoś�
 ## Komputer A — front
 Zrobione 22.11.2026 w nocy (szczegóły w „Zrobione”): wszystko, co B dał dla frontu (B.3, B.4, B.7, B.8, B.9). Dalej:
 
-1. **Odpis aktu urodzenia (F35, wymóg zadania).** Atrapa przebiegu gov.pl.
-2. **„Jedna rzecz na dziś” (F15).** Najbliższe zadanie z terminem na górze planu.
+1. Prezentacja (do 10 slajdów) i scenariusz filmu (do 3 min) — wymóg formalny; zrzuty z przykładowych rodzin.
+2. Funkcje z FUNKCJE.md P2, gdy zostanie czas: wspólny plan pary (F17), edycja treści zdarzeń w panelu (F36).
 3. Gdy B da: wykres miesiąc po miesiącu (B.12), wniosek o pracę w czasie urlopu (B.13, pokaże się sam), zakładka „Informacja zwrotna” w `/admin` (F38).
 - Eksport terminów do kalendarza (F25) robi front sam z dat silnika (`frontend/src/lib/ics.ts`, w toku razem z nowym „Co przed Wami” i kalendarzem rocznym); B tego nie robi. Po B.15 można zdjąć blokadę zmian w czasie odpowiedzi asystenta (`PlanScreen.apply`).
-4. Przegląd całości na telefonie i desktopie, dostępność (F39: WCAG, kontrast, klawiatura).
+4. Przegląd całości na telefonie i desktopie przed nagraniem filmu.
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- Front (A, 22.11.2026 noc, cd.): przykładowe rodziny bez AI (F19), „Na co uważać” z silnika i cytatów (F26), pasek „Na dziś” (F15), odpis aktu urodzenia — symulacja (F35), wysoki kontrast, AA dla podpisów, fokus klawiatury i lżejszy start (F39); okna atrap nad arkuszem na telefonie działają.
 - B.12 (22.11.2026, F4): **Dla frontu:** `Timeline.monthly: MonthlyPayment[]` — każdy miesiąc od pierwszej do ostatniej wypłaty (`month` "2027-03", `mother`, `father`, `total`, `payment_ids`), miesiące bez wypłaty z 0 i `lines: []` (dołki); `lines[]`: `parent`, `payer` (`employer` / `payer` / `zus` / `payer-or-zus` albo `null`, gdy materiały nie mówią — świadczenie rehabilitacyjne), `payer_label` po polsku, `amount`, `payment_ids`. `Timeline.money_total` (`total`, `mother`, `father`) albo `null`. Kwota miesiąca = dzienna × dni w tym miesiącu, bez dat przelewów; suma miesięcy = suma `payments.total` co do grosza. Front niczego nie sumuje.
 - B.13 (22.11.2026): **Dla frontu:** dokumenty `parental-work-request-<k>` i `parental-father-work-request-<k>` (to samo `k` co `parental-request-<k>`) z `form` (szablon `parental-work`: pola `employee-name`, `work-fraction`, `work-period`, `extension-work`, bez załączników; adresat `employer`) i `deadline` = 21 dni przed podjęciem pracy; `RequestKind` `parental-work-request` w `types.ts` (sprawdzanie wniosku zna ten wniosek). Plan z pracą jest odrzucany, gdy mama straciła pracę w ciąży (nie jest już pracownicą).
 - B.15 (22.11.2026): tura czatu trzyma blokadę sesji od wczytania do zapisu (`session_lock` w `app/services/sessions.py`); `PATCH /api/session/{id}/scenario` w trakcie tury dostaje **409** z polskim `detail` („Asystent właśnie odpowiada… spróbuj ponownie za chwilę”), więc zmiana nie ginie i nic nie jest zapisane w połowie; tura, która zaczyna się w trakcie PATCH, czeka na niego. **Dla frontu:** `changeScenario` przy 409 rzuca błąd z tym komunikatem — ponów zmianę po zdarzeniu `done` (blokadę interfejsu na czas odpowiedzi można zostawić). Test: `test_a_change_during_a_chat_turn_is_refused_not_lost`. Blokada działa w jednym procesie backendu (jak w demo); przy kilku procesach potrzebna byłaby kolumna wersji w `sessions`.
