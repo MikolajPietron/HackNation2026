@@ -129,7 +129,7 @@ Aplikacja z sytuacji rodziny buduje osobistą oś czasu od ciąży do powrotu do
 - **Potwierdzenie przez człowieka:** odczytane dane można poprawić i przeliczyć.
 - **Ocena bez AI:** silnik sprawdza ubezpieczenie chorobowe w dniu powstania prawa, liczy podstawę z miesięcy z Z-3 krok po kroku i zestawia wynik z decyzją ZUS.
 - **„Pokaż na osi”:** sprawa staje się planem.
-- **Zgodność z decyzjami ZUS:** 53 z 59 spraw z jednoznacznym rozstrzygnięciem (77 z 86 spraw przeczytanych), policzone bez AI.
+- **Wynik obok decyzji ZUS:** silnik bez AI sprawdza ubezpieczenie i wylicza kwoty, a wynik stoi obok rozstrzygnięcia ZUS z aktami jako źródłem.
 - **9 przykładowych rodzin** działa bez AI i bez skanów: jedno kliknięcie na ekranie startowym.
 
 ## 12. Asystent AI
@@ -203,7 +203,7 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 - Każdy cytat jest sprawdzany co do znaku i co do strony.
 - Niezależna weryfikacja reguł z dokumentami ZUS, sekcja po sekcji.
 - Asystent sprawdzany na prawdziwym modelu na scenariuszach z ręcznie policzonym wynikiem.
-- Zgodność z decyzjami ZUS na przykładowych sprawach: 53 z 59 spraw z jednoznacznym rozstrzygnięciem.
+- Każda data liczona co do dnia, każda kwota co do grosza; ponad 480 dosłownych cytatów z 7 źródeł.
 
 ## 19. Technologia
 
@@ -217,7 +217,7 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 
 ## 20. Co dalej
 
-- Zgodność na wszystkich 86 sprawach.
+- Przebieg na wszystkich 86 sprawach.
 - Wersje językowe: angielska i ukraińska.
 - Głos: czytanie wyniku na głos i pytania głosem.
 - Zanonimizowana informacja zwrotna dla ZUS: na którym pytaniu rodzice kończą, co ich zaskakuje.

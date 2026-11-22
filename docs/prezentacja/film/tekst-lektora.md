@@ -1,6 +1,6 @@
 # Film: tekst lektora
 
-Głos: ElevenLabs (Paweł, eleven_multilingual_v2). Długość filmu: 2:51.
+Głos: ElevenLabs (Paweł, eleven_multilingual_v2). Długość filmu: 2:56.
 
 ## Problem
 
@@ -32,7 +32,7 @@ Najważniejszy test to prawdziwe sprawy ZUS. Wybieramy sprawę albo wgrywamy ska
 
 ## Trafność
 
-Wynik silnika zgadza się z decyzją ZUS w pięćdziesięciu trzech z pięćdziesięciu dziewięciu spraw z jednoznaczną decyzją. Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a każdy cytat jest sprawdzany z przepisem co do znaku.
+Wszystko liczy silnik reguł, nie sztuczna inteligencja: każdą datę co do dnia i każdą kwotę co do grosza, z przepisem przy każdym kroku. Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a ponad czterysta osiemdziesiąt dosłownych cytatów z przepisów jest sprawdzanych co do znaku.
 
 ## Panel i asystent
 

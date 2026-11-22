@@ -116,7 +116,8 @@ Prosty język, większy tekst, tryb wysokiego kontrastu, widoczny fokus klawiatu
 - **Liczy silnik reguł**: czysty, deterministyczny moduł w Pythonie, bez bazy i bez AI. Te same odpowiedzi zawsze dają tę samą oś.
 - **Każda reguła ma źródło**: dosłowny cytat z numerem strony albo artykułu. Test automatyczny sprawdza każdy cytat co do znaku i co do strony.
 - **Ponad 2 500 testów automatycznych**: oczekiwane daty i kwoty są w nich policzone ręcznie z przepisów.
-- **Zgodność z decyzjami ZUS**: 53 z 59 przykładowych spraw z jednoznacznym rozstrzygnięciem.
+- **Co do dnia i co do grosza**: każda data i każda kwota wynika z przepisu, krok po kroku; wypłaty miesiąc po miesiącu sumują się co do grosza.
+- **Ponad 480 dosłownych cytatów** z 7 źródeł (opis wyzwania, Kodeks pracy, ustawa zasiłkowa, dwa rozporządzenia, Załącznik i Poradnik ZUS).
 - **Parametry to dane**: wszystkie liczby (tygodnie, stawki, terminy, limity) są w pliku parametrów i w panelu, każda ze źródłem.
 
 ## Sztuczna inteligencja

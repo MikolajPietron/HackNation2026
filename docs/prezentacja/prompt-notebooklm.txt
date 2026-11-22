@@ -10,7 +10,7 @@ Akcentuj to, co najważniejsze dla ZUS: uprawnienia ustalone dla konkretnej rodz
 6. Wnioski: co, komu i do kiedy; pracodawca czy ZUS; terminy z Kodeksu pracy; wniosek wypełniony danymi z planu, sprawdzany regułami, PDF. [slajd-06-wnioski]
 7. Zanim coś się wydarzy: test planu na wcześniaka, bliźnięta, utratę pracy; zmiana widoczna na osi przed decyzją; punkty bez powrotu i ryzyka. Nasz główny wyróżnik. [slajd-07-co-jesli]
 8. Tak samo na telefonie: ta sama oś, pionowo, mama i tata obok siebie, kwoty i terminy. [slajd-08-telefon]
-9. Sprawdzone i gotowe na zmiany przepisów: sprawy ZUS wybierane albo wgrywane, wynik obok decyzji ZUS (53 z 59 zgodnych, ponad 2 500 testów); panel administracyjny z wersjami od daty i podglądem skutków. [slajd-09a-sprawy-zus, slajd-09b-panel-admina]
+9. Sprawdzone i gotowe na zmiany przepisów: sprawy ZUS wybierane albo wgrywane, wynik obok decyzji ZUS; każda data co do dnia i kwota co do grosza, ponad 2 500 testów, ponad 480 cytatów sprawdzanych co do znaku; panel administracyjny z wersjami od daty i podglądem skutków. [slajd-09a-sprawy-zus, slajd-09b-panel-admina]
 10. AI pomaga, silnik liczy: asystent prowadzi rozmowę i tłumaczy plan liczbami z silnika i ze źródłem, czyta skany spraw i pisma z ZUS; każda funkcja AI oznaczona; symulacje mObywatel, ZUS, e-ZLA, PUE/eZUS; architektura REST gotowa do wdrożenia, demo online. [slajd-10-asystent-ai]
 
 Styl: białe tło, zieleń #007834 jako kolor główny, granat #283754 w nagłówkach, bursztyn #fab856 tylko przy terminach i ryzykach. Dużo pustej przestrzeni, zaokrąglone karty, miękkie cienie, font bezszeryfowy. Zrzut z telefonu w ramce telefonu, zrzuty z komputera w ramce okna. Bez logo ZUS. Język prosty i konkretny, bez wykrzykników.

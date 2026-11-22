@@ -91,25 +91,25 @@ W kolejnej sprawie liczy podstawę z zaświadczenia płatnika i kwotę za każdy
 Jednym kliknięciem sprawa staje się planem na osi.
 
 24
-00:02:04,110 --> 00:02:13,447
-Wynik silnika zgadza się z decyzją ZUS w pięćdziesięciu trzech z pięćdziesięciu dziewięciu spraw z jednoznaczną decyzją.
+00:02:04,110 --> 00:02:14,956
+Wszystko liczy silnik reguł, nie sztuczna inteligencja: każdą datę co do dnia i każdą kwotę co do grosza, z przepisem przy każdym kroku.
 
 25
-00:02:13,447 --> 00:02:24,172
-Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a każdy cytat jest sprawdzany z przepisem co do znaku.
+00:02:14,956 --> 00:02:29,048
+Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a ponad czterysta osiemdziesiąt dosłownych cytatów z przepisów jest sprawdzanych co do znaku.
 
 26
-00:02:24,872 --> 00:02:34,617
+00:02:29,748 --> 00:02:39,493
 Gdy zmienią się przepisy, ekspert zmienia liczby w panelu, bez programisty, z datą obowiązywania i podglądem skutków.
 
 27
-00:02:34,617 --> 00:02:41,637
+00:02:39,493 --> 00:02:46,513
 A asystent AI tłumaczy plan prostym językiem, zawsze liczbami z silnika i ze źródłem.
 
 28
-00:02:42,737 --> 00:02:45,637
+00:02:47,613 --> 00:02:50,513
 Zasiłkowy Przewodnik Przyszłego Rodzica.
 
 29
-00:02:45,637 --> 00:02:48,821
+00:02:50,513 --> 00:02:53,697
 Wszystko, co się należy, na jednej osi czasu.
