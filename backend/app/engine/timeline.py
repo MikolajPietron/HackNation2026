@@ -160,6 +160,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         + plan_assumptions
         + after_insurance_assumptions(answers),
         payments=draft.payments,
+        bases=draft.bases,
     )
     timeline.assumptions += money_assumptions(scenario, timeline, params)
     # Applications and protection (guide A.4, I): who pays, requests, protection.

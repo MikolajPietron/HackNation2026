@@ -118,18 +118,23 @@ const LAW_NAME: Record<'kp' | 'ustawa', string> = {
 export const sourceLabel = (source: SourceRef) =>
   source.doc === 'przewodnik'
     ? `Przewodnik ZUS, s. ${source.page}${source.page_to ? `–${source.page_to}` : ''}`
-    : `${LAW_NAME[source.doc]}, ${source.article}`
+    : source.doc === 'zalacznik'
+      ? `Załącznik ZUS, ${source.section}`
+      : `${LAW_NAME[source.doc]}, ${source.article}`
 
 /**
  * Where a set of quotes comes from, in one short line: the guide's pages and the articles of
  * the Labour Code and the ustawa zasiłkowa (without paragraphs), e.g. "Przewodnik ZUS, s. 5–7 ·
- * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31".
+ * Kodeks pracy, art. 182¹ᵃ, 182¹ᶜ · Ustawa zasiłkowa, art. 31", and the ZUS Załącznik.
  */
 export function sourcesSummary(sources: SourceRef[]): string {
   const pages = new Set<number>()
   const articles = { kp: new Set<string>(), ustawa: new Set<string>() }
+  let zalacznik = false
   for (const source of sources) {
-    if (source.doc !== 'przewodnik') {
+    if (source.doc === 'zalacznik') {
+      zalacznik = true
+    } else if (source.doc !== 'przewodnik') {
       if (source.article) {
         articles[source.doc].add(
           source.article.replace(/^art\. /, '').replace(/ (§|ust\.|pkt) .*$/, ''),
@@ -144,6 +149,7 @@ export function sourcesSummary(sources: SourceRef[]): string {
   for (const doc of ['kp', 'ustawa'] as const) {
     if (articles[doc].size > 0) parts.push(`${LAW_NAME[doc]}, art. ${[...articles[doc]].join(', ')}`)
   }
+  if (zalacznik) parts.push('Załącznik ZUS')
   return parts.join(' · ')
 }
 
@@ -256,6 +262,11 @@ export function toolLabel(name: string, args: Record<string, unknown>): string {
       return typeof args.amount === 'number'
         ? `Kwota ${whose}: ${formatPln(args.amount)} miesięcznie`
         : `Kwota ${whose}: nie podano`
+    }
+    case 'set_pay_history': {
+      const whose = args.parent === 'father' ? 'taty' : 'mamy'
+      const months = Array.isArray(args.months) ? args.months.length : 0
+      return months > 0 ? `Zarobki ${whose}: ${months} mies.` : `Dane do podstawy zasiłku ${whose}`
     }
     case 'set_rate_choice':
       if (args.rate_815 === true) return 'Zasiłek 81,5% przez cały urlop'

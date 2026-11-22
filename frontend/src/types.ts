@@ -19,10 +19,10 @@ export type TakenIn = 'adoption' | 'foster'
 
 /**
  * A literal quote: from the guide (section and pages), from the Labour Code ('kp') or from the
- * ustawa zasiłkowa ('ustawa'; both: article).
+ * ustawa zasiłkowa ('ustawa'; both: article), or from the ZUS Załącznik ('zalacznik': section).
  */
 export interface SourceRef {
-  doc: 'przewodnik' | 'kp' | 'ustawa'
+  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik'
   quote: string
   section: string | null
   page: number | null
@@ -174,6 +174,10 @@ export interface Scenario {
   taken_in_handover_after_weeks: number | null
   /** Adoption after foster care: the leave already used as a foster family. */
   foster_before: FosterBefore | null
+  // The benefit base in detail (engine/base.py): the payer's certificate (Z-3, Z-3a) typed in.
+  /** Months given win over `mother_pay`; the other fields apply either way. */
+  mother_pay_history: PayHistory | null
+  father_pay_history: PayHistory | null
 }
 
 /** Applied for (no decision yet), granted or refused. */
@@ -186,6 +190,37 @@ export interface FosterBefore {
   leave_end: string | null
   /** Weeks of parental leave used as a foster family. */
   parental_weeks: number | null
+}
+
+/** One calendar month of pay before the right to the benefit, as the payer's certificate gives it. */
+export interface PayMonth {
+  /** "2026-03" */
+  month: string
+  /** PLN. Employee: gross pay for the month (no quarterly or annual bonuses); else the contribution base. */
+  amount: number
+  /** A month not worked in full: days required and days worked (a non-employee: days of the month). */
+  days_required: number | null
+  days_worked: number | null
+  /** Employee, a month in part: the fixed monthly pay from the contract, taken in full. */
+  fixed: number | null
+  /** Employee, with `fixed`: the variable pay for the days worked, topped up by days. */
+  variable: number | null
+  /** Employee: overtime, night work, commission — as paid, never topped up. */
+  not_topped: number | null
+}
+
+export interface PayHistory {
+  months: PayMonth[]
+  /** Quarterly bonuses paid for the four quarters before the month of the right, together. */
+  quarterly_bonuses: number | null
+  /** Annual pay (thirteenth salary, annual award) for the year before the month of the right. */
+  annual_bonus: number | null
+  /** Full-time work: the base is not lower than the minimum. */
+  full_time: boolean | null
+  /** The first day of insurance with this payer; null = not known. */
+  insured_from: string | null
+  /** The monthly pay in the contract: the base in the first month of insurance. */
+  contract_pay: number | null
 }
 
 /**
@@ -276,6 +311,50 @@ export interface Payment {
   sources: SourceRef[]
 }
 
+/** One step of computing a benefit base ("Dlaczego tyle?"), with the rules it applies. */
+export interface BaseStep {
+  text: string
+  sources: SourceRef[]
+}
+
+/**
+ * full = taken as paid; topped-up = worked at least half, topped up; skipped = worked less than
+ * half; outside = not among the months of the base; before-insurance = before insurance began.
+ */
+export type BaseMonthStatus = 'full' | 'topped-up' | 'skipped' | 'outside' | 'before-insurance'
+
+export interface BaseMonth {
+  month: string
+  amount: number
+  /** What enters the average; null = not counted. */
+  counted: number | null
+  status: BaseMonthStatus
+}
+
+/** One parent's monthly benefit base and how it was computed, step by step (engine/base.py). */
+export interface BenefitBase {
+  parent: 'mother' | 'father'
+  work: Work
+  /** The day the right arose that the base is set for. */
+  right_from: string
+  /** The months the base comes from ("2025-11" to "2026-10"); null = from the contract. */
+  months_from: string | null
+  months_to: string | null
+  /** The monthly average before the deduction (with a twelfth of bonuses). */
+  pay: number
+  /** Percent deducted for the contributions (13,71). */
+  deducted: number
+  /** The monthly benefit base. */
+  base: number
+  /** Computed from the months given, not from one monthly amount. */
+  detailed: boolean
+  /** The base in one sentence, after "Podstawa wymiaru zasiłku: ". */
+  summary: string
+  steps: BaseStep[]
+  months: BaseMonth[]
+  sources: SourceRef[]
+}
+
 /**
  * One point of the case explanation: situation = which case this is, right = what the mother is
  * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
@@ -306,6 +385,8 @@ export interface Timeline {
   taken_in: TakenIn | null
   /** Section G: the benefit for each period, once the parent's monthly amount is known. */
   payments: Payment[]
+  /** Each parent's benefit base behind `payments`, step by step. */
+  bases: BenefitBase[]
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */

@@ -306,6 +306,51 @@ class MoneyParams(BaseModel):
     ust. 2)."""
 
 
+class BaseParams(BaseModel):
+    """The benefit base in detail (engine/base.py): ustawa zasiłkowa art. 36-50 (for the maternity
+    benefit through art. 47 and 52) and the chapter of the ZUS Załącznik on the benefit base."""
+
+    months: Param[int]
+    """The base is the average of this many calendar months before the month of the right."""
+    shorter: Rule
+    """Insured for a shorter time: the full calendar months of insurance with this payer."""
+    non_employee_rules: Rule
+    """Which of the employee's rules apply to a non-employee."""
+    first_month: Rule
+    """The right before a full calendar month of insurance: the pay set in the contract."""
+    first_month_by_days: Rule
+    """...or the pay for the days worked, topped up to the days of the month."""
+    first_month_contract: Rule
+    """A contract of mandate in the first month: the income set in the contract."""
+    average: Rule
+    half_skipped: Rule
+    """A month worked less than half is left out."""
+    half_topped: Rule
+    """A month worked at least half is topped up to a full month."""
+    every_month_short: Rule
+    """Every month worked less than half: all of them, topped up."""
+    not_topped: Rule
+    """Overtime, night work, commission: as paid, never topped up."""
+    non_employee_months: Rule
+    """A non-employee: a month of activity less than half is left out, at least half taken as
+    it is; every month reduced: all taken."""
+    bonus_twelfth: Param[int]
+    """Quarterly bonuses (four quarters) and annual pay (a year) enter as one this-many-th."""
+    quarterly: Rule
+    annual: Rule
+    same_base: Rule
+    """No new base when the previous benefit (or the employer's sick pay) ended less than a
+    calendar month before."""
+    minimum_wage: Param[float]
+    """The minimum wage, gross: the base of full-time work is not lower than it less the
+    contributions."""
+    minimum: Rule
+    voluntary_cap: Param[float]
+    """The highest monthly base of the voluntary sickness contribution (a non-employee)."""
+    deduction_employee: Rule
+    deduction_non_employee: Rule
+
+
 class Rules(BaseModel):
     medical_certificate: Rule
     work_until_birth: Rule
@@ -371,6 +416,7 @@ class Params(BaseModel):
     applications: ApplicationParams
     parental_plan: ParentalPlanParams
     money: MoneyParams
+    benefit_base: BaseParams
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""

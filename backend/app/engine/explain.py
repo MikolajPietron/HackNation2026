@@ -10,12 +10,14 @@ import datetime as dt
 
 from app.engine.after_insurance import after_job_loss, insurance_note, leave_before_cut
 from app.engine.applications import application_notes
+from app.engine.base import add_base_notes
 from app.engine.draft import DAY, days_between
 from app.engine.explain_adoption import taken_in_notes
 from app.engine.father import MATERNITY_PARTS
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage
 from app.engine.loss import Loss, child_loss
 from app.engine.models import CaseNote, Marker, Scenario, Segment, SourceRef, Timeline
+from app.engine.money import NOTE_ID as MONEY_NOTE
 from app.engine.money import add_money_notes
 from app.engine.params import Params, Rule
 from app.engine.parental import for_children, parental_table, parental_weeks
@@ -40,7 +42,9 @@ def case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[C
     at = next((i for i, n in enumerate(notes) if n.id == "computed"), len(notes))
     notes = notes[:at] + plan + notes[at:]
     # Section G: the choice of rate joins the choices, the amounts come after the dates.
-    return add_money_notes(notes, scenario, timeline, params)
+    notes = add_money_notes(notes, scenario, timeline, params)
+    # The benefit base in detail (base.py): how it was computed, before the amounts.
+    return add_base_notes(notes, timeline, before=MONEY_NOTE)
 
 
 def _case_notes(scenario: Scenario, timeline: Timeline, params: Params) -> list[CaseNote]:

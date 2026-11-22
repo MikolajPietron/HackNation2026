@@ -924,4 +924,43 @@ SCENARIOS = [
             },
         ],
     },
+    {
+        "id": "pay-history-z3",
+        "about": "the user types the payer's certificate (Z-3); the calculator computes the base "
+        "(ustawa art. 36, 38 ust. 2, 42 ust. 3; Załącznik)",
+        "runs": 2,
+        "onboarding": MOTHER_EXPECTED,
+        "steps": [
+            {"event": "timeline_ready", "question": "leave-before-birth"},
+            {
+                # The right arises on the due date, 15.03.2027 (no leave before it yet): the
+                # months are March 2026–February 2027. July: 8 of 23 days, less than half (16 <
+                # 23), left out (art. 38 ust. 2 pkt 1). 4 × 7000 + 3 × 9000 = 55 000 / 7 =
+                # 7857,14; × (100% − 13,71%) = 6779,93 zł.
+                "say": "Przepisuję zarobki brutto z zaświadczenia Z-3: marzec 2026 — 7000 zł, "
+                "kwiecień — 7000 zł, maj — 7000 zł, czerwiec — 7000 zł, lipiec — 2400 zł "
+                "(przepracowałam 8 z 23 dni, reszta to zwolnienie), sierpień — 9000 zł, "
+                "wrzesień — 9000 zł, październik 2026 — 9000 zł.",
+                "tools": [{"name": "set_pay_history", "args": {"parent": "mother"}}],
+                "no_tools": ["set_monthly_pay"],
+                "timeline": {"bases": {"mother": 6779.93}, "notes": ["base-mother"]},
+                "changed_notes": ["base-mother"],
+                "question": "leave-before-birth",
+            },
+            {
+                # The thirteenth salary for the last year enters as a twelfth (art. 42 ust. 3):
+                # 8400 / 12 = 700; 7857,14 + 700 = 8557,14; × 0,8629 = 7383,96 zł. Above the
+                # minimum (4806 × 0,8629 = 4147,10), so full time changes nothing.
+                "say": "Pracuję na pełny etat i dostaję trzynastkę: za ostatni rok 8400 zł.",
+                "tools": [
+                    {
+                        "name": "set_pay_history",
+                        "args": {"parent": "mother", "annual_bonus": 8400, "full_time": True},
+                    }
+                ],
+                "timeline": {"bases": {"mother": 7383.96}},
+                "question": "leave-before-birth",
+            },
+        ],
+    },
 ]

@@ -1,6 +1,9 @@
 # Dokumenty od ZUS (przykładowe sprawy i materiały) – poufne, tylko na użytek HackNation.
 # Nie wolno ich kopiować ani rozpowszechniać, więc nigdy nie trafiają do repo.
 docs/dokumentyZUS/
+# Tekst rozdziału Załącznika ZUS do cytowania — budowany lokalnie z materiałów
+# (python3 tools/przewodnik/extract_zalacznik.py), też nie trafia do repo.
+backend/app/assistant/zalacznik.json
 
 # Sekrety
 .env

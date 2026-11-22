@@ -32,7 +32,7 @@ from app.engine import (
     changed_element_ids,
     changed_note_ids,
 )
-from app.engine.insurance import NOT_INSURED
+from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     BirthWeek,
     ChildLoss,
@@ -41,6 +41,8 @@ from app.engine.models import (
     MotherEvent,
     ParentalPart,
     PayerSize,
+    PayHistory,
+    PayMonth,
     RehabStatus,
     Role,
     TakenIn,
@@ -1017,6 +1019,89 @@ async def set_monthly_pay(
         "pay-sick-pay",
         "pay-sick-benefit",
     )
+
+
+# The benefit base in detail (engine/base.py): the data of the payer's certificate.
+
+
+@assistant.tool(sequential=True)
+async def set_pay_history(
+    ctx: RunContext[AssistantDeps],
+    parent: Literal["mother", "father"],
+    months: list[PayMonth] | None = None,
+    quarterly_bonuses: Annotated[float, Field(ge=0)] | None = None,
+    annual_bonus: Annotated[float, Field(ge=0)] | None = None,
+    full_time: bool | None = None,
+    insured_from: dt.date | None = None,
+    contract_pay: Annotated[float, Field(gt=0)] | None = None,
+    replace: bool = False,
+) -> str:
+    """Record what a parent's benefit base is computed from, in detail, as the user gave it:
+    pay month by month (e.g. copied from the payer's certificate Z-3 or Z-3a, from payslips or
+    from the declared contribution base), quarterly and annual bonuses, full-time work, the start
+    of insurance with this payer, the monthly pay in the contract. The calculator computes the
+    base and the benefit: never sum, average, top up or compute anything yourself, and never
+    guess a number the user did not give. Fields left out keep what was recorded; a month given
+    again replaces that month.
+
+    Args:
+        parent: Whose pay it is.
+        months: Calendar months before the right to the benefit, each with: month ("RRRR-MM");
+            amount in PLN (an employee: gross pay for that month without quarterly and annual
+            bonuses; a contract or business: the base of the sickness contribution); and only if
+            the user gave them, for a month not worked in full (e.g. sick leave): days_required
+            (days to work that month) and days_worked; fixed (the fixed monthly pay from the
+            contract) and variable (variable pay for the days worked); not_topped (overtime,
+            night work, commission in that month).
+        quarterly_bonuses: Quarterly bonuses and awards paid for the four quarters before,
+            together.
+        annual_bonus: Annual pay (the thirteenth salary, an annual award) for the year before.
+        full_time: True = works full time; False = part time.
+        insured_from: The first day of insurance with this payer (this contract, this business).
+        contract_pay: The monthly pay (or contract income) set in the contract.
+        replace: True = forget what was recorded for this parent before and keep only this;
+            with nothing else given it removes the record.
+    """
+    scenario = ctx.deps.scenario
+    work = scenario.mothers_work if parent == "mother" else scenario.fathers_work
+    cover = coverage(scenario) if parent == "mother" else father_coverage(scenario)
+    who = "mama" if parent == "mother" else "tata"
+    if work not in ("employment", "contract", "business") or cover in NOT_INSURED:
+        raise ModelRetry(
+            f"Podstawę zasiłku liczymy tylko, gdy {who} pracuje i podlega ubezpieczeniu "
+            "chorobowemu. Najpierw ustal, jak pracuje."
+        )
+    if any(0 < m.amount < MIN_MONTHLY_PAY for m in months or []):
+        raise ModelRetry(
+            "To bardzo mała kwota miesięczna. Zapisz ją w złotych (np. 8000, a nie 8) albo "
+            "dopytaj użytkownika."
+        )
+    field = "mother_pay_history" if parent == "mother" else "father_pay_history"
+    recorded = getattr(scenario, field)
+    old = PayHistory() if replace or recorded is None else recorded
+    given = {m.month: m for m in months or []}
+    changes = {
+        name: value
+        for name, value in (
+            ("quarterly_bonuses", quarterly_bonuses),
+            ("annual_bonus", annual_bonus),
+            ("full_time", full_time),
+            ("insured_from", insured_from),
+            ("contract_pay", contract_pay),
+        )
+        if value is not None
+    }
+    kept = [m for m in old.months if m.month not in given]
+    try:
+        history = PayHistory.model_validate(
+            old.model_dump() | changes | {"months": [*kept, *given.values()]}
+        )
+    except ValidationError as exc:
+        raise ModelRetry(f"Nie zapisano: {exc.errors()[0]['msg']}") from exc
+    empty = history == PayHistory()
+    updated = _with(ctx, **{field: None if empty else history.model_dump()})
+    first = "pay-maternity" if parent == "mother" else "pay-paternity"
+    return await _apply(ctx, updated, first, "pay-parental", "pay-parental-father")
 
 
 @assistant.tool(sequential=True)

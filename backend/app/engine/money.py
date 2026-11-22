@@ -27,12 +27,13 @@ adding one entry there (and, for a new rule, one `Kind` and one branch in `piece
 - job-loss: the benefit equal to the maternity benefit until the birth, 100% (guide page 4).
 The base: the average monthly pay of the 12 calendar months before (an employee: art. 36 ust. 1,
 with art. 47 for the maternity benefit and the benefit equal to it) or the average monthly income
-(a contract or a business: art. 48 ust. 1 with art. 52), less 13,71% (art. 3 pkt 3-4). The amount
-the parent gives is taken as that average: the simple case of 12 full months with the same pay.
+(a contract or a business: art. 48 ust. 1 with art. 52), less 13,71% (art. 3 pkt 3-4): base.py,
+from the amount the parent gives or from the months of the payer's certificate, once per parent,
+for the first paid period.
 Every benefit is due for every day, days off work included (art. 31 ust. 5, art. 11 ust. 4; sick
 pay: art. 92 § 2); the base for one day is one thirtieth of the monthly base (art. 36 ust. 3).
-Amounts appear only for a parent whose monthly amount was given in the chat; the onboarding's
-range of earnings is never used.
+Amounts appear only for a parent whose monthly amount (or months of pay) was given in the chat;
+the onboarding's range of earnings is never used.
 
 Our readings, not settled by the materials (CLAUDE.md, open questions):
 - an employee's own contributions (art. 3 pkt 3) are 13,71% of the gross pay, as the ZUS
@@ -50,24 +51,27 @@ Our readings, not settled by the materials (CLAUDE.md, open questions):
   time worked), for the weeks of work only;
 - the benefit equal to the maternity benefit is counted like the maternity benefit: every day,
   one thirtieth of the monthly amount;
-- no minimum base (art. 45), no top-up to the parental allowance (art. 31 ust. 3a) and no cap on
-  the base of the sickness benefit after the insurance ended (art. 46): their amounts are not in
-  the materials.
+- no top-up to the parental allowance (art. 31 ust. 3a) and no cap on the base of the sickness
+  benefit after the insurance ended (art. 46): their amounts are not in the materials.
 """
 
 import datetime as dt
 import re
 from dataclasses import dataclass, replace
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from fractions import Fraction
 from typing import Literal
 
 from app.engine.adoption import cover_of, taker
 from app.engine.after_insurance import PERIODS as AFTER_BIRTH
 from app.engine.after_insurance import after_job_loss, confirmed
+from app.engine.amounts import cents, percent, pln
+from app.engine.base import NoBase, base_assumptions
+from app.engine.base import benefit_base as compute_base
 from app.engine.draft import DAY, WEEK, Draft, days_between, merge_sources, one_year_later
 from app.engine.insurance import NOT_INSURED, Coverage, coverage, father_coverage, work_coverage
 from app.engine.loss import Loss
+from app.engine.models import BenefitBase as Base
 from app.engine.models import (
     CaseNote,
     Marker,
@@ -76,14 +80,12 @@ from app.engine.models import (
     Segment,
     SourceRef,
     Timeline,
-    Work,
 )
 from app.engine.params import Param, Params
 from app.engine.parental_plan import fraction, part_ids, work_weeks
 from app.engine.wording import fmt, long_date
 
 Parent = Literal["mother", "father"]
-CENT = Decimal("0.01")
 WHOSE = {"mother": "mamy", "father": "taty"}
 WHO = {"mother": "mama", "father": "tata"}
 
@@ -171,20 +173,6 @@ def paid_for(segment_id: str) -> Paid | None:
     return PAID.get(segment_id) or PAID.get(re.sub(r"-\d+$", "", segment_id))
 
 
-def cents(amount: Decimal) -> Decimal:
-    return amount.quantize(CENT, rounding=ROUND_HALF_UP)
-
-
-def pln(amount: Decimal) -> str:
-    """6 903,20 zł"""
-    return f"{cents(amount):,.2f}".replace(",", " ").replace(".", ",") + " zł"
-
-
-def percent(rate: Decimal) -> str:
-    """100%, 81,5%"""
-    return f"{rate.normalize():f}".replace(".", ",") + "%"
-
-
 def _dec(value: float) -> Decimal:
     return Decimal(str(value))
 
@@ -199,33 +187,58 @@ def rates(params: Params) -> tuple[str, str, str]:
     )
 
 
-@dataclass(frozen=True)
-class Base:
-    """One parent's benefit base."""
-
-    parent: Parent
-    work: Work
-    pay: Decimal
-    """The monthly amount the parent gave: gross pay, or the contribution base."""
-    deducted: Decimal
-    """Percent of `pay` deducted for the contributions."""
-    base: Decimal
-    """`pay` less the contributions: the monthly benefit base."""
-
-    @property
-    def employee(self) -> bool:
-        return self.work == "employment"
+SICK_KINDS = ("sick-pay", "sick-benefit", "rehab", "job-loss")
+"""Benefits in pregnancy: their right arises on their own first day."""
 
 
-def benefit_base(scenario: Scenario, parent: Parent, params: Params) -> Base | None:
-    """The parent's benefit base, when the amount and the kind of work are known."""
-    pay = scenario.mother_pay if parent == "mother" else scenario.father_pay
-    work = scenario.mothers_work if parent == "mother" else scenario.fathers_work
-    if not isinstance(pay, float | int) or work not in ("employment", "contract", "business"):
-        return None
-    amount = _dec(pay)
-    deducted = _dec(params.money.contributions_percent.value)
-    return Base(parent, work, amount, deducted, cents(amount * (100 - deducted) / 100))
+def bases_for(
+    segments: list[Segment], scenario: Scenario, params: Params
+) -> tuple[dict[str, Base | None], list[Base], list[str]]:
+    """The base (base.py) of every paid period, by segment id; the bases found, the main one of
+    each parent first; and, where a base cannot be computed, why (a warning).
+
+    Each parent has a main base, set for the first day of their first paid period after the
+    pregnancy (maternity leave and the rest): base.py keeps the base of a sick leave in pregnancy
+    that it follows without a break of a month (art. 43). The benefits in pregnancy get a base
+    of their own from their first day; when the main base follows them, it is the same one."""
+    by_segment: dict[str, Base | None] = {}
+    kept: list[Base] = []
+    warnings: list[str] = []
+
+    def compute(parent: Parent, right_from: dt.date) -> Base | None:
+        found = compute_base(scenario, parent, params, right_from, segments)
+        if isinstance(found, NoBase):
+            if found.reason not in warnings:
+                warnings.append(found.reason)
+            return None
+        return found
+
+    for parent in ("mother", "father"):
+        paid = sorted(
+            (s for s in segments if s.lane == parent and paid_for(s.id) is not None),
+            key=lambda s: s.start,
+        )
+        sick = [s for s in paid if paid_for(s.id).kind in SICK_KINDS]  # type: ignore[union-attr]
+        rest = [s for s in paid if s not in sick]
+        main = compute(parent, rest[0].start) if rest else None
+        early = None
+        if sick:
+            early = compute(parent, sick[0].start)
+            if main is not None and early is not None and early.right_from == main.right_from:
+                early = main
+        for s in rest:
+            by_segment[s.id] = main
+        for s in sick:
+            by_segment[s.id] = early
+        kept += [b for b in (main, early) if b is not None and b not in kept]
+    return by_segment, kept, warnings
+
+
+def _bases_of(timeline: Timeline) -> dict[str, Base | None]:
+    """Each parent's main base (the first one kept for them)."""
+    return {
+        p: next((b for b in timeline.bases if b.parent == p), None) for p in ("mother", "father")
+    }
 
 
 def monthly(base: Base, rate: Decimal) -> Decimal:
@@ -255,7 +268,16 @@ def request_deadline(birth: dt.date, params: Params) -> dt.date:
 def money_active(scenario: Scenario) -> bool:
     """Section G joins the timeline once the interview has reached it: a monthly amount (or
     that it is unknown) or the mother's choice of rate."""
-    return any(v is not None for v in (scenario.mother_pay, scenario.father_pay, scenario.rate_815))
+    return any(
+        v is not None
+        for v in (
+            scenario.mother_pay,
+            scenario.father_pay,
+            scenario.rate_815,
+            scenario.mother_pay_history,
+            scenario.father_pay_history,
+        )
+    )
 
 
 def pay_matters(scenario: Scenario, parent: Parent) -> bool:
@@ -481,16 +503,13 @@ def _with_work(found: list[Piece], segment: Segment, ctx: Context) -> list[Piece
 
 
 def priced(
-    segments: list[Segment], scenario: Scenario, ctx: Context
+    segments: list[Segment], scenario: Scenario, ctx: Context, bases: dict[str, Base | None]
 ) -> list[tuple[Segment, Paid, Piece, Base]]:
-    """Every paid day on the timeline, for a parent whose amount is known."""
-    bases: dict[str, Base | None] = {
-        p: benefit_base(scenario, p, ctx.params) for p in ("mother", "father")
-    }
+    """Every paid day on the timeline whose base is known (`bases`: by segment id)."""
     found = []
     for segment in segments:
         paid = paid_for(segment.id)
-        base = bases.get(segment.lane)
+        base = bases.get(segment.id)
         if paid is None or base is None:
             continue
         found += [(segment, paid, piece, base) for piece in pieces(segment, paid, ctx)]
@@ -514,7 +533,10 @@ def money_rules(
     ctx = context(draft.segments, scenario, params, birth, cover)
     if _choice_open(draft.segments, scenario, ctx, cover, loss):
         draft.markers.append(_deadline_marker(scenario, ctx))
-    draft.payments += payments(draft.segments, scenario, ctx)
+    bases, kept, warnings = bases_for(draft.segments, scenario, params)
+    draft.bases += kept
+    draft.warnings += warnings
+    draft.payments += payments(draft.segments, scenario, ctx, bases)
 
 
 def taken_in_money(timeline: Timeline, scenario: Scenario, params: Params) -> None:
@@ -528,12 +550,17 @@ def taken_in_money(timeline: Timeline, scenario: Scenario, params: Params) -> No
         timeline.markers = sorted(
             [*timeline.markers, _deadline_marker(scenario, ctx)], key=lambda m: m.date
         )
-    timeline.payments = payments(timeline.segments, scenario, ctx)
+    bases, kept, warnings = bases_for(timeline.segments, scenario, params)
+    timeline.bases = kept
+    timeline.warnings += warnings
+    timeline.payments = payments(timeline.segments, scenario, ctx, bases)
     timeline.assumptions += money_assumptions(scenario, timeline, params)
 
 
-def payments(segments: list[Segment], scenario: Scenario, ctx: Context) -> list[Payment]:
-    found = priced(segments, scenario, ctx)
+def payments(
+    segments: list[Segment], scenario: Scenario, ctx: Context, bases: dict[str, Base | None]
+) -> list[Payment]:
+    found = priced(segments, scenario, ctx, bases)
     count: dict[str, int] = {}
     for segment, *_ in found:
         count[segment.id] = count.get(segment.id, 0) + 1
@@ -603,25 +630,12 @@ def _deadline_marker(scenario: Scenario, ctx: Context) -> Marker:
 
 
 def _base_line(base: Base, first: str = "Podstawa") -> str:
-    what = (
-        "wynagrodzenia brutto" if base.employee else "podstawy składki na ubezpieczenie chorobowe"
-    )
-    return (
-        f"{first} wymiaru zasiłku: {pln(base.pay)} {what} pomniejszone o "
-        f"{percent(base.deducted)}, czyli "
-        f"{pln(base.base)} miesięcznie."
-    )
+    return f"{first} wymiaru zasiłku: {base.summary}"
 
 
 def _base_sources(base: Base, params: Params) -> list[SourceRef]:
-    m = params.money
-    rule = m.base_employee if base.employee else m.base_non_employee
-    contributions = [
-        s
-        for s in m.contributions_percent.sources
-        if s.article == ("art. 3 pkt 3" if base.employee else "art. 3 pkt 4")
-    ]
-    return merge_sources(rule.sources, contributions)
+    """Every step of the base (base.py)."""
+    return base.sources
 
 
 def _kind_sources(kind: Kind, base: Base, params: Params) -> list[SourceRef]:
@@ -907,8 +921,9 @@ def _choice_note(scenario: Scenario, timeline: Timeline, params: Params) -> Case
 def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Request) -> str:
     """Both ways, for the requesting parent's leave and parental leave as the timeline shows
     them (the same rules as the payments: part-time work, the first year)."""
-    if benefit_base(scenario, req.who, params) is None:
+    if _bases_of(timeline).get(req.who) is None:
         return ""
+    bases, _, _ = bases_for(timeline.segments, scenario, params)
     rf, rp, rs = rates(params)
     periods = [
         s for s in timeline.segments if s.lane == req.who and _kind(s) in ("maternity", "parental")
@@ -921,7 +936,7 @@ def _comparison(scenario: Scenario, timeline: Timeline, params: Params, req: Req
             sum(
                 (
                     _amounts(base, _dec(piece.rate.value), piece.work, params)[1] * piece.days
-                    for _, _, piece, base in priced(periods, asked, ctx)
+                    for _, _, piece, base in priced(periods, asked, ctx, bases)
                 ),
                 Decimal(0),
             )
@@ -941,12 +956,15 @@ def _computed_note(scenario: Scenario, timeline: Timeline, params: Params) -> Ca
         return None
     m = params.money
     ctx = _timeline_context(scenario, timeline, params)
-    used = priced(timeline.segments, scenario, ctx)
+    used = priced(
+        timeline.segments, scenario, ctx, bases_for(timeline.segments, scenario, params)[0]
+    )
+    bases = _bases_of(timeline)
     parts = []
     sources: list[list[SourceRef]] = []
     for parent, who in (("mother", "Mama"), ("father", "Tata")):
         paid = [p for p in timeline.payments if p.lane == parent]
-        base = benefit_base(scenario, parent, params)
+        base = bases[parent]
         if not paid or base is None:
             continue
         periods = "; ".join(
@@ -992,22 +1010,17 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
         return []
     rf, rp, rs = rates(params)
     assumptions = []
-    bases = [b for p in ("mother", "father") if (b := benefit_base(scenario, p, params))]
     kinds = {paid.kind for p in timeline.payments if (paid := paid_for(p.segment_id))}
     if timeline.payments:
         assumptions += [
-            "Podaną kwotę miesięczną traktujemy jako przeciętną z 12 pełnych miesięcy "
-            "kalendarzowych przed miesiącem, w którym powstało prawo do zasiłku: tak jest, gdy "
-            "przez cały ten czas była taka sama. Inne przypadki (krótsze ubezpieczenie, miesiące "
-            "z nieobecnością, premie kwartalne i roczne) liczy się inaczej i tego jeszcze nie "
-            "pokazujemy.",
             "Kwoty zaokrąglamy do pełnych groszy (od pół grosza w górę): podstawę, kwotę "
             "miesięczną i kwotę za dzień; kwota za okres to kwota za dzień razy liczba dni. "
             "Pokazujemy zasiłek bez potrąceń, np. zaliczki na podatek.",
-            "Nie stosujemy minimalnej podstawy wymiaru (art. 45 ustawy zasiłkowej) ani "
-            "podwyższenia zasiłku do kwoty świadczenia rodzicielskiego (art. 31 ust. 3a): tych "
-            "kwot nie ma w naszych materiałach.",
+            "Nie stosujemy podwyższenia zasiłku do kwoty świadczenia rodzicielskiego (art. 31 "
+            "ust. 3a ustawy zasiłkowej): tej kwoty nie ma w naszych materiałach.",
         ]
+    # The benefit base in detail (base.py).
+    assumptions += base_assumptions(timeline)
     if kinds & {"sick-pay", "sick-benefit", "rehab", "job-loss"}:
         assumptions.append(
             "Wynagrodzenie chorobowe, zasiłek chorobowy i zasiłek w wysokości zasiłku "
@@ -1030,17 +1043,6 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
             "niż przeciętne wynagrodzenie (art. 46 ustawy zasiłkowej). Tej kwoty nie ma "
             "w materiałach, więc tej granicy nie stosujemy."
         )
-    if any(b.employee for b in bases):
-        assumptions.append(
-            "Od wynagrodzenia brutto pracownika odejmujemy 13,71%: tyle wynoszą jego składki na "
-            "ubezpieczenia emerytalne, rentowe i chorobowe według Załącznika ZUS. Wyciąg "
-            "z ustawy wymienia te składki, ale nie podaje ich stawek."
-        )
-    if any(not b.employee for b in bases):
-        assumptions.append(
-            "Przy umowie zlecenia i własnej firmie liczymy z podanej podstawy składki "
-            "chorobowej. Górnej granicy tej podstawy wyciąg z ustawy nie podaje."
-        )
     marker = next((mk for mk in timeline.markers if mk.id == DEADLINE_ID), None)
     if marker is not None:
         days = (marker.date - timeline.birth_date).days
@@ -1056,7 +1058,8 @@ def money_assumptions(scenario: Scenario, timeline: Timeline, params: Params) ->
             f"{rf} jego podstawy: materiały nie mówią wprost, czy {rs} obejmuje też jego część."
         )
     ctx = _timeline_context(scenario, timeline, params)
-    used = [piece for _, _, piece, _ in priced(timeline.segments, scenario, ctx)]
+    by_segment = bases_for(timeline.segments, scenario, params)[0]
+    used = [piece for _, _, piece, _ in priced(timeline.segments, scenario, ctx, by_segment)]
     if any(piece.work is not None for piece in used):
         assumptions.append(
             "„Proporcjonalnie do wymiaru czasu pracy” czytamy tak: przy pracy na 1/2 etatu "

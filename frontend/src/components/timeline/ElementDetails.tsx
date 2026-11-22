@@ -239,8 +239,9 @@ const numbersIn = (text: string) => new Set(text.match(/\d+(?:,\d+)?/g) ?? [])
  * (e.g. 31 weeks for twins: the guide quotes only the 20 weeks of one child).
  */
 function Sources({ sources, text }: { sources: SourceRef[]; text: string }) {
-  const guide = sources.filter((s) => s.doc === 'przewodnik')
-  const law = sources.filter((s) => s.doc !== 'przewodnik')
+  // The ZUS Załącznik is shown with the guide: both are ZUS's own words, not the law.
+  const guide = sources.filter((s) => s.doc === 'przewodnik' || s.doc === 'zalacznik')
+  const law = sources.filter((s) => s.doc === 'kp' || s.doc === 'ustawa')
   const inGuide = numbersIn(guide.map((s) => s.quote).join(' '))
   const inLaw = numbersIn(law.map((s) => s.quote).join(' '))
   const onlyInLaw = [...numbersIn(text)].some((n) => inLaw.has(n) && !inGuide.has(n))
