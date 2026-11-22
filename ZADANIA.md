@@ -13,6 +13,13 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 
 ## Komputer B — logika
 
+### 0. PILNE: czat zadaje złe pytanie wywiadu (błąd zgłoszony 22.11.2026)
+- Objaw: dziecko w drodze, termin porodu zapisany (23.01.2027). Rodzic klika chip „Wcześniak”, który wysyła „Co się zmieni, jeśli dziecko urodzi się przedwcześnie?”. Asystent kończy odpowiedź pytaniem „Kiedy jest przewidywany poród albo kiedy urodziło się dziecko? Podaj dzień, miesiąc i rok.”, czyli pyta o datę, którą już zna.
+- Przyczyna: stan jest dobry. `next_question` zwraca `leave-before-birth`, a front pokazuje do niego poprawne szybkie odpowiedzi. Ostatnie zdanie odpowiedzi pisze jednak model: `prompts.py` (linie ~60, ~144, ~170) i `describe.py` (`Następne pytanie wywiadu (zadaj je dokładnie tak)`) tylko go o to proszą. Gemini Flash (`LLM_MODEL=gemini-flash-latest` na komputerze A) czasem uznaje, że do wcześniaka potrzebna jest data urodzenia, i sam układa pytanie. W 4 powtórzeniach na czystej sesji się nie pojawiło, czyli błąd jest losowy, ale prawdziwy.
+- Poprawka (deterministyczna): pytanie wywiadu dokleja serwer, nie model. Prompt zabrania modelowi zadawania pytań wywiadu („aplikacja doda je sama pod Twoją odpowiedzią”), a `chat.py` po zakończeniu odpowiedzi wysyła `question.text` jako ostatnią porcję tekstu (albo osobne zdarzenie `question`, które front pokaże jako dymek). Doklejone pytanie musi też trafić do historii modelu, żeby kolejna tura wiedziała, o co zapytano.
+- Gotowe, gdy: test na skryptowanym modelu, który „pisze własne pytanie”, pokazuje w odpowiedzi tylko pytanie z kodu; przypadek „wcześniak przy znanym terminie” jest w `tools/eval`.
+- Doraźnie na komputerze A można zmienić model czatu na `gemini-pro-latest` (lepiej trzyma się instrukcji, ale jest wolniejszy).
+
 ### 1. Pełna podstawa wymiaru (kalkulator f)
 Zadanie: „kalkulator wysokości zasiłku przy uwzględnianiu indywidualnej podstawy wymiaru zasiłku – symulacja zasiłku przy uwzględnieniu konkretnej sprawy z podanych w zestawach”.
 - Reguły z Załącznika (CLAUDE.md, „Podstawa wymiaru”): 12 pełnych miesięcy, miesiące przepracowane w mniej niż połowie pomijane, w co najmniej połowie uzupełniane, premie kwartalne i roczne jako 1/12, krótsze zatrudnienie, nie-pracownik z podstawy składek, limit 2026, przerwa krótsza niż miesiąc.
