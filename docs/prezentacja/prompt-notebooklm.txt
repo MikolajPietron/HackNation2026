@@ -1,0 +1,15 @@
+Przygotuj prezentację po polsku dla jury hackathonu HackNation 2026 (wyzwanie ZUS). Opieraj się wyłącznie na źródle. Nie dodawaj liczb, funkcji ani obietnic, których w nim nie ma.
+
+Najwyżej 10 slajdów, w tej kolejności:
+1. Tytuł: „Zasiłkowy Przewodnik Przyszłego Rodzica” i jedno zdanie o tym, co robi.
+2. Problem rodzica i to, czego chce ZUS (jeden zintegrowany kalkulator).
+3. Rozwiązanie: osobista oś czasu. Ścieżki Dziecko, Mama, Tata, Pieniądze, Dokumenty.
+4. Co liczy silnik reguł: ciąża, mama, tata, strata dziecka, przyjęcie dziecka, kto płaci, ochrona.
+5. Pieniądze: stawki, przykład z 8 000 zł brutto, kalendarz wypłat, „Dlaczego tyle?”.
+6. Wyróżniki: plany dla celu, test odporności, „nie zostawiajcie tego na stole”, punkty bez powrotu.
+7. Wnioski i dokumenty: wypełnianie na dokumencie, PDF, sprawdzanie, terminy, pismo z ZUS.
+8. Gdzie jest AI, a gdzie go nie ma. Zdanie przewodnie: „Liczy silnik reguł, nie AI”.
+9. Przykładowe sprawy ZUS, raport zgodności i panel administracyjny.
+10. Dlaczego można temu ufać i co dalej.
+
+Styl: jasny, nowoczesny, dużo pustej przestrzeni. Białe tło, zieleń #007834 jako kolor główny, granat #283754 do nagłówków, bursztyn #fab856 tylko jako akcent przy terminach. Zaokrąglone karty, miękkie cienie. Mało tekstu na slajdzie: nagłówek i 3–5 krótkich punktów. Oś czasu rysuj jako poziome pasy z zaokrąglonymi klipami. Nie używaj logo ZUS i nie udawaj strony ZUS.
