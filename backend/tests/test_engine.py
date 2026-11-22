@@ -363,7 +363,15 @@ def test_without_sickness_insurance_there_are_no_benefit_periods(
         # An employed father has his requests, who pays and his protection (guide A.4, I).
         employed = answers.get("role") == "father"
         extra = ["protection", "payer", "applications"] if employed else []
-        assert [n.id for n in t.notes] == ["situation", "insurance", "father", "computed", *extra]
+        # F14 (no_right.py): right after "no right", what instead and what would give it.
+        assert [n.id for n in t.notes] == [
+            "situation",
+            "insurance",
+            "insurance-way",
+            "father",
+            "computed",
+            *extra,
+        ]
         assert t.notes[1].kind == "risk"
         assert t.notes[1].title == "Zasiłek macierzyński wymaga ubezpieczenia chorobowego"
         # Ustawa art. 30 ust. 1: the benefit after the insurance ended follows an employment

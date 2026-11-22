@@ -836,6 +836,8 @@ def plan_scenarios() -> list[dict[str, Any]]:
             {"parent": "mother", "weeks": 12, "start": "2028-06-01"},
         ],
         [{"parent": "father", "weeks": 20}],
+        # F9: weeks of the pool the plan leaves out (some of them the father's alone).
+        [{"parent": "mother", "weeks": 20}, {"parent": "father", "weeks": 5}],
     ]
     cases = [
         base
@@ -878,6 +880,16 @@ def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) ->
             assert step.sources, (base.parent, step.text)
             for source in step.sources:
                 assert is_literal(source), (base.parent, source.quote)
+    # F10 (leftover.py): a point of no return quotes what its marker already quotes.
+    for marker in timeline.markers:
+        if marker.irreversible is not None:
+            assert marker.irreversible.sources, marker.id
+            assert all(s in marker.sources for s in marker.irreversible.sources), marker.id
+    # F9: everything left on the table quotes its rules.
+    for item in timeline.left_on_table:
+        assert item.sources, item.id
+        for source in item.sources:
+            assert is_literal(source), (item.id, source.quote)
 
 
 def test_the_model_always_has_the_source_text() -> None:

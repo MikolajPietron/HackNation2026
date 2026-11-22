@@ -46,6 +46,7 @@ from app.engine.draft import DAY, WEEK, Draft, merge_sources
 from app.engine.explain import case_notes
 from app.engine.father import father_rules
 from app.engine.insurance import INSURED, NOT_INSURED, Coverage, coverage, father_coverage
+from app.engine.leftover import add_leftovers
 from app.engine.loss import Loss, child_loss, maternity_end_after_loss
 from app.engine.models import (
     Document,
@@ -80,6 +81,7 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
         # Guide section D: a child taken in for upbringing has its own rules (adoption.py).
         timeline = taken_in_timeline(scenario, params, today)
         taken_in_money(timeline, scenario, params)  # section G for the leave of a child taken in
+        add_leftovers(timeline, scenario, params)  # F9, F10 (leftover.py)
         timeline.notes = case_notes(scenario, timeline, params)
         return timeline
     born = scenario.child_born is True
@@ -165,6 +167,8 @@ def build_timeline(scenario: Scenario, params: Params, today: dt.date) -> Timeli
     timeline.assumptions += money_assumptions(scenario, timeline, params)
     # Applications and protection (guide A.4, I): who pays, requests, protection.
     add_applications(timeline, scenario, params)
+    # F9, F10 (leftover.py): points of no return, what the family would leave unused.
+    add_leftovers(timeline, scenario, params)
     timeline.notes = case_notes(scenario, timeline, params)
     return timeline
 

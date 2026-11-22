@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.assistant.guide import page_label
 from app.engine.after_insurance import after_job_loss, leave_before_cut
+from app.engine.amounts import dec, pln
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
 from app.engine.models import (
     CaseNote,
@@ -640,9 +641,26 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
             lines.append(f"- {NOTE_KINDS[n.kind]} — {n.title}. {n.text}{backed}")
     if timeline.warnings:
         lines += ["", "Ostrzeżenia:", *(f"- {w}" for w in timeline.warnings)]
+    lines += _no_return_and_left_on_table(timeline)  # F9, F10 (engine/leftover.py)
     if changed:
         lines += ["", f"Zmienione przez tę operację: {', '.join(changed)}"]
     return "\n".join(lines)
+
+
+def _no_return_and_left_on_table(timeline: Timeline) -> list[str]:
+    """F10: the days after which a right is lost; F9: what the family can still use (from the
+    calculator, with the amounts it computed)."""
+    lines: list[str] = []
+    marked = [(m, m.irreversible) for m in timeline.markers if m.irreversible is not None]
+    if marked:
+        lines += ["", "Punkty bez powrotu (z kalkulatora):"]
+        lines += [f"- [{m.id}] {fmt(m.date)}: {point.lost}" for m, point in marked]
+    if timeline.left_on_table:
+        lines += ["", "Zostawiacie na stole — można jeszcze wykorzystać (z kalkulatora):"]
+        for item in timeline.left_on_table:
+            amount = f" Kwota: {pln(dec(item.amount))}." if item.amount else ""
+            lines.append(f"- [{item.id}] do {fmt(item.last_day)}: {item.text}{amount}")
+    return lines
 
 
 SENSITIVE_NOTES = ("loss", "mother-event")
@@ -694,6 +712,8 @@ def describe_element(element: TimelineElement) -> str:
             ]
         case Marker():
             lines = [f"{element.title}: {fmt(element.date)}.", element.summary, *element.details]
+            if element.irreversible is not None:  # F10 (engine/leftover.py)
+                lines.append(f"Punkt bez powrotu: {element.irreversible.lost}")
         case Document():
             status = "mama już je ma" if element.done else "jeszcze potrzebne"
             lines = [
