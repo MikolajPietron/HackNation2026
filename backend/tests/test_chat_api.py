@@ -421,6 +421,7 @@ def test_the_mothers_work_and_insurance_decide_about_the_benefit(client: TestCli
     assert [n["kind"] for n in update["timeline"]["notes"]] == [
         "situation",
         "risk",
+        "risk",  # F14: what instead (the father) and what would give the right
         "right",
         "computed",
         "right",  # the employed father's protection

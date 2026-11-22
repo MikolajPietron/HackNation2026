@@ -427,6 +427,53 @@ class Scenario(BaseModel):
         return self.work if self.role == "father" else self.father_work
 
 
+# F9 "Zostawiacie na stole" and F10 "Punkty bez powrotu" (ZADANIA B.8; engine/leftover.py).
+
+
+class Irreversible(BaseModel):
+    """F10, a point of no return: after the marker's day something is lost for good, as the
+    sources say."""
+
+    lost: str
+    """What is lost after that day, in one Polish sentence."""
+    days_left: int
+    """Days from today to that day: 0 = today is the last day, negative = it has passed."""
+    sources: list[SourceRef]
+    """The quotes that say so, taken from the marker's own sources."""
+
+
+LeftoverKind = Literal["leave", "choice"]
+"""leave = days of leave (or of the benefit for that time) not used yet; choice = an option that
+closes on its last day (the request for 81,5%)."""
+
+
+class Leftover(BaseModel):
+    """F9: something the family can still use and loses if they do nothing (leftover.py)."""
+
+    id: str
+    """"left-" + the period's id ("left-parental-father"), "left-parental-pool" (weeks a plan
+    leaves out) or "left-rate-815"."""
+    kind: LeftoverKind
+    parent: Role | None
+    """Whose right; None = either parent."""
+    title: str
+    text: str
+    days: int | None
+    """Days that can still be used; None for a choice."""
+    amount: float | None
+    """PLN lost if nothing is done: the benefit for those days, as the payments give it; for a
+    choice, how much more the other option pays for the periods on the timeline (0 when it pays
+    no more). None = no base is known yet."""
+    last_day: dt.date
+    """The last day it can still be used (for a choice: the request filed)."""
+    start_by: dt.date | None
+    """The last day to start so that all `days` fit before `last_day`."""
+    segment_id: str | None = None
+    marker_id: str | None = None
+    """The point of no return on the timeline (F10), when there is one."""
+    sources: list[SourceRef]
+
+
 class Segment(BaseModel):
     """A period on the timeline. Dates are inclusive."""
 
@@ -453,6 +500,8 @@ class Marker(BaseModel):
     summary: str
     details: list[str] = []
     sources: list[SourceRef]
+    irreversible: Irreversible | None = None
+    """F10: after this day a right is lost for good (leftover.py)."""
 
 
 class Document(BaseModel):
@@ -600,6 +649,8 @@ class Timeline(BaseModel):
     """Section G: the benefit for each period, once the parent's monthly amount is known."""
     bases: list[BenefitBase] = []
     """Each parent's benefit base behind `payments`, step by step (engine/base.py)."""
+    left_on_table: list[Leftover] = []
+    """F9: what the family can still use and loses if they do nothing (leftover.py)."""
 
     def elements(self) -> list[TimelineElement]:
         return [*self.segments, *self.markers, *self.documents, *self.payments]

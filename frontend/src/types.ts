@@ -300,7 +300,57 @@ export interface Marker {
   summary: string
   details: string[]
   sources: SourceRef[]
+  /** F10: after this day a right is lost for good (a padlock with a countdown). */
+  irreversible: Irreversible | null
 }
+
+// --- F9 "Zostawiacie na stole", F10 "Punkty bez powrotu" (ZADANIA B.8; engine/leftover.py) ---
+
+/**
+ * A point of no return: `rate-815-deadline`, `paternity-deadline`, `parental-deadline`.
+ * `days_left`: from today to the marker's day; 0 = today is the last day, negative = passed.
+ */
+export interface Irreversible {
+  /** What is lost after that day, one sentence. */
+  lost: string
+  days_left: number
+  /** The quotes that say so (a subset of the marker's sources). */
+  sources: SourceRef[]
+}
+
+/**
+ * Something the family can still use and loses if they do nothing, the soonest first in
+ * `Timeline.left_on_table`. Ids: `left-parental`, `left-parental-father`, `left-paternity`,
+ * `left-supplementary` (the option on the timeline, `segment_id`), `left-parental-pool` (weeks a
+ * plan leaves out) and `left-rate-815` (kind `choice`: the request for 81,5%). Empty after the
+ * loss of a child or the mother's death.
+ */
+export interface Leftover {
+  id: string
+  /** leave = days not used yet; choice = an option that closes on `last_day`. */
+  kind: 'leave' | 'choice'
+  /** Whose right; null = either parent. */
+  parent: Role | null
+  title: string
+  text: string
+  /** Days that can still be used; null for a choice. */
+  days: number | null
+  /**
+   * PLN lost if nothing is done: the benefit for those days; for a choice, how much more the
+   * other option pays (0 when it pays no more). null = no base known yet.
+   */
+  amount: number | null
+  /** The last day it can still be used (for a choice: the request filed). */
+  last_day: string
+  /** The last day to start so that all `days` fit before `last_day`. */
+  start_by: string | null
+  segment_id: string | null
+  /** The point of no return on the timeline, when there is one. */
+  marker_id: string | null
+  sources: SourceRef[]
+}
+
+// --- end F9, F10 ---
 
 export interface Document {
   id: string
@@ -386,6 +436,9 @@ export interface BenefitBase {
  * One point of the case explanation: situation = which case this is, right = what the mother is
  * entitled to, risk = what stands in the way of an entitlement, choice = what the family can
  * decide, relief = an easier or longer path the rules give them, computed = what we calculated.
+ * F14 "Nie przysługuje" z dalszą drogą: `insurance-way`, `father-way`, `taken-in-way` (kind risk,
+ * right after the point that says there is no right): "Co zamiast: …" and "Co zrobić, żeby
+ * przysługiwał: …" (engine/no_right.py).
  */
 export interface CaseNote {
   id: string
@@ -414,6 +467,8 @@ export interface Timeline {
   payments: Payment[]
   /** Each parent's benefit base behind `payments`, step by step. */
   bases: BenefitBase[]
+  /** F9: what the family can still use and loses if they do nothing (see `Leftover`). */
+  left_on_table: Leftover[]
 }
 
 /** An app event the assistant reacts to instead of a message; the user does not see it. */
