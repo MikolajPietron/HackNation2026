@@ -811,7 +811,14 @@ def describe_note_changes(
         extra += (
             " Przy nowym prawie albo nowej długości urlopu dodaj w nawiasie źródło: "
             + "; ".join(cite)
-            + "."
+            + ". Nową długość urlopu podaj liczbą tygodni z punktu (np. „56 tygodni”), nie tylko "
+            "datami."
+        )
+    if any(n.id == "loss" for n in notes):
+        # Eval: after a death before 8 weeks the 7 days from the death were left out.
+        extra += (
+            " Punkt o stracie powiedz spokojnie i w całości, z każdą zasadą, którą zawiera "
+            "(np. „nie krócej niż 7 dni od dnia śmierci dziecka”)."
         )
     if money:
         extra += " Zmieniły się kwoty zasiłku: podaj nową kwotę miesięczną z osi."
