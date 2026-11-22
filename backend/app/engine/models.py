@@ -4,14 +4,16 @@ Phases covered: section A of the guide (pages 5-6): 1 "Przygotowanie do porodu",
 dziecka" and 3 "Szczególna sytuacja" (stillbirth or death of the child); and section B (pages 7-8),
 the father: paternity leave, his part of parental leave, taking over maternity leave. With the
 Labour Code provisions behind them. Section G (page 9), the amount of the benefit, with the
-ustawa zasiłkowa behind it: `Payment`.
+ustawa zasiłkowa behind it: `Payment`; the benefit base in detail (ustawa art. 36-52, the ZUS
+Załącznik): `PayHistory` in, `BenefitBase` out.
 """
 
 import datetime as dt
+from decimal import Decimal
 from fractions import Fraction
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, PlainSerializer, model_validator
 
 Lane = Literal["mother", "father", "child", "documents"]
 Tone = Literal["leave", "work", "option"]
@@ -31,9 +33,10 @@ niezawodowa)."""
 
 class SourceRef(BaseModel):
     """A literal quote: from the guide (section and pages), from the Labour Code ("kp") or from
-    the ustawa zasiłkowa ("ustawa"; both: article)."""
+    the ustawa zasiłkowa ("ustawa"; both: article), or from the ZUS Załącznik to the challenge
+    ("zalacznik": section, as named in zalacznik.json)."""
 
-    doc: Literal["przewodnik", "kp", "ustawa"]
+    doc: Literal["przewodnik", "kp", "ustawa", "zalacznik"]
     quote: str
     section: str | None = None
     page: int | None = None
@@ -194,6 +197,81 @@ mandate) reports to sickness insurance: more than 20 = it pays the benefit itsel
 does (guide page 1, footnote 1). "unknown" = the parent does not know."""
 
 
+# The benefit base in detail (ustawa zasiłkowa art. 36-52, the ZUS Załącznik; engine/base.py):
+# the data of the payer's certificate (Z-3 for an employee, Z-3a for a contract), typed by the
+# user.
+
+YearMonth = Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
+"""A calendar month: "2026-03"."""
+
+
+class PayMonth(BaseModel):
+    """One calendar month of a parent's pay before the right to the benefit, as the payer's
+    certificate (or a payslip, or the declared contribution base) gives it."""
+
+    month: YearMonth
+    amount: float = Field(ge=0)
+    """In PLN. Employee: the gross pay for that month (the base of the sickness contribution),
+    monthly components only: quarterly and annual ones go to `PayHistory`. Contract, business:
+    the base of the sickness contribution for that month."""
+    days_required: int | None = Field(default=None, ge=1)
+    """A month not worked in full: the days the parent was obliged to work that month (a
+    non-employee: the days of the month). None = worked in full."""
+    days_worked: int | None = Field(default=None, ge=0)
+    """The days actually worked that month (the rest: a justified absence, e.g. sick leave)."""
+    fixed: float | None = Field(default=None, ge=0)
+    """Employee, a month not worked in full: the fixed monthly pay set in the contract, taken in
+    full. None = the whole `amount` is topped up by days."""
+    variable: float | None = Field(default=None, ge=0)
+    """Employee, with `fixed`: the variable pay for the days worked, topped up by days."""
+    not_topped: float | None = Field(default=None, ge=0)
+    """Employee: the part of `amount` taken as paid, never topped up (overtime, night work
+    allowance, commission)."""
+
+    @model_validator(mode="after")
+    def days_make_sense(self) -> Self:
+        if (self.days_worked is None) != (self.days_required is None):
+            raise ValueError(
+                "Przy miesiącu przepracowanym w części podaj oba: dni obowiązujące do "
+                "przepracowania i dni przepracowane."
+            )
+        if (self.days_worked or 0) > (self.days_required or 0):
+            raise ValueError("Dni przepracowanych nie może być więcej niż dni obowiązujących.")
+        if (self.not_topped or 0) > self.amount:
+            raise ValueError("Część nieuzupełniana nie może być większa niż kwota za miesiąc.")
+        return self
+
+
+class PayHistory(BaseModel):
+    """What a parent's benefit base is computed from, in detail. Without `months` the monthly
+    amount (`mother_pay`, `father_pay`) stands for the average of the months; the other fields
+    apply either way."""
+
+    months: list[PayMonth] = []
+    quarterly_bonuses: float | None = Field(default=None, ge=0)
+    """Employee: quarterly bonuses and awards paid for the four quarters before the month the
+    right arose, together."""
+    annual_bonus: float | None = Field(default=None, ge=0)
+    """Employee: annual pay (e.g. the thirteenth salary, an annual award) paid for the year
+    before the month the right arose."""
+    full_time: bool | None = None
+    """Employee: works full time, so the base is not lower than the minimum."""
+    insured_from: dt.date | None = None
+    """The first day of the uninterrupted sickness insurance with this payer (on this contract,
+    in this business). None = not known: the months given are taken as they are."""
+    contract_pay: float | None = Field(default=None, gt=0)
+    """The monthly pay set in the contract: the base when the right arises before a full
+    calendar month of insurance."""
+
+    @model_validator(mode="after")
+    def one_entry_per_month(self) -> Self:
+        months = [m.month for m in self.months]
+        if len(months) != len(set(months)):
+            raise ValueError("Każdy miesiąc można podać tylko raz.")
+        self.months = sorted(self.months, key=lambda m: m.month)
+        return self
+
+
 class Scenario(BaseModel):
     """What the onboarding and the interview have established. None = not known yet."""
 
@@ -316,6 +394,13 @@ class Scenario(BaseModel):
     """Weeks of that leave used before passing it on; None = the minimum (14)."""
     foster_before: FosterBefore | None = None
     """Adoption after foster care: the leave already used as a foster family."""
+    # The benefit base in detail (engine/base.py).
+    mother_pay_history: PayHistory | None = None
+    """The mother's pay month by month and the rest of what her base depends on, as the user
+    typed it (e.g. from the payer's certificate Z-3 or Z-3a). Months given win over
+    `mother_pay`."""
+    father_pay_history: PayHistory | None = None
+    """The same for the father."""
 
     @property
     def anchor_date(self) -> dt.date | None:
@@ -416,6 +501,67 @@ class Payment(BaseModel):
     sources: list[SourceRef]
 
 
+Amount = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
+"""PLN, exact in the engine (Decimal), a number in the API."""
+
+
+class BaseStep(BaseModel):
+    """One step of computing a benefit base ("Dlaczego tyle?"), with the rules it applies."""
+
+    text: str
+    sources: list[SourceRef] = []
+
+
+BaseMonthStatus = Literal["full", "topped-up", "skipped", "outside", "before-insurance"]
+"""full = taken as paid; topped-up = worked at least half, topped up to a full month; skipped =
+worked less than half; outside = not among the 12 months before the month of the right;
+before-insurance = before the insurance (with this payer) began."""
+
+
+class BaseMonth(BaseModel):
+    """A month the parent gave, and what the base takes from it."""
+
+    month: str
+    amount: Amount
+    counted: Amount | None
+    """What enters the average (topped up, capped); None = not counted."""
+    status: BaseMonthStatus
+
+
+class BenefitBase(BaseModel):
+    """One parent's monthly benefit base (podstawa wymiaru zasiłku) and how it was computed,
+    step by step, each step with its sources (engine/base.py)."""
+
+    parent: Role
+    work: Work
+    right_from: dt.date
+    """The day the right arose that the base is set for: the first day of the parent's first
+    paid period, or of an earlier benefit it follows without a break of a month."""
+    months_from: str | None
+    months_to: str | None
+    """The calendar months the base comes from ("2025-11" to "2026-10"); None = from the
+    contract (the right arose before a full month of insurance)."""
+    pay: Amount
+    """The monthly average before the deduction: gross pay (or the contribution base), with a
+    twelfth of quarterly and annual bonuses."""
+    deducted: Amount
+    """Percent of `pay` deducted for the contributions."""
+    base: Amount
+    """The monthly benefit base."""
+    detailed: bool
+    """Computed from the months the parent gave, not from one monthly amount."""
+    summary: str
+    """The base in one sentence, after "Podstawa wymiaru zasiłku: "."""
+    steps: list[BaseStep]
+    months: list[BaseMonth] = []
+    sources: list[SourceRef]
+    """Every step's sources, each quote once."""
+
+    @property
+    def employee(self) -> bool:
+        return self.work == "employment"
+
+
 TimelineElement = Segment | Marker | Document | Payment
 
 NoteKind = Literal["situation", "right", "risk", "choice", "relief", "computed"]
@@ -452,6 +598,8 @@ class Timeline(BaseModel):
     """Set for a child taken in for upbringing: then `birth_date` is the day of taking in."""
     payments: list[Payment] = []
     """Section G: the benefit for each period, once the parent's monthly amount is known."""
+    bases: list[BenefitBase] = []
+    """Each parent's benefit base behind `payments`, step by step (engine/base.py)."""
 
     def elements(self) -> list[TimelineElement]:
         return [*self.segments, *self.markers, *self.documents, *self.payments]

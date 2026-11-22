@@ -72,6 +72,25 @@ PROVISIONS = {
     "art. 48 ust. 1": ("Art. 48 [", "ust", "1"),
     "art. 52": ("Art. 52 [", None, None),
     "art. 61 ust. 1": ("Art. 61 [", "ust", "1"),
+    # The benefit base in detail (engine/base.py).
+    "art. 36 ust. 2": ("Art. 36 [", "ust", "2"),
+    "art. 36 ust. 4": ("Art. 36 [", "ust", "4"),
+    "art. 37 ust. 1": ("Art. 37 [", "ust", "1"),
+    "art. 37 ust. 2": ("Art. 37 [", "ust", "2"),
+    "art. 38 ust. 1": ("Art. 38 [", "ust", "1"),
+    "art. 38 ust. 2": ("Art. 38 [", "ust", "2"),
+    "art. 38 ust. 3": ("Art. 38 [", "ust", "3"),
+    "art. 42 ust. 1": ("Art. 42 [", "ust", "1"),
+    "art. 42 ust. 2": ("Art. 42 [", "ust", "2"),
+    "art. 42 ust. 3": ("Art. 42 [", "ust", "3"),
+    "art. 43": ("Art. 43 [", None, None),
+    "art. 45 ust. 1": ("Art. 45 [", "ust", "1"),
+    "art. 45 ust. 2": ("Art. 45 [", "ust", "2"),
+    "art. 48 ust. 2": ("Art. 48 [", "ust", "2"),
+    "art. 48a ust. 1": ("Art. 48a [", "ust", "1"),
+    "art. 49 ust. 1": ("Art. 49 [", "ust", "1"),
+    "art. 50 ust. 1": ("Art. 50 [", "ust", "1"),
+    "art. 50 ust. 2": ("Art. 50 [", "ust", "2"),
 }
 
 GLUED = {

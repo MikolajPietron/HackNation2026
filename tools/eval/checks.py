@@ -12,6 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 GUIDE_JSON = ROOT / "backend/app/assistant/przewodnik_pages.json"
 KP_JSON = ROOT / "backend/app/assistant/kodeks_pracy.json"
+USTAWA_JSON = ROOT / "backend/app/assistant/ustawa_zasilkowa.json"
+ZALACZNIK_JSON = ROOT / "backend/app/assistant/zalacznik.json"
 
 MONTHS = {
     "stycznia": 1,
@@ -89,11 +91,21 @@ def _norm(text: str) -> str:
 
 
 def load_sources() -> dict[str, str]:
-    """Normalized source texts: 'p<N>' for guide pages, 'kp:<article>' for the Labour Code."""
+    """Normalized source texts: 'p<N>' for guide pages, 'kp:<article>' for the Labour Code,
+    'ustawa:<article>' for the ustawa zasiłkowa, 'zal:<section>' for the ZUS Załącznik."""
     guide = json.loads(GUIDE_JSON.read_text(encoding="utf-8"))["pages"]
     kp = json.loads(KP_JSON.read_text(encoding="utf-8"))["articles"]
+    ustawa = json.loads(USTAWA_JSON.read_text(encoding="utf-8"))["articles"]
+    # Not in git (a ZUS document): built locally by tools/przewodnik/extract_zalacznik.py.
+    zalacznik = (
+        json.loads(ZALACZNIK_JSON.read_text(encoding="utf-8"))["sections"]
+        if ZALACZNIK_JSON.exists()
+        else {}
+    )
     out = {f"p{n}": _norm(text) for n, text in guide.items()}
     out.update({f"kp:{art}": _norm(text) for art, text in kp.items()})
+    out.update({f"ustawa:{art}": _norm(text) for art, text in ustawa.items()})
+    out.update({f"zal:{name}": _norm(text) for name, text in zalacznik.items()})
     return out
 
 
@@ -160,7 +172,7 @@ def _cited(text: str, end: int) -> tuple[set[str], set[str]]:
 
 
 def _article_matches(cited: set[str], hits: list[str]) -> bool:
-    found = {_article_key(h[3:]) for h in hits if h.startswith("kp:")}
+    found = {_article_key(h.split(":", 1)[1]) for h in hits if h.startswith(("kp:", "ustawa:"))}
     flat = {k.replace("¹", "1").replace("ᵃ", "a").replace("ᶜ", "c") for k in found}
     for c in cited:
         c_flat = c.replace("¹", "1").replace("ᵃ", "a").replace("ᶜ", "c")
@@ -397,7 +409,7 @@ def check_question(text: str, question: dict | None) -> Check:
 def check_timeline(timeline: dict, expect: dict) -> list[Check]:
     """expect: {"segments": {id: [start, end]}, "markers": {id: date},
     "documents": {id: needed_by or [needed_by, done]}, "absent": [ids], "notes": [ids],
-    "no_notes": [ids]}."""
+    "no_notes": [ids], "bases": {parent: monthly benefit base}}."""
     out = []
     segs = {s["id"]: s for s in timeline["segments"]}
     for sid, (start, end) in expect.get("segments", {}).items():
@@ -425,4 +437,8 @@ def check_timeline(timeline: dict, expect: dict) -> list[Check]:
         out.append(Check(f"note {nid}", nid in note_ids))
     for nid in expect.get("no_notes", []):
         out.append(Check(f"no note {nid}", nid not in note_ids))
+    bases = {b["parent"]: b["base"] for b in timeline.get("bases", [])}
+    for parent, want in expect.get("bases", {}).items():
+        got = bases.get(parent, "missing")
+        out.append(Check(f"base {parent}", got == want, f"want {want}, got {got}"))
     return out

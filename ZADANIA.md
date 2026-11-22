@@ -20,12 +20,11 @@ Granica: API i modele. Gdy B zmienia model albo endpoint, aktualizuje też `fron
 - Gotowe, gdy: test na skryptowanym modelu, który „pisze własne pytanie”, pokazuje w odpowiedzi tylko pytanie z kodu; przypadek „wcześniak przy znanym terminie” jest w `tools/eval`.
 - Doraźnie na komputerze A można zmienić model czatu na `gemini-pro-latest` (lepiej trzyma się instrukcji, ale jest wolniejszy).
 
-### 1. Pełna podstawa wymiaru (kalkulator f)
-Zadanie: „kalkulator wysokości zasiłku przy uwzględnianiu indywidualnej podstawy wymiaru zasiłku – symulacja zasiłku przy uwzględnieniu konkretnej sprawy z podanych w zestawach”.
-- Reguły z Załącznika (CLAUDE.md, „Podstawa wymiaru”): 12 pełnych miesięcy, miesiące przepracowane w mniej niż połowie pomijane, w co najmniej połowie uzupełniane, premie kwartalne i roczne jako 1/12, krótsze zatrudnienie, nie-pracownik z podstawy składek, limit 2026, przerwa krótsza niż miesiąc.
-- Wejście już jest: odczyt sprawy daje miesiące w `CaseFacts.pay` (`backend/app/cases/models.py`, `PayMonth`: `month` RRRR-MM, `amount`, `kind` salary albo contribution_base, `person`, `full_month`, `note` np. dni nieobecności, premia).
-- Dziś to uproszczenie: `backend/app/cases/assess.py`, funkcja `monthly_pay` liczy zwykłą średnią i wpisuje ją do `Scenario.mother_pay` / `father_pay` (notatka w wyniku mówi o uproszczeniu). Zastąp to funkcją silnika (np. pole `Scenario.mother_pay_months` i wyliczenie w `engine/money.py`), wyliczenie krok po kroku w `Payment.details`. `mother_pay` zostaje dla kwoty podanej w onboardingu.
-- Gotowe, gdy: testy na przykładach z Załącznika, a sprawa z Z-3 (np. S80) pokazuje podstawę z pełnych reguł zamiast średniej.
+### 1. Pełna podstawa wymiaru → podpiąć pod przykładowe sprawy
+`engine/base.py` jest gotowy (Mikołaj, 22.11.2026: `Scenario.mother_pay_history` / `father_pay_history`, `PayHistory`, `Timeline.bases`). Zostało podpięcie odczytu spraw:
+- `backend/app/cases/assess.py`, funkcja `monthly_pay`, dziś liczy zwykłą średnią i wpisuje `mother_pay`. Zamień to na `PayHistory(months=[engine PayMonth(month, amount, days_required, days_worked, …)], insured_from=…)` z `CaseFacts.pay`. Uwaga na nazwy: `app.cases.models.PayMonth` to inny model niż `app.engine.models.PayMonth`.
+- Czytnik daje dziś `full_month` i `note`. Jeśli `base.py` potrzebuje dni wymaganych i przepracowanych oraz premii, dodaj te pola do `CaseFacts` (`cases/models.py`) i do instrukcji w `cases/reader.py`. Sprawy przeczytane wcześniej mają wtedy puste pola: przeczytaj je ponownie albo przyjmij domyślne.
+- Gotowe, gdy: S80 (12 miesięcy z Z-3) pokazuje podstawę z `base.py` krok po kroku, a notatka o uproszczeniu znika.
 
 ### 2. Zgodność z decyzjami ZUS na 86 sprawach (cel „X/86” z CLAUDE.md)
 - `cd backend && uv run python -m app.cases.batch --summary /tmp/sprawy.json` czyta sprawy, których nie ma w pamięci odczytów (`backend/.cases_cache/`, poza gitem), i wypisuje zgodność oraz listę różnic.
@@ -72,5 +71,5 @@ README jest nieaktualny („zrobiona jest faza 1”, „Claude przez OpenRouter�
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
-- Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).
+- Pełna podstawa wymiaru `engine/base.py` (B). Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).
 - Przykładowe sprawy: wybór, wgranie, odczyt przez AI, ubezpieczenie, porównanie z ZUS, „Pokaż na osi” (A).

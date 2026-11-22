@@ -3,7 +3,7 @@
 import datetime as dt
 from dataclasses import dataclass, field
 
-from app.engine.models import Document, Marker, Payment, Segment, SourceRef
+from app.engine.models import BenefitBase, Document, Marker, Payment, Segment, SourceRef
 
 DAY = dt.timedelta(days=1)
 WEEK = dt.timedelta(days=7)
@@ -16,6 +16,7 @@ class Draft:
     documents: list[Document] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     payments: list[Payment] = field(default_factory=list)
+    bases: list[BenefitBase] = field(default_factory=list)
 
     def segment(self, segment_id: str) -> Segment | None:
         return next((s for s in self.segments if s.id == segment_id), None)

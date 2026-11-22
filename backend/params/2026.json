@@ -2359,5 +2359,289 @@
         }
       ]
     }
+  },
+  "benefit_base": {
+    "months": {
+      "value": 12,
+      "note": "Przeciętna z 12 miesięcy kalendarzowych przed miesiącem, w którym powstało prawo do zasiłku.",
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 36 ust. 1",
+          "quote": "Podstawę wymiaru zasiłku chorobowego przysługującego ubezpieczonemu będącemu pracownikiem stanowi przeciętne miesięczne wynagrodzenie wypłacone za okres 12 miesięcy kalendarzowych poprzedzających miesiąc, w którym powstała niezdolność do pracy."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Średnia z 12 pełnych miesięcy kalendarzowych poprzedzających miesiąc choroby, pomniejszona o 13,71%."
+        }
+      ]
+    },
+    "shorter": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 36 ust. 2",
+          "quote": "Jeżeli niezdolność do pracy powstała przed upływem okresu, o którym mowa w ust. 1, podstawę wymiaru zasiłku chorobowego stanowi przeciętne miesięczne wynagrodzenie za pełne miesiące kalendarzowe ubezpieczenia."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 36 ust. 4",
+          "quote": "Podstawę wymiaru zasiłku chorobowego ustala się z uwzględnieniem wynagrodzenia uzyskanego u płatnika składek w okresie nieprzerwanego ubezpieczenia chorobowego, w trakcie którego powstała niezdolność do pracy."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Średnia z pełnych kalendarzowych miesięcy nieprzerwanego ubezpieczenia, pomniejszona o 13,71%."
+        }
+      ]
+    },
+    "non_employee_rules": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 48 ust. 2",
+          "quote": "Przy ustalaniu podstawy wymiaru zasiłku chorobowego przysługującego ubezpieczonemu niebędącemu pracownikiem stosuje się odpowiednio przepisy art. 36 ust. 2-4, art. 38 ust. 1, art. 42, art. 43 i art. 46"
+        }
+      ]
+    },
+    "first_month": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 37 ust. 1",
+          "quote": "Jeżeli niezdolność do pracy powstała przed upływem pełnego miesiąca kalendarzowego ubezpieczenia chorobowego, podstawę wymiaru zasiłku chorobowego stanowi wynagrodzenie, które ubezpieczony będący pracownikiem osiągnąłby, gdyby pracował pełny miesiąc kalendarzowy."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 37 ust. 2",
+          "quote": "wynagrodzenie miesięczne określone w umowie o pracę lub w innym akcie, na podstawie którego powstał stosunek pracy, jeżeli wynagrodzenie przysługuje w stałej miesięcznej wysokości;"
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Wynagrodzenie z umowy po uzupełnieniu do pełnego miesiąca, pomniejszone o 13,71%."
+        }
+      ]
+    },
+    "first_month_by_days": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 37 ust. 2",
+          "quote": "wynagrodzenie miesięczne obliczone przez podzielenie wynagrodzenia osiągniętego za przepracowane dni robocze przez liczbę dni przepracowanych i pomnożenie przez liczbę dni, które ubezpieczony będący pracownikiem był obowiązany przepracować w tym miesiącu, jeżeli przepracował choćby 1 dzień;"
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Wynagrodzenie za pełny miesiąc (po uzupełnieniu 1. miesiąca, jeśli był niepełny), pomniejszone o 13,71%."
+        }
+      ]
+    },
+    "first_month_contract": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 49 ust. 1",
+          "quote": "kwota przychodu określona w umowie przypadająca za miesiąc, w którym powstało prawo do zasiłku, po odliczeniach, o których mowa w art. 3 pkt 4"
+        }
+      ]
+    },
+    "average": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 38 ust. 1",
+          "quote": "Przeciętne miesięczne wynagrodzenie stanowiące podstawę wymiaru zasiłku chorobowego ustala się przez podzielenie wynagrodzenia osiągniętego przez ubezpieczonego będącego pracownikiem za okres, o którym mowa w art. 36 ust. 1 i 2, przez liczbę miesięcy, w których wynagrodzenie to zostało osiągnięte."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 42 ust. 1",
+          "quote": "Premie, nagrody i inne składniki wynagrodzenia przysługujące za okresy miesięczne wlicza się do podstawy wymiaru zasiłku chorobowego w kwocie wypłaconej pracownikowi za miesiące kalendarzowe, z których wynagrodzenie przyjmuje się do ustalenia podstawy wymiaru zasiłku."
+        }
+      ]
+    },
+    "half_skipped": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 38 ust. 2",
+          "quote": "wyłącza się wynagrodzenie za miesiące, w których przepracował mniej niż połowę obowiązującego go czasu pracy;"
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Uzupełnianie wynagrodzenia za niepełny miesiąc",
+          "quote": "Miesiąc jest wyłączany z obliczeń (nie bierze się go pod uwagę)."
+        }
+      ]
+    },
+    "half_topped": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 38 ust. 2",
+          "quote": "przyjmuje się, po uzupełnieniu według zasad określonych w art. 37 ust. 2, wynagrodzenie z miesięcy, w których ubezpieczony będący pracownikiem przepracował co najmniej połowę obowiązującego go czasu pracy."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Uzupełnianie wynagrodzenia za niepełny miesiąc",
+          "quote": "Składniki stałe: pełna kwota z umowy minus 13,71%."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Uzupełnianie wynagrodzenia za niepełny miesiąc",
+          "quote": "Składniki zmienne: kwota faktyczna podzielona przez dni przepracowane i pomnożona przez dni robocze w miesiącu."
+        }
+      ]
+    },
+    "every_month_short": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 38 ust. 3",
+          "quote": "Jeżeli w okresie, o którym mowa w ust. 1, ubezpieczony będący pracownikiem w każdym miesiącu z przyczyn usprawiedliwionych wykonywał pracę przez mniej niż połowę obowiązującego go czasu pracy, przy ustalaniu podstawy wymiaru zasiłku chorobowego przyjmuje się wynagrodzenie za wszystkie miesiące po uzupełnieniu według zasad określonych w art. 37 ust. 2."
+        }
+      ]
+    },
+    "not_topped": {
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Składniki wynagrodzenia w podstawie wymiaru zasiłku",
+          "quote": "Wynagrodzenie za nadgodziny, dodatki nocne, prowizje bez uzupełniania"
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Składniki wynagrodzenia w podstawie wymiaru zasiłku",
+          "quote": "Wliczane w kwocie faktycznie wypłaconej, bez uzupełniania."
+        }
+      ]
+    },
+    "non_employee_months": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 50 ust. 1",
+          "quote": "wyłącza się przychód za miesiące, w których ubezpieczony wykonywał pracę lub działalność przez mniej niż połowę miesiąca;"
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 50 ust. 1",
+          "quote": "przyjmuje się przychód za miesiące, w których ubezpieczony wykonywał pracę lub działalność przez co najmniej połowę miesiąca."
+        },
+        {
+          "doc": "ustawa",
+          "article": "art. 50 ust. 2",
+          "quote": "Jeżeli w okresie, o którym mowa w ust. 1, przychód ubezpieczonego w każdym miesiącu uległ zmniejszeniu z przyczyn wymienionych w ust. 1, przy ustalaniu podstawy wymiaru zasiłku chorobowego przyjmuje się przychód za wszystkie miesiące."
+        }
+      ]
+    },
+    "bonus_twelfth": {
+      "value": 12,
+      "note": "Premie kwartalne i składniki roczne wchodzą do podstawy w jednej dwunastej.",
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Składniki wynagrodzenia w podstawie wymiaru zasiłku",
+          "quote": "Wliczane w wysokości 1/12 kwot wypłaconych za 4 poprzednie kwartały."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Składniki wynagrodzenia w podstawie wymiaru zasiłku",
+          "quote": "Wliczane w wysokości 1/12 kwoty wypłaconej za rok poprzedni."
+        }
+      ]
+    },
+    "quarterly": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 42 ust. 2",
+          "quote": "Składniki wynagrodzenia, o których mowa w ust. 1, przysługujące za okresy kwartalne, wlicza się do przeciętnego miesięcznego wynagrodzenia przyjmowanego do ustalenia podstawy wymiaru zasiłku chorobowego w wysokości stanowiącej jedną dwunastą kwot wypłaconych pracownikowi za cztery kwartały poprzedzające miesiąc, w którym powstała niezdolność do pracy."
+        }
+      ]
+    },
+    "annual": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 42 ust. 3",
+          "quote": "Składniki wynagrodzenia, o których mowa w ust. 1, przysługujące za okresy roczne, wlicza się do podstawy wymiaru zasiłku chorobowego w wysokości stanowiącej jedną dwunastą kwoty wypłaconej pracownikowi za rok poprzedzający miesiąc, w którym powstała niezdolność do pracy."
+        }
+      ]
+    },
+    "same_base": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 43",
+          "quote": "Podstawy wymiaru zasiłku nie ustala się na nowo, jeżeli między okresami pobierania zasiłków zarówno tego samego rodzaju, jak i innego rodzaju nie było przerwy albo przerwa była krótsza niż miesiąc kalendarzowy."
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Przerwa między zasiłkami poniżej 1 miesiąca"
+        },
+        {
+          "doc": "zalacznik",
+          "section": "Okres uwzględniany w podstawie wymiaru zasiłku",
+          "quote": "Brak nowej podstawy wymiaru zasiłku – obowiązuje podstawa ustalona dla poprzedniego zasiłku."
+        },
+        {
+          "doc": "kp",
+          "article": "art. 92 § 2",
+          "quote": "Wynagrodzenie, o którym mowa w § 1, oblicza się według zasad obowiązujących przy ustalaniu podstawy wymiaru zasiłku chorobowego"
+        }
+      ]
+    },
+    "minimum_wage": {
+      "value": 4806,
+      "note": "Minimalne wynagrodzenie za pracę w 2026 roku (brutto). Tabeli minimalnych podstaw Załącznik nie zawiera: minimalną podstawę liczymy z art. 45 ust. 1.",
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Minimalna podstawa wymiaru zasiłku w 2026 roku",
+          "quote": "Wartości wyliczone od płacy minimalnej (4 806 zł brutto) po odjęciu składek społecznych finansowanych przez pracownika (13,71%):"
+        }
+      ]
+    },
+    "minimum": {
+      "sources": [
+        {
+          "doc": "ustawa",
+          "article": "art. 45 ust. 1",
+          "quote": "Podstawa wymiaru zasiłku chorobowego z tytułu pracy w pełnym wymiarze czasu pracy nie może być niższa od kwoty minimalnego wynagrodzenia za pracę, po odliczeniu kwoty odpowiadającej 13,71% tego wynagrodzenia."
+        }
+      ]
+    },
+    "voluntary_cap": {
+      "value": 23550,
+      "note": "Najwyższa miesięczna podstawa składki na dobrowolne ubezpieczenie chorobowe w 2026 roku (umowa zlecenia, własna firma): po odjęciu 13,71% limit podstawy zasiłku 20 321,30 zł.",
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Podstawa wymiaru zasiłków dla nie pracowników",
+          "quote": "W 2026 roku maksymalna miesięczna podstawa wymiaru dobrowolnej składki chorobowej wynosi 23 550,00 zł (co po odjęciu 13,71% daje limit podstawy zasiłku 20 321,30 zł)."
+        }
+      ]
+    },
+    "deduction_employee": {
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Podstawa wymiaru zasiłków dla pracowników",
+          "quote": "Podstawę wymiaru zasiłku dla pracownika stanowi przeciętne miesięczne wynagrodzenie z 12 miesięcy poprzedzających chorobę, pomniejszone o 13,71%."
+        }
+      ]
+    },
+    "deduction_non_employee": {
+      "sources": [
+        {
+          "doc": "zalacznik",
+          "section": "Podstawa wymiaru zasiłków dla nie pracowników",
+          "quote": "Podstawę wymiaru zasiłku dla ubezpieczonego niebędącego pracownikiem (np. przedsiębiorcy lub zleceniobiorcy) stanowi przeciętny miesięczny przychód za 12 miesięcy kalendarzowych poprzedzających miesiąc choroby, pomniejszony o 13,71%."
+        }
+      ]
+    }
   }
 }

@@ -40,6 +40,7 @@ EARNINGS = {
     "over-12k": "powyżej 12 000 zł",
     "unknown": "nie wiem",
 }
+YES_NO = {True: "tak", False: "nie"}
 
 
 # How the explanation points are named for the model; brackets are kept for element ids only.
@@ -58,6 +59,8 @@ def source_label(source: SourceRef) -> str:
         return f"Kodeks pracy, {source.article}"
     if source.doc == "ustawa":
         return f"Ustawa zasiłkowa, {source.article}"
+    if source.doc == "zalacznik":
+        return f"Załącznik ZUS, {source.section}"
     return f"Przewodnik ZUS, {page_label(source.page, source.page_to)}"
 
 
@@ -108,7 +111,51 @@ def describe_person(scenario: Scenario) -> str:
             "to tylko przedział. Nic z nich nie wyliczaj: kwoty zasiłku liczy kalkulator "
             "z dokładnej kwoty, o którą pyta wywiad (`set_monthly_pay`)."
         )
-    return "\n".join(lines)
+    # The benefit base in detail (engine/base.py): what is recorded, so a change adds to it.
+    lines += [describe_pay_history(scenario, parent) for parent in ("mother", "father")]
+    return "\n".join(line for line in lines if line)
+
+
+def describe_pay_history(scenario: Scenario, parent: Literal["mother", "father"]) -> str:
+    """The parent's recorded pay history, as `set_pay_history` takes it; "" when none."""
+    history = scenario.mother_pay_history if parent == "mother" else scenario.father_pay_history
+    if history is None:
+        return ""
+    items = []
+    for m in history.months:
+        item = f"{m.month}: {_num(m.amount)} zł"
+        if m.days_worked is not None:
+            item += f", przepracowane {m.days_worked} z {m.days_required} dni"
+        if m.fixed is not None:
+            item += f", stałe z umowy {_num(m.fixed)} zł, zmienne {_num(m.variable or 0)} zł"
+        if m.not_topped:
+            item += f", bez uzupełniania {_num(m.not_topped)} zł"
+        items.append(item)
+    extra = [
+        f"{label}: {value}"
+        for label, value in (
+            ("premie kwartalne za 4 kwartały", _num(history.quarterly_bonuses)),
+            ("składniki roczne", _num(history.annual_bonus)),
+            ("pełny etat", None if history.full_time is None else YES_NO[history.full_time]),
+            ("ubezpieczenie od", history.insured_from and fmt(history.insured_from)),
+            ("wynagrodzenie z umowy", _num(history.contract_pay)),
+        )
+        if value is not None
+    ]
+    who = "mamy" if parent == "mother" else "taty"
+    months = "; ".join(items) if items else "bez miesięcy"
+    return (
+        f"Zapisane dane do podstawy zasiłku {who} (`set_pay_history`): {months}"
+        + (f"; {'; '.join(extra)}" if extra else "")
+        + ". Podstawę i kwoty liczy kalkulator."
+    )
+
+
+def _num(amount: float | None) -> str | None:
+    """An amount as given: 8000, 2434.78 (None stays None)."""
+    if amount is None:
+        return None
+    return f"{amount:.2f}".rstrip("0").rstrip(".")
 
 
 def describe_parental_plan(scenario: Scenario) -> str:
@@ -464,15 +511,24 @@ def _money_questions(scenario: Scenario) -> list[Question]:
         return []
     questions = []
     mother = coverage(scenario) not in NOT_INSURED and scenario.mothers_work in PAID_WORK
-    if pay_matters(scenario, "mother") and scenario.mother_pay is None:
+    if pay_matters(scenario, "mother") and not _pay_given(scenario, "mother"):
         questions.append(_pay_question(scenario, "mother"))
     event = scenario.mother_event
     left = event is not None and event.kind in ("death", "abandonment")
-    if mother and scenario.mother_pay is not None and scenario.rate_815 is None and not left:
+    if mother and _pay_given(scenario, "mother") and scenario.rate_815 is None and not left:
         questions.append(_rate_question(scenario))
-    if pay_matters(scenario, "father") and scenario.father_pay is None:
+    if pay_matters(scenario, "father") and not _pay_given(scenario, "father"):
         questions.append(_pay_question(scenario, "father"))
     return questions
+
+
+def _pay_given(scenario: Scenario, parent: Literal["mother", "father"]) -> bool:
+    """The amount was answered (or declined), or months of pay (or the pay in the contract,
+    for the first month of insurance) were given instead."""
+    pay = scenario.mother_pay if parent == "mother" else scenario.father_pay
+    history = scenario.mother_pay_history if parent == "mother" else scenario.father_pay_history
+    detail = history is not None and (bool(history.months) or history.contract_pay is not None)
+    return pay is not None or detail
 
 
 def _pay_question(scenario: Scenario, parent: Literal["mother", "father"]) -> Question:

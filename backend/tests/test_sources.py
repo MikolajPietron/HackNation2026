@@ -6,7 +6,15 @@ from typing import Any
 import pytest
 
 from app.assistant.guide import guide_sections
-from app.assistant.law import kp_articles, kp_contains, ustawa_articles, ustawa_contains
+from app.assistant.law import (
+    kp_articles,
+    kp_contains,
+    ustawa_articles,
+    ustawa_contains,
+    zalacznik_available,
+    zalacznik_contains,
+    zalacznik_sections,
+)
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.engine import Scenario, build_timeline
 from app.engine.models import SourceRef
@@ -23,6 +31,11 @@ def is_literal(source: SourceRef) -> bool:
         return source.article is not None and kp_contains(source.article, source.quote)
     if source.doc == "ustawa":
         return source.article is not None and ustawa_contains(source.article, source.quote)
+    if source.doc == "zalacznik":
+        # The Załącznik's text is not in git (a ZUS document): checked where it was built.
+        if not zalacznik_available():
+            return source.section is not None
+        return source.section is not None and zalacznik_contains(source.section, source.quote)
     assert source.section is not None
     pages = SECTIONS[source.section].pages_of(source.quote)
     return pages == (source.page, source.page_to or source.page)
@@ -203,6 +216,25 @@ def test_ustawa_zasilkowa_provisions() -> None:
         "art. 48 ust. 1",
         "art. 52",
         "art. 61 ust. 1",
+        # The benefit base in detail (engine/base.py).
+        "art. 36 ust. 2",
+        "art. 36 ust. 4",
+        "art. 37 ust. 1",
+        "art. 37 ust. 2",
+        "art. 38 ust. 1",
+        "art. 38 ust. 2",
+        "art. 38 ust. 3",
+        "art. 42 ust. 1",
+        "art. 42 ust. 2",
+        "art. 42 ust. 3",
+        "art. 43",
+        "art. 45 ust. 1",
+        "art. 45 ust. 2",
+        "art. 48 ust. 2",
+        "art. 48a ust. 1",
+        "art. 49 ust. 1",
+        "art. 50 ust. 1",
+        "art. 50 ust. 2",
     }
     texts = ustawa_articles()
     assert texts["art. 30a ust. 1"].startswith("Ubezpieczona - matka dziecka, nie później niż 21")
@@ -216,6 +248,40 @@ def test_ustawa_zasilkowa_provisions() -> None:
     assert "w okresie ciąży - 100% tej podstawy" in texts["art. 19 ust. 1"]
     assert all("Legalis" not in t and "ROZDZIAŁ" not in t for t in texts.values())
     assert SECTIONS["G.3"].text.startswith("Jeżeli ubezpieczona-matka, niepóźnej niż 21 dni")
+    # A paragraph keeps its points; the next paragraph or article is not part of it.
+    assert "3) kwota zmiennych składników" in texts["art. 37 ust. 2"]
+    assert texts["art. 38 ust. 2"].endswith("co najmniej połowę obowiązującego go czasu pracy.")
+    assert texts["art. 43"].endswith("krótsza niż miesiąc kalendarzowy.")
+    assert texts["art. 49 ust. 1"].endswith(
+        "na rzecz danego płatnika składek za miesiąc, w którym "
+        "powstało prawo do zasiłku - dla osób wykonujących "
+        "pracę nakładczą."
+    )
+
+
+@pytest.mark.skipif(
+    not zalacznik_available(), reason="zalacznik.json is built locally from the ZUS materials"
+)
+def test_zalacznik_sections() -> None:
+    """The chapter of the ZUS Załącznik on the benefit base, its own text; table rows keep their
+    cells separated by " | "."""
+    sections = zalacznik_sections()
+    assert set(sections) == {
+        "Podstawa wymiaru zasiłków dla pracowników",
+        "Okres uwzględniany w podstawie wymiaru zasiłku",
+        "Minimalna podstawa wymiaru zasiłku w 2026 roku",
+        "Składniki wynagrodzenia w podstawie wymiaru zasiłku",
+        "Uzupełnianie wynagrodzenia za niepełny miesiąc",
+        "Podstawa wymiaru zasiłków dla nie pracowników",
+    }
+    period = sections["Okres uwzględniany w podstawie wymiaru zasiłku"]
+    assert period.startswith("Sytuacja pracownika | Sposób ustalenia podstawy wymiaru zasiłku")
+    assert "(4 806 zł brutto)" in sections["Minimalna podstawa wymiaru zasiłku w 2026 roku"]
+    cap = "wynosi 23 550,00 zł (co po odjęciu 13,71% daje limit podstawy zasiłku 20 321,30 zł)"
+    assert cap in sections["Podstawa wymiaru zasiłków dla nie pracowników"]
+    # The original's typo stays.
+    components = sections["Składniki wynagrodzenia w podstawie wymiaru zasiłku"]
+    assert "(gdy przysługuje w czasie zawonienia)" in components
 
 
 def test_every_quote_in_params_is_literal() -> None:
@@ -292,6 +358,7 @@ def scenarios() -> list[dict[str, Any]]:
         + pregnancy_scenarios()
         + taken_in_scenarios()
         + money_scenarios()
+        + base_scenarios()
     )
 
 
@@ -385,6 +452,72 @@ def every_paid_period_scenarios() -> list[dict[str, Any]]:
     ]
     cases.append(expecting | {"sick_leave": True, "sick_leave_start": "2026-11-01"})
     return cases
+
+
+def base_scenarios() -> list[dict[str, Any]]:
+    """The benefit base in detail: months in full, worked in part (less and at least half, fixed
+    pay), every month short, bonuses, a shorter insurance, the first month, the minimum, the cap,
+    sick leave straight into maternity leave, an expected child, either parent."""
+    born = {"child_born": True, "birth_date": "2026-11-10", "children_count": 1}
+    born |= {"role": "mother", "leave_before_birth_weeks": 0}
+    year = [{"month": month, "amount": 8000} for month in _months("2025-11", 12)]
+    partial = [
+        *year[:4],
+        {"month": "2026-03", "amount": 3000, "days_required": 21, "days_worked": 8},
+        {"month": "2026-04", "amount": 4400, "days_required": 22, "days_worked": 11},
+        {"month": "2026-05", "amount": 7400, "days_required": 21, "days_worked": 14}
+        | {"fixed": 6000, "variable": 1400, "not_topped": 300},
+        *year[7:],
+    ]
+    short = [
+        {"month": month, "amount": 2000, "days_required": 21, "days_worked": 5}
+        for month in ("2026-08", "2026-09", "2026-10")
+    ]
+    first_month = [{"month": "2026-11", "amount": 1600, "days_required": 6, "days_worked": 4}]
+    histories: list[dict[str, Any]] = [
+        {"months": year},
+        {"months": partial, "quarterly_bonuses": 6000, "annual_bonus": 9600},
+        {"months": short, "insured_from": "2026-08-01"},
+        {"months": year[5:], "insured_from": "2026-03-15", "full_time": True},
+        {"insured_from": "2026-11-02", "contract_pay": 6000},
+        {"months": first_month, "insured_from": "2026-11-02"},
+        {"full_time": True},
+    ]
+    cases: list[dict[str, Any]] = [
+        born | {"work": "employment", "mother_pay": 4000, "mother_pay_history": history}
+        for history in histories
+    ]
+    cases += [
+        born | {"work": work, "mother_insured": True, "mother_pay_history": history}
+        for work in ("contract", "business")
+        for history in (
+            {"months": [month | {"amount": 25000} for month in year]},
+            {"months": short, "insured_from": "2026-08-01"},
+            {"insured_from": "2026-11-02", "contract_pay": 5000},
+        )
+    ]
+    cases += [
+        born
+        | {"work": "employment", "sick_leave": True, "sick_leave_start": "2026-06-01"}
+        | {"sick_leave_end": end, "mother_pay_history": {"months": year}}
+        for end in (None, "2026-08-31")
+    ]
+    cases += [
+        {"child_born": False, "due_date": "2027-03-15", "children_count": 1, "role": "mother"}
+        | {"work": "employment", "mother_pay_history": {"months": year}}
+        | {"father_work": "business", "father_pay_history": {"months": year}},
+        born
+        | {"work": "none", "father_work": "employment"}
+        | {"father_pay_history": {"months": partial, "full_time": False}},
+    ]
+    return cases
+
+
+def _months(first: str, count: int) -> list[str]:
+    """ "2025-11", 3 -> ["2025-11", "2025-12", "2026-01"]"""
+    year, month = (int(part) for part in first.split("-"))
+    index = year * 12 + month - 1
+    return [f"{(index + i) // 12}-{(index + i) % 12 + 1:02d}" for i in range(count)]
 
 
 def father_scenarios() -> list[dict[str, Any]]:
@@ -739,6 +872,12 @@ def test_every_timeline_element_has_a_literal_source(answers: dict[str, Any]) ->
         for source in note.sources:
             assert is_literal(source), (note.id, source.quote)
     assert len({note.id for note in timeline.notes}) == len(timeline.notes)
+    # The benefit base, step by step (engine/base.py): every step quotes its rules.
+    for base in timeline.bases:
+        for step in base.steps:
+            assert step.sources, (base.parent, step.text)
+            for source in step.sources:
+                assert is_literal(source), (base.parent, source.quote)
 
 
 def test_the_model_always_has_the_source_text() -> None:
@@ -747,6 +886,8 @@ def test_the_model_always_has_the_source_text() -> None:
     for text in kp_articles().values():
         assert text in STATIC_INSTRUCTIONS
     for text in ustawa_articles().values():
+        assert text in STATIC_INSTRUCTIONS
+    for text in zalacznik_sections().values():
         assert text in STATIC_INSTRUCTIONS
 
 

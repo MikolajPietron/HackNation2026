@@ -15,6 +15,7 @@ from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls
 
 from app.api.deps import get_chat_model, get_param_store, get_session_store, get_today
 from app.assistant.describe import opening_notes
+from app.assistant.law import zalacznik_available
 from app.assistant.prompts import STATIC_INSTRUCTIONS
 from app.config import Settings, get_settings
 from app.engine.models import CaseNote
@@ -1203,3 +1204,55 @@ def test_the_money_tools_and_the_ustawa_are_in_the_instructions() -> None:
     assert "[Przewodnik ZUS, s. 9: Wysokość zasiłku macierzyńskiego: 100% podstawy]" in (
         STATIC_INSTRUCTIONS
     )
+
+
+# The benefit base in detail (engine/base.py).
+
+
+def test_the_pay_history_is_recorded_month_by_month(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """The user types the payer's certificate: `set_pay_history` records the months as given
+    and the calculator computes the base (12 × 8000 → 6903,20 zł); a later call adds to it."""
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "child_born": True,
+            "birth_date": "2026-11-10",
+            "children_count": 1,
+            "leave_before_birth_weeks": 0,
+            "father_work": "none",
+        },
+    )
+    year = [{"month": f"2025-{m}", "amount": 8000} for m in ("11", "12")] + [
+        {"month": f"2026-{m:02d}", "amount": 8000} for m in range(1, 11)
+    ]
+    update = timeline_after(client, "set_pay_history", {"parent": "mother", "months": year})
+    assert len(update["scenario"]["mother_pay_history"]["months"]) == 12
+    assert update["focus"] == "pay-maternity"
+    assert update["timeline"]["bases"][0]["base"] == 6903.2
+    assert "base-mother" in update["changed_notes"]
+
+    # A month again replaces it, other fields are added: March worked 8 of 21 days is left out.
+    march = {"month": "2026-03", "amount": 3000, "days_required": 21, "days_worked": 8}
+    args = {"parent": "mother", "months": [march], "annual_bonus": 9600}
+    history = timeline_after(client, "set_pay_history", args)["scenario"]["mother_pay_history"]
+    assert [m["amount"] for m in history["months"] if m["month"] == "2026-03"] == [3000]
+    assert (len(history["months"]), history["annual_bonus"]) == (12, 9600)
+    assert "2026-03: 3000 zł, przepracowane 8 z 21 dni" in instructions_now(client)
+
+    # A slip and a parent who does not work are refused; `replace` alone removes the record.
+    slip = {"parent": "mother", "months": [{"month": "2026-03", "amount": 8}]}
+    assert rejected("set_pay_history") in ask(client, scripted("set_pay_history", slip, "…"), "…")
+    father = {"parent": "father", "months": year}
+    out = ask(client, scripted("set_pay_history", father, "…"), "…")
+    assert rejected("set_pay_history") in out
+    gone = timeline_after(client, "set_pay_history", {"parent": "mother", "replace": True})
+    assert gone["scenario"]["mother_pay_history"] is None
+    assert "`set_pay_history`" in STATIC_INSTRUCTIONS
+    if zalacznik_available():  # built locally from the ZUS materials, not in git
+        assert "[Załącznik ZUS, Okres uwzględniany w podstawie wymiaru zasiłku]" in (
+            STATIC_INSTRUCTIONS
+        )

@@ -155,7 +155,8 @@ def test_non_employee_base_is_the_contribution_base_less_13_71_percent() -> None
     assert any(s.article == "art. 3 pkt 4" for s in maternity.sources)
     assert any(s.article == "art. 48 ust. 1" for s in maternity.sources)
     assert not any(s.article == "art. 3 pkt 3" for s in maternity.sources)
-    assert any("Górnej granicy tej podstawy" in a for a in t.assumptions)
+    # The cap of the voluntary contribution base is in the ZUS Załącznik (test_base.py).
+    assert any("najwyżej 23 550,00 zł miesięcznie" in a for a in t.assumptions)
 
 
 def test_expected_child_with_leave_before_the_birth() -> None:
