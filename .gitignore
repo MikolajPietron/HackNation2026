@@ -35,3 +35,6 @@ dist/
 backend/.cases_cache/
 # Conversations kept locally when Supabase is not configured (app/services/sessions.py)
 backend/.sessions/
+
+# The film is uploaded to YouTube; too big for git.
+docs/prezentacja/film/*.mp4

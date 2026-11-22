@@ -1,0 +1,115 @@
+1
+00:00:00,400 --> 00:00:05,794
+Kiedy w rodzinie pojawia się dziecko, rodzice mają dziesiątki pytań.
+
+2
+00:00:05,794 --> 00:00:07,905
+Ile urlopu nam się należy?
+
+3
+00:00:07,905 --> 00:00:09,156
+Ile dostaniemy?
+
+4
+00:00:09,156 --> 00:00:10,876
+Co złożyć i do kiedy?
+
+5
+00:00:10,876 --> 00:00:17,443
+Przepisy są rozproszone, a jedna przegapiona data potrafi kosztować tysiące złotych.
+
+6
+00:00:18,143 --> 00:00:27,390
+Zasiłkowy Przewodnik Przyszłego Rodzica zaczyna od kilku prostych pytań: kim jesteś, kiedy jest termin porodu i jak pracujecie.
+
+7
+00:00:27,390 --> 00:00:30,496
+Po chwili rodzina widzi swój osobisty plan.
+
+8
+00:00:31,177 --> 00:00:36,561
+Sercem aplikacji jest oś czasu: jeden kalkulator zamiast dziesięciu.
+
+9
+00:00:36,561 --> 00:00:43,194
+Urlop mamy i taty, terminy wniosków i dni, po których prawa nie da się już odzyskać.
+
+10
+00:00:43,194 --> 00:00:48,267
+Każdy element ma dosłowny cytat z przepisu albo z materiałów ZUS.
+
+11
+00:00:48,977 --> 00:00:53,020
+Kwoty liczy silnik reguł, nie sztuczna inteligencja.
+
+12
+00:00:53,020 --> 00:01:00,192
+Okno „Dlaczego tyle?” pokazuje podstawę wymiaru krok po kroku, z przepisem przy każdym kroku.
+
+13
+00:01:00,192 --> 00:01:07,135
+Aplikacja mówi, kto wypłaci zasiłek, pracodawca czy ZUS, i wypełnia wnioski danymi z planu.
+
+14
+00:01:07,843 --> 00:01:10,643
+A co, jeśli urodzi się wcześniak?
+
+15
+00:01:10,643 --> 00:01:20,522
+Plan przelicza się od razu: dochodzi urlop uzupełniający, terminy się przesuwają, a stary plan zostaje na osi jako cień.
+
+16
+00:01:21,210 --> 00:01:30,219
+Na telefonie wszystko działa tak samo: oś układa się pionowo, mama i tata są obok siebie, a przy każdym okresie widać kwotę.
+
+17
+00:01:30,910 --> 00:01:34,154
+Najważniejszy test to prawdziwe sprawy ZUS.
+
+18
+00:01:34,154 --> 00:01:36,881
+Wybieramy sprawę albo wgrywamy skan.
+
+19
+00:01:36,881 --> 00:01:42,557
+Sztuczna inteligencja tylko przepisuje fakty z dokumentów, z numerem strony.
+
+20
+00:01:42,557 --> 00:01:44,474
+Resztę robi silnik reguł.
+
+21
+00:01:44,474 --> 00:01:53,614
+Tutaj sprawdza ubezpieczenie chorobowe w dniu porodu, dochodzi do odmowy z tego samego powodu co ZUS i wskazuje strony akt.
+
+22
+00:01:53,614 --> 00:01:59,732
+W kolejnej sprawie liczy podstawę z zaświadczenia płatnika i kwotę za każdy okres.
+
+23
+00:01:59,732 --> 00:02:03,418
+Jednym kliknięciem sprawa staje się planem na osi.
+
+24
+00:02:04,110 --> 00:02:13,447
+Wynik silnika zgadza się z decyzją ZUS w pięćdziesięciu trzech z pięćdziesięciu dziewięciu spraw z jednoznaczną decyzją.
+
+25
+00:02:13,447 --> 00:02:24,172
+Reguł pilnuje ponad dwa i pół tysiąca testów z ręcznie policzonymi datami i kwotami, a każdy cytat jest sprawdzany z przepisem co do znaku.
+
+26
+00:02:24,872 --> 00:02:34,617
+Gdy zmienią się przepisy, ekspert zmienia liczby w panelu, bez programisty, z datą obowiązywania i podglądem skutków.
+
+27
+00:02:34,617 --> 00:02:41,637
+A asystent AI tłumaczy plan prostym językiem, zawsze liczbami z silnika i ze źródłem.
+
+28
+00:02:42,737 --> 00:02:45,637
+Zasiłkowy Przewodnik Przyszłego Rodzica.
+
+29
+00:02:45,637 --> 00:02:48,821
+Wszystko, co się należy, na jednej osi czasu.
