@@ -6,7 +6,7 @@ Każda reguła ma dosłowny cytat ze źródła: Przewodnika ZUS (opis wyzwania),
 
 ## Demo online
 
-https://app-production-2f4e6c1c.up.railway.app (Railway, jeden kontener: FastAPI serwuje też zbudowany front; `Dockerfile`, `railway.json`). Panel parametrów: `/admin`, raport zgodności: `/raport`. Rozmowy są w pamięci serwera. Skanów spraw ZUS na serwerze nie ma: sprawę wgrywa się samemu albo wybiera przykładową rodzinę.
+https://przewodnik-rodzica.up.railway.app (Railway, jeden kontener: FastAPI serwuje też zbudowany front; `Dockerfile`, `railway.json`). Panel parametrów: `/admin`, raport zgodności: `/raport`. Rozmowy są w pamięci serwera. Skanów spraw ZUS na serwerze nie ma: sprawę wgrywa się samemu albo wybiera przykładową rodzinę.
 
 Wdrożenie nowej wersji: `npx @railway/cli up --service app` z katalogu głównego (po `railway login`).
 

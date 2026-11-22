@@ -209,7 +209,7 @@ Każda funkcja AI jest oznaczona w interfejsie. AI nigdy nie liczy kwot ani dat.
 
 ## 19. Technologia
 
-- Demo online: https://app-production-2f4e6c1c.up.railway.app (jeden kontener, backend serwuje też stronę).
+- Demo online: https://przewodnik-rodzica.up.railway.app (jeden kontener, backend serwuje też stronę).
 
 - Frontend: React, TypeScript, Vite, Tailwind, Motion.
 - Backend: Python, FastAPI. Silnik reguł to czysty, deterministyczny moduł bez bazy i bez AI.
