@@ -2,7 +2,7 @@
 // insured on the day the right arises, and does the calculator agree with the decision of ZUS),
 // the amounts and periods the engine computed, and the facts to correct by hand. Each answer is
 // a picture, a word and one sentence; the detail is a click away.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ArrowLeft, ChevronDown } from 'lucide-react'
@@ -47,6 +47,13 @@ export function CaseResultView({
   onShowPlan: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  const factsRef = useRef<HTMLElement>(null)
+  // No date of birth (or of taking the child in) in the documents: there is no timeline to show
+  // yet, so the main button leads to the one field that is missing instead of being dead.
+  const openFacts = () => {
+    setEditing(true)
+    requestAnimationFrame(() => factsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
   const { facts, insurance, comparison, timeline } = result
   const covered: Tone = insurance.covered ? 'good' : insurance.covered === false ? 'bad' : 'unknown'
   const verdict: { tone: Tone; word: string } =
@@ -153,7 +160,7 @@ export function CaseResultView({
         </Section>
       )}
 
-      <section className="mt-5 rounded-3xl border border-line">
+      <section ref={factsRef} className="mt-5 rounded-3xl border border-line">
         <button
           type="button"
           onClick={() => setEditing(!editing)}
@@ -207,9 +214,15 @@ export function CaseResultView({
         >
           Inna sprawa
         </button>
-        <PrimaryButton onClick={onShowPlan} disabled={busy || !timeline} className="h-12 px-6 text-base">
-          Pokaż na osi
-        </PrimaryButton>
+        {timeline ? (
+          <PrimaryButton onClick={onShowPlan} disabled={busy} className="h-12 px-6 text-base">
+            Pokaż na osi
+          </PrimaryButton>
+        ) : (
+          <PrimaryButton onClick={openFacts} disabled={busy} className="h-12 px-6 text-base">
+            Wpisz datę porodu, żeby zobaczyć oś
+          </PrimaryButton>
+        )}
       </div>
     </div>
   )
