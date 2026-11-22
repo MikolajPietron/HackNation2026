@@ -20,9 +20,12 @@ export type TakenIn = 'adoption' | 'foster'
 /**
  * A literal quote: from the guide (section and pages), from the Labour Code ('kp') or from the
  * ustawa zasiłkowa ('ustawa'; both: article), or from the ZUS Załącznik ('zalacznik': section).
+ * The request forms also quote two regulations (article: "§ 15 ust. 1", "zał. 6"):
+ * 'rozp_wnioski' (11.03.2025, the leave requests) and 'rozp_zasilki' (27.09.2026, the documents
+ * for the benefits).
  */
 export interface SourceRef {
-  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik'
+  doc: 'przewodnik' | 'kp' | 'ustawa' | 'zalacznik' | 'rozp_wnioski' | 'rozp_zasilki'
   quote: string
   section: string | null
   page: number | null
@@ -352,6 +355,76 @@ export interface Leftover {
 
 // --- end F9, F10 ---
 
+// Request forms (ZADANIA B.3, backend/app/engine/forms.py): each request on the timeline as a
+// form to fill in. Only what the sources name: the regulation on the leave requests
+// ('rozp_wnioski') and the annexes of the regulation on the benefit documents ('rozp_zasilki':
+// annex 6 = the data of ZAM, annex 1 = the sickness benefit). The ZUS forms themselves (ZAM,
+// ZAS-53) are on www.zus.pl, not in our materials.
+
+/**
+ * text = words or numbers; date = one day (`start`); period = from `start` to `end`;
+ * statement = a declaration the person makes in the request (`value` says what it is about).
+ */
+export type FormFieldKind = 'text' | 'date' | 'period' | 'statement'
+
+/**
+ * Who the request goes to: the employer; the payer of contributions (the principal of a contract
+ * of mandate) that pays the benefit itself; ZUS; the payer or ZUS (the payer's size not known).
+ */
+export type Addressee = 'employer' | 'payer' | 'zus' | 'payer-or-zus'
+
+export interface FormField {
+  /** Stable within the form, e.g. "employee-name", "leave-period", "child-birth-date". */
+  id: string
+  label: string
+  kind: FormFieldKind
+  /** Filled in by the app, in Polish (dates DD.MM.RRRR); null = the person types it in. */
+  value: string | null
+  /** The filled value as dates: kind "date" — `start`; kind "period" — `start` to `end`. */
+  start: string | null
+  end: string | null
+  /** Personal data (names, PESEL, addresses, NIP, bank account, signature): never filled in. */
+  personal: boolean
+  /** false = only in the case the source names (e.g. "jeżeli są niezbędne"). */
+  required: boolean
+  /** Where the value comes from, or what to write in. */
+  hint: string | null
+  sources: SourceRef[]
+}
+
+export interface FormAttachment {
+  id: string
+  label: string
+  /** false = only in the case `hint` describes (e.g. when the payer, not ZUS, pays). */
+  required: boolean
+  hint: string | null
+  sources: SourceRef[]
+}
+
+/** A line about the whole request, e.g. that the ZUS form is on www.zus.pl. */
+export interface FormNote {
+  text: string
+  sources: SourceRef[]
+}
+
+export interface RequestForm {
+  title: string
+  applicant: Role
+  addressee: Addressee
+  /** "Pracodawca mamy", "ZUS", "Płatnik składek (zleceniodawca) albo ZUS". */
+  addressee_label: string
+  /** "ZAM", "ZAS-53" (on www.zus.pl); null = a request the employee writes. */
+  official_form: string | null
+  /** The provisions that name this request and say what it contains. */
+  legal_basis: SourceRef[]
+  /** The period on the timeline the request is for. */
+  start: string | null
+  end: string | null
+  fields: FormField[]
+  attachments: FormAttachment[]
+  notes: FormNote[]
+}
+
 export interface Document {
   id: string
   label: string
@@ -361,6 +434,14 @@ export interface Document {
   rule: string
   segment_id: string | null
   sources: SourceRef[]
+  /**
+   * The last day to file it under a Labour Code deadline, for the day on the timeline (may have
+   * passed). null = the materials give no deadline: `needed_by` is only the day the leave, the
+   * benefit or the sick leave starts — show it as "na dzień startu", never as a deadline.
+   */
+  deadline: string | null
+  /** The request as a form to fill in; null for documents that are not requests. */
+  form: RequestForm | null
 }
 
 /**

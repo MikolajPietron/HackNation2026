@@ -34,9 +34,12 @@ niezawodowa)."""
 class SourceRef(BaseModel):
     """A literal quote: from the guide (section and pages), from the Labour Code ("kp") or from
     the ustawa zasiłkowa ("ustawa"; both: article), or from the ZUS Załącznik to the challenge
-    ("zalacznik": section, as named in zalacznik.json)."""
+    ("zalacznik": section, as named in zalacznik.json). The request forms also quote two
+    regulations (article: "§ 15 ust. 1", "zał. 6"): "rozp_wnioski", of 11 March 2025, on the
+    leave requests and their attachments, and "rozp_zasilki", of 27 September 2026, on the
+    documents for the benefits (assistant/rozporzadzenia.json)."""
 
-    doc: Literal["przewodnik", "kp", "ustawa", "zalacznik"]
+    doc: Literal["przewodnik", "kp", "ustawa", "zalacznik", "rozp_wnioski", "rozp_zasilki"]
     quote: str
     section: str | None = None
     page: int | None = None
@@ -504,6 +507,86 @@ class Marker(BaseModel):
     """F10: after this day a right is lost for good (leftover.py)."""
 
 
+# Request forms (ZADANIA B.3): each request on the timeline as a form to fill in, filled from
+# the scenario and the timeline (engine/forms.py). Only what the sources name: the regulation on
+# the leave requests (rozp_wnioski), the annexes of the regulation on the benefit documents
+# (rozp_zasilki: annex 6 is the data of the ZAM request, annex 1 of the sickness benefit) and the
+# guide. The ZUS forms themselves (ZAM, ZAS-53) are on www.zus.pl, not in our materials. A
+# checker of filled requests (ZADANIA B.9, F23) reads fields by `id`.
+
+FormFieldKind = Literal["text", "date", "period", "statement"]
+"""text = words or numbers; date = one day (`start`); period = from `start` to `end`;
+statement = a declaration the person makes in the request (`value` says what it is about)."""
+
+Addressee = Literal["employer", "payer", "zus", "payer-or-zus"]
+"""Who the request goes to: the employer; the payer of contributions (the principal of a
+contract of mandate) that pays the benefit itself; ZUS; the payer or ZUS, by how many people the
+payer reports to sickness insurance (not known yet)."""
+
+
+class FormField(BaseModel):
+    """One piece of a request, as its source names it."""
+
+    id: str
+    """Stable within the form (e.g. "employee-name", "leave-period", "child-birth-date")."""
+    label: str
+    kind: FormFieldKind
+    value: str | None = None
+    """Filled in by the app, in Polish (dates DD.MM.RRRR). None = the person types it in."""
+    start: dt.date | None = None
+    end: dt.date | None = None
+    """The filled value as dates: kind "date" — `start`; kind "period" — `start` to `end`."""
+    personal: bool = False
+    """Personal data (names, PESEL, addresses, NIP, bank account, signature): the app never
+    fills it in and never asks for it; the person types it in the form."""
+    required: bool = True
+    """False = only in the case the source names (e.g. the other parent's data "jeżeli są
+    niezbędne")."""
+    hint: str | None = None
+    """Where the value comes from, or what to write in."""
+    sources: list[SourceRef]
+
+
+class FormAttachment(BaseModel):
+    """A document attached to the request."""
+
+    id: str
+    label: str
+    required: bool = True
+    """False = only in the case `hint` describes (e.g. when the payer, not ZUS, pays)."""
+    hint: str | None = None
+    sources: list[SourceRef]
+
+
+class FormNote(BaseModel):
+    """A line about the whole request, e.g. that the ZUS form is on www.zus.pl."""
+
+    text: str
+    sources: list[SourceRef] = []
+
+
+class RequestForm(BaseModel):
+    """A request on the timeline as a form: who files it, with whom, on what legal basis, what
+    it contains and what goes with it."""
+
+    title: str
+    applicant: Role
+    addressee: Addressee
+    addressee_label: str
+    """In Polish: "Pracodawca mamy", "ZUS", "Płatnik składek (zleceniodawca) albo ZUS"."""
+    official_form: str | None = None
+    """The ZUS form ("ZAM", "ZAS-53"), on www.zus.pl. None = a request the employee writes:
+    the regulation gives its content, not a template."""
+    legal_basis: list[SourceRef]
+    """The provisions that name this request and say what it contains."""
+    start: dt.date | None = None
+    end: dt.date | None = None
+    """The period on the timeline the request is for."""
+    fields: list[FormField] = []
+    attachments: list[FormAttachment] = []
+    notes: list[FormNote] = []
+
+
 class Document(BaseModel):
     """A document the parent needs by a given day."""
 
@@ -515,6 +598,15 @@ class Document(BaseModel):
     rule: str
     segment_id: str | None = None
     sources: list[SourceRef]
+    # Deadlines and forms (ZADANIA B.3, B.4).
+    deadline: dt.date | None = None
+    """The last day to file it under a Labour Code deadline ("w terminie nie krótszym niż N dni
+    przed"), counted for the day on the timeline; it may have passed (then `needed_by` is today
+    for an option the parents can still move, and `rule` says from when a request filed today is
+    in time). None = the materials give no deadline: `needed_by` is only the day the leave, the
+    benefit or the sick leave it is for starts, never a deadline."""
+    form: RequestForm | None = None
+    """The request as a form to fill in; None for documents that are not requests."""
 
 
 class Payment(BaseModel):

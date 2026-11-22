@@ -2643,5 +2643,1390 @@
         }
       ]
     }
+  },
+  "forms": {
+    "templates": {
+      "prenatal": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 2 ust. 1",
+            "quote": "W przypadku, o którym mowa w art. 180 § 2 ustawy z dnia 26 czerwca 1974 r. – Kodeks pracy, zwanej dalej „Kodeksem pracy”, wniosek o udzielenie pracownicy części urlopu macierzyńskiego przed przewidywaną datą porodu zawiera:"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "A.4",
+            "page": 6,
+            "quote": "Kobieta będąca pracownikiem występuje do pracodawcy z wnioskiem o udzielnie urlopu macierzyńskiego"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko pracownicy",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 2 ust. 1",
+                "quote": "imię i nazwisko pracownicy"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 2 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "due-date-certificate": {
+            "label": "Kopia zaświadczenia lekarskiego o przewidywanej dacie porodu",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 2 ust. 2",
+                "quote": "Do wniosku dołącza się kopię zaświadczenia lekarskiego wystawionego na zwykłym druku, określającego przewidywaną datę porodu."
+              }
+            ]
+          },
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "odpis skrócony aktu urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju"
+              },
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 2",
+                "quote": "Odpisu skróconego aktu urodzenia dziecka nie przedstawia się, jeżeli płatnikiem zasiłku jest Zakład."
+              }
+            ]
+          },
+          "stillbirth-certificate": {
+            "label": "Zaświadczenie o martwym urodzeniu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "a w przypadku gdy nie został sporządzony akt urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka – zaświadczenie lekarza posiadającego tytuł specjalisty w dziedzinie położnictwa i ginekologii lub lekarza w trakcie odbywania specjalizacji w tej dziedzinie albo położnej o martwym urodzeniu"
+              },
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "hospital-certificate": {
+            "label": "Zaświadczenie ze szpitala, w którym przebywało dziecko",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "za-zyciem-certificate": {
+            "label": "Zaświadczenie „Za życiem”",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          }
+        }
+      },
+      "maternity": {
+        "basis": [
+          {
+            "doc": "przewodnik",
+            "section": "A.4",
+            "page": 6,
+            "quote": "Kobieta będąca pracownikiem występuje do pracodawcy z wnioskiem o udzielnie urlopu macierzyńskiego"
+          }
+        ],
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "odpis skrócony aktu urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju"
+              },
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 2",
+                "quote": "Odpisu skróconego aktu urodzenia dziecka nie przedstawia się, jeżeli płatnikiem zasiłku jest Zakład."
+              }
+            ]
+          },
+          "stillbirth-certificate": {
+            "label": "Zaświadczenie o martwym urodzeniu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "a w przypadku gdy nie został sporządzony akt urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka – zaświadczenie lekarza posiadającego tytuł specjalisty w dziedzinie położnictwa i ginekologii lub lekarza w trakcie odbywania specjalizacji w tej dziedzinie albo położnej o martwym urodzeniu"
+              },
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "hospital-certificate": {
+            "label": "Zaświadczenie ze szpitala, w którym przebywało dziecko",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "za-zyciem-certificate": {
+            "label": "Zaświadczenie „Za życiem”",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          }
+        }
+      },
+      "resignation": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 3 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 8 Kodeksu pracy, w sprawie rezygnacji przez pracownicę z pozostałej części urlopu macierzyńskiego po wykorzystaniu po porodzie co najmniej 14 tygodni tego urlopu i powrotu do pracy zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko pracownicy",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 3 ust. 1",
+                "quote": "imię i nazwisko pracownicy"
+              }
+            ]
+          },
+          "return-date": {
+            "label": "Termin powrotu do pracy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 3 ust. 1",
+                "quote": "wskazanie terminu powrotu do pracy"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "father-request-copy": {
+            "label": "Kopia wniosku taty o pozostałą część urlopu macierzyńskiego albo kopia jego oświadczenia o przerwaniu działalności zarobkowej",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 3 ust. 2",
+                "quote": "Do wniosku dołącza się kopię wniosku pracownika – ojca wychowującego dziecko o udzielenie pozostałej części urlopu macierzyńskiego albo kopię oświadczenia ubezpieczonego – ojca dziecka o przerwaniu działalności zarobkowej w celu sprawowania opieki nad dzieckiem przez okres odpowiadający okresowi, który pozostał do końca urlopu macierzyńskiego."
+              }
+            ]
+          }
+        }
+      },
+      "father-takeover": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 5 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 9 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny pozostałej części urlopu macierzyńskiego"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "child-name": {
+            "label": "Imię i nazwisko dziecka",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 1",
+                "quote": "imię i nazwisko oraz datę urodzenia dziecka (dzieci), na które ma być udzielona pozostała część urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "child-birth-date": {
+            "label": "Data urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 1",
+                "quote": "imię i nazwisko oraz datę urodzenia dziecka (dzieci), na które ma być udzielona pozostała część urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "prenatal-leave": {
+            "label": "Urlop macierzyński (albo zasiłek) mamy wykorzystany przed porodem",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 1",
+                "quote": "oświadczenie pracownika o okresie urlopu macierzyńskiego albo o okresie pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi części urlopu macierzyńskiego, wykorzystanych przed porodem"
+              }
+            ]
+          },
+          "leave-period": {
+            "label": "Okres pozostałej części urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 1",
+                "quote": "wskazanie okresu, na który ma być udzielona pozostała część urlopu macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          },
+          "mother-resignation-statement": {
+            "label": "Oświadczenie mamy o zamiarze rezygnacji z pozostałej części urlopu macierzyńskiego (albo z zasiłku za ten okres)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 5 ust. 2",
+                "quote": "oświadczenie pracownicy o zamiarze rezygnacji z pozostałej części urlopu macierzyńskiego albo oświadczenie ubezpieczonej – matki dziecka o zamiarze rezygnacji z pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi pozostałej części urlopu macierzyńskiego"
+              }
+            ]
+          }
+        }
+      },
+      "father-hospital-employee": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 6 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku przerwania przez pracownicę przebywającą w szpitalu"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego (dzień, od którego mama przerwała urlop)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, odpowiadającej dacie, od której pracownica przerwała urlop macierzyński"
+              }
+            ]
+          },
+          "prenatal-leave": {
+            "label": "Urlop macierzyński (albo zasiłek) mamy wykorzystany przed porodem",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 1",
+                "quote": "oświadczenie pracownika o okresie urlopu macierzyńskiego wykorzystanego przed porodem"
+              }
+            ]
+          },
+          "discharge-commitment": {
+            "label": "Zobowiązanie do poinformowania pracodawcy o dniu wypisu mamy ze szpitala",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 1",
+                "quote": "oświadczenie pracownika, w którym zobowiązuje się on do poinformowania pracodawcy o dacie opuszczenia przez pracownicę szpitala"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "mother-statement": {
+            "label": "Oświadczenie mamy, od kiedy przerwała urlop macierzyński (albo zasiłek) na czas pobytu w szpitalu",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 2",
+                "quote": "oświadczenie pracownicy, która przebywa w szpitalu albo w innym zakładzie leczniczym podmiotu leczniczego wykonującego działalność leczniczą w rodzaju stacjonarne i całodobowe świadczenia zdrowotne, wskazujące datę, od której przerwała ona urlop macierzyński"
+              }
+            ]
+          },
+          "admission-certificate": {
+            "label": "Zaświadczenie szpitala o dniu przyjęcia mamy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 2",
+                "quote": "zaświadczenie o terminie przyjęcia pracownicy do placówki, o której mowa w pkt 1, wystawione przez tę placówkę"
+              }
+            ]
+          },
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 6 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          }
+        }
+      },
+      "father-hospital-insured": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 7 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku przerwania przez ubezpieczoną – matkę dziecka przebywającą w szpitalu"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego (dzień, od którego mama przerwała urlop)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, odpowiadającej dacie, od której ubezpieczona – matka dziecka przerwała pobieranie zasiłku macierzyńskiego"
+              }
+            ]
+          },
+          "prenatal-leave": {
+            "label": "Urlop macierzyński (albo zasiłek) mamy wykorzystany przed porodem",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 1",
+                "quote": "oświadczenie pracownika o okresie pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi części urlopu macierzyńskiego wykorzystanego przed porodem"
+              }
+            ]
+          },
+          "discharge-commitment": {
+            "label": "Zobowiązanie do poinformowania pracodawcy o dniu wypisu mamy ze szpitala",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 1",
+                "quote": "oświadczenie pracownika, w którym zobowiązuje się on do poinformowania pracodawcy o dacie opuszczenia przez ubezpieczoną – matkę dziecka szpitala"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "mother-statement": {
+            "label": "Oświadczenie mamy, od kiedy przerwała urlop macierzyński (albo zasiłek) na czas pobytu w szpitalu",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 2",
+                "quote": "oświadczenie ubezpieczonej – matki dziecka, która przebywa w szpitalu albo w innym zakładzie leczniczym podmiotu leczniczego wykonującego działalność leczniczą w rodzaju stacjonarne i całodobowe świadczenia zdrowotne, wskazujące datę, od której przerwała ona pobieranie zasiłku macierzyńskiego"
+              }
+            ]
+          },
+          "admission-certificate": {
+            "label": "Zaświadczenie szpitala o dniu przyjęcia mamy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 2",
+                "quote": "zaświadczenie o terminie przyjęcia ubezpieczonej – matki dziecka do placówki, o której mowa w pkt 1, wystawione przez tę placówkę"
+              }
+            ]
+          },
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 7 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          }
+        }
+      },
+      "father-death": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 8 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku zgonu pracownicy w czasie urlopu macierzyńskiego albo ubezpieczonej – matki dziecka w czasie pobierania zasiłku macierzyńskiego"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 8 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "event-date": {
+            "label": "Data śmierci mamy",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 8 ust. 1",
+                "quote": "oświadczenie pracownika o dacie zgonu pracownicy albo ubezpieczonej – matki dziecka"
+              }
+            ]
+          },
+          "prenatal-leave": {
+            "label": "Urlop macierzyński (albo zasiłek) mamy wykorzystany przed porodem",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 8 ust. 1",
+                "quote": "oświadczenie pracownika o okresie urlopu macierzyńskiego albo o okresie pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi części urlopu macierzyńskiego, wykorzystanych przed porodem"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 8 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, przypadającej po dniu zgonu pracownicy albo ubezpieczonej – matki dziecka"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 8 ust. 2",
+                "quote": "Do wniosku dołącza się odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów."
+              }
+            ]
+          }
+        }
+      },
+      "father-abandonment": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 9 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180 § 16 Kodeksu pracy, o udzielenie pracownikowi – ojcu wychowującemu dziecko albo pracownikowi – innemu członkowi najbliższej rodziny części urlopu macierzyńskiego w przypadku porzucenia dziecka przez pracownicę w czasie urlopu macierzyńskiego"
+          }
+        ],
+        "fields": {
+          "father-name": {
+            "label": "Imię i nazwisko taty",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 9 ust. 1",
+                "quote": "imię i nazwisko pracownika – ojca wychowującego dziecko albo pracownika – innego członka najbliższej rodziny"
+              }
+            ]
+          },
+          "event-date": {
+            "label": "Data porzucenia dziecka przez mamę",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 9 ust. 1",
+                "quote": "oświadczenie pracownika o dacie porzucenia dziecka przez pracownicę albo ubezpieczoną – matkę dziecka"
+              }
+            ]
+          },
+          "prenatal-leave": {
+            "label": "Urlop macierzyński (albo zasiłek) mamy wykorzystany przed porodem",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 9 ust. 1",
+                "quote": "oświadczenie pracownika o okresie urlopu macierzyńskiego albo o okresie pobierania zasiłku macierzyńskiego za okres odpowiadający okresowi części urlopu macierzyńskiego, wykorzystanych przed porodem"
+              }
+            ]
+          },
+          "leave-from": {
+            "label": "Data, od której ma być udzielona część urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 9 ust. 1",
+                "quote": "wskazanie daty, od której ma być udzielona część urlopu macierzyńskiego, przypadającej po dniu porzucenia dziecka przez pracownicę, nie wcześniej jednak niż po wykorzystaniu przez nią po porodzie co najmniej 8 tygodni urlopu macierzyńskiego"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 9 ust. 2",
+                "quote": "Do wniosku dołącza się odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów."
+              }
+            ]
+          }
+        }
+      },
+      "supplementary": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 14 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 180² § 4 Kodeksu pracy, o udzielenie pracownicy albo pracownikowi – ojcu wychowującemu dziecko uzupełniającego urlopu macierzyńskiego zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 14 ust. 1",
+                "quote": "imię i nazwisko pracownicy albo pracownika – ojca wychowującego dziecko"
+              }
+            ]
+          },
+          "maternity-end": {
+            "label": "Termin zakończenia urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 14 ust. 1",
+                "quote": "termin zakończenia urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "leave-period": {
+            "label": "Okres uzupełniającego urlopu macierzyńskiego",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 14 ust. 1",
+                "quote": "wskazanie okresu, na który ma być udzielony uzupełniający urlop macierzyński"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "hospital-certificate": {
+            "label": "Zaświadczenie ze szpitala, w którym przebywało dziecko",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 14 ust. 2",
+                "quote": "zaświadczenie, o którym mowa w art. 180² § 5 Kodeksu pracy"
+              },
+              {
+                "doc": "kp",
+                "article": "art. 180² § 5",
+                "quote": "Do wniosku dołącza się zaświadczenie wydane przez szpital, w którym przebywało dziecko"
+              }
+            ]
+          },
+          "other-parent-statement": {
+            "label": "Oświadczenie, że drugi z rodziców nie zamierza korzystać z urlopu uzupełniającego (ani z zasiłku za ten okres)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 14 ust. 2",
+                "quote": "oświadczenie pracownicy albo pracownika – ojca wychowującego dziecko o braku zamiaru korzystania z uzupełniającego urlopu macierzyńskiego albo z zasiłku macierzyńskiego za okres odpowiadający okresowi uzupełniającego urlopu macierzyńskiego przez drugiego z rodziców dziecka"
+              }
+            ]
+          }
+        }
+      },
+      "parental": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 15 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 182¹ᵈ § 1 Kodeksu pracy, o udzielenie pracownikowi – rodzicowi dziecka urlopu rodzicielskiego lub jego części zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 1",
+                "quote": "imię i nazwisko pracownika"
+              }
+            ]
+          },
+          "used-so-far": {
+            "label": "Wykorzystany dotąd urlop rodzicielski (albo zasiłek za ten okres) i liczba części",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 1",
+                "quote": "wskazanie okresu dotychczas wykorzystanego urlopu rodzicielskiego lub zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego oraz liczby wykorzystanych części urlopu rodzicielskiego lub liczby wniosków o zasiłek macierzyński za okres odpowiadający części urlopu rodzicielskiego"
+              }
+            ]
+          },
+          "leave-period": {
+            "label": "Okres urlopu rodzicielskiego (albo jego części)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 1",
+                "quote": "wskazanie okresu, na który ma być udzielony urlop rodzicielski lub ma być udzielona jego część"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          },
+          "other-parent-statement": {
+            "label": "Oświadczenie, czy i kiedy drugi z rodziców korzysta z urlopu rodzicielskiego w okresie z wniosku",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 2",
+                "quote": "oświadczenie pracownika o braku zamiaru korzystania z urlopu rodzicielskiego albo z zasiłku macierzyńskiego za okres odpowiadający okresowi urlopu rodzicielskiego przez drugiego z rodziców dziecka przez okres wskazany we wniosku albo o okresie, w którym drugi z rodziców dziecka zamierza korzystać z urlopu rodzicielskiego albo z zasiłku za okres odpowiadający okresowi urlopu rodzicielskiego w okresie objętym wnioskiem"
+              }
+            ]
+          },
+          "za-zyciem-certificate": {
+            "label": "Kopia zaświadczenia „Za życiem”",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 15 ust. 2",
+                "quote": "kopię zaświadczenia, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin „Za życiem” (Dz.U. z 2024 r. poz. 1829), w przypadku gdy wniosek o udzielenie urlopu rodzicielskiego lub jego części dotyczy urlopu rodzicielskiego w wymiarze, o którym mowa w art. 182¹ᵃ § 2 Kodeksu pracy"
+              }
+            ]
+          }
+        }
+      },
+      "paternity": {
+        "basis": [
+          {
+            "doc": "rozp_wnioski",
+            "article": "§ 17 ust. 1",
+            "quote": "Wniosek, o którym mowa w art. 182³ § 2 Kodeksu pracy, o udzielenie pracownikowi – ojcu urlopu ojcowskiego lub jego części zawiera:"
+          }
+        ],
+        "fields": {
+          "employee-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 17 ust. 1",
+                "quote": "imię i nazwisko pracownika"
+              }
+            ]
+          },
+          "leave-period": {
+            "label": "Okres urlopu ojcowskiego (albo jego części)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 17 ust. 1",
+                "quote": "wskazanie okresu, na który ma być udzielony urlop ojcowski albo ma być udzielona jego część"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 17 ust. 2",
+                "quote": "odpis skrócony aktu urodzenia dziecka (dzieci) lub zagraniczny dokument potwierdzający urodzenie dziecka (dzieci), wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju, albo kopie tych dokumentów"
+              }
+            ]
+          },
+          "paternity-statement": {
+            "label": "Oświadczenie taty, czy korzystał już z urlopu ojcowskiego (albo jego części)",
+            "sources": [
+              {
+                "doc": "rozp_wnioski",
+                "article": "§ 17 ust. 2",
+                "quote": "oświadczenie pracownika – ojca, czy korzystał z urlopu ojcowskiego albo jego części"
+              }
+            ]
+          }
+        }
+      },
+      "zam": {
+        "basis": [
+          {
+            "doc": "rozp_zasilki",
+            "article": "§ 12",
+            "quote": "Dokumentami niezbędnymi do przyznania i wypłaty zasiłku macierzyńskiego przez Zakład są dokument zawierający dane i informacje określone w załączniku nr 6 do rozporządzenia lub zaświadczenie płatnika składek, o którym mowa w § 3."
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "ZAM – wniosek o zasiłek macierzyński za okres urlopu macierzyńskiego, urlopu rodzicielskiego"
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "Formularz ZAO od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+          },
+          {
+            "doc": "przewodnik",
+            "section": "F",
+            "page": 12,
+            "quote": "Formularz ZUR od 24 października 2026 r. został połączony z formularzem ZAM i od tego dnia jest zlikwidowany."
+          }
+        ],
+        "fields": {
+          "payer-nip": {
+            "label": "NIP i REGON płatnika składek",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "NIP i REGON płatnika składek, a jeżeli płatnikowi składek nie nadano tych numerów albo jednego z nich – numer PESEL lub seria i numer paszportu, jeżeli nie ma obowiązku posługiwania się NIP i nie nadano numeru PESEL"
+              }
+            ]
+          },
+          "payer-name": {
+            "label": "Nazwa i adres płatnika składek",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "nazwa i adres płatnika składek"
+              }
+            ]
+          },
+          "insured-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "insured-pesel": {
+            "label": "Numer PESEL (bez niego: seria i numer paszportu oraz data urodzenia)",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "insured-address": {
+            "label": "Adres zamieszkania",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "insurance-title": {
+            "label": "Czy ubezpieczenie jest z tytułu, o którym mowa w art. 6 ust. 1 pkt 5, 10 i 24 ustawy o systemie ubezpieczeń społecznych",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja, czy ubezpieczony jest objęty ubezpieczeniem w razie choroby i macierzyństwa lub ubezpieczeniem z tytułu wypadków przy pracy i chorób zawodowych jako osoba, o której mowa w art. 6 ust. 1 pkt 5, 10 i 24 ustawy z dnia 13 października 1998 r. o systemie ubezpieczeń społecznych"
+              }
+            ]
+          },
+          "child-name": {
+            "label": "Imię i nazwisko dziecka",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "imię i nazwisko dziecka, numer PESEL dziecka, data i miejsce urodzenia dziecka"
+              }
+            ]
+          },
+          "child-pesel": {
+            "label": "Numer PESEL dziecka",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "imię i nazwisko dziecka, numer PESEL dziecka, data i miejsce urodzenia dziecka"
+              }
+            ]
+          },
+          "child-birth-date": {
+            "label": "Data urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "imię i nazwisko dziecka, numer PESEL dziecka, data i miejsce urodzenia dziecka"
+              }
+            ]
+          },
+          "child-birth-place": {
+            "label": "Miejsce urodzenia dziecka",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "imię i nazwisko dziecka, numer PESEL dziecka, data i miejsce urodzenia dziecka"
+              }
+            ]
+          },
+          "other-parent": {
+            "label": "Dane drugiego rodzica, jeśli są potrzebne do rozpatrzenia wniosku",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "dane drugiego rodzica dziecka albo członka rodziny – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania – jeżeli są niezbędne do rozpatrzenia wniosku o zasiłek macierzyński"
+              }
+            ]
+          },
+          "benefit-period": {
+            "label": "Rodzaj świadczenia i jego okres",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "wskazanie rodzaju świadczenia, o które ubiega się wnioskująca osoba, oraz jego okresu"
+              }
+            ]
+          },
+          "reason": {
+            "label": "Czego dotyczy wniosek",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja, czy wniosek dotyczy urodzenia dziecka, przyjęcia na wychowanie dziecka i wystąpienia do sądu opiekuńczego w sprawie jego przysposobienia albo przyjęcia na wychowanie dziecka w ramach rodziny zastępczej, z wyjątkiem rodziny zastępczej zawodowej"
+              }
+            ]
+          },
+          "za-zyciem": {
+            "label": "Czy dziecko ma zaświadczenie „Za życiem”",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "oświadczenie, czy dziecko posiada zaświadczenie, o którym mowa w art. 4 ust. 3 ustawy z dnia 4 listopada 2016 r. o wsparciu kobiet w ciąży i rodzin „Za życiem” (Dz.U. z 2024 r. poz. 1829)"
+              }
+            ]
+          },
+          "due-date": {
+            "label": "Przewidywana data porodu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja o przewidywanej dacie porodu"
+              }
+            ]
+          },
+          "employer-situation": {
+            "label": "Czy pracodawca ogłosił upadłość, likwidację, rozwiązał umowę o pracę z naruszeniem przepisów prawa albo zmarł",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja, czy wniosek dotyczy sytuacji, gdy pracodawca ogłosił upadłość, likwidację, rozwiązał umowę o pracę z naruszeniem przepisów prawa, zmarł"
+              }
+            ]
+          },
+          "hospital": {
+            "label": "Urodzenie i pobyt dziecka w szpitalu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja dotycząca danych o urodzeniu i okresie pobytu dziecka w szpitalu – jeżeli wniosek dotyczy zasiłku macierzyńskiego za okres uzupełniającego urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "mother-situation": {
+            "label": "Sytuacja mamy, która wpływa na prawo do zasiłku",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacje dotyczące sytuacji matki dziecka mające wpływ na ustalenie prawa do zasiłku macierzyńskiego"
+              }
+            ]
+          },
+          "other-parent-use": {
+            "label": "Zasiłek drugiego rodzica za urlop rodzicielski albo uzupełniający",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja dotycząca korzystania przez drugiego z rodziców z zasiłku macierzyńskiego za okres urlopu rodzicielskiego lub uzupełniającego urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "full-leave": {
+            "label": "Czy zamierzasz wykorzystać pełny wymiar urlopu macierzyńskiego i rodzicielskiego, z co najmniej jednym dniem urlopu rodzicielskiego w pierwszym roku życia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja, czy ubezpieczony zamierza korzystać z pełnego wymiaru urlopu macierzyńskiego / urlopu na warunkach urlopu macierzyńskiego i urlopu rodzicielskiego i co najmniej jeden dzień urlopu rodzicielskiego będzie przypadał w pierwszym roku życia dziecka"
+              }
+            ]
+          },
+          "parts": {
+            "label": "Części urlopu rodzicielskiego albo urlopu ojcowskiego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "informacja dotycząca części urlopu rodzicielskiego lub urlopu ojcowskiego"
+              }
+            ]
+          },
+          "bank-account": {
+            "label": "Numer rachunku bankowego",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "numer rachunku bankowego ubezpieczonego"
+              }
+            ]
+          },
+          "signature": {
+            "label": "Miejscowość, data i podpis",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 6",
+                "quote": "miejscowość, data, podpis osoby upoważnionej do wystawienia zaświadczenia"
+              }
+            ]
+          }
+        },
+        "attachments": {
+          "due-date-certificate": {
+            "label": "Zaświadczenie lekarskie o przewidywanej dacie porodu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "zaświadczenie lekarskie wystawione na zwykłym druku określające przewidywaną datę porodu – za okres przed dniem porodu"
+              }
+            ]
+          },
+          "birth-certificate": {
+            "label": "Odpis skrócony aktu urodzenia dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "odpis skrócony aktu urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka wydany przez uprawniony organ dokonujący rejestracji urodzenia w danym kraju"
+              },
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 2",
+                "quote": "Odpisu skróconego aktu urodzenia dziecka nie przedstawia się, jeżeli płatnikiem zasiłku jest Zakład."
+              }
+            ]
+          },
+          "stillbirth-certificate": {
+            "label": "Zaświadczenie o martwym urodzeniu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 13 ust. 1",
+                "quote": "a w przypadku gdy nie został sporządzony akt urodzenia dziecka lub zagraniczny dokument potwierdzający urodzenie dziecka – zaświadczenie lekarza posiadającego tytuł specjalisty w dziedzinie położnictwa i ginekologii lub lekarza w trakcie odbywania specjalizacji w tej dziedzinie albo położnej o martwym urodzeniu"
+              },
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "hospital-certificate": {
+            "label": "Zaświadczenie ze szpitala, w którym przebywało dziecko",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "za-zyciem-certificate": {
+            "label": "Zaświadczenie „Za życiem”",
+            "sources": [
+              {
+                "doc": "przewodnik",
+                "section": "A.4",
+                "page": 6,
+                "quote": "Do wniosków powinny zostać dołączone dokumenty, które są niezbędne do ustalenia prawa do zasiłku (np. zaświadczenie o martwym urodzeniu) lub które mogą mieć wpływ na wymiar zasiłku (np. zaświadczenie „Za życiem”, zaświadczenie wydane przez szpital stanowiące podstawę do uzupełniającego urlopu macierzyńskiego)."
+              }
+            ]
+          },
+          "supplementary-other-parent": {
+            "label": "Oświadczenie, że drugi z rodziców nie zamierza korzystać z zasiłku za okres urlopu uzupełniającego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 26",
+                "quote": "oświadczenie ubezpieczonego o braku zamiaru korzystania przez drugiego z rodziców dziecka z zasiłku macierzyńskiego za okres ustalony przepisami Kodeksu pracy jako okres uzupełniającego urlopu macierzyńskiego"
+              }
+            ]
+          },
+          "mother-benefit-certificate": {
+            "label": "Zaświadczenie płatnika zasiłku mamy o okresie wypłaconego jej zasiłku macierzyńskiego i jego stawce",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 20 ust. 1",
+                "quote": "zaświadczenie płatnika zasiłku o okresie przysługującego i wypłaconego matce dziecka zasiłku macierzyńskiego oraz stawce procentowej, w jakiej zasiłek macierzyński został wypłacony ubezpieczonej matce dziecka"
+              }
+            ]
+          },
+          "mother-benefit-certificate-hospital": {
+            "label": "Zaświadczenie płatnika zasiłku mamy o okresie wypłaconego jej zasiłku macierzyńskiego i jego stawce",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 23 ust. 1",
+                "quote": "zaświadczenie płatnika zasiłku o okresie przysługującego i wypłaconego matce dziecka zasiłku macierzyńskiego oraz o stawce procentowej, w jakiej zasiłek macierzyński został wypłacony ubezpieczonej matce dziecka"
+              }
+            ]
+          },
+          "mother-event-statement": {
+            "label": "Oświadczenie o śmierci mamy albo o porzuceniu przez nią dziecka",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 20 ust. 3",
+                "quote": "oświadczenie ubezpieczonego odpowiednio o śmierci matki dziecka albo o porzuceniu przez nią dziecka"
+              }
+            ]
+          },
+          "incapacity-ruling": {
+            "label": "Orzeczenie o niezdolności mamy do samodzielnej egzystencji",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 22 ust. 1",
+                "quote": "orzeczenie stwierdzające niezdolność matki do samodzielnej egzystencji"
+              }
+            ]
+          },
+          "mother-hospital-certificates": {
+            "label": "Zaświadczenia szpitala o dniu przyjęcia i dniu wypisu mamy",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 23 ust. 1",
+                "quote": "zaświadczenie o dacie przyjęcia ubezpieczonej matki dziecka do szpitala"
+              },
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 23 ust. 1",
+                "quote": "zaświadczenie o dacie wypisania ubezpieczonej matki dziecka z placówki leczniczej"
+              }
+            ]
+          },
+          "mother-uninsured-statement": {
+            "label": "Oświadczenie, że mama nie ma tytułu do ubezpieczenia chorobowego",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 32 ust. 1",
+                "quote": "oświadczenie ubezpieczonego, że matka dziecka nie posiada tytułu do objęcia ubezpieczeniem społecznym w razie choroby i macierzyństwa"
+              }
+            ]
+          },
+          "paternity-statement": {
+            "label": "Oświadczenie, czy zasiłek za okres urlopu ojcowskiego był już pobrany z innego tytułu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "§ 33 ust. 1",
+                "quote": "oświadczenie ubezpieczonego, czy zasiłek macierzyński za okres urlopu ojcowskiego został pobrany z innego tytułu"
+              }
+            ]
+          }
+        }
+      },
+      "sick": {
+        "basis": [
+          {
+            "doc": "rozp_zasilki",
+            "article": "§ 2",
+            "quote": "Dokumentami niezbędnymi do przyznania i wypłaty przez Zakład Ubezpieczeń Społecznych, zwany dalej „Zakładem”, zasiłku chorobowego są dokument zawierający dane i informacje określone w załączniku nr 1 do rozporządzenia"
+          }
+        ],
+        "fields": {
+          "insured-name": {
+            "label": "Imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "insured-pesel": {
+            "label": "Numer PESEL (bez niego: seria i numer paszportu oraz data urodzenia)",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "insured-address": {
+            "label": "Adres zamieszkania",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "dane ubezpieczonego – pierwsze imię, nazwisko, numer PESEL albo seria i numer paszportu i data urodzenia, jeżeli nie nadano numeru PESEL, oraz adres zamieszkania"
+              }
+            ]
+          },
+          "payer-nip": {
+            "label": "NIP i REGON płatnika składek",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "NIP i REGON płatnika składek, a jeżeli płatnikowi składek nie nadano tych numerów albo jednego z nich – numer PESEL lub seria i numer paszportu, jeżeli nie ma obowiązku posługiwania się NIP i nie nadano numeru PESEL"
+              }
+            ]
+          },
+          "payer-name": {
+            "label": "Nazwa i adres płatnika składek albo jego imię i nazwisko",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "nazwa i adres płatnika składek albo imię i nazwisko płatnika składek"
+              }
+            ]
+          },
+          "sick-period": {
+            "label": "Okres, za który ubiegasz się o zasiłek chorobowy",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "wskazanie okresu, za który wnioskodawca ubiega się o zasiłek chorobowy, z podaniem serii i numeru zaświadczenia lekarskiego"
+              }
+            ]
+          },
+          "certificate-number": {
+            "label": "Seria i numer zaświadczenia lekarskiego (e-ZLA)",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "wskazanie okresu, za który wnioskodawca ubiega się o zasiłek chorobowy, z podaniem serii i numeru zaświadczenia lekarskiego"
+              }
+            ]
+          },
+          "insurance-period": {
+            "label": "Czy niezdolność do pracy przypada w czasie ubezpieczenia, czy po jego ustaniu",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "wskazanie, czy wniosek dotyczy okresu niezdolności do pracy z powodu choroby przypadającego w okresie ubezpieczenia społecznego w razie choroby i macierzyństwa"
+              }
+            ]
+          },
+          "accident": {
+            "label": "Czy niezdolność do pracy powstała z powodu choroby zawodowej albo wypadku",
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "wskazanie, czy niezdolność do pracy powstała z powodu choroby zawodowej, wypadku przy pracy albo wypadku w drodze do pracy lub z pracy, ze wskazaniem dokumentu potwierdzającego tę okoliczność"
+              }
+            ]
+          },
+          "bank-account": {
+            "label": "Numer rachunku bankowego",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "numer rachunku bankowego wnioskodawcy"
+              }
+            ]
+          },
+          "signature": {
+            "label": "Data i podpis",
+            "personal": true,
+            "sources": [
+              {
+                "doc": "rozp_zasilki",
+                "article": "zał. 1",
+                "quote": "data oraz podpis wnioskodawcy"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "personal_files": {
+      "sources": [
+        {
+          "doc": "rozp_wnioski",
+          "article": "§ 22",
+          "quote": "Do wniosków, o których mowa w rozporządzeniu, nie dołącza się dokumentów wymienionych w rozporządzeniu, jeżeli dokumenty te znajdują się w aktach osobowych pracownika."
+        }
+      ]
+    },
+    "zus_forms": {
+      "sources": [
+        {
+          "doc": "przewodnik",
+          "section": "F",
+          "page": 12,
+          "quote": "Wzory formularzy stanowiących podstawę do ustalenia uprawnień do zasiłku znajdują się na stronie Zakładu www.zus.pl (w zakładce Wzory formularzy, Zasiłki)."
+        }
+      ]
+    },
+    "zus_birth_data": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 13 ust. 2",
+          "quote": "Odpisu skróconego aktu urodzenia dziecka nie przedstawia się, jeżeli płatnikiem zasiłku jest Zakład."
+        },
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 13 ust. 3",
+          "quote": "W przypadku, o którym mowa w ust. 2, do Zakładu przekazuje się następujące dane: imię i nazwisko dziecka, numer PESEL dziecka, o ile zostały nadane, datę i miejsce urodzenia dziecka oraz imię i nazwisko rodzica dziecka wnioskującego o przyznanie zasiłku macierzyńskiego"
+        }
+      ]
+    },
+    "sick_alternatives": {
+      "sources": [
+        {
+          "doc": "rozp_zasilki",
+          "article": "§ 2",
+          "quote": "lub wydruk zaświadczenia lekarskiego, lub zaświadczenie lekarskie wystawione na formularzu zaświadczenia lekarskiego wydrukowanym z systemu teleinformatycznego albo zaświadczenie płatnika składek, o którym mowa w § 3."
+        }
+      ]
+    }
   }
 }

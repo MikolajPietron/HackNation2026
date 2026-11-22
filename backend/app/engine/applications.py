@@ -9,9 +9,12 @@ Applied last, on the finished timeline (`add_applications`, before the case note
   than 20 people to sickness insurance, otherwise ZUS; with her own business the mother files
   ZAM straight with ZUS, so ZUS pays;
 - requests as documents: an employee asks the employer for each leave (one request may cover
-  maternity and parental leave right after it); the Labour Code deadlines are counted back from
-  the leave; a mother who is not an employee files ZAM (on a contract of mandate the payer
-  determines the benefit or ZUS does, with Z-3a from the payer);
+  maternity and parental leave right after it; each part of the parents' plan of parental leave
+  is its own request, art. 182¹ᵈ § 2); the Labour Code deadlines are counted back from the leave
+  and kept in `Document.deadline` (None: the materials give no deadline, and the day shown is
+  only the start of the leave or benefit, ZADANIA B.4); a mother who is not an employee files ZAM
+  (on a contract of mandate the payer determines the benefit or ZUS does, with Z-3a from the
+  payer). What each request contains is forms.py's (applied after this module);
 - protection: for an employed mother, the last day of the special protection her leave on the
   timeline gives, and the extension of a fixed-term contract until the birth;
 - sick leave in pregnancy (guide page 3, pregnancy.py draws the periods): e-ZLA goes straight to
@@ -85,6 +88,10 @@ REQUESTS = (
     "father-benefit-request",
 )
 """The requests for leave and the maternity benefit this module adds, by id."""
+PLAN_REQUESTS = ("parental-request-", "parental-father-request-")
+"""Prefixes of the requests for the parts of a parental plan: "parental-request-2" is the
+mother's second part (segment "parental-mother-2"), "parental-father-request-1" the father's
+first."""
 SICK_DOCUMENTS = ("sick-leave-notice", "sick-benefit-request")
 """Sick leave in pregnancy: informing the employer; the documents for the sickness benefit."""
 COURT_JUDGMENT = "court-judgment"
@@ -486,8 +493,9 @@ def _employee_mother(
         documents += _supplementary_request(supplementary, "mother", params, today)
     if parental is not None and parental.end >= today:
         p = a.parental_days_before.value
+        deadline = parental.start - p * DAY
         needed_by, when = _by(
-            parental.start - p * DAY,
+            deadline,
             p,
             f"przed rozpoczęciem urlopu ({fmt(parental.start)})",
             today,
@@ -515,8 +523,10 @@ def _employee_mother(
                 rule=" ".join(rule),
                 segment_id="parental",
                 sources=merge_sources(*sources),
+                deadline=deadline,
             )
         )
+    documents += _plan_part_requests(timeline, params, today, "mother")
     his = _segment(timeline, "maternity-father")
     if (
         scenario.father_takes_over
@@ -527,8 +537,9 @@ def _employee_mother(
     ):
         back = maternity.end + DAY
         r = a.resignation_days_before.value
+        deadline = back - r * DAY
         needed_by, when = _by(
-            back - r * DAY, r, f"przed powrotem do pracy ({fmt(back)})", today, movable=False
+            deadline, r, f"przed powrotem do pracy ({fmt(back)})", today, movable=False
         )
         rule = [f"Mama składa go pracodawcy, gdy dalszą część urlopu przejmuje tata. {when}"]
         if (scenario.mother_weeks_before_takeover or 14) == 14:
@@ -546,6 +557,7 @@ def _employee_mother(
                     a.resignation_days_before.sources,
                     params.father.takeover_starts_after.sources,
                 ),
+                deadline=deadline,
             )
         )
     return documents
@@ -561,8 +573,9 @@ def _supplementary_request(
     a = params.applications
     days = a.supplementary_days_before_end.value
     maternity_end = supplementary.start - DAY
+    deadline = maternity_end - days * DAY
     needed_by, when = _by(
-        maternity_end - days * DAY,
+        deadline,
         days,
         f"przed końcem urlopu macierzyńskiego ({fmt(maternity_end)})",
         today,
@@ -584,8 +597,59 @@ def _supplementary_request(
                 a.supplementary_days_before_end.sources,
                 a.supplementary_hospital_certificate.sources,
             ),
+            deadline=deadline,
         )
     ]
+
+
+# Requests for the parts of the parents' plan of parental leave (ZADANIA B.3): every part is its
+# own request (the number of parts is the number of requests, art. 182¹ᵈ § 2), filed at least
+# 21 days before the part starts (art. 182¹ᵈ § 1). Parts already under way need none any more.
+
+
+def _plan_part_requests(
+    timeline: Timeline, params: Params, today: dt.date, parent: Parent
+) -> list[Document]:
+    a = params.applications
+    days = a.parental_days_before.value
+    parts = sorted(
+        (s for s in timeline.segments if s.id.startswith(f"parental-{parent}-")),
+        key=lambda s: s.start,
+    )
+    whose = "" if parent == "mother" else " taty"
+    to = "pracodawcy" if parent == "mother" else "swojemu pracodawcy"
+    documents = []
+    for number, part in enumerate(parts, 1):
+        if part.start < today:
+            continue
+        deadline = part.start - days * DAY
+        _, when = _by(
+            deadline,
+            days,
+            f"przed rozpoczęciem tej części ({fmt(part.start)})",
+            today,
+            movable=False,
+        )
+        documents.append(
+            Document(
+                id=f"{PLAN_REQUESTS[parent == 'father']}{number}",
+                label=f"Wniosek{whose}: rodzicielski, cz. {number}",
+                title=f"Wniosek{whose} o urlop rodzicielski (część {number})",
+                needed_by=deadline,
+                done=False,
+                rule=(
+                    f"{WHO[parent]} składa go {to}. {when} Każda część to osobny wniosek: "
+                    "liczbę części urlopu ustala się według liczby złożonych wniosków."
+                ),
+                segment_id=part.id,
+                sources=merge_sources(
+                    a.parental_days_before.sources,
+                    params.parental_plan.parts_of_both_parents.sources,
+                ),
+                deadline=deadline,
+            )
+        )
+    return documents
 
 
 def _employee_father(
@@ -596,11 +660,13 @@ def _employee_father(
     his = _segment(timeline, "maternity-father")
     if his is not None and his.end >= today:
         event = scenario.mother_event
+        deadline: dt.date | None = None
         if event is None or event.kind == "incapacity":
             # Art. 180 § 9: taking over after 14 weeks (§ 4-5) or the mother's incapacity (§ 6-7).
             days = a.father_maternity_days_before.value
+            deadline = his.start - days * DAY
             needed_by, when = _by(
-                his.start - days * DAY,
+                deadline,
                 days,
                 f"przed rozpoczęciem tej części urlopu ({fmt(his.start)})",
                 today,
@@ -625,6 +691,7 @@ def _employee_father(
                 rule=f"Tata składa go swojemu pracodawcy. {when}",
                 segment_id="maternity-father",
                 sources=sources,
+                deadline=deadline,
             )
         )
     supplementary = _segment(timeline, "supplementary")
@@ -633,8 +700,9 @@ def _employee_father(
     paternity = _segment(timeline, "paternity")
     if paternity is not None and paternity.end >= today:
         days = a.paternity_days_before.value
+        deadline = paternity.start - days * DAY
         needed_by, when = _by(
-            paternity.start - days * DAY,
+            deadline,
             days,
             f"przed rozpoczęciem urlopu ({fmt(paternity.start)})",
             today,
@@ -650,13 +718,15 @@ def _employee_father(
                 rule=f"Tata składa go swojemu pracodawcy. {when}",
                 segment_id="paternity",
                 sources=a.paternity_days_before.sources,
+                deadline=deadline,
             )
         )
     parental = _segment(timeline, "parental-father")
     if parental is not None and parental.end >= today:
         days = a.parental_days_before.value
+        deadline = parental.start - days * DAY
         needed_by, when = _by(
-            parental.start - days * DAY,
+            deadline,
             days,
             f"przed rozpoczęciem urlopu ({fmt(parental.start)})",
             today,
@@ -672,8 +742,10 @@ def _employee_father(
                 rule=f"Tata składa go swojemu pracodawcy. {when}",
                 segment_id="parental-father",
                 sources=a.parental_days_before.sources,
+                deadline=deadline,
             )
         )
+    documents += _plan_part_requests(timeline, params, today, "father")
     return documents
 
 
@@ -904,14 +976,7 @@ def _fixed_term(scenario: Scenario, timeline: Timeline, params: Params) -> None:
 def _assumptions(scenario: Scenario, timeline: Timeline) -> list[str]:
     shown = {d.id for d in timeline.documents}
     assumptions = []
-    if shown & {
-        "supplementary-request",
-        "parental-request",
-        "maternity-resignation",
-        "maternity-father-request",
-        "paternity-request",
-        "parental-father-request",
-    }:
+    if any(d.deadline is not None for d in timeline.documents):  # a Labour Code deadline
         assumptions.append(
             "Termin „nie krótszy niż 21 dni przed” rozpoczęciem urlopu liczymy tak: wniosek "
             "trzeba złożyć najpóźniej 21. dnia przed pierwszym dniem urlopu (tak samo przy 7 i 14 "
@@ -1146,7 +1211,8 @@ def _destination(document: Document, scenario: Scenario) -> str:
             return "do płatnika składek albo do ZUS"
 
 
-def _applications_line(document: Document, scenario: Scenario) -> str:
+def _applications_line(document: Document, scenario: Scenario, today: dt.date) -> str:
+    destination = _destination(document, scenario)
     match document.id:
         case "sick-leave-notice":
             return (
@@ -1157,22 +1223,40 @@ def _applications_line(document: Document, scenario: Scenario) -> str:
                 f"{document.title}: bez niego zasiłek w wysokości zasiłku macierzyńskiego nie "
                 "przysługuje."
             )
-        case _:
-            return (
-                f"{document.title} — {_destination(document, scenario)}, do "
-                f"{long_date(document.needed_by)}."
+        # A deadline only where the Labour Code gives one (`Document.deadline`, ZADANIA B.4):
+        # the day of any other request is when its leave or benefit starts, never "do" a day.
+        case _ if document.deadline is None:
+            benefit = document.id in ("father-benefit-request", "sick-benefit-request") or (
+                "ZAM" in document.title
             )
+            day = (
+                "dzień, od którego przysługuje zasiłek"
+                if benefit
+                else "dzień, w którym zaczyna się urlop"
+            )
+            return (
+                f"{document.title} — {destination}. Terminu materiały nie podają; na osi jest "
+                f"na {long_date(document.needed_by)}, {day}."
+            )
+        case _ if document.deadline < today:
+            return f"{document.title} — {destination}: termin minął {long_date(document.deadline)}."
+        case _:
+            return f"{document.title} — {destination}, najpóźniej {long_date(document.deadline)}."
 
 
 def _applications_note(scenario: Scenario, timeline: Timeline) -> CaseNote | None:
     listed = (*REQUESTS, *SICK_DOCUMENTS, COURT_JUDGMENT)
     documents = sorted(
-        (d for d in timeline.documents if d.id in listed and not d.done),
+        (
+            d
+            for d in timeline.documents
+            if (d.id in listed or d.id.startswith(PLAN_REQUESTS)) and not d.done
+        ),
         key=lambda d: d.needed_by,
     )
     if not documents:
         return None
-    lines = [_applications_line(d, scenario) for d in documents]
+    lines = [_applications_line(d, scenario, timeline.today) for d in documents]
     return CaseNote(
         id="applications",
         kind="computed",

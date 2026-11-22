@@ -3,11 +3,13 @@
 All dates and numbers come from the engine; the model only reads them.
 """
 
+import datetime as dt
 from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
 
 from app.assistant.guide import page_label
+from app.assistant.law import ROZPORZADZENIE_NAME
 from app.engine.after_insurance import after_job_loss, leave_before_cut
 from app.engine.amounts import dec, pln
 from app.engine.insurance import NOT_INSURED, coverage, father_coverage
@@ -16,6 +18,7 @@ from app.engine.models import (
     Document,
     Marker,
     Payment,
+    RequestForm,
     Scenario,
     ScenarioError,
     Segment,
@@ -62,7 +65,35 @@ def source_label(source: SourceRef) -> str:
         return f"Ustawa zasiłkowa, {source.article}"
     if source.doc == "zalacznik":
         return f"Załącznik ZUS, {source.section}"
+    if source.doc in ROZPORZADZENIE_NAME:
+        return f"{ROZPORZADZENIE_NAME[source.doc]}, {source.article}"
     return f"Przewodnik ZUS, {page_label(source.page, source.page_to)}"
+
+
+# Deadlines (ZADANIA B.4): the model says "termin" only where applications.py counted one from
+# the Labour Code (`Document.deadline`); any other date of a document is the day its leave,
+# benefit or sick leave starts, and the materials give no deadline for it.
+NO_DEADLINE = (
+    "na dzień startu, bez terminu w materiałach: {day} (to nie jest termin; nie pisz przy tej "
+    "dacie „najpóźniej”, „do” ani „termin”)"
+)
+
+
+def document_when(document: Document, today: dt.date) -> str:
+    """When a document is due, in words the model may repeat."""
+    if document.done:
+        return "mama już je ma"
+    if document.deadline is None:
+        return NO_DEADLINE.format(day=fmt(document.needed_by))
+    if document.deadline < today:
+        filed = (
+            f"; złożony {fmt(document.needed_by)} jest w terminie dla późniejszego urlopu (zasada "
+            "przy dokumencie)"
+            if document.needed_by != document.deadline
+            else ""
+        )
+        return f"termin z Kodeksu pracy minął {fmt(document.deadline)}{filed}"
+    return f"termin z Kodeksu pracy (policzył go kalkulator): najpóźniej {fmt(document.deadline)}"
 
 
 def describe_person(scenario: Scenario) -> str:
@@ -631,8 +662,7 @@ def describe_timeline(timeline: Timeline, changed: list[str] | None = None) -> s
     for p in timeline.payments:
         lines.append(f"- [{p.id}] {p.title}: {fmt(p.start)}–{fmt(p.end)}. {p.summary}")
     for d in timeline.documents:
-        status = "mama już je ma" if d.done else "jeszcze potrzebne"
-        lines.append(f"- [{d.id}] {d.title}: potrzebne na {fmt(d.needed_by)} ({status})")
+        lines.append(f"- [{d.id}] {d.title}: {document_when(d, timeline.today)}")
     if timeline.notes:
         lines += ["", "Wyjaśnienie sytuacji (z kalkulatora, z tego mów):"]
         for n in timeline.notes:
@@ -701,7 +731,26 @@ def describe_note_changes(timeline: Timeline, changed_notes: list[str] | None) -
     )
 
 
-def describe_element(element: TimelineElement) -> str:
+def describe_form(form: RequestForm) -> list[str]:
+    """What a request contains and what goes with it (engine/forms.py), for the model: the
+    fields the app filled in, the ones the person types in, the attachments."""
+    lines = ["", f"Wniosek jako formularz ({form.addressee_label}):"]
+    if form.official_form:
+        lines.append(f"- formularz ZUS: {form.official_form}, na www.zus.pl")
+    for field in form.fields:
+        if field.personal:
+            value = "wpisuje sam rodzic (dane osobowe; nie pytaj o nie)"
+        else:
+            value = field.value or "do uzupełnienia przez rodzica"
+        lines.append(f"- pole „{field.label}”: {value}")
+    lines += [
+        f"- załącznik: {a.label}" + (f" ({a.hint})" if a.hint else "") for a in form.attachments
+    ]
+    lines += [f"- {note.text}" for note in form.notes]
+    return lines
+
+
+def describe_element(element: TimelineElement, today: dt.date | None = None) -> str:
     match element:
         case Segment():
             period = f"{fmt(element.start)}–{fmt(element.end)}"
@@ -715,11 +764,10 @@ def describe_element(element: TimelineElement) -> str:
             if element.irreversible is not None:  # F10 (engine/leftover.py)
                 lines.append(f"Punkt bez powrotu: {element.irreversible.lost}")
         case Document():
-            status = "mama już je ma" if element.done else "jeszcze potrzebne"
-            lines = [
-                f"{element.title}: potrzebne na {fmt(element.needed_by)} ({status}).",
-                element.rule,
-            ]
+            when = document_when(element, today or element.needed_by)
+            lines = [f"{element.title}: {when}.", element.rule]
+            if element.form is not None:
+                lines += describe_form(element.form)
         case Payment():
             period = f"{fmt(element.start)}–{fmt(element.end)}"
             lines = [
@@ -727,6 +775,10 @@ def describe_element(element: TimelineElement) -> str:
                 element.summary,
                 *element.details,
             ]
+    sources = list(element.sources)
+    if isinstance(element, Document) and element.form is not None:
+        quoted = {(s.doc, s.quote) for s in sources}
+        sources += [s for s in element.form.legal_basis if (s.doc, s.quote) not in quoted]
     lines += ["", "Źródła (cytuj dosłownie):"]
-    lines += [f"- {source_label(s)}: „{s.quote}”" for s in element.sources]
+    lines += [f"- {source_label(s)}: „{s.quote}”" for s in sources]
     return "\n".join(lines)

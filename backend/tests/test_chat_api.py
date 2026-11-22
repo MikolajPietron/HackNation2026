@@ -1318,3 +1318,78 @@ def test_the_interview_question_comes_from_the_code_not_the_model(
 
 async def _words(text: str) -> AsyncIterator[str]:
     yield text
+
+
+def test_the_model_gets_no_deadline_the_materials_do_not_give(
+    client: TestClient, store: MemorySessionStore
+) -> None:
+    """ZADANIA B.4: on Gemini the assistant wrote that the request for maternity leave must be
+    filed with the employer by a given day. The materials give no such deadline, so the state of
+    the timeline and the tool result call that day the start of the leave, "bez terminu
+    w materiałach", and give a deadline only where the Labour Code has one: parental leave from
+    19.07.2027, 21 days before = 28.06.2027; paternity leave from 15.03.2027, 7 days before =
+    08.03.2027. The leave before the birth starts 2 weeks before 15.03.2027: 01.03.2027."""
+    remember(
+        store,
+        {
+            "role": "mother",
+            "work": "employment",
+            "father_work": "employment",
+            "child_born": False,
+            "due_date": "2027-03-15",
+            "children_count": 1,
+            "leave_before_birth_weeks": 2,
+        },
+    )
+    state = instructions_now(client)
+    request = next(x for x in state.splitlines() if x.startswith("- [maternity-request]"))
+    assert request == (
+        "- [maternity-request] Wniosek o urlop macierzyński: na dzień startu, bez terminu "
+        "w materiałach: 01.03.2027 (to nie jest termin; nie pisz przy tej dacie „najpóźniej”, "
+        "„do” ani „termin”)"
+    )
+    assert (
+        "- [parental-request] Wniosek o urlop rodzicielski: termin z Kodeksu pracy (policzył go "
+        "kalkulator): najpóźniej 28.06.2027"
+    ) in state
+    assert (
+        "- [paternity-request] Wniosek o urlop ojcowski: termin z Kodeksu pracy (policzył go "
+        "kalkulator): najpóźniej 08.03.2027"
+    ) in state
+    # The explanation point says it too, without "do 1 marca".
+    assert (
+        "Wniosek o urlop macierzyński — do pracodawcy. Terminu materiały nie podają; na osi jest "
+        "na 1 marca 2027, dzień, w którym zaczyna się urlop."
+    ) in state
+    assert "do pracodawcy, do 1 marca 2027" not in state
+    assert "Gdy rodzic pyta o termin takiego wniosku, powiedz wprost, że materiały go nie " in (
+        STATIC_INSTRUCTIONS
+    )
+
+    # The parent asks for the deadline; the model looks the request up.
+    returned: list[str] = []
+    model = scripted(
+        "explain_timeline_element",
+        {"element_id": "maternity-request"},
+        "Materiały nie podają terminu tego wniosku.",
+        returned,
+    )
+    out = ask(client, model, "Do kiedy muszę złożyć wniosek o urlop macierzyński?")
+    assert {
+        "type": "tool-result",
+        "id": "call-1",
+        "name": "explain_timeline_element",
+        "ok": True,
+    } in out
+    told = returned[0]
+    assert told.startswith(
+        "Wniosek o urlop macierzyński: na dzień startu, bez terminu w materiałach: 01.03.2027"
+    )
+    assert "najpóźniej 01.03.2027" not in told
+    # What the request contains, from the regulation on the leave requests (§ 2).
+    assert "Wniosek jako formularz (Pracodawca mamy):" in told
+    assert "- pole „Data, od której ma być udzielona część urlopu macierzyńskiego”: 01.03.2027" in (
+        told
+    )
+    assert "- pole „Imię i nazwisko pracownicy”: wpisuje sam rodzic" in told
+    assert "- Rozporządzenie w sprawie wniosków urlopowych, § 2 ust. 1: „W przypadku" in told

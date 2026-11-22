@@ -246,7 +246,12 @@ def test_with_her_own_business_the_mother_files_zam_with_zus() -> None:
     )
     assert segment(t, "maternity").details[-1].startswith("Zasiłek mamy wypłaca ZUS")
     assert note(t, "payer").title == "Zasiłek mamy wypłaca ZUS"
-    assert "do ZUS, do 10 listopada 2026" in note(t, "applications").text
+    # No deadline in the materials: the day on the timeline is not called one (ZADANIA B.4).
+    assert request.deadline is None
+    assert (
+        "Wniosek o zasiłek macierzyński (ZAM) — do ZUS. Terminu materiały nie podają; na osi jest "
+        "na 10 listopada 2026, dzień, od którego przysługuje zasiłek."
+    ) in note(t, "applications").text
 
 
 def test_an_uninsured_mother_has_nothing_to_file() -> None:
@@ -374,11 +379,22 @@ def test_the_notes_end_with_what_to_file() -> None:
     assert [n.id for n in t.notes][-4:] == ["computed", "protection", "payer", "applications"]
     told = note(t, "applications")
     assert (told.kind, told.title) == ("computed", "Co złożyć i do kiedy")
+    # "Najpóźniej" only where the Labour Code gives a deadline; the request for maternity leave
+    # has none in the materials, so its day is the first day of the leave (ZADANIA B.4).
     assert told.text.startswith(
-        "Wniosek o urlop macierzyński — do pracodawcy, do 1 marca 2027. Wniosek o urlop "
-        "ojcowski — do pracodawcy, do 8 marca 2027. Wniosek o urlop rodzicielski — do "
-        "pracodawcy, do 28 czerwca 2027."
+        "Wniosek o urlop macierzyński — do pracodawcy. Terminu materiały nie podają; na osi jest "
+        "na 1 marca 2027, dzień, w którym zaczyna się urlop. Wniosek o urlop ojcowski — do "
+        "pracodawcy, najpóźniej 8 marca 2027. Wniosek o urlop rodzicielski — do pracodawcy, "
+        "najpóźniej 28 czerwca 2027."
     )
+    deadlines = {d.id: d.deadline for d in t.documents}
+    assert deadlines == {
+        "medical-certificate": None,
+        "maternity-request": None,
+        "parental-request": dt.date(2027, 6, 28),
+        "paternity-request": dt.date(2027, 3, 8),
+        "parental-father-request": dt.date(2028, 2, 7),
+    }
     assert note(t, "payer").title == "Kto wypłaca zasiłek"
 
 
@@ -483,9 +499,10 @@ def test_on_a_contract_of_mandate_the_payer_sends_z3a() -> None:
     assert "zaświadczenie płatnika składek Z-3a, i zasiłek wypłaca ZUS" in request.rule
     assert "Materiały nie podają terminu" in request.rule
     assert "ZC" in sections(request)
-    assert "Dokumenty do zasiłku chorobowego — do płatnika składek albo do ZUS, do 7 grudnia " in (
-        note(t, "applications").text
-    )
+    assert (
+        "Dokumenty do zasiłku chorobowego — do płatnika składek albo do ZUS. Terminu materiały "
+        "nie podają; na osi jest na 7 grudnia 2026, dzień, od którego przysługuje zasiłek."
+    ) in note(t, "applications").text
     # The size of the payer is not known yet: the day the number of insured is counted on.
     assert "według stanu na 30 listopada poprzedniego roku" in note(t, "payer").text
 
@@ -516,9 +533,10 @@ def test_with_a_business_zas53_goes_to_zus() -> None:
     payer = note(t, "payer")
     assert payer.title == "Zasiłek mamy wypłaca ZUS"
     assert "Liczbę ubezpieczonych" not in payer.text
-    assert "Wniosek o zasiłek chorobowy (ZAS-53) — do ZUS, do 30 grudnia 2026." in (
-        note(t, "applications").text
-    )
+    assert (
+        "Wniosek o zasiłek chorobowy (ZAS-53) — do ZUS. Terminu materiały nie podają; na osi jest "
+        "na 30 grudnia 2026, dzień, od którego przysługuje zasiłek."
+    ) in note(t, "applications").text
     assert any("zasiłek chorobowy wypłaca ZUS" in a for a in t.assumptions)
 
 

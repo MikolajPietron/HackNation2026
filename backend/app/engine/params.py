@@ -401,6 +401,43 @@ class ApplicationParams(BaseModel):
     """A business: ZAS-53 to ZUS."""
 
 
+# Request forms (engine/forms.py): what each request contains, as the regulations name it.
+
+
+class FormItem(BaseModel):
+    """A field or an attachment of a request: its label in the form and the words of the source
+    that name it."""
+
+    label: str
+    personal: bool = False
+    """Personal data: never filled in by the app (FormField.personal)."""
+    sources: list[SourceRef] = Field(min_length=1)
+
+
+class FormTemplate(BaseModel):
+    """One kind of request: the provisions that name it, its fields and attachments, by id, in
+    the order of the source. engine/forms.py fills the fields and picks the attachments."""
+
+    basis: list[SourceRef] = Field(min_length=1)
+    fields: dict[str, FormItem] = {}
+    attachments: dict[str, FormItem] = {}
+
+
+class FormParams(BaseModel):
+    templates: dict[str, FormTemplate]
+    """By kind of request: "prenatal", "maternity", "resignation", "father-takeover",
+    "father-hospital-employee", "father-hospital-insured", "father-death",
+    "father-abandonment", "supplementary", "parental", "paternity", "zam", "sick"."""
+    personal_files: Rule
+    """An employee attaches nothing the employer keeps in the personal files."""
+    zus_forms: Rule
+    """The ZUS forms are on www.zus.pl."""
+    zus_birth_data: Rule
+    """When ZUS pays: no birth certificate, the child's data instead."""
+    sick_alternatives: Rule
+    """The sickness benefit: the e-ZLA printout or the payer's certificate also do."""
+
+
 class Params(BaseModel):
     version: str
     description: str
@@ -417,6 +454,8 @@ class Params(BaseModel):
     parental_plan: ParentalPlanParams
     money: MoneyParams
     benefit_base: BaseParams
+    forms: FormParams
+    """The request forms (engine/forms.py)."""
 
     def sources(self) -> list[SourceRef]:
         """Every source in the file, for the test that checks quotes against the documents."""
@@ -430,6 +469,9 @@ class Params(BaseModel):
                     walk(getattr(value, name))
             elif isinstance(value, list):
                 for item in value:
+                    walk(item)
+            elif isinstance(value, dict):
+                for item in value.values():
                     walk(item)
 
         walk(self)

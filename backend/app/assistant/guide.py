@@ -224,6 +224,7 @@ _SECTIONS: list[tuple[str, str, list[tuple[int, str, str]]]] = [
         "Formularze: ZAM, zaświadczenia płatnika składek i formularze zlikwidowane",
         [
             (12, "ZAM – wniosek o zasiłek macierzyński", "i wysokość zasiłku)"),
+            (12, "Wzory formularzy stanowiących", "Wzory formularzy, Zasiłki)."),
             (12, "Formularz ZUR od 24", "Z-3b od 24 października 2026 r. zlikwidowany"),
         ],
     ),

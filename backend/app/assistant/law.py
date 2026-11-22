@@ -1,5 +1,6 @@
-"""Provisions of the Labour Code and of the ustawa zasiłkowa the app cites (public law text;
-regenerate with tools/przewodnik/), and the chapter of the ZUS Załącznik on the benefit base.
+"""Provisions of the Labour Code, of the ustawa zasiłkowa and of the two regulations on the
+requests the app cites (public law text; regenerate with tools/przewodnik/), and the chapter of
+the ZUS Załącznik on the benefit base.
 
 The model reads them in its instructions, and every quote from them shown in the UI is checked
 against them.
@@ -66,4 +67,32 @@ def zalacznik_sections() -> dict[str, str]:
 def zalacznik_contains(section: str, quote: str) -> bool:
     """True if `quote` is a literal fragment of that section (whitespace aside)."""
     text = zalacznik_sections().get(section)
+    return text is not None and normalize(quote) in text
+
+
+# Two regulations the request forms quote (public law text; regenerate with
+# tools/przewodnik/extract_rozporzadzenia.py): "wnioski", on the leave requests and their
+# attachments, and "zasilki", on the documents for the benefits. SourceRef.doc names them
+# "rozp_wnioski" and "rozp_zasilki"; the provision ("§ 15 ust. 1", "zał. 6") is its article.
+ROZPORZADZENIA_FILE = Path(__file__).with_name("rozporzadzenia.json")
+ROZPORZADZENIA = {"rozp_wnioski": "wnioski", "rozp_zasilki": "zasilki"}
+"""SourceRef.doc -> the regulation in rozporzadzenia.json."""
+ROZPORZADZENIE_NAME = {
+    "rozp_wnioski": "Rozporządzenie w sprawie wniosków urlopowych",
+    "rozp_zasilki": "Rozporządzenie w sprawie dokumentów do zasiłków",
+}
+"""How a source label starts: "Rozporządzenie w sprawie wniosków urlopowych, § 15 ust. 1"."""
+
+
+@lru_cache
+def rozporzadzenie_provisions(doc: str) -> dict[str, str]:
+    """Provision of that regulation ("§ 15 ust. 1", "zał. 6") -> its text."""
+    acts = json.loads(ROZPORZADZENIA_FILE.read_text(encoding="utf-8"))
+    provisions = acts[ROZPORZADZENIA[doc]]["provisions"]
+    return {key: normalize(text) for key, text in provisions.items()}
+
+
+def rozporzadzenie_contains(doc: str, provision: str, quote: str) -> bool:
+    """True if `quote` is a literal fragment of that provision (whitespace aside)."""
+    text = rozporzadzenie_provisions(doc).get(provision)
     return text is not None and normalize(quote) in text
