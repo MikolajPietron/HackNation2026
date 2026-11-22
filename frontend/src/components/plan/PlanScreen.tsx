@@ -31,7 +31,11 @@ import type { Choice } from '@/lib/interview'
 import type { Persona } from '@/lib/mockData'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, Scenario, SessionStart, Timeline } from '@/types'
+import { ApplicationForm } from '@/components/applications/ApplicationForm'
 import { MoneyCard } from '@/components/money/MoneyCard'
+import { SupportList, SupportWindow } from '@/components/support/SupportList'
+import { Illustration } from '@/components/ui/illustration'
+import { ICONS } from '@/lib/icons'
 import { MoneyExplanation } from '@/components/money/MoneyExplanation'
 import { Dialog } from './Dialog'
 import { Explanation } from './Explanation'
@@ -103,6 +107,16 @@ export function PlanScreen({
   const [why, setWhy] = useState<{ focus?: string } | null>(null)
   const [view, setView] = usePlanView()
   const [moneyOpen, setMoneyOpen] = useState(false)
+  const [supportOpen, setSupportOpen] = useState(false)
+  // A premature baby or a child in hospital: the support that fits, on the plan itself.
+  const supportTopics = scenario?.hospital_care === true ? (['premature', 'crisis'] as const) : null
+  /** The request being filled in (a document id). */
+  const [fill, setFill] = useState<string | null>(null)
+  const fillDocument = timeline?.documents.find((d) => d.id === fill) ?? null
+  const openFill = (id: string) => {
+    onSelect(null)
+    setFill(id)
+  }
   const [moneyHover, setMoneyHover] = useState<string | null>(null)
   const [overlayRoot, setOverlayRoot] = useState<HTMLDivElement | null>(null)
   const [mock, setMock] = useState<{ text: string; id: number } | null>(null)
@@ -170,6 +184,7 @@ export function PlanScreen({
           onZusData={() => setZusOpen(true)}
           onCases={() => setCasesOpen(true)}
           onAbout={() => setWhy({})}
+          onSupport={() => setSupportOpen(true)}
           onStartOver={onStartOver}
           onMock={showMock}
         />
@@ -279,9 +294,19 @@ export function PlanScreen({
                     />
                   </motion.div>
 
+                  {supportTopics && (
+                    <motion.section variants={ITEM} className="mt-5 rounded-4xl border border-line px-4 py-5 sm:px-5">
+                      <h2 className="flex items-center gap-3 text-lg font-bold text-navy-900">
+                        <Illustration src={ICONS.serce} size="event" className="bg-navy-50/60" />
+                        Gdzie szukać wsparcia
+                      </h2>
+                      <SupportList topics={[...supportTopics]} className="mt-4" />
+                    </motion.section>
+                  )}
+
                   <GoalPlans onMock={showMock} />
                   <RiskRadar scenario={scenario} onCheckZus={checkZus} />
-                  <Footer />
+                  <Footer onSupport={() => setSupportOpen(true)} />
                 </>
               ) : (
                 <Empty onStartOver={onStartOver} />
@@ -295,7 +320,17 @@ export function PlanScreen({
             <AnimatePresence>
               {selected && timeline && (
                 <Dialog key="details" label={selected.title} onClose={() => onSelect(null)}>
-                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+                  <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} />
+                </Dialog>
+              )}
+              {fillDocument && timeline && (
+                <Dialog key="fill" label={fillDocument.title} onClose={() => setFill(null)}>
+                  <ApplicationForm timeline={timeline} document={fillDocument} />
+                </Dialog>
+              )}
+              {supportOpen && (
+                <Dialog key="support" label="Wsparcie dla rodziców" onClose={() => setSupportOpen(false)}>
+                  <SupportWindow />
                 </Dialog>
               )}
               {moneyOpen && timeline && (
@@ -373,8 +408,18 @@ export function PlanScreen({
             title={selected?.title ?? 'Szczegóły'}
           >
             {selected && timeline && (
-              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} />
+              <ElementDetails key={selected.id} item={selected} timeline={timeline} onSelect={onSelect} onFill={openFill} />
             )}
+          </Sheet>
+          <Sheet
+            open={fillDocument !== null && timeline !== null}
+            onOpenChange={(open) => !open && setFill(null)}
+            title={fillDocument?.title ?? 'Wniosek'}
+          >
+            {fillDocument && timeline && <ApplicationForm timeline={timeline} document={fillDocument} />}
+          </Sheet>
+          <Sheet open={supportOpen} onOpenChange={setSupportOpen} title="Wsparcie dla rodziców">
+            <SupportWindow />
           </Sheet>
           <Sheet open={moneyOpen && timeline !== null} onOpenChange={setMoneyOpen} title="Dlaczego tyle?">
             {timeline && (
@@ -504,7 +549,7 @@ function Decision({
 }
 
 /** Links from the brief, and the way into the admin panel. */
-function Footer() {
+function Footer({ onSupport }: { onSupport: () => void }) {
   return (
     <motion.footer
       variants={ITEM}
@@ -526,7 +571,10 @@ function Footer() {
           </li>
         ))}
       </ul>
-      <span className="flex gap-4 lg:ml-auto">
+      <span className="flex flex-wrap gap-4 lg:ml-auto">
+        <button type="button" onClick={onSupport} className="font-bold text-zus-700 hover:text-zus-900">
+          Wsparcie dla rodziców
+        </button>
         <a href="/raport" className="font-bold text-navy-500 hover:text-navy-900">
           Raport zgodności
         </a>

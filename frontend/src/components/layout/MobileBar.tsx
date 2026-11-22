@@ -10,6 +10,7 @@ import {
   Contrast,
   Ear,
   FolderOpen,
+  HeartHandshake,
   Languages,
   LogOut,
   Menu,
@@ -33,6 +34,7 @@ interface Props {
   onZusData: () => void
   onCases: () => void
   onAbout: () => void
+  onSupport: () => void
   onStartOver: () => void
   onMock: (message: string) => void
 }
@@ -87,6 +89,7 @@ function MenuContent({
   onZusData,
   onCases,
   onAbout,
+  onSupport,
   onStartOver,
   onMock,
   close,
@@ -104,6 +107,9 @@ function MenuContent({
         </Item>
         <Item icon={<Calculator />} onClick={then(onAbout)}>
           Jak to liczymy?
+        </Item>
+        <Item icon={<HeartHandshake />} onClick={then(onSupport)}>
+          Wsparcie dla rodziców
         </Item>
         <Item icon={<RotateCcw />} onClick={then(onStartOver)}>
           Zacznij od nowa

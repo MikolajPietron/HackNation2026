@@ -78,25 +78,23 @@ Sprawdź, czy materiały (Poradnik ZUS 2026, wyciągi) wymieniają organizacje w
 - Odczyt ma też wypełniać pola, których potrzebuje `base.py` (punkt 1) i scenariusz: utrata pracy (`JobLoss`), zadłużenie (dla S04, S10), części rodzicielskiego, przejęcie urlopu przez tatę.
 
 ## Komputer A — front
-Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko część. Kolejność według priorytetów z FUNKCJE.md:
+Zrobione 22.11.2026 (szczegóły w „Zrobione”): pieniądze na planie (F4, F5), raport zgodności (F37), porównanie 100/70 a 81,5% (F12), organizacje wsparcia (F28), wniosek o urlop z wysyłką-atrapą (F22). Dalej:
 
-1. **Pieniądze na ekranie planu (F4, F5; P0).** Dziś kwota jest tylko w szczegółach okresu. Do zrobienia: kafelek „Ile dostaniecie?” w „Twojej sytuacji”, ścieżka Pieniądze na osi z prawdziwego `Timeline.payments` (kto płaci, ile w którym miesiącu) i „Dlaczego tyle?” z `Timeline.bases` oraz `Payment.details` (krok po kroku, ze źródłem).
-2. **Raport zgodności (F37; P0).** Strona z listą spraw: zgodne, różne, bez decyzji, z powodem różnicy. Dane z pamięci odczytów (endpoint w `app/cases`, jak `batch --only-cached`).
-3. **Porównanie 100/70 a 81,5% (F12; P1).** Dwa przeliczenia przez `POST /api/timeline` (`rate_815` true/false), różnica w złotówkach i czasie.
-4. **Organizacje wsparcia (F28, wymóg i zadania).** Lista ze sprawdzonymi adresami, w trybie łagodnym i przy wcześniaku.
-5. **Wnioski: wypełnienie i atrapa wysyłki (F22, wymóg zadania).** Na danych z B.3; do tego czasu z `timeline.documents`.
-6. **Odpis aktu urodzenia (F35, wymóg zadania).** Atrapa przebiegu gov.pl.
-7. **Plan rodzicielskiego w interfejsie (F6 suwak 0–50% etatu, F13 kafelki tygodni, F3 walidacja na żywo; P0/P1).** Wymaga endpointu z B (niżej). Do tego czasu przez czat, jak chipy „Co jeśli…”.
-8. **„Co jeśli: Utrata pracy w ciąży” (F7).** Podpiąć przez czat.
-9. „Zostawiacie na stole” (F9), punkty bez powrotu (F10), „Plany dla Was” (F8, drzewo decyzyjne).
+1. **Plan rodzicielskiego w interfejsie (F6 suwak 0–50% etatu, F13 kafelki tygodni, F3 walidacja na żywo).** Czeka na B.7. Do tego czasu przez czat.
+2. **Odpis aktu urodzenia (F35, wymóg zadania).** Atrapa przebiegu gov.pl.
+3. **„Co jeśli: Utrata pracy w ciąży” (F7).** Podpiąć przez czat.
+4. „Zostawiacie na stole” (F9), punkty bez powrotu (F10), stress-test (F11) — gdy B.8 da dane. „Plany dla Was” (F8, drzewo decyzyjne).
 
 ### Potrzebne od B dla frontu
+- Opcjonalnie: suma kwot za cały plan i kwoty miesiąc po miesiącu w silniku (np. `Timeline.money_total`, `Timeline.monthly`). Front nie sumuje kwot sam; dziś pokazuje kwoty okresów i zestawienie z punktu `rate-815`.
+- B.10: front ma już listę organizacji ze sprawdzonych stron (`frontend/src/lib/support.ts`). Jeśli materiały ZUS wymieniają inne, dopisz je tam ze źródłem.
 - Punkty B.7 (endpoint zmiany scenariusza), B.3 (dane wniosków), B.10 (źródło organizacji wsparcia), B.8 (funkcje silnika do narysowania).
 
 ## Konfiguracja na komputerze A (tylko `backend/.env`, nie w gicie)
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- Front (A, 22.11.2026): „Ile dostaniecie?”, ścieżka Pieniądze, karta Pieniądze ze wykresem schodkowym, „Dlaczego tyle?”, porównanie 100/70 a 81,5%, raport zgodności `/raport` (`GET /api/cases/report`), wniosek o urlop (wypełnienie, druk, wysyłka-atrapa), organizacje wsparcia.
 - B.0 (22.11.2026): pytanie wywiadu dokleja serwer (`chat.py`), nie model; trafia też do historii modelu i do rozmowy po odświeżeniu. Front bez zmian: tekst odpowiedzi kończy się pytaniem, a szybkie odpowiedzi nadal idą po `question.key`. Test `test_the_interview_question_comes_from_the_code_not_the_model`, przypadek `premature-question-known-due-date` w `tools/eval`.
 - Pełna podstawa wymiaru `engine/base.py` (B). Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).
 - Przykładowe sprawy: wybór, wgranie, odczyt przez AI, ubezpieczenie, porównanie z ZUS, „Pokaż na osi” (A).

@@ -14,6 +14,8 @@ interface Props {
   item: TimelineItem
   timeline: Timeline
   onSelect: (id: string) => void
+  /** Open the filled-in request for a document (a leave request). */
+  onFill?: (documentId: string) => void
 }
 
 interface Fact {
@@ -25,10 +27,10 @@ interface Fact {
  * What the parent needs about one element. The facts come first and big (from, to, how long;
  * or when and how far away), the explanation with its numbers in bold, the sources last.
  */
-export function ElementDetails({ item, timeline, onSelect }: Props) {
+export function ElementDetails({ item, timeline, onSelect, onFill }: Props) {
   return (
     <div className="text-[15px] leading-relaxed text-navy-700">
-      <Body item={item} timeline={timeline} onSelect={onSelect} />
+      <Body item={item} timeline={timeline} onSelect={onSelect} onFill={onFill} />
       <Sources sources={item.element.sources} text={elementText(item)} />
     </div>
   )
@@ -36,7 +38,7 @@ export function ElementDetails({ item, timeline, onSelect }: Props) {
 
 const weeksOrDays = (days: number) => (days % 7 === 0 ? `${days / 7} tyg.` : `${days} dni`)
 
-function Body({ item, timeline, onSelect }: Props) {
+function Body({ item, timeline, onSelect, onFill }: Props) {
   switch (item.kind) {
     case 'segment': {
       const s = item.element
@@ -161,6 +163,15 @@ function Body({ item, timeline, onSelect }: Props) {
           <p className="mt-5">
             <Emphasis text={d.rule} />
           </p>
+          {onFill && segment && d.id.endsWith('-request') && (
+            <button
+              type="button"
+              onClick={() => onFill(d.id)}
+              className="mt-4 flex h-11 items-center gap-2 rounded-full bg-zus-600 px-5 text-sm font-bold text-white transition-colors hover:bg-zus-700"
+            >
+              Wypełnij wniosek <ChevronRight className="size-4" />
+            </button>
+          )}
           {segment && (
             <button
               type="button"
