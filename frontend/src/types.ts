@@ -440,6 +440,13 @@ export interface SessionView {
   question: InterviewQuestion | null
 }
 
+/**
+ * Fields of the scenario the interface changes without the chat (`PATCH
+ * /api/session/{id}/scenario`): e.g. `parental_parts`, `rate_815`, `job_loss`,
+ * `mother_pay_history`. A field given replaces the saved one; null clears it.
+ */
+export type ScenarioChanges = Partial<Scenario>
+
 /** The onboarding answers as stored, and the first timeline. */
 export interface SessionStart {
   scenario: Scenario

@@ -9,6 +9,7 @@ import type {
   ParamPreview,
   ParamValues,
   Scenario,
+  ScenarioChanges,
   SessionStart,
   SessionView,
 } from './types'
@@ -164,6 +165,17 @@ export async function uploadCase(file: File, signal?: AbortSignal): Promise<Case
 /** Recalculate after the facts were corrected by hand (no AI). */
 export const assessCase = (body: { id: string | null; pages: number; pages_read: number; facts: CaseFacts }) =>
   requestJson<CaseResult>('/api/cases/assess', { method: 'POST', body: JSON.stringify(body) })
+
+/**
+ * The interface changes the scenario without the chat (sliders, week tiles, the 81,5% switch):
+ * the engine recalculates and validates it like a chat answer; a refused change throws with
+ * the Polish message. The chat gets a hidden note of what changed.
+ */
+export const changeScenario = (sessionId: string, changes: ScenarioChanges) =>
+  requestJson<SessionStart>(`/api/session/${sessionId}/scenario`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  })
 
 /** The case becomes the plan: a new conversation from its facts. */
 export const loadCaseIntoPlan = (sessionId: string, scenario: Scenario) =>

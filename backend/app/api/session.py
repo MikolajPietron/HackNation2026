@@ -1,16 +1,20 @@
-"""Session endpoints: start one from the onboarding, restore it after a reload, forget it."""
+"""Session endpoints: start one from the onboarding, change the scenario from the interface,
+restore it after a reload, forget it."""
 
 import datetime as dt
+import json
 from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, Field, model_validator
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic_ai import ModelMessagesTypeAdapter, ModelRequest, UserPromptPart
 
 from app.api.chat import load_history
 from app.api.deps import get_params, get_session_store, get_today
 from app.assistant.agent import MIN_MONTHLY_PAY
 from app.assistant.describe import InterviewQuestion, next_question
+from app.assistant.prompts import EVENT_MARKER
 from app.assistant.transcript import to_chat_messages
 from app.engine import Params, Scenario, ScenarioError, Timeline, build_timeline
 from app.engine.models import Earnings, Pay, PayerSize, Role, TakenIn, Work
@@ -204,6 +208,59 @@ async def start_from_onboarding(
     except ScenarioError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     await store.save(session_id, Session(scenario=scenario))
+    return SessionStart(scenario=scenario, timeline=timeline, question=next_question(scenario))
+
+
+@router.patch("/session/{session_id}/scenario")
+async def change_scenario(
+    session_id: UUID,
+    changes: Annotated[dict[str, Any], Body()],
+    store: Annotated[SessionStore, Depends(get_session_store)],
+    params: Annotated[Params, Depends(get_params)],
+    today: Annotated[dt.date, Depends(get_today)],
+) -> SessionStart:
+    """The interface changes the scenario without the chat (FUNKCJE: "Te same narzędzia wywołuje
+    interfejs"): e.g. the parental plan (`parental_parts`), the 81,5% choice (`rate_815`), a job
+    loss (`job_loss`) or the months of pay (`mother_pay_history`). The fields given replace the
+    saved ones (null clears one); the engine validates the result the same way as after a chat
+    tool. The chat history gets a hidden note of what changed, so the assistant knows."""
+    unknown = sorted(set(changes) - set(Scenario.model_fields))
+    if unknown:
+        raise HTTPException(
+            status_code=422, detail=f"Nieznane pola scenariusza: {', '.join(unknown)}."
+        )
+    session = await store.load(session_id)
+    before = session.scenario.model_dump(mode="json")
+    try:
+        scenario = Scenario.model_validate({**before, **changes})
+    except ValidationError as exc:
+        field = ".".join(str(part) for part in exc.errors()[0]["loc"]) or "scenariusz"
+        raise HTTPException(
+            status_code=422, detail=f"Nieprawidłowa wartość pola „{field}”. Sprawdź dane."
+        ) from exc
+    if scenario.anchor_date is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Najpierw potrzebna jest data: przewidywana data porodu albo data urodzenia.",
+        )
+    try:
+        timeline = build_timeline(scenario, params, today)
+    except ScenarioError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    after = scenario.model_dump(mode="json")
+    changed = {k: after[k] for k in changes if after.get(k) != before.get(k)}
+    if changed:
+        listed = "; ".join(
+            f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in sorted(changed.items())
+        )
+        note = (
+            f"{EVENT_MARKER} Rodzic zmienił w aplikacji, bez czatu: {listed}. Oś czasu jest już "
+            "przeliczona; tych odpowiedzi nie zapisuj drugi raz."
+        )
+        history = [*load_history(session), ModelRequest(parts=[UserPromptPart(content=note)])]
+        session.history = ModelMessagesTypeAdapter.dump_python(history, mode="json")
+    session.scenario = scenario
+    await store.save(session_id, session)
     return SessionStart(scenario=scenario, timeline=timeline, question=next_question(scenario))
 
 

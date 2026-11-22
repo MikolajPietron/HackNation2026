@@ -53,11 +53,6 @@ README jest nieaktualny („zrobiona jest faza 1”, „Claude przez OpenRouter�
 - Funkcje AI: czat-wywiad i wyjaśnienia (Gemini Flash albo Claude) oraz odczyt spraw ze skanów (Gemini Pro albo Claude).
 - Bez AI: silnik dat i kwot, sprawdzenie ubezpieczenia, porównanie z ZUS.
 
-### 7. Endpoint do zmiany scenariusza z interfejsu (front na to czeka)
-- `PATCH /api/session/{id}/scenario` z wybranymi polami (`parental_parts`, `rate_815`, `job_loss`, `mother_pay_history` itd.), walidowany przez silnik. Zwraca `SessionStart` (oś, scenariusz, następne pytanie). Ma też zapisać w historii czatu krótką notatkę, co zmieniono, żeby asystent wiedział.
-- FUNKCJE (agent): „Te same narzędzia wywołuje interfejs, więc wynik czatu i formularza jest identyczny”. Bez tego front nie zrobi suwaka etatu (F6), kafelków tygodni (F13) ani przełącznika 81,5% bez czatu.
-- Gotowe, gdy: test API (zmiana `parental_parts` przelicza oś, złe dane dają 422 z polskim komunikatem) i typy w `frontend/src/types.ts`.
-
 ### 8. Silnik: funkcje wyróżniające (FUNKCJE 4.2, P1)
 Każda jako czysta funkcja silnika z testem; front je narysuje.
 - **F9 „Zostawiacie na stole”:** niewykorzystane tygodnie i złotówki (np. 9 tygodni taty, ojcowski przed końcem okna, wariant 81,5% po terminie), z dniem, do którego jeszcze można.
@@ -97,6 +92,7 @@ Silnik liczy już prawie cały zakres zadania, ale interfejs pokazuje tylko czę
 `LLM_PROVIDER=google`, `LLM_MODEL=gemini-flash-latest` (czat), `CASES_MODEL=gemini-pro-latest` (sprawy), `GEMINI_API_KEY`, `CASES_DIR` (folder ze skanami). Klucz OpenRouter nie ma już środków.
 
 ## Zrobione
+- B.7 (22.11.2026): `PATCH /api/session/{id}/scenario` — body to obiekt z polami `Scenario` do zmiany (np. `{"parental_parts": [...]}`, `{"rate_815": true}`, `{"job_loss": {...}}`, `{"mother_pay_history": {...}}`; `null` czyści pole). Silnik waliduje jak po narzędziu czatu; odpowiedź to `SessionStart` (scenariusz, oś, następne pytanie). Błąd: 422 z polskim `detail` (np. „Nieznane pola scenariusza…”, „Nieprawidłowa wartość pola…”, komunikat silnika przy złym planie). Do historii czatu trafia ukryta notatka, co zmieniono, więc asystent tego nie dopytuje. Front: `changeScenario(sessionId, changes)` w `api.ts`, typ `ScenarioChanges` w `types.ts`. Testy: `backend/tests/test_scenario_patch.py`.
 - B.0 (22.11.2026): pytanie wywiadu dokleja serwer (`chat.py`), nie model; trafia też do historii modelu i do rozmowy po odświeżeniu. Front bez zmian: tekst odpowiedzi kończy się pytaniem, a szybkie odpowiedzi nadal idą po `question.key`. Test `test_the_interview_question_comes_from_the_code_not_the_model`, przypadek `premature-question-known-due-date` w `tools/eval`.
 - Pełna podstawa wymiaru `engine/base.py` (B). Świadczenie rehabilitacyjne, pozostałe przypadki adopcji, kwoty za każdy okres, zasiłek po ustaniu ubezpieczenia, stawki w panelu admina (B, w `main`).
 - Przykładowe sprawy: wybór, wgranie, odczyt przez AI, ubezpieczenie, porównanie z ZUS, „Pokaż na osi” (A).
