@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent, ReactNode } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { assessCase, fetchCases, loadCaseIntoPlan, readCase, uploadCase } from '@/api'
 import { MockModal } from '@/components/mocks/MockModal'
 import { Illustration } from '@/components/ui/illustration'
@@ -203,13 +203,6 @@ function Picker({
           decyzją ZUS.
         </p>
       </header>
-
-      <a
-        href="/raport"
-        className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-zus-700 underline-offset-4 hover:underline"
-      >
-        Raport zgodności z decyzjami ZUS <ChevronRight className="size-4" />
-      </a>
 
       <SampleFamilies onLoaded={onSample} className="mt-5" />
 

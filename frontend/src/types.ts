@@ -1063,43 +1063,8 @@ export interface CaseComparison {
   text: string
   /** Set when `match` is false. */
   reason: DifferenceReason | null
-  /** The difference in a sentence or two, for the agreement report. */
+  /** The difference in a sentence or two. */
   reason_text: string
-}
-
-/** One catalogue case in the agreement report (GET /api/cases/agreement, cache only). */
-export interface CaseAgreementRow {
-  id: string
-  category: string
-  /** Read already (in the cache); the other fields are empty until then. */
-  read: boolean
-  title: string
-  zus: CaseOutcome | null
-  ours: CaseOutcome | null
-  match: boolean | null
-  reason: DifferenceReason | null
-  reason_text: string
-  covered: boolean | null
-  timeline: boolean
-  payments: number
-  problem: string | null
-}
-
-/** "Zgodność z decyzjami ZUS: agree/decided", from the cases already read; nothing is read. */
-export interface CaseAgreement {
-  configured: boolean
-  total: number
-  read: number
-  /** Cases where both the calculator and ZUS have an answer. */
-  decided: number
-  agree: number
-  /** The decisions of ZUS among the cases read. */
-  zus: Partial<Record<CaseOutcome, number>>
-  /** The differences by reason. */
-  reasons: Partial<Record<DifferenceReason, number>>
-  with_timeline: number
-  with_amounts: number
-  rows: CaseAgreementRow[]
 }
 
 export interface CaseResult {

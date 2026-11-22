@@ -804,7 +804,7 @@ function Decision({
   )
 }
 
-/** Links from the brief, support and the agreement report (the admin panel is in the top bar). */
+/** Links from the brief and support (the admin panel is in the top bar). */
 function Footer({ onSupport }: { onSupport: () => void }) {
   return (
     <motion.footer
@@ -827,14 +827,9 @@ function Footer({ onSupport }: { onSupport: () => void }) {
           </li>
         ))}
       </ul>
-      <span className="flex flex-wrap gap-4 lg:ml-auto">
-        <button type="button" onClick={onSupport} className="font-bold text-zus-700 hover:text-zus-900">
-          Wsparcie dla rodziców
-        </button>
-        <a href="/raport" className="font-bold text-navy-500 hover:text-navy-900">
-          Raport zgodności
-        </a>
-      </span>
+      <button type="button" onClick={onSupport} className="self-start font-bold text-zus-700 hover:text-zus-900 lg:ml-auto lg:self-auto">
+        Wsparcie dla rodziców
+      </button>
     </motion.footer>
   )
 }

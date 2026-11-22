@@ -2,7 +2,6 @@ import type {
   AdminView,
   CaseFacts,
   CaseList,
-  CaseAgreement,
   CaseResult,
   ChatEvent,
   ChatRequest,
@@ -257,9 +256,6 @@ export const checkRequest = (body: RequestCheckRequest, signal?: AbortSignal) =>
     body: JSON.stringify(body),
     signal,
   })
-
-/** The agreement report: the calculator against ZUS for the cases already read (cache only). */
-export const fetchAgreement = () => requestJson<CaseAgreement>('/api/cases/agreement')
 
 // Share the plan with the other parent: a read-only copy, no conversation, no personal data.
 

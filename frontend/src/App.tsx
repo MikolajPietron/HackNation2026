@@ -8,26 +8,23 @@ import { childrenLabel } from '@/lib/ui'
 import type { SessionStart } from '@/types'
 
 // Loaded on demand, so the start screen comes up fast on a phone: the plan (with the chat, the
-// timeline and the windows), the parameters panel and the report are separate files.
+// timeline and the windows) and the parameters panel are separate files.
 const loadPlan = () => import('@/components/plan/PlanScreen')
 const PlanScreen = lazy(() => loadPlan().then((m) => ({ default: m.PlanScreen })))
 const AdminScreen = lazy(() => import('@/components/admin/AdminScreen').then((m) => ({ default: m.AdminScreen })))
-const ReportScreen = lazy(() => import('@/components/report/ReportScreen').then((m) => ({ default: m.ReportScreen })))
 const SharedPlan = lazy(() => import('@/components/plan/SharedPlan').then((m) => ({ default: m.SharedPlan })))
 
 /** While a part of the app loads: a quiet page, marked busy for screen readers. */
 const Loading = () => <div className="h-dvh bg-white" aria-busy="true" aria-label="Wczytywanie" />
 
-/** `/admin` is the parameters panel, `/raport` the agreement report, `/plan/<token>` a plan shared
- *  read-only; the rest is the parents' app. */
+/** `/admin` is the parameters panel, `/plan/<token>` a plan shared read-only; the rest is the
+ *  parents' app. */
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <Suspense fallback={<Loading />}>
         {window.location.pathname.startsWith('/admin') ? (
           <AdminScreen />
-        ) : window.location.pathname.startsWith('/raport') ? (
-          <ReportScreen />
         ) : window.location.pathname.startsWith('/plan/') ? (
           <SharedPlan token={window.location.pathname.split('/')[2] ?? ''} />
         ) : (
