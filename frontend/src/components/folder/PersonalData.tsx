@@ -1,14 +1,23 @@
 // "Twoje dane do wniosków": typed once, used in every request and in the folder. It stays in
 // this browser (localStorage) and is never sent anywhere: the requests are made into PDF here.
 // "Wypełnij z mObywatela" is a simulation, as the brief asks: the test account's made-up data.
-import { useState } from 'react'
+// PESEL, the bank account and NIP are checked here, in the browser (lib/validate.ts): the error
+// shows under the field once it is left, and "Zapisz dane" with an error goes to that field.
+import { useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useReducedMotion } from 'motion/react'
 import { Lock, Trash2 } from 'lucide-react'
 import { SimBadge } from '@/components/mocks/MockModal'
 import { PrimaryButton } from '@/components/onboarding/ChoiceCard'
+import { FieldError } from '@/components/ui/field-error'
+import { fieldLook, useFieldErrors } from '@/hooks/useFieldErrors'
 import type { Persona } from '@/lib/mockData'
 import { clearProfile, fromMObywatel, useProfile, type Profile } from '@/lib/personal'
+import { accountError, formatAccount, nipError, peselDigits, peselError, typed } from '@/lib/validate'
+import { cn } from '@/lib/utils'
 import type { Role } from '@/types'
+
+type Validate = (value: string) => string | null
 
 export function PersonalData({
   role,
@@ -38,11 +47,54 @@ export function PersonalData({
   const parents: Role[] = withFather || role === 'father' ? ['mother', 'father'] : ['mother']
   const ordered = role === 'father' ? [...parents].reverse() : parents
 
+  // The fields with a format, in their order on screen (only the parents shown are checked).
+  const rules: { key: string; value: string; validate: Validate }[] = [
+    ...ordered.flatMap((parent) => {
+      const e = parent === 'mother' ? 'motherEmployer' : 'fatherEmployer'
+      return [
+        { key: `${parent}.pesel`, value: draft[parent].pesel, validate: peselError },
+        { key: `${parent}.account`, value: draft[parent].account, validate: accountError },
+        { key: `${e}.nip`, value: draft[e].nip, validate: nipError },
+      ]
+    }),
+    { key: 'child.pesel', value: draft.child.pesel, validate: peselError },
+  ]
+  const errors = useFieldErrors()
+  const inputs = useRef(new Map<string, HTMLInputElement>())
+  const reduce = useReducedMotion()
+
+  /** The props of a field with a format: its error, blur and the ref to go back to it. */
+  const checked = (key: string, update: (value: string) => void) => {
+    const rule = rules.find((r) => r.key === key)!
+    return {
+      error: errors.shown(key, rule.validate(rule.value)),
+      onBlur: () => errors.blur(key, rule.validate(rule.value)),
+      onChange: (value: string) => {
+        update(value)
+        errors.change(key, rule.validate(value))
+      },
+      inputRef: (element: HTMLInputElement | null) => {
+        if (element) inputs.current.set(key, element)
+        else inputs.current.delete(key)
+      },
+    }
+  }
+
   return (
     <form
       className="space-y-6"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault()
+        const failing = rules.filter((r) => r.validate(r.value)).map((r) => r.key)
+        if (failing.length > 0) {
+          // Nothing is saved: each wrong field says why, and the first one is brought into view.
+          errors.showAll(failing)
+          const first = inputs.current.get(failing[0])
+          first?.focus({ preventScroll: true })
+          first?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+          return
+        }
         save(draft)
         onDone()
       }}
@@ -69,7 +121,12 @@ export function PersonalData({
       </button>
 
       <Group title="Miejscowość (do daty na wniosku)">
-        <Input value={draft.place} onChange={(place) => set('place', place)} placeholder="np. Warszawa" />
+        <Input
+          ariaLabel="Miejscowość"
+          value={draft.place}
+          onChange={(place) => set('place', place)}
+          placeholder="np. Warszawa"
+        />
       </Group>
 
       {ordered.map((parent) => {
@@ -86,17 +143,20 @@ export function PersonalData({
               onChange={(address) => set(pKey, { ...p, address })}
               autoComplete="street-address"
             />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-[10.5rem_1fr]">
               <Input
                 label="PESEL"
                 value={p.pesel}
-                onChange={(pesel) => set(pKey, { ...p, pesel: pesel.replace(/\D/g, '').slice(0, 11) })}
+                {...checked(`${pKey}.pesel`, (pesel) => set(pKey, { ...p, pesel }))}
+                format={peselDigits}
                 inputMode="numeric"
               />
               <Input
                 label="Nr konta do wypłaty zasiłku"
                 value={p.account}
-                onChange={(account) => set(pKey, { ...p, account })}
+                {...checked(`${pKey}.account`, (account) => set(pKey, { ...p, account }))}
+                format={formatAccount}
+                placeholder="00 0000 0000 0000 0000 0000 0000"
                 inputMode="numeric"
               />
             </div>
@@ -106,9 +166,14 @@ export function PersonalData({
               onChange={(name) => set(eKey, { ...e, name })}
               autoComplete="organization"
             />
-            <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+            <div className="grid gap-3 sm:grid-cols-[1fr_13rem]">
               <Input label="Adres pracodawcy" value={e.address} onChange={(address) => set(eKey, { ...e, address })} />
-              <Input label="NIP" value={e.nip} onChange={(nip) => set(eKey, { ...e, nip })} inputMode="numeric" />
+              <Input
+                label="NIP"
+                value={e.nip}
+                {...checked(`${eKey}.nip`, (nip) => set(eKey, { ...e, nip }))}
+                inputMode="numeric"
+              />
             </div>
           </Group>
         )
@@ -125,7 +190,8 @@ export function PersonalData({
           <Input
             label="PESEL dziecka"
             value={draft.child.pesel}
-            onChange={(pesel) => set('child', { ...draft.child, pesel: pesel.replace(/\D/g, '').slice(0, 11) })}
+            {...checked('child.pesel', (pesel) => set('child', { ...draft.child, pesel }))}
+            format={peselDigits}
             inputMode="numeric"
           />
           <Input
@@ -166,33 +232,69 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function Input({
   label,
+  ariaLabel,
   value,
   onChange,
+  format,
+  error,
+  onBlur,
+  inputRef,
   placeholder,
   hint,
   inputMode,
   autoComplete,
 }: {
   label?: string
+  /** The name when there is no visible label. */
+  ariaLabel?: string
   value: string
   onChange: (value: string) => void
+  /** Reformats what is typed (digits only, the account in groups), keeping the caret in place. */
+  format?: (value: string) => string
+  /** The format error to show under the field. */
+  error?: string | null
+  onBlur?: () => void
+  inputRef?: (element: HTMLInputElement | null) => void
   placeholder?: string
   hint?: string
   inputMode?: 'numeric' | 'text'
   autoComplete?: string
 }) {
+  const id = useId()
+  const errorId = `${id}-error`
+  const hintId = `${id}-hint`
+  const describedBy = [error && errorId, hint && hintId].filter(Boolean).join(' ') || undefined
   return (
-    <label className="block">
-      {label && <span className="mb-1 block text-sm text-navy-700">{label}</span>}
+    <div>
+      {label && (
+        <label htmlFor={id} className="mb-1 block text-sm text-navy-700">
+          {label}
+        </label>
+      )}
       <input
+        id={id}
+        ref={inputRef}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(typed(event.target, format))}
+        onBlur={onBlur}
         placeholder={placeholder}
         inputMode={inputMode}
         autoComplete={autoComplete}
-        className="h-11 w-full rounded-xl border border-line bg-white px-3.5 text-navy-900 outline-none transition-[border-color,box-shadow] focus:border-zus-500 focus:ring-2 focus:ring-zus-100"
+        aria-label={label ? undefined : ariaLabel}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={cn(
+          'h-11 w-full rounded-xl border border-line bg-white px-3.5 text-navy-900 outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-navy-300 focus:border-zus-600 focus:ring-2 focus:ring-zus-600/15',
+          inputMode === 'numeric' && 'tabular-nums',
+          fieldLook(error ? 'error' : null),
+        )}
       />
-      {hint && <span className="mt-1 block text-xs text-navy-400">{hint}</span>}
-    </label>
+      <FieldError id={errorId} issues={error ? [{ key: 'format', tone: 'error', text: error }] : []} />
+      {hint && (
+        <span id={hintId} className="mt-1 block text-xs text-navy-400">
+          {hint}
+        </span>
+      )}
+    </div>
   )
 }
